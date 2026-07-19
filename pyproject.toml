@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "enterprise-ai-knowledge-assistant"
+version = "0.1.0"
+description = "Internal AI knowledge assistant backend."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "alembic>=1.13.0",
+    "asyncpg>=0.29.0",
+    "celery[redis]>=5.4.0",
+    "fastapi>=0.115.0",
+    "email-validator>=2.2.0",
+    "pydantic-settings>=2.4.0",
+    "PyMuPDF>=1.24.0",
+    "python-multipart>=0.0.9",
+    "PyJWT>=2.8.0",
+    "pwdlib[argon2]>=0.2.0",
+    "pgvector>=0.3.6",
+    "sentence-transformers>=3.0.0",
+    "sqlalchemy[asyncio]>=2.0.0",
+    "tiktoken>=0.7.0",
+    "uvicorn[standard]>=0.30.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "httpx>=0.27.0",
+    "pytest>=8.0.0",
+    "ruff>=0.6.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = ["-m", "not integration"]
+markers = [
+    "integration: tests that require a real PostgreSQL database",
+    "celery_integration: tests that require a real Redis broker and Celery worker",
+    "embedding_model_integration: tests that load the real local embedding model",
+    "processing_pipeline_model_integration: tests that run the real embedding model through the processing pipeline",
+    "processing_pipeline_celery_integration: tests that run the document pipeline through a real Celery worker",
+    "semantic_retrieval_model_integration: tests that run real semantic retrieval with the local embedding model",
+    "hybrid_retrieval_model_integration: tests that run real hybrid retrieval with the local embedding model",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["B", "E", "F", "I", "SIM", "UP"]
+
+

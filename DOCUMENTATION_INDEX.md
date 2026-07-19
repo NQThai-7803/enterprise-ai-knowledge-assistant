@@ -1,0 +1,38 @@
+# Documentation Index
+
+Danh sách tài liệu được tạo cho dự án.
+
+- `API_ERROR_CODES.md`
+- `API_SPEC.md`
+- `ARCHITECTURE.md`
+- `CHANGELOG.md`
+- `CODEX_MASTER_PROMPT.md`
+- `CODEX_START_HERE.md`
+- `CODING_STANDARDS.md`
+- `CONTRIBUTING.md`
+- `DATABASE_DESIGN.md`
+- `DECISIONS.md`
+- `DEMO_SCENARIO.md`
+- `DEPLOYMENT.md`
+- `DEVELOPMENT_GUIDE.md`
+- `DOCUMENT_PROCESSING.md`
+- `ENVIRONMENT_VARIABLES.md`
+- `FRONTEND_SPEC.md`
+- `FUNCTIONAL_REQUIREMENTS.md`
+- `GLOSSARY.md`
+- `NON_FUNCTIONAL_REQUIREMENTS.md`
+- `PRODUCT_REQUIREMENTS.md`
+- `PROJECT_OVERVIEW.md`
+- `PROJECT_ROADMAP.md`
+- `PROJECT_STATUS.md`
+- `RAG_DESIGN.md`
+- `RBAC.md`
+- `README.md`
+- `SECURITY.md`
+- `SETUP.md`
+- `TASKS.md`
+- `TESTING_STRATEGY.md`
+- `adr/0001-use-fastapi.md`
+- `adr/0002-use-postgresql-pgvector.md`
+- `templates/PROJECT_STATUS_UPDATE_TEMPLATE.md`
+- `templates/TASK_TEMPLATE.md`
