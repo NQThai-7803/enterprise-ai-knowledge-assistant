@@ -5,6 +5,7 @@ from uuid import UUID
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.audit import AuditEventType, AuditTargetType
 from app.core.exceptions import (
     DocumentPermissionAlreadyExistsError,
     ResourceNotFoundError,
@@ -17,6 +18,7 @@ from app.repositories import (
     user_repository,
 )
 from app.schemas.document import DocumentPermissionCreate, DocumentPermissionUpdate
+from app.services.audit_service import AuditContext, AuditService
 
 
 class DocumentPermissionService:
@@ -33,6 +35,7 @@ class DocumentPermissionService:
         document_id: UUID,
         payload: DocumentPermissionCreate,
         current_user: User,
+        audit_context: AuditContext | None = None,
     ) -> DocumentPermission:
         try:
             await self._get_active_document_or_404(document_id)
@@ -47,6 +50,14 @@ class DocumentPermissionService:
                 created_by=current_user.id,
             )
             await self.session.flush()
+            await AuditService(self.session).record_success(
+                actor_user_id=current_user.id,
+                event_type=AuditEventType.DOCUMENT_PERMISSION_GRANTED,
+                target_type=AuditTargetType.DOCUMENT_PERMISSION,
+                target_id=document_permission.id,
+                context=audit_context,
+                metadata=_permission_audit_metadata(document_permission),
+            )
             await self.session.commit()
             await self.session.refresh(document_permission)
         except IntegrityError as exc:
@@ -63,6 +74,8 @@ class DocumentPermissionService:
         document_id: UUID,
         permission_id: UUID,
         payload: DocumentPermissionUpdate,
+        current_user: User,
+        audit_context: AuditContext | None = None,
     ) -> DocumentPermission:
         try:
             await self._get_active_document_or_404(document_id)
@@ -75,6 +88,14 @@ class DocumentPermissionService:
                 raise ResourceNotFoundError()
             document_permission.permission = payload.permission
             await self.session.flush()
+            await AuditService(self.session).record_success(
+                actor_user_id=current_user.id,
+                event_type=AuditEventType.DOCUMENT_PERMISSION_UPDATED,
+                target_type=AuditTargetType.DOCUMENT_PERMISSION,
+                target_id=document_permission.id,
+                context=audit_context,
+                metadata=_permission_audit_metadata(document_permission),
+            )
             await self.session.commit()
             await self.session.refresh(document_permission)
         except Exception:
@@ -87,6 +108,8 @@ class DocumentPermissionService:
         *,
         document_id: UUID,
         permission_id: UUID,
+        current_user: User,
+        audit_context: AuditContext | None = None,
     ) -> None:
         try:
             await self._get_active_document_or_404(document_id)
@@ -97,8 +120,17 @@ class DocumentPermissionService:
             )
             if document_permission is None:
                 raise ResourceNotFoundError()
+            metadata = _permission_audit_metadata(document_permission)
             await document_permission_repository.delete(self.session, document_permission)
             await self.session.flush()
+            await AuditService(self.session).record_success(
+                actor_user_id=current_user.id,
+                event_type=AuditEventType.DOCUMENT_PERMISSION_REVOKED,
+                target_type=AuditTargetType.DOCUMENT_PERMISSION,
+                target_id=permission_id,
+                context=audit_context,
+                metadata=metadata,
+            )
             await self.session.commit()
         except Exception:
             await self.session.rollback()
@@ -146,3 +178,14 @@ class DocumentPermissionService:
             existing_permission = None
         if existing_permission is not None:
             raise DocumentPermissionAlreadyExistsError()
+
+
+def _permission_audit_metadata(permission: DocumentPermission) -> dict[str, object]:
+    principal_id = permission.user_id or permission.department_id
+    principal_type = "USER" if permission.user_id is not None else "DEPARTMENT"
+    return {
+        "document_id": permission.document_id,
+        "permission": permission.permission,
+        "principal_type": principal_type,
+        "principal_id": principal_id,
+    }

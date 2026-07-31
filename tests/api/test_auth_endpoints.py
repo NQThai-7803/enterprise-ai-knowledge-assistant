@@ -5,12 +5,14 @@ import uuid
 from collections.abc import AsyncIterator, Iterator
 from datetime import timedelta
 
+import jwt
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.core.security import create_access_token, hash_password, hash_refresh_token
+from app.core.config import get_settings
+from app.core.security import create_access_token, hash_password, hash_refresh_token, utc_now
 from app.db.session import get_db_session
 from app.main import app
 from app.models import RefreshToken, User, UserRole
@@ -65,6 +67,19 @@ async def get_refresh_token_row(
         return await session.scalar(
             select(RefreshToken).where(RefreshToken.token_hash == hash_refresh_token(raw_token))
         )
+
+
+async def set_user_active(
+    session_factory: async_sessionmaker[AsyncSession],
+    user_id: uuid.UUID,
+    *,
+    is_active: bool,
+) -> None:
+    async with session_factory() as session:
+        user = await session.get(User, user_id)
+        assert user is not None
+        user.is_active = is_active
+        await session.commit()
 
 
 def create_test_user(
@@ -135,6 +150,29 @@ def test_unknown_email_returns_same_invalid_credentials(api_client: TestClient) 
     }
 
 
+def test_login_error_does_not_enumerate_user(
+    api_client: TestClient,
+    async_session_factory_for_tests: async_sessionmaker[AsyncSession],
+) -> None:
+    create_test_user(
+        async_session_factory_for_tests,
+        email="api-login-enumeration@example.com",
+    )
+
+    wrong_password = api_client.post(
+        "/api/v1/auth/login",
+        json={"email": "api-login-enumeration@example.com", "password": "wrong password"},
+    )
+    unknown_email = api_client.post(
+        "/api/v1/auth/login",
+        json={"email": "api-login-enumeration-missing@example.com", "password": "wrong password"},
+    )
+
+    assert wrong_password.status_code == 401
+    assert unknown_email.status_code == 401
+    assert wrong_password.json()["error"] == unknown_email.json()["error"]
+
+
 def test_inactive_user_cannot_login(
     api_client: TestClient,
     async_session_factory_for_tests: async_sessionmaker[AsyncSession],
@@ -179,6 +217,86 @@ def test_refresh_endpoint_rotates_refresh_token(
     assert old_row.revoked_at is not None
     assert new_row is not None
     assert new_row.revoked_at is None
+
+
+def test_access_token_cannot_be_used_as_refresh(
+    api_client: TestClient,
+    async_session_factory_for_tests: async_sessionmaker[AsyncSession],
+) -> None:
+    create_test_user(async_session_factory_for_tests, email="api-access-as-refresh@example.com")
+    token_pair = login(api_client, email="api-access-as-refresh@example.com")
+
+    response = api_client.post(
+        "/api/v1/auth/refresh",
+        json={"refresh_token": token_pair["access_token"]},
+    )
+
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "REFRESH_TOKEN_INVALID"
+
+
+def test_refresh_token_cannot_be_used_as_access(
+    api_client: TestClient,
+    async_session_factory_for_tests: async_sessionmaker[AsyncSession],
+) -> None:
+    create_test_user(async_session_factory_for_tests, email="api-refresh-as-access@example.com")
+    token_pair = login(api_client, email="api-refresh-as-access@example.com")
+
+    response = api_client.get(
+        "/api/v1/auth/me",
+        headers=auth_headers(str(token_pair["refresh_token"])),
+    )
+
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "ACCESS_TOKEN_INVALID"
+
+
+def test_none_algorithm_rejected(
+    api_client: TestClient,
+    async_session_factory_for_tests: async_sessionmaker[AsyncSession],
+) -> None:
+    user = create_test_user(async_session_factory_for_tests, email="api-none-alg@example.com")
+    settings = get_settings()
+    now = utc_now()
+    token = jwt.encode(
+        {
+            "sub": str(user.id),
+            "type": "access",
+            "jti": str(uuid.uuid4()),
+            "iat": now,
+            "nbf": now,
+            "exp": now + timedelta(minutes=15),
+            "iss": settings.jwt_issuer,
+            "aud": settings.jwt_audience,
+        },
+        key="",
+        algorithm="none",
+    )
+
+    response = api_client.get("/api/v1/auth/me", headers=auth_headers(token))
+
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "ACCESS_TOKEN_INVALID"
+
+
+def test_inactive_user_refresh_rejected(
+    api_client: TestClient,
+    async_session_factory_for_tests: async_sessionmaker[AsyncSession],
+) -> None:
+    user = create_test_user(
+        async_session_factory_for_tests,
+        email="api-inactive-refresh@example.com",
+    )
+    token_pair = login(api_client, email="api-inactive-refresh@example.com")
+    asyncio.run(set_user_active(async_session_factory_for_tests, user.id, is_active=False))
+
+    response = api_client.post(
+        "/api/v1/auth/refresh",
+        json={"refresh_token": token_pair["refresh_token"]},
+    )
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "USER_INACTIVE"
 
 
 def test_old_refresh_token_cannot_be_reused(

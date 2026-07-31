@@ -26,6 +26,7 @@ from app.embeddings.constants import EMBEDDING_SCHEMA_DIMENSIONS
 
 if TYPE_CHECKING:
     from app.models.document import Document
+    from app.models.message_citation import MessageCitation
 
 
 class DocumentChunk(Base):
@@ -106,3 +107,8 @@ class DocumentChunk(Base):
     )
 
     document: Mapped[Document] = relationship("Document", back_populates="chunks")
+    message_citations: Mapped[list[MessageCitation]] = relationship(
+        "MessageCitation",
+        back_populates="chunk",
+        passive_deletes=True,
+    )

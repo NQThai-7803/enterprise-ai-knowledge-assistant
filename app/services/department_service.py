@@ -6,6 +6,7 @@ from uuid import UUID
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.audit import AuditEventType, AuditTargetType
 from app.core.exceptions import (
     BusinessValidationError,
     DepartmentCodeAlreadyExistsError,
@@ -18,7 +19,7 @@ from app.models import Department, User
 from app.repositories import department_repository, document_repository, user_repository
 from app.schemas.common import PaginationMeta, build_pagination_meta, calculate_offset
 from app.schemas.department import DepartmentCreate, DepartmentUpdate
-from app.services.audit_service import AuditAction, AuditContext, AuditService
+from app.services.audit_service import AuditContext, AuditService
 
 DEPARTMENT_SAFE_AUDIT_FIELDS = ("name", "code", "description")
 
@@ -74,13 +75,13 @@ class DepartmentService:
                 description=description,
             )
             await self.session.flush()
-            await AuditService(self.session).create_audit_log(
+            await AuditService(self.session).record_success(
                 actor_user_id=current_user.id,
-                action=AuditAction.DEPARTMENT_CREATED.value,
-                entity_type="Department",
-                entity_id=department.id,
+                event_type=AuditEventType.DEPARTMENT_CREATED,
+                target_type=AuditTargetType.DEPARTMENT,
+                target_id=department.id,
                 context=audit_context,
-                metadata={"name": department.name, "code": department.code},
+                metadata={},
             )
             await self.session.commit()
             await self.session.refresh(department)
@@ -130,17 +131,13 @@ class DepartmentService:
                 return department
 
             await self.session.flush()
-            await AuditService(self.session).create_audit_log(
+            await AuditService(self.session).record_success(
                 actor_user_id=current_user.id,
-                action=AuditAction.DEPARTMENT_UPDATED.value,
-                entity_type="Department",
-                entity_id=department.id,
+                event_type=AuditEventType.DEPARTMENT_UPDATED,
+                target_type=AuditTargetType.DEPARTMENT,
+                target_id=department.id,
                 context=audit_context,
-                metadata={
-                    "changed_fields": changed_fields,
-                    "before": {field: before[field] for field in changed_fields},
-                    "after": {field: after[field] for field in changed_fields},
-                },
+                metadata={},
             )
             await self.session.commit()
             await self.session.refresh(department)
@@ -179,16 +176,15 @@ class DepartmentService:
             if scoped_document_count > 0:
                 raise DepartmentHasDocumentsError()
 
-            snapshot = _department_audit_snapshot(department)
             await department_repository.delete(self.session, department)
             await self.session.flush()
-            await AuditService(self.session).create_audit_log(
+            await AuditService(self.session).record_success(
                 actor_user_id=current_user.id,
-                action=AuditAction.DEPARTMENT_DELETED.value,
-                entity_type="Department",
-                entity_id=department_id,
+                event_type=AuditEventType.DEPARTMENT_DELETED,
+                target_type=AuditTargetType.DEPARTMENT,
+                target_id=department_id,
                 context=audit_context,
-                metadata={"name": snapshot["name"], "code": snapshot["code"]},
+                metadata={},
             )
             await self.session.commit()
         except Exception:

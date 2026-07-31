@@ -1,0 +1,157 @@
+from __future__ import annotations
+
+from typing import Annotated
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi.responses import StreamingResponse
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.api.dependencies import (
+    enforce_chat_rate_limit,
+    get_audit_context,
+    get_current_user,
+    get_grounded_answer_service,
+)
+from app.db.session import get_db_session
+from app.models import User
+from app.schemas.chat import (
+    ChatAnswerResponse,
+    ChatMessageCreate,
+    ChatSessionCreate,
+    ChatSessionDetail,
+    ChatSessionSummary,
+)
+from app.schemas.common import DEFAULT_PAGE, DataResponse, ListResponse
+from app.services.audit_service import AuditContext
+from app.services.chat_session_service import ChatSessionService
+from app.services.chat_stream_service import ChatStreamService
+from app.services.grounded_answer_service import GroundedAnswerService
+
+router = APIRouter(prefix="/chat", tags=["Chat"])
+
+
+@router.post(
+    "/sessions",
+    response_model=DataResponse[ChatSessionSummary],
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_chat_session(
+    payload: ChatSessionCreate,
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    audit_context: Annotated[AuditContext, Depends(get_audit_context)],
+) -> DataResponse[ChatSessionSummary]:
+    chat_session = await ChatSessionService(session).create_session(
+        payload=payload,
+        current_user=current_user,
+        audit_context=audit_context,
+    )
+    return DataResponse[ChatSessionSummary](
+        data=ChatSessionSummary.from_session(chat_session),
+        meta=None,
+    )
+
+
+@router.get("/sessions", response_model=ListResponse[ChatSessionSummary])
+async def list_chat_sessions(
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    page: Annotated[int, Query(ge=1)] = DEFAULT_PAGE,
+    page_size: Annotated[int | None, Query(ge=1)] = None,
+    include_archived: bool = False,
+) -> ListResponse[ChatSessionSummary]:
+    rows, meta = await ChatSessionService(session).list_sessions(
+        current_user=current_user,
+        page=page,
+        page_size=page_size,
+        include_archived=include_archived,
+    )
+    return ListResponse[ChatSessionSummary](
+        data=[ChatSessionSummary.from_session_row(row) for row in rows],
+        meta=meta,
+    )
+
+
+@router.get("/sessions/{session_id}", response_model=DataResponse[ChatSessionDetail])
+async def read_chat_session(
+    session_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    message_page: Annotated[int, Query(ge=1)] = DEFAULT_PAGE,
+    message_page_size: Annotated[int | None, Query(ge=1)] = None,
+) -> DataResponse[ChatSessionDetail]:
+    detail = await ChatSessionService(session).get_session_detail(
+        session_id=session_id,
+        current_user=current_user,
+        message_page=message_page,
+        message_page_size=message_page_size,
+    )
+    return DataResponse[ChatSessionDetail](
+        data=ChatSessionDetail.from_parts(
+            chat_session=detail.chat_session,
+            messages=detail.messages,
+            citations_by_message_id=detail.citations_by_message_id,
+            message_pagination=detail.message_pagination,
+        ),
+        meta=None,
+    )
+
+
+@router.post(
+    "/sessions/{session_id}/messages/stream",
+    status_code=status.HTTP_200_OK,
+    response_class=StreamingResponse,
+)
+async def stream_chat_message(
+    request: Request,
+    session_id: UUID,
+    payload: ChatMessageCreate,
+    current_user: Annotated[User, Depends(get_current_user)],
+    answer_service: Annotated[GroundedAnswerService, Depends(get_grounded_answer_service)],
+    audit_context: Annotated[AuditContext, Depends(get_audit_context)],
+) -> StreamingResponse:
+    await enforce_chat_rate_limit(request, current_user)
+    stream_service = ChatStreamService(settings=answer_service.settings)
+    return StreamingResponse(
+        stream_service.stream_answer(
+            request=request,
+            current_user=current_user,
+            session_id=session_id,
+            question=payload.content,
+            answer_service=answer_service,
+            audit_context=audit_context,
+        ),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@router.post(
+    "/sessions/{session_id}/messages",
+    response_model=DataResponse[ChatAnswerResponse],
+    status_code=status.HTTP_201_CREATED,
+)
+async def submit_chat_message(
+    request: Request,
+    session_id: UUID,
+    payload: ChatMessageCreate,
+    current_user: Annotated[User, Depends(get_current_user)],
+    answer_service: Annotated[GroundedAnswerService, Depends(get_grounded_answer_service)],
+    audit_context: Annotated[AuditContext, Depends(get_audit_context)],
+) -> DataResponse[ChatAnswerResponse]:
+    await enforce_chat_rate_limit(request, current_user)
+    result = await answer_service.answer_question(
+        current_user=current_user,
+        session_id=session_id,
+        question=payload.content,
+        audit_context=audit_context,
+    )
+    return DataResponse[ChatAnswerResponse](
+        data=ChatAnswerResponse.from_result(result),
+        meta=None,
+    )

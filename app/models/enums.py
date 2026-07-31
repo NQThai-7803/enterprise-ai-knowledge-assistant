@@ -25,3 +25,14 @@ class DocumentPermissionLevel(StrEnum):
     VIEW = "VIEW"
     EDIT = "EDIT"
     MANAGE = "MANAGE"
+
+
+class ChatMessageRole(StrEnum):
+    USER = "USER"
+    ASSISTANT = "ASSISTANT"
+    SYSTEM = "SYSTEM"
+
+
+class FeedbackRating(StrEnum):
+    HELPFUL = "HELPFUL"
+    NOT_HELPFUL = "NOT_HELPFUL"

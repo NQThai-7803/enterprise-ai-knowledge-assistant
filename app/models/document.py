@@ -28,6 +28,7 @@ if TYPE_CHECKING:
     from app.models.department import Department
     from app.models.document_chunk import DocumentChunk
     from app.models.document_permission import DocumentPermission
+    from app.models.message_citation import MessageCitation
     from app.models.user import User
 
 
@@ -125,5 +126,10 @@ class Document(Base):
         "DocumentChunk",
         back_populates="document",
         cascade="all, delete-orphan",
+        passive_deletes=True,
+    )
+    message_citations: Mapped[list[MessageCitation]] = relationship(
+        "MessageCitation",
+        back_populates="document",
         passive_deletes=True,
     )

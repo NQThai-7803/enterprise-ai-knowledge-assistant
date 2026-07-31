@@ -16,6 +16,7 @@ async def worker_session() -> AsyncIterator[AsyncSession]:
         settings.database_url,
         pool_pre_ping=True,
         poolclass=NullPool,
+        connect_args={"timeout": settings.db_connect_timeout_seconds},
     )
     session_factory = async_sessionmaker(
         bind=engine,

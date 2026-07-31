@@ -1,0 +1,5 @@
+import { clsx } from "clsx";
+
+export function ShimmerText({ children, className }: { children: React.ReactNode; className?: string }) {
+  return <span className={clsx("motion-shimmer", className)}>{children}</span>;
+}

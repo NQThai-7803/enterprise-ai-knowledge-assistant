@@ -5,7 +5,8 @@
 - Passwords are not stored in plaintext.
 - Password verification uses the Argon2 helper from `pwdlib`.
 - Access tokens are short-lived JWTs signed with `HS256`.
-- Access tokens include `sub`, `type`, `jti`, `iat`, `nbf`, `exp`, `iss`, and `aud` claims.
+- Access tokens include `sub`, `type`, `jti`, `iat`,
+bf`, `exp`, `iss`, and `aud` claims.
 - Access tokens do not include role, permission, or department claims as the authorization source.
 - Access token decoding uses an explicit algorithm allowlist: `HS256` only.
 - Access token issuer and audience are validated.
@@ -129,11 +130,11 @@ Future RAG implementation must treat document content as data, not system instru
 
 - No password invitation flow.
 - No password reset.
-- No audit log query API.
+- Audit log query API is implemented as Admin-only `GET /api/v1/audit-logs`.
 - No audit retention policy.
 - No trusted-proxy configuration.
 - No rate limiting.
-- Audit logs currently cover User and Department administration events only.
+- Audit logs cover selected authentication, administration, Document, Chat, and Feedback operations.
 
 
 ## 12. TASK-008 document data security
@@ -157,7 +158,7 @@ Known limitations after TASK-008:
 - No signed download URL.
 - No Document API access checks.
 - No permission-aware retrieval.
-- No document audit events.
+- Document upload, download, delete, and permission mutations create sanitized audit events.
 - No storage abstraction or local file persistence.
 - No PDF processing, chunks, embeddings, or pgvector extension.
 ## 13. TASK-009 local upload security
@@ -192,7 +193,7 @@ Known limitations after TASK-009:
 - No signed download URL.
 - No scheduled orphan-file cleanup job.
 - Concurrent duplicate uploads by the same user may still race before a later idempotency or locking improvement.
-- No document audit events yet.
+- Document upload, download, delete, and permission mutations create sanitized audit events.
 - Local storage is not suitable for multi-instance production without shared storage.
 ## 14. TASK-010 document access and download security
 
@@ -214,7 +215,7 @@ Implemented document access controls:
 
 Known limitations after TASK-010:
 
-- No document audit events yet.
+- Document upload, download, delete, and permission mutations create sanitized audit events.
 - No preview endpoint.
 - No signed download URL.
 - No HTTP Range request support.
@@ -406,3 +407,195 @@ Known limitations:
 - Retrieval cache, retrieval audit events, and retrieval-specific rate limiting are not implemented.
 - PII redaction in retrieved chunk text is not implemented.
 - The internal hybrid retrieval service is not exposed through a public API.
+
+## TASK-020 citation security
+
+- The backend does not trust citation metadata produced by the LLM.
+- The LLM may emit only source markers such as `[SOURCE_1]`.
+- Document IDs, chunk IDs, page numbers, document titles, excerpts, relevance scores, and permission metadata are mapped only from backend-controlled source registry entries.
+- Unknown, missing, malformed, unselected, or over-limit markers are rejected before persistence.
+- Permission is revalidated after LLM generation and before response or persistence.
+- If a cited source is revoked, deleted, archived, non-ready, missing, or unauthorized, the generated answer is not returned; the service persists and returns the fixed NO_ANSWER with empty citations.
+- Excerpts are generated from server-side chunk text and are bounded by configuration.
+- Citations are inserted in the same database transaction as the USER and ASSISTANT message pair.
+- Citation history remains owner-only through ChatSession ownership.
+- Historical citation metadata can be omitted when current Document access is no longer available.
+- Excerpt, source title, source registry, prompt, answer, chunk text, storage key, and API key must not be logged.
+- Chunk replacement is not blocked by historical citations because `message_citations.chunk_id` uses `ON DELETE SET NULL`.
+
+Known limitations:
+
+- Previously generated Assistant answer text may remain in owned chat history even if source permission is later revoked; historical-answer redaction is not implemented.
+- Citation page uses the start page of a multi-page chunk.
+- Excerpt is a bounded chunk excerpt and is not guaranteed to be the exact supporting sentence.
+- LLM marker placement is not claim-level semantic verification; a marker can still be attached to a claim that is weakly supported.
+- Citation quality evaluation dashboard is not implemented.
+- PII masking is not implemented.
+- Chat content and citation excerpts are stored plaintext in PostgreSQL.
+
+## TASK-021 feedback security
+
+- Feedback target ownership and ASSISTANT role are checked in PostgreSQL before upsert.
+- Non-owner, missing, USER, and SYSTEM message targets return the same safe `404 FEEDBACK_TARGET_NOT_FOUND` response.
+- Feedback upsert uses PostgreSQL `ON CONFLICT(message_id, user_id)` and does not use a race-prone select-then-insert/update flow for the Feedback row.
+- Manager report scope is applied in PostgreSQL before pagination and total counting.
+- Manager report scope uses the feedback submitter's current Department from the database, not a JWT claim and not source Document Department.
+- Feedback reports do not return Chat content, User questions, session titles, citations, citation excerpts, retrieval query, token usage, prompts, Document titles, storage keys, or permission metadata.
+- Feedback reason is not logged by application code.
+- Feedback does not call LLM, retrieval, Redis, or Celery.
+- Feedback upsert records sanitized audit metadata and never stores Feedback reason in audit logs.
+
+Known limitations:
+
+- Feedback deletion is not implemented.
+- Feedback analytics and aggregation dashboards are not implemented.
+- Reporting scope is based on the submitter's current Department; if a User moves Department, historical Feedback appears under the new Department scope.
+- Feedback reason is stored plaintext in PostgreSQL.
+- PII masking in Feedback reason is not implemented.
+- Feedback-specific rate limiting is not implemented.
+
+## TASK-022 audit security
+
+Implemented controls:
+
+- AuditLog rows are append-only at the application layer: repository code exposes create/list/count only and the API exposes only Admin report reads.
+- Success audit events for business mutations are inserted in the same PostgreSQL transaction as the mutation. If required success audit insertion fails, the mutation rolls back.
+- Failure audit events use a separate best-effort transaction after rollback. If failure-audit persistence fails, the original error is preserved and only a generic log message is emitted.
+- Audit metadata uses a central allowlist sanitizer. Nested values, bytes, ORM instances, exception objects, secret values, unknown keys, and overlong payloads are rejected.
+- Authentication failure audit does not store the submitted email/login identifier, password, token, or raw failure detail.
+- Administration audit does not store user email, full name, password, password hash, phone, or Department name.
+- Document audit does not store original filename, storage key, local path, checksum, title, MIME details, or document text.
+- Chat audit does not store user question, assistant answer, prompt, retrieved context, citation excerpt, provider response body, or token usage.
+- Feedback audit records only the safe rating and does not store Feedback reason or message content.
+- Audit report filters and total counts run in PostgreSQL before pagination; report responses sanitize legacy metadata again before returning it.
+- Audit report access is Admin-only. Manager and Staff users receive `403 AUDIT_REPORT_FORBIDDEN`.
+- Reading AuditLog does not create an audit event, avoiding recursive report mutation.
+- Audit service does not call Redis, Celery, LLM providers, retrieval services, webhooks, Kafka, or external SIEM sinks.
+
+Known limitations:
+
+- AuditLog rows are not cryptographically signed.
+- AuditLog rows are not copied to external immutable storage.
+- SIEM integration is not implemented.
+- Retention cleanup is not implemented.
+- A database administrator can still modify rows directly.
+- Download streaming completion is not confirmed after the response starts.
+- Audit report access is not itself audited to avoid recursion.
+- Anomaly detection is not implemented.
+- Audit export is not implemented.
+
+
+## TASK-023 Docker stack security
+
+Implemented Docker controls:
+
+- API and worker containers run as non-root user `app`.
+- The runtime image does not copy `.env`, `.venv`, uploads, model cache, Git metadata, test logs, or local build artifacts.
+- Secrets are supplied at runtime through local environment handling; real secrets must stay out of source control and image layers.
+- The default Compose stack does not mount the Docker socket, host root, `.git`, `.venv`, or `.env` as a volume.
+- API, PostgreSQL, and Redis host ports are bound to `127.0.0.1` for local development only.
+- API liveness does not require PostgreSQL, Redis, LLM, or embedding model loading.
+- API readiness checks PostgreSQL and Redis without exposing connection details.
+- LLM is disabled by default and is not called during import, startup, migration, or health checks.
+
+Known limitations after TASK-023:
+
+- No TLS or reverse proxy is configured.
+- No production secret manager is configured.
+- No container resource limits are configured.
+- Local named volumes are not encrypted by the application layer.
+- The Docker stack is a local development stack, not a production deployment topology.
+
+## TASK-025 MVP hardening security
+
+Implemented controls:
+
+- Production startup rejects debug mode, placeholder JWT secrets, empty or placeholder database passwords, wildcard trusted hosts, invalid CORS origins, and wildcard CORS origins with credentials.
+- API docs are configurable with `API_DOCS_ENABLED`; development defaults to enabled and production can disable `/docs`, `/redoc`, and `/openapi.json`.
+- CORS uses configured explicit origins, credentials policy, method allowlist, and header allowlist.
+- `TrustedHostMiddleware` enforces configured hosts and does not trust `X-Forwarded-Host`.
+- API responses include `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`, and `Cache-Control: no-store`.
+- HSTS is added only when `APP_ENV=production` and the request scheme is HTTPS.
+- Global body-size middleware rejects oversized `Content-Length` and streamed bodies with `413 REQUEST_TOO_LARGE` without logging the body.
+- Upload error codes now distinguish file size, empty file, file type, PDF signature, and filename validation failures.
+- Rate limiting covers `POST /auth/login`, `POST /auth/refresh`, `POST /documents/upload`, `POST /chat/sessions/{id}/messages`, and `PUT /messages/{id}/feedback`.
+- Rate-limit identity uses direct client IP for anonymous auth and current User ID for authenticated actions; Manager/Admin do not bypass limits.
+- Redis rate-limit outages fail open in development/test. In production, login, refresh, upload, and chat fail closed; feedback remains fail-open as non-critical.
+- Database pool, database connect timeout, Redis connect/socket timeout, Redis health interval, and Celery task time limits are bounded by configuration.
+- Unhandled production errors return a generic `500 INTERNAL_SERVER_ERROR` envelope without stack traces or raw provider/database/Redis details.
+- Logging redaction covers password, secret, token, authorization, API key, cookie, database URL, Redis URL, question, answer, context, excerpt, feedback reason, document text, chat content, and citation excerpt keys.
+- Compose application services use `no-new-privileges:true` and still run as non-root.
+
+Known limitations after TASK-025:
+
+- No malware or antivirus scanning is implemented.
+- No automatic chat retention, audit retention, feedback deletion, or PII masking is implemented.
+- Uploaded files use local/shared storage; application-level storage encryption is not implemented.
+- Previously generated Assistant answers may remain in chat history after later permission changes.
+- Citation excerpts, chat messages, feedback reasons, chunk text, and selected plaintext fields remain plaintext in PostgreSQL.
+- No trusted-proxy configuration is implemented; forwarded host/IP headers are intentionally ignored.
+- No TLS termination, production secret manager, SIEM integration, container resource limits, Kubernetes, Terraform, or deployment automation is included.
+
+## TASK-026 multi-LLM provider security
+
+Implemented controls:
+
+- `LLM_ENABLED=false` is the default and requires no provider key, model, endpoint, internet access, model download, or provider network call.
+- Only the selected enabled provider is required to have provider-specific configuration. Unselected provider secrets may remain empty.
+- Provider secrets use `SecretStr` configuration fields and are excluded from `Settings` representation.
+- Provider validation errors are generic and do not include API keys, URL credentials, raw endpoints with credentials, prompt text, context, document text, provider response bodies, or stack traces.
+- Base URL validation rejects embedded credentials, query strings, fragments, and invalid ports. Remote production providers must use HTTPS; HTTP is allowed only for local provider hosts.
+- `LLMProviderRegistry` and `LLMProviderManager` create providers lazily. No HTTP client is opened at import time, app startup, Alembic startup, liveness, or readiness.
+- Provider HTTP calls use explicit connect/read/write/pool timeouts, a bounded connection pool, bounded retries, and retry backoff.
+- Provider failures are normalized to safe LLM error codes such as `LLM_PROVIDER_AUTHENTICATION_FAILED`, `LLM_PROVIDER_RATE_LIMITED`, `LLM_PROVIDER_TIMEOUT`, `LLM_PROVIDER_UNAVAILABLE`, `LLM_PROVIDER_BAD_RESPONSE`, and `LLM_REQUEST_REJECTED`.
+- Raw provider bodies, request bodies, response bodies, headers, prompts, retrieved context, questions, answers, document text, citation excerpts, API keys, and authorization headers are not logged or returned to clients.
+- Grounded answer policy, selected-context policy, backend-owned citation validation, permission revalidation, and no-answer behavior remain outside provider adapters.
+- No automatic provider fallback is implemented. This avoids silent duplicate cost, unexpected external data transfer, data-residency changes, and non-deterministic answers.
+- Docker Compose does not add an LLM container, does not install Ollama, and does not download models in TASK-026.
+
+Known limitations after TASK-026:
+
+- External provider enablement can transfer selected prompt/context data to that provider; deployment owners must approve provider data residency and contractual terms before enabling it.
+- Provider connectivity health is explicit through `health_check(check_connectivity=True)`, reports only safe status/message/request-id metadata, and default readiness does not call external LLMs.
+- Chat messages still do not persist provider/model metadata because TASK-026 avoids a schema migration unless a future policy requires it.
+- Cost estimation, pricing, provider analytics, and dashboards are not implemented; those belong to TASK-032.
+- Frontend provider/model selection is not implemented; TASK-028 may expose selection only when backend authorization policy allows it.
+## TASK-027 streaming chat security
+
+Implemented controls:
+
+- The SSE endpoint reuses bearer authentication, active-user loading, owner-only ChatSession checks in `GroundedAnswerService`, and the existing chat rate-limit rule.
+- JWTs are not accepted in query strings; clients use the standard Authorization header.
+- Provider chunks are not forwarded. The public delta is emitted only after complete-answer grounding, citation validation, permission revalidation, and atomic final persistence succeed.
+- Partial ASSISTANT messages are never persisted. Provider failure, grounding failure, citation failure, timeout, and disconnect persist no partial ASSISTANT message.
+- SSE frames are encoded through centralized JSON serialization; raw user/provider text is never concatenated into SSE syntax.
+- Stream errors contain only safe code/message/retryable fields and never include raw provider bodies, headers, prompts, context, SQL details, stack traces, API keys, or authorization data.
+- Heartbeats contain no content and do not extend the bounded stream duration.
+- Client disconnect cancels active work on the serving instance where the provider coroutine is cancellable.
+- Audit behavior remains the grounded Chat audit behavior and stores no prompt, context, answer, delta, provider payload, or citation excerpt.
+
+Known limitations after TASK-027:
+
+- TASK-027 does not implement native token-by-token public streaming because citation validation is not incremental.
+- Explicit cross-instance cancellation is not implemented; client disconnect is the stop-generation mechanism for the serving instance.
+- No frontend SSE consumer is implemented; TASK-028 owns UI integration.
+## TASK-028 Frontend Security Notes
+
+The frontend is an operational console and does not act as the security authority. Backend authentication, RBAC, document permissions, citation validation, audit logging, rate limiting, and provider safety remain authoritative.
+
+Frontend controls implemented in TASK-028:
+
+- Bearer access tokens are sent in the `Authorization` header and never placed in URLs.
+- Refresh/access token values are not rendered, logged, or included in route state.
+- No LLM provider API key, database credential, Redis credential, JWT signing secret, or internal provider endpoint is exposed in frontend configuration.
+- The typed API client maps backend errors to safe `ApiError` values and does not display raw exception bodies.
+- Chat content is rendered as plain text with `whitespace-pre-wrap`; unsafe raw HTML rendering is not used.
+- SSE events are parsed from normalized backend events only; raw provider events are never consumed by UI code.
+- Role-aware navigation reduces accidental access, but protected backend endpoints remain the enforcement point.
+- Audit log metadata is rendered as escaped text/json, not as HTML.
+- Decorative motion is non-interactive and respects reduced-motion CSS.
+
+Known browser-token limitation: the current backend contract exposes bearer tokens to the SPA. TASK-028 stores them in `sessionStorage` to avoid long-lived persistence. A future cookie-based or BFF architecture would reduce XSS token exposure further.
+### Frontend Dependency Advisory
+
+`npm audit --audit-level=high` currently reports a high advisory for `react-router` in the 7.12.0-8.2.0 range. The TASK-028 frontend uses React Router in SPA/browser mode only and does not use RSC mode, server actions, route actions, or SSR redirects. Downgrading to 7.11.0 was evaluated and exposed a broader set of React Router advisories, so the project remains pinned to `react-router-dom@7.18.2` until an upstream non-vulnerable release compatible with the SPA is available. Avoid enabling React Router RSC/action features without re-evaluating this advisory.

@@ -17,17 +17,34 @@ class AuditLog(Base):
         Index("ix_audit_logs_action", "action"),
         Index("ix_audit_logs_created_at", "created_at"),
         Index("ix_audit_logs_user_id", "user_id"),
+        Index("ix_audit_logs_created_id", "created_at", "id"),
+        Index("ix_audit_logs_action_created", "action", "created_at"),
+        Index("ix_audit_logs_user_created", "user_id", "created_at"),
+        Index("ix_audit_logs_entity_created", "entity_type", "entity_id", "created_at"),
+        Index("ix_audit_logs_outcome_created", "outcome", "created_at"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(
+        Uuid,
+        primary_key=True,
+        server_default=func.gen_random_uuid(),
+    )
     user_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid,
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
     )
     action: Mapped[str] = mapped_column(String(100), nullable=False)
-    entity_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    outcome: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+        default="SUCCESS",
+        server_default=text("'SUCCESS'"),
+    )
+    entity_type: Mapped[str | None] = mapped_column(String(64), nullable=True)
     entity_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
+    request_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    error_code: Mapped[str | None] = mapped_column(String(100), nullable=True)
     ip_address: Mapped[str | None] = mapped_column(INET, nullable=True)
     user_agent: Mapped[str | None] = mapped_column(Text, nullable=True)
     metadata_json: Mapped[dict[str, Any]] = mapped_column(

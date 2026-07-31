@@ -6,7 +6,6 @@ from uuid import UUID
 from pydantic import (
     BaseModel,
     ConfigDict,
-    EmailStr,
     Field,
     SecretStr,
     field_validator,
@@ -14,12 +13,13 @@ from pydantic import (
 )
 
 from app.models import User, UserRole
+from app.schemas.email import normalize_email_address
 
 
 class UserCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    email: EmailStr
+    email: str
     full_name: str = Field(max_length=200)
     password: SecretStr = Field(min_length=12)
     role: UserRole
@@ -27,10 +27,8 @@ class UserCreate(BaseModel):
 
     @field_validator("email", mode="before")
     @classmethod
-    def normalize_email(cls, value: object) -> object:
-        if isinstance(value, str):
-            return value.strip().lower()
-        return value
+    def normalize_email(cls, value: object) -> str:
+        return normalize_email_address(value)
 
     @field_validator("full_name", mode="before")
     @classmethod
@@ -51,7 +49,7 @@ class UserCreate(BaseModel):
 class UserUpdate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    email: EmailStr | None = None
+    email: str | None = None
     full_name: str | None = Field(default=None, max_length=200)
     role: UserRole | None = None
     department_id: UUID | None = None
@@ -59,10 +57,10 @@ class UserUpdate(BaseModel):
 
     @field_validator("email", mode="before")
     @classmethod
-    def normalize_email(cls, value: object) -> object:
-        if isinstance(value, str):
-            return value.strip().lower()
-        return value
+    def normalize_email(cls, value: object) -> str | None:
+        if value is None:
+            return None
+        return normalize_email_address(value)
 
     @field_validator("full_name", mode="before")
     @classmethod

@@ -1,19 +1,38 @@
 from functools import lru_cache
 from math import isfinite
 from typing import Annotated, Literal
+from urllib.parse import urlsplit
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import AliasChoices, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 from app.embeddings.constants import (
     EMBEDDING_PROVIDER_SENTENCE_TRANSFORMERS,
     EMBEDDING_SCHEMA_DIMENSIONS,
 )
+from app.llm.provider_names import (
+    ANTHROPIC_PROVIDER,
+    AZURE_OPENAI_PROVIDER,
+    GEMINI_PROVIDER,
+    LM_STUDIO_PROVIDER,
+    OLLAMA_PROVIDER,
+    OPENAI_COMPATIBLE_PROVIDER,
+    OPENROUTER_PROVIDER,
+    SUPPORTED_PROVIDER_NAMES,
+    normalize_provider_name,
+)
 
 PLACEHOLDER_SECRET_KEYS = {
+    "",
     "change-me",
     "change-me-for-local-development",
+    "changeme",
+    "development-secret",
+    "example",
+    "replace-me",
     "replace-with-a-long-random-secret-key",
+    "secret",
+    "your-secret-here",
 }
 
 
@@ -22,19 +41,25 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
+        populate_by_name=True,
     )
 
     app_name: str = "Enterprise AI Knowledge Assistant"
-    app_env: Literal["development", "test", "staging", "production"] = "development"
-    app_debug: bool = True
+    app_env: Literal["development", "test", "production"] = "development"
+    app_debug: bool = Field(default=False, validation_alias="APP_DEBUG")
+    debug: bool = Field(default=False, repr=False, validation_alias="DEBUG")
     api_v1_prefix: str = "/api/v1"
-    secret_key: str = Field(default="replace-with-a-long-random-secret-key", min_length=32)
+    api_docs_enabled: bool = True
+    secret_key: str = Field(
+        default="replace-with-a-long-random-secret-key",
+        repr=False,
+    )
     jwt_algorithm: Literal["HS256"] = "HS256"
     jwt_issuer: str = "enterprise-ai-knowledge-assistant"
     jwt_audience: str = "enterprise-ai-api"
     access_token_expire_minutes: int = Field(default=15, ge=1)
     refresh_token_expire_days: int = Field(default=7, ge=1)
-    database_url: str = "postgresql+asyncpg:///enterprise_ai"
+    database_url: str = Field(default="postgresql+asyncpg:///enterprise_ai", repr=False)
     dev_admin_email: str = "admin@example.com"
     dev_admin_full_name: str = "Development Admin"
     dev_admin_password: str = ""
@@ -75,11 +100,107 @@ class Settings(BaseSettings):
     hybrid_semantic_weight: float = Field(default=1.0, ge=0.0)
     hybrid_keyword_weight: float = Field(default=1.0, ge=0.0)
     hybrid_semantic_min_relevance_score: float = Field(default=0.30, ge=0.0, le=1.0)
-    cors_origins: Annotated[list[str], NoDecode] = Field(
-        default_factory=lambda: ["http://localhost:3000", "http://localhost:5173"]
+    chat_session_title_max_characters: int = Field(default=200, gt=0)
+    chat_session_list_page_size: int = Field(default=20, gt=0)
+    chat_session_list_max_page_size: int = Field(default=100, gt=0)
+    chat_history_page_size: int = Field(default=50, gt=0)
+    chat_history_max_page_size: int = Field(default=100, gt=0)
+    chat_message_max_characters: int = Field(default=12000, gt=0)
+    llm_enabled: bool = False
+    llm_provider: str = OPENAI_COMPATIBLE_PROVIDER
+    llm_model: str = ""
+    llm_timeout_seconds: float = Field(default=30.0, gt=0.0)
+    llm_stream_heartbeat_seconds: float = Field(default=15.0, gt=0.0, le=300.0)
+    llm_stream_max_duration_seconds: float = Field(default=120.0, gt=0.0, le=3600.0)
+    llm_max_retries: int = Field(default=2, ge=0)
+    llm_retry_backoff_seconds: float = Field(default=1.0, ge=0.0)
+    llm_temperature: float = Field(default=0.0, ge=0.0, le=2.0)
+    llm_max_output_tokens: int = Field(default=1024, gt=0)
+    llm_base_url: str = Field(
+        default="",
+        validation_alias=AliasChoices("LLM_OPENAI_BASE_URL", "LLM_BASE_URL"),
     )
-    celery_broker_url: str = "redis://localhost:6379/1"
-    celery_result_backend: str = "redis://localhost:6379/2"
+    llm_api_key: SecretStr = Field(
+        default_factory=lambda: SecretStr(""),
+        repr=False,
+        validation_alias=AliasChoices("LLM_OPENAI_API_KEY", "LLM_API_KEY"),
+    )
+    llm_azure_endpoint: str = Field(default="", repr=False)
+    llm_azure_api_key: SecretStr = Field(default_factory=lambda: SecretStr(""), repr=False)
+    llm_azure_deployment: str = ""
+    llm_azure_api_version: str = ""
+    llm_gemini_api_key: SecretStr = Field(default_factory=lambda: SecretStr(""), repr=False)
+    llm_gemini_model: str = ""
+    llm_gemini_base_url: str = Field(default="https://generativelanguage.googleapis.com")
+    llm_anthropic_api_key: SecretStr = Field(default_factory=lambda: SecretStr(""), repr=False)
+    llm_anthropic_model: str = ""
+    llm_anthropic_version: str = "2023-06-01"
+    llm_anthropic_base_url: str = Field(default="https://api.anthropic.com")
+    llm_ollama_base_url: str = Field(default="http://host.docker.internal:11434")
+    llm_ollama_model: str = ""
+    llm_lm_studio_base_url: str = Field(default="http://host.docker.internal:1234/v1")
+    llm_lm_studio_model: str = ""
+    llm_openrouter_base_url: str = Field(default="https://openrouter.ai/api/v1")
+    llm_openrouter_api_key: SecretStr = Field(default_factory=lambda: SecretStr(""), repr=False)
+    llm_openrouter_model: str = ""
+    llm_no_answer_sentinel: str = Field(default="__NO_ANSWER__", min_length=1)
+    chat_retrieval_top_k: int = Field(default=8, gt=0)
+    chat_history_max_messages: int = Field(default=10, ge=0)
+    chat_context_max_tokens: int = Field(default=6000, gt=0)
+    chat_no_answer_message: str = Field(
+        default=(
+            "Khong tim thay du thong tin trong cac tai lieu ban duoc phep truy cap "
+            "de tra loi cau hoi nay."
+        ),
+        min_length=1,
+    )
+    citation_excerpt_max_characters: int = Field(default=500, gt=0)
+    citation_max_sources_per_answer: int = Field(default=8, gt=0)
+    feedback_reason_max_characters: int = Field(default=1000, ge=1, le=1000)
+    feedback_report_page_size: int = Field(default=20, gt=0)
+    feedback_report_max_page_size: int = Field(default=100, gt=0)
+    audit_report_page_size: int = Field(default=50, gt=0)
+    audit_report_max_page_size: int = Field(default=200, gt=0)
+    audit_metadata_max_length: int = Field(default=2000, gt=0)
+    audit_error_code_max_length: int = Field(default=100, gt=0)
+    audit_target_type_max_length: int = Field(default=64, gt=0)
+    cors_origins: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: ["http://localhost:3000", "http://localhost:5173"],
+        validation_alias=AliasChoices("CORS_ALLOWED_ORIGINS", "CORS_ORIGINS"),
+    )
+    cors_allow_credentials: bool = True
+    cors_allowed_methods: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]
+    )
+    cors_allowed_headers: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: ["Authorization", "Content-Type", "Accept", "Origin"]
+    )
+    trusted_hosts: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: ["localhost", "127.0.0.1", "testserver"]
+    )
+    max_request_body_bytes: int = Field(default=26_214_400, gt=0)
+    db_pool_size: int = Field(default=10, ge=1, le=100)
+    db_max_overflow: int = Field(default=20, ge=0, le=200)
+    db_pool_timeout_seconds: int = Field(default=30, ge=1, le=300)
+    db_pool_recycle_seconds: int = Field(default=1800, ge=60, le=86_400)
+    db_connect_timeout_seconds: int = Field(default=10, ge=1, le=60)
+    redis_url: str = Field(default="redis://localhost:6379/0", repr=False)
+    redis_connect_timeout_seconds: int = Field(default=5, ge=1, le=60)
+    redis_socket_timeout_seconds: int = Field(default=5, ge=1, le=60)
+    redis_health_check_interval_seconds: int = Field(default=30, ge=1, le=3600)
+    rate_limit_enabled: bool = True
+    rate_limit_login_requests: int = Field(default=5, ge=1, le=10_000)
+    rate_limit_login_window_seconds: int = Field(default=60, ge=1, le=86_400)
+    rate_limit_refresh_requests: int = Field(default=10, ge=1, le=10_000)
+    rate_limit_refresh_window_seconds: int = Field(default=60, ge=1, le=86_400)
+    rate_limit_chat_requests: int = Field(default=20, ge=1, le=10_000)
+    rate_limit_chat_window_seconds: int = Field(default=60, ge=1, le=86_400)
+    rate_limit_upload_requests: int = Field(default=10, ge=1, le=10_000)
+    rate_limit_upload_window_seconds: int = Field(default=300, ge=1, le=86_400)
+    rate_limit_feedback_requests: int = Field(default=30, ge=1, le=10_000)
+    rate_limit_feedback_window_seconds: int = Field(default=60, ge=1, le=86_400)
+    celery_broker_url: str = Field(default="redis://localhost:6379/1", repr=False)
+    celery_result_backend: str = Field(default="redis://localhost:6379/2", repr=False)
     celery_task_default_queue: str = Field(default="default", min_length=1)
     celery_document_queue: str = Field(default="documents", min_length=1)
     celery_task_track_started: bool = True
@@ -88,15 +209,33 @@ class Settings(BaseSettings):
     celery_worker_prefetch_multiplier: int = Field(default=1, ge=1)
     celery_task_max_retries: int = Field(default=3, ge=0)
     celery_task_retry_backoff_seconds: int = Field(default=5, ge=0)
+    celery_task_soft_time_limit_seconds: int = Field(default=300, ge=1)
+    celery_task_time_limit_seconds: int = Field(default=360, ge=1)
+    celery_broker_connection_retry_on_startup: bool = True
     celery_result_expires_seconds: int = Field(default=3600, ge=1)
     log_level: str = "INFO"
     log_format: Literal["json", "console"] = "json"
 
-    @field_validator("cors_origins", mode="before")
+    @field_validator(
+        "cors_origins",
+        "cors_allowed_methods",
+        "cors_allowed_headers",
+        "trusted_hosts",
+        mode="before",
+    )
     @classmethod
-    def parse_cors_origins(cls, value: str | list[str]) -> list[str]:
+    def parse_csv_settings(cls, value: str | list[str]) -> list[str]:
         if isinstance(value, str):
-            return [origin.strip() for origin in value.split(",") if origin.strip()]
+            return [item.strip() for item in value.split(",") if item.strip()]
+        return value
+
+    @field_validator("llm_provider", mode="before")
+    @classmethod
+    def normalize_llm_provider(cls, value: object) -> object:
+        if isinstance(value, str):
+            if not value.strip():
+                return OPENAI_COMPATIBLE_PROVIDER
+            return normalize_provider_name(value)
         return value
 
     @field_validator("database_url")
@@ -137,11 +276,42 @@ class Settings(BaseSettings):
             raise ValueError(msg)
         return value
 
-    @field_validator("celery_broker_url", "celery_result_backend")
+    @field_validator("redis_url", "celery_broker_url", "celery_result_backend")
     @classmethod
-    def validate_celery_redis_url(cls, value: str) -> str:
+    def validate_redis_url(cls, value: str) -> str:
         if not value.startswith(("redis://", "rediss://")):
-            msg = "Celery Redis URLs must use redis:// or rediss://."
+            msg = "Redis URLs must use redis:// or rediss://."
+            raise ValueError(msg)
+        return value
+
+    @field_validator(
+        "max_request_body_bytes",
+        "db_pool_size",
+        "db_max_overflow",
+        "db_pool_timeout_seconds",
+        "db_pool_recycle_seconds",
+        "db_connect_timeout_seconds",
+        "redis_connect_timeout_seconds",
+        "redis_socket_timeout_seconds",
+        "redis_health_check_interval_seconds",
+        "rate_limit_login_requests",
+        "rate_limit_login_window_seconds",
+        "rate_limit_refresh_requests",
+        "rate_limit_refresh_window_seconds",
+        "rate_limit_chat_requests",
+        "rate_limit_chat_window_seconds",
+        "rate_limit_upload_requests",
+        "rate_limit_upload_window_seconds",
+        "rate_limit_feedback_requests",
+        "rate_limit_feedback_window_seconds",
+        "celery_task_soft_time_limit_seconds",
+        "celery_task_time_limit_seconds",
+        mode="before",
+    )
+    @classmethod
+    def reject_boolean_hardening_integer_settings(cls, value: object) -> object:
+        if isinstance(value, bool):
+            msg = "Hardening integer settings must not be boolean values."
             raise ValueError(msg)
         return value
 
@@ -181,6 +351,27 @@ class Settings(BaseSettings):
         "hybrid_retrieval_max_top_k",
         "hybrid_candidate_multiplier",
         "hybrid_rrf_k",
+        "chat_session_title_max_characters",
+        "chat_session_list_page_size",
+        "chat_session_list_max_page_size",
+        "chat_history_page_size",
+        "chat_history_max_page_size",
+        "chat_message_max_characters",
+        "llm_max_retries",
+        "llm_max_output_tokens",
+        "chat_retrieval_top_k",
+        "chat_history_max_messages",
+        "chat_context_max_tokens",
+        "citation_excerpt_max_characters",
+        "citation_max_sources_per_answer",
+        "feedback_reason_max_characters",
+        "feedback_report_page_size",
+        "feedback_report_max_page_size",
+        "audit_report_page_size",
+        "audit_report_max_page_size",
+        "audit_metadata_max_length",
+        "audit_error_code_max_length",
+        "audit_target_type_max_length",
         mode="before",
     )
     @classmethod
@@ -196,6 +387,11 @@ class Settings(BaseSettings):
         "hybrid_semantic_weight",
         "hybrid_keyword_weight",
         "hybrid_semantic_min_relevance_score",
+        "llm_timeout_seconds",
+        "llm_stream_heartbeat_seconds",
+        "llm_stream_max_duration_seconds",
+        "llm_retry_backoff_seconds",
+        "llm_temperature",
         mode="before",
     )
     @classmethod
@@ -211,6 +407,11 @@ class Settings(BaseSettings):
         "hybrid_semantic_weight",
         "hybrid_keyword_weight",
         "hybrid_semantic_min_relevance_score",
+        "llm_timeout_seconds",
+        "llm_stream_heartbeat_seconds",
+        "llm_stream_max_duration_seconds",
+        "llm_retry_backoff_seconds",
+        "llm_temperature",
     )
     @classmethod
     def validate_retrieval_float_settings(cls, value: float) -> float:
@@ -238,24 +439,262 @@ class Settings(BaseSettings):
         return self
 
     @model_validator(mode="after")
-    def validate_production_settings(self) -> "Settings":
-        if self.app_env == "production" and (
-            not self.secret_key.strip() or self.secret_key in PLACEHOLDER_SECRET_KEYS
-        ):
-            msg = "SECRET_KEY must be a non-placeholder value in production."
+    def validate_chat_settings(self) -> "Settings":
+        if self.chat_session_list_page_size > self.chat_session_list_max_page_size:
+            msg = (
+                "CHAT_SESSION_LIST_PAGE_SIZE must be less than or equal to "
+                "CHAT_SESSION_LIST_MAX_PAGE_SIZE."
+            )
             raise ValueError(msg)
-        if self.app_env == "production" and self.app_debug:
-            msg = "APP_DEBUG must be false in production."
+        if self.chat_history_page_size > self.chat_history_max_page_size:
+            msg = "CHAT_HISTORY_PAGE_SIZE must be less than or equal to CHAT_HISTORY_MAX_PAGE_SIZE."
             raise ValueError(msg)
-        if self.app_env == "production" and (
-            "localhost" in self.celery_broker_url
-            or "127.0.0.1" in self.celery_broker_url
-            or "localhost" in self.celery_result_backend
-            or "127.0.0.1" in self.celery_result_backend
-        ):
-            msg = "Celery Redis URLs must not use localhost in production."
+        if not self.llm_provider.strip():
+            msg = "LLM_PROVIDER must not be empty."
+            raise ValueError(msg)
+        if not self.llm_no_answer_sentinel.strip():
+            msg = "LLM_NO_ANSWER_SENTINEL must not be empty."
+            raise ValueError(msg)
+        if not self.chat_no_answer_message.strip():
+            msg = "CHAT_NO_ANSWER_MESSAGE must not be empty."
+            raise ValueError(msg)
+        if self.citation_max_sources_per_answer > self.chat_retrieval_top_k:
+            msg = "CITATION_MAX_SOURCES_PER_ANSWER must be <= CHAT_RETRIEVAL_TOP_K."
+            raise ValueError(msg)
+        if self.llm_enabled:
+            _validate_selected_llm_provider_configuration(self)
+        return self
+
+    @model_validator(mode="after")
+    def validate_feedback_settings(self) -> "Settings":
+        if self.feedback_report_page_size > self.feedback_report_max_page_size:
+            msg = (
+                "FEEDBACK_REPORT_PAGE_SIZE must be less than or equal to "
+                "FEEDBACK_REPORT_MAX_PAGE_SIZE."
+            )
             raise ValueError(msg)
         return self
+
+    @model_validator(mode="after")
+    def validate_audit_settings(self) -> "Settings":
+        if self.audit_report_page_size > self.audit_report_max_page_size:
+            msg = "AUDIT_REPORT_PAGE_SIZE must be less than or equal to AUDIT_REPORT_MAX_PAGE_SIZE."
+            raise ValueError(msg)
+        return self
+
+    @model_validator(mode="after")
+    def validate_hardening_settings(self) -> "Settings":
+        for origin in self.cors_origins:
+            _validate_cors_origin(origin)
+        if self.cors_allow_credentials and "*" in self.cors_origins:
+            msg = "CORS wildcard origin cannot be used with credentials."
+            raise ValueError(msg)
+        if self.app_env == "production" and "*" in self.cors_origins:
+            msg = "CORS wildcard origin is not allowed in production."
+            raise ValueError(msg)
+        if self.app_env == "production" and any(
+            method == "*" for method in self.cors_allowed_methods
+        ):
+            msg = "CORS wildcard methods are not allowed in production."
+            raise ValueError(msg)
+        for host in self.trusted_hosts:
+            _validate_trusted_host(host)
+        if self.app_env == "production" and "*" in self.trusted_hosts:
+            msg = "TRUSTED_HOSTS wildcard is not allowed in production."
+            raise ValueError(msg)
+        if self.celery_task_soft_time_limit_seconds > self.celery_task_time_limit_seconds:
+            msg = "CELERY_TASK_SOFT_TIME_LIMIT_SECONDS must be <= CELERY_TASK_TIME_LIMIT_SECONDS."
+            raise ValueError(msg)
+        return self
+
+    @model_validator(mode="after")
+    def validate_production_settings(self) -> "Settings":
+        if self.debug and not self.app_debug:
+            self.app_debug = True
+        if self.app_env != "production":
+            return self
+        if _is_placeholder_secret(self.secret_key) or len(self.secret_key.strip()) < 32:
+            msg = "SECRET_KEY must be a non-placeholder value in production."
+            raise ValueError(msg)
+        if self.app_debug or self.debug:
+            msg = "APP_DEBUG must be false in production."
+            raise ValueError(msg)
+        if _database_password_is_placeholder(self.database_url):
+            msg = "DATABASE_URL must include a non-placeholder password in production."
+            raise ValueError(msg)
+        if (
+            _uses_localhost(self.redis_url)
+            or _uses_localhost(self.celery_broker_url)
+            or _uses_localhost(self.celery_result_backend)
+        ):
+            msg = "Redis URLs must not use localhost in production."
+            raise ValueError(msg)
+        return self
+
+
+def _is_placeholder_secret(value: str | None) -> bool:
+    if value is None:
+        return True
+    return value.strip().lower() in PLACEHOLDER_SECRET_KEYS
+
+
+def _database_password_is_placeholder(database_url: str) -> bool:
+    parsed = urlsplit(database_url)
+    password = parsed.password
+    if password is None:
+        return True
+    return _is_placeholder_secret(password)
+
+
+def _uses_localhost(url: str) -> bool:
+    parsed = urlsplit(url)
+    host = (parsed.hostname or "").lower()
+    return host in {"localhost", "127.0.0.1", "::1"}
+
+
+def _validate_cors_origin(origin: str) -> None:
+    if origin == "*":
+        return
+    parsed = urlsplit(origin)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc or not parsed.hostname:
+        msg = "CORS origins must be absolute http(s) origins."
+        raise ValueError(msg)
+    try:
+        _ = parsed.port
+    except ValueError as exc:
+        msg = "CORS origins must use a valid optional port."
+        raise ValueError(msg) from exc
+    if parsed.username or parsed.password or parsed.path or parsed.query or parsed.fragment:
+        msg = "CORS origins must not contain credentials, path, query, or fragment."
+        raise ValueError(msg)
+
+
+def _validate_trusted_host(host: str) -> None:
+    if not host or "/" in host or "?" in host or "#" in host or "://" in host:
+        msg = "TRUSTED_HOSTS entries must be hostnames, IPs, wildcard subdomains, or '*'."
+        raise ValueError(msg)
+
+
+def _secret_is_empty(value: SecretStr) -> bool:
+    return not value.get_secret_value().strip()
+
+
+def _model_or_default(provider_model: str, default_model: str) -> str:
+    return provider_model.strip() or default_model.strip()
+
+
+def _validate_selected_llm_provider_configuration(settings: Settings) -> None:
+    provider = normalize_provider_name(settings.llm_provider)
+    if provider not in SUPPORTED_PROVIDER_NAMES:
+        msg = "LLM_PROVIDER is not supported."
+        raise ValueError(msg)
+    if provider == OPENAI_COMPATIBLE_PROVIDER:
+        if not settings.llm_base_url.strip() or not settings.llm_model.strip():
+            msg = "Selected LLM provider is missing required configuration."
+            raise ValueError(msg)
+        _validate_llm_url(settings.llm_base_url, settings=settings)
+        if _secret_is_empty(settings.llm_api_key) and not _llm_url_is_local(settings.llm_base_url):
+            msg = "Selected LLM provider is missing required configuration."
+            raise ValueError(msg)
+        return
+    if provider == AZURE_OPENAI_PROVIDER:
+        if (
+            not settings.llm_azure_endpoint.strip()
+            or _secret_is_empty(settings.llm_azure_api_key)
+            or not settings.llm_azure_deployment.strip()
+            or not settings.llm_azure_api_version.strip()
+        ):
+            msg = "Selected LLM provider is missing required configuration."
+            raise ValueError(msg)
+        _validate_llm_url(settings.llm_azure_endpoint, settings=settings, allow_http_local=False)
+        return
+    if provider == GEMINI_PROVIDER:
+        if _secret_is_empty(settings.llm_gemini_api_key) or not _model_or_default(
+            settings.llm_gemini_model,
+            settings.llm_model,
+        ):
+            msg = "Selected LLM provider is missing required configuration."
+            raise ValueError(msg)
+        _validate_llm_url(settings.llm_gemini_base_url, settings=settings, allow_http_local=False)
+        return
+    if provider == ANTHROPIC_PROVIDER:
+        if (
+            _secret_is_empty(settings.llm_anthropic_api_key)
+            or not _model_or_default(settings.llm_anthropic_model, settings.llm_model)
+            or not settings.llm_anthropic_version.strip()
+        ):
+            msg = "Selected LLM provider is missing required configuration."
+            raise ValueError(msg)
+        _validate_llm_url(
+            settings.llm_anthropic_base_url, settings=settings, allow_http_local=False
+        )
+        return
+    if provider == OLLAMA_PROVIDER:
+        if not settings.llm_ollama_base_url.strip() or not _model_or_default(
+            settings.llm_ollama_model,
+            settings.llm_model,
+        ):
+            msg = "Selected LLM provider is missing required configuration."
+            raise ValueError(msg)
+        _validate_llm_url(settings.llm_ollama_base_url, settings=settings)
+        return
+    if provider == LM_STUDIO_PROVIDER:
+        if not settings.llm_lm_studio_base_url.strip() or not _model_or_default(
+            settings.llm_lm_studio_model,
+            settings.llm_model,
+        ):
+            msg = "Selected LLM provider is missing required configuration."
+            raise ValueError(msg)
+        _validate_llm_url(settings.llm_lm_studio_base_url, settings=settings)
+        return
+    if provider == OPENROUTER_PROVIDER:
+        if (
+            not settings.llm_openrouter_base_url.strip()
+            or _secret_is_empty(settings.llm_openrouter_api_key)
+            or not _model_or_default(settings.llm_openrouter_model, settings.llm_model)
+        ):
+            msg = "Selected LLM provider is missing required configuration."
+            raise ValueError(msg)
+        _validate_llm_url(
+            settings.llm_openrouter_base_url, settings=settings, allow_http_local=False
+        )
+
+
+def _validate_llm_url(
+    value: str,
+    *,
+    settings: Settings,
+    allow_http_local: bool = True,
+) -> None:
+    parsed = urlsplit(value.strip())
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc or not parsed.hostname:
+        msg = "Selected LLM provider URL is invalid."
+        raise ValueError(msg)
+    try:
+        _ = parsed.port
+    except ValueError as exc:
+        msg = "Selected LLM provider URL is invalid."
+        raise ValueError(msg) from exc
+    if parsed.username or parsed.password or parsed.query or parsed.fragment:
+        msg = "Selected LLM provider URL is invalid."
+        raise ValueError(msg)
+    if (
+        parsed.scheme == "http"
+        and settings.app_env == "production"
+        and (not allow_http_local or not _is_local_provider_host(parsed.hostname))
+    ):
+        msg = "Remote LLM provider URLs must use HTTPS in production."
+        raise ValueError(msg)
+
+
+def _llm_url_is_local(value: str) -> bool:
+    parsed = urlsplit(value.strip())
+    return bool(parsed.hostname and _is_local_provider_host(parsed.hostname))
+
+
+def _is_local_provider_host(hostname: str) -> bool:
+    normalized = hostname.strip().lower().strip("[]")
+    return normalized in {"localhost", "127.0.0.1", "::1", "host.docker.internal"}
 
 
 @lru_cache

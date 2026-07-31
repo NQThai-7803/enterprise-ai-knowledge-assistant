@@ -14,10 +14,14 @@ from sqlalchemy.pool import NullPool
 from app.core.config import get_settings
 from app.models import (
     AuditLog,
+    ChatMessage,
+    ChatSession,
     Department,
     Document,
     DocumentChunk,
     DocumentPermission,
+    Feedback,
+    MessageCitation,
     RefreshToken,
     User,
 )
@@ -78,6 +82,10 @@ def async_session_factory_for_tests(
 async def _clear_database_data(session_factory: async_sessionmaker[AsyncSession]) -> None:
     async with session_factory() as session:
         await session.execute(delete(AuditLog))
+        await session.execute(delete(Feedback))
+        await session.execute(delete(MessageCitation))
+        await session.execute(delete(ChatMessage))
+        await session.execute(delete(ChatSession))
         await session.execute(delete(RefreshToken))
         await session.execute(delete(DocumentPermission))
         await session.execute(delete(DocumentChunk))

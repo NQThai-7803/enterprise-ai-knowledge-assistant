@@ -14,6 +14,7 @@ dependencies = [
     "celery[redis]>=5.4.0",
     "fastapi>=0.115.0",
     "email-validator>=2.2.0",
+    "httpx>=0.27.0",
     "pydantic-settings>=2.4.0",
     "PyMuPDF>=1.24.0",
     "python-multipart>=0.0.9",
@@ -28,8 +29,8 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "httpx>=0.27.0",
     "pytest>=8.0.0",
+    "coverage[toml]>=7.6.0",
     "ruff>=0.6.0",
 ]
 
@@ -48,6 +49,9 @@ markers = [
     "processing_pipeline_celery_integration: tests that run the document pipeline through a real Celery worker",
     "semantic_retrieval_model_integration: tests that run real semantic retrieval with the local embedding model",
     "hybrid_retrieval_model_integration: tests that run real hybrid retrieval with the local embedding model",
+    "llm_provider_integration: tests that run the OpenAI-compatible provider contract with a mock/local endpoint",
+    "real_llm_provider_integration: opt-in tests that call a real LLM provider with synthetic content",
+    "streaming_chat_integration: tests that verify chat SSE transport with mocked providers",
 ]
 
 [tool.ruff]
@@ -58,3 +62,12 @@ target-version = "py312"
 select = ["B", "E", "F", "I", "SIM", "UP"]
 
 
+
+[tool.coverage.run]
+branch = true
+source = ["app"]
+omit = ["app/db/migrations/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_empty = true

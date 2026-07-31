@@ -19,7 +19,36 @@ def test_user_create_normalizes_email() -> None:
         department_id=uuid4(),
     )
 
-    assert str(payload.email) == "staff@example.com"
+    assert payload.email == "staff@example.com"
+
+
+def test_user_create_accepts_reserved_test_domain() -> None:
+    payload = UserCreate(
+        email=" Staff.UAT@Example.TEST ",
+        full_name="Staff User",
+        password="StrongPassword123!",
+        role=UserRole.STAFF,
+        department_id=uuid4(),
+    )
+
+    assert payload.email == "staff.uat@example.test"
+
+
+def test_user_update_accepts_reserved_test_domain() -> None:
+    payload = UserUpdate(email=" Manager.UAT@Example.TEST ")
+
+    assert payload.email == "manager.uat@example.test"
+
+
+def test_user_create_rejects_invalid_email() -> None:
+    with pytest.raises(ValidationError):
+        UserCreate(
+            email="not-an-email",
+            full_name="Staff User",
+            password="StrongPassword123!",
+            role=UserRole.STAFF,
+            department_id=uuid4(),
+        )
 
 
 def test_user_create_trims_full_name() -> None:

@@ -1,0 +1,211 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+    branches:
+      - "**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend CI
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_DB: enterprise_ai_ci
+          POSTGRES_USER: app_user
+          POSTGRES_PASSWORD: ci-postgres-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U app_user -d enterprise_ai_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      APP_ENV: test
+      APP_DEBUG: "false"
+      APP_NAME: Enterprise AI Knowledge Assistant
+      API_V1_PREFIX: /api/v1
+      SECRET_KEY: ci-local-only-secret-key-000000000000000000000000
+      JWT_ALGORITHM: HS256
+      JWT_ISSUER: enterprise-ai-knowledge-assistant
+      JWT_AUDIENCE: enterprise-ai-api
+      ACCESS_TOKEN_EXPIRE_MINUTES: "15"
+      REFRESH_TOKEN_EXPIRE_DAYS: "7"
+      DATABASE_URL: postgresql+asyncpg://app_user:ci-postgres-password@127.0.0.1:5432/enterprise_ai_ci
+      REDIS_URL: redis://127.0.0.1:6379/0
+      CELERY_BROKER_URL: redis://127.0.0.1:6379/1
+      CELERY_RESULT_BACKEND: redis://127.0.0.1:6379/2
+      CELERY_TASK_DEFAULT_QUEUE: default
+      CELERY_DOCUMENT_QUEUE: documents
+      CELERY_WORKER_CONCURRENCY: "1"
+      STORAGE_BACKEND: local
+      LOCAL_STORAGE_PATH: ${{ github.workspace }}/.ci-data/uploads
+      EMBEDDING_MODEL_CACHE_PATH: ${{ github.workspace }}/.ci-data/models
+      HF_HOME: ${{ github.workspace }}/.ci-data/models/huggingface
+      SENTENCE_TRANSFORMERS_HOME: ${{ github.workspace }}/.ci-data/models/sentence-transformers
+      EMBEDDING_PROVIDER: sentence_transformers
+      EMBEDDING_MODEL_NAME: intfloat/multilingual-e5-small
+      EMBEDDING_DIMENSIONS: "384"
+      EMBEDDING_DEVICE: cpu
+      EMBEDDING_LOCAL_FILES_ONLY: "false"
+      LLM_ENABLED: "false"
+      LLM_PROVIDER: openai_compatible
+      LLM_BASE_URL: http://localhost:11434/v1
+      LLM_API_KEY: ""
+      LLM_MODEL: ""
+      LOG_LEVEL: INFO
+      LOG_FORMAT: json
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install dependencies from pyproject
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+          python --version
+          python -m pip --version
+
+      - name: Prepare CI output directories
+        run: |
+          set -euo pipefail
+          mkdir -p reports logs .ci-data/uploads .ci-data/models
+
+      - name: Verify PostgreSQL pgvector service
+        run: |
+          set -euo pipefail
+          docker exec "${{ job.services.postgres.id }}" \
+            psql -U app_user -d enterprise_ai_ci \
+            -c "CREATE EXTENSION IF NOT EXISTS vector;" 2>&1 | tee logs/postgres-pgvector-install.log
+          docker exec "${{ job.services.postgres.id }}" \
+            psql -U app_user -d enterprise_ai_ci \
+            -tAc "SELECT extname FROM pg_extension WHERE extname = 'vector';" \
+            | tee logs/postgres-pgvector-verify.log
+          grep -qx "vector" logs/postgres-pgvector-verify.log
+
+      - name: Verify Redis service
+        run: |
+          set -euo pipefail
+          docker exec "${{ job.services.redis.id }}" redis-cli ping | tee logs/redis-ping.log
+          grep -qx "PONG" logs/redis-ping.log
+
+      - name: Run Alembic migrations and verify revision
+        run: |
+          set -euo pipefail
+          python -m alembic upgrade head 2>&1 | tee logs/alembic-upgrade.log
+          python -m alembic heads 2>&1 | tee logs/alembic-heads.log
+          python -m alembic current 2>&1 | tee logs/alembic-current.log
+          python - <<'PY'
+          import subprocess
+          import sys
+
+          def lines(command: list[str]) -> list[str]:
+              output = subprocess.check_output(command, text=True)
+              return [line.strip() for line in output.splitlines() if line.strip()]
+
+          heads = [line.split()[0] for line in lines([sys.executable, "-m", "alembic", "heads"])]
+          current = [line.split()[0] for line in lines([sys.executable, "-m", "alembic", "current"]) if "INFO" not in line]
+          if len(heads) != 1:
+              raise SystemExit(f"Expected exactly one Alembic head, got {heads!r}")
+          if current != heads:
+              raise SystemExit(f"Alembic current {current!r} does not match head {heads!r}")
+          print(f"Alembic head verified: {heads[0]}")
+          PY
+
+      - name: Lint
+        run: |
+          set -euo pipefail
+          python -m ruff check . 2>&1 | tee logs/ruff-check.log
+          python -m ruff format --check . 2>&1 | tee logs/ruff-format.log
+
+      - name: Run unit, API, integration, marker tests with coverage
+        run: |
+          set -euo pipefail
+          coverage erase
+          coverage run --parallel-mode -m pytest tests/unit \
+            --junitxml=reports/pytest-unit.xml 2>&1 | tee logs/pytest-unit.log
+          coverage run --parallel-mode -m pytest tests/api -m "not integration" \
+            --junitxml=reports/pytest-api-unit.xml 2>&1 | tee logs/pytest-api-unit.log
+          coverage run --parallel-mode -m pytest tests/api -m integration \
+            --junitxml=reports/pytest-api.xml 2>&1 | tee logs/pytest-api.log
+          coverage run --parallel-mode -m pytest tests/integration \
+            -m "integration and not celery_integration and not embedding_model_integration and not processing_pipeline_model_integration and not processing_pipeline_celery_integration and not semantic_retrieval_model_integration and not hybrid_retrieval_model_integration" \
+            --junitxml=reports/pytest-integration.xml 2>&1 | tee logs/pytest-integration.log
+          coverage run --parallel-mode -m pytest -m "celery_integration and not processing_pipeline_celery_integration" \
+            --junitxml=reports/pytest-celery-integration.xml 2>&1 | tee logs/pytest-celery-integration.log
+          coverage run --parallel-mode -m pytest -m embedding_model_integration \
+            --junitxml=reports/pytest-embedding-model.xml 2>&1 | tee logs/pytest-embedding-model.log
+          coverage run --parallel-mode -m pytest -m processing_pipeline_model_integration \
+            --junitxml=reports/pytest-processing-model.xml 2>&1 | tee logs/pytest-processing-model.log
+          coverage run --parallel-mode -m pytest -m processing_pipeline_celery_integration \
+            --junitxml=reports/pytest-processing-celery.xml 2>&1 | tee logs/pytest-processing-celery.log
+          coverage run --parallel-mode -m pytest -m semantic_retrieval_model_integration \
+            --junitxml=reports/pytest-semantic-retrieval.xml 2>&1 | tee logs/pytest-semantic-retrieval.log
+          coverage run --parallel-mode -m pytest -m hybrid_retrieval_model_integration \
+            --junitxml=reports/pytest-hybrid-retrieval.xml 2>&1 | tee logs/pytest-hybrid-retrieval.log
+          coverage run --parallel-mode -m pytest -m llm_provider_integration \
+            --junitxml=reports/pytest-llm-provider.xml 2>&1 | tee logs/pytest-llm-provider.log
+          coverage combine
+          coverage xml -o coverage.xml
+          coverage report 2>&1 | tee logs/coverage-report.log
+
+      - name: Security scan
+        run: |
+          set -euo pipefail
+          python .github/scripts/security_scan.py 2>&1 | tee logs/security-scan.log
+
+      - name: Docker build verification
+        run: |
+          set -euo pipefail
+          docker build --target runtime -t enterprise-ai-knowledge-assistant-backend:ci . \
+            2>&1 | tee logs/docker-build.log
+          docker compose config 2>&1 | tee logs/docker-compose-config.log
+
+      - name: Upload CI artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-ci-artifacts
+          if-no-files-found: warn
+          path: |
+            coverage.xml
+            reports/
+            logs/

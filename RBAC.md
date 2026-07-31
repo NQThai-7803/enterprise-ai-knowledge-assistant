@@ -162,3 +162,29 @@ Document manage/delete policy:
 Direct permission management is Admin-only. Permission levels are evaluated through explicit sets for view, edit, and manage; enum string ordering and numeric hierarchy are not used.
 
 The reusable accessible-document filter is applied in PostgreSQL for list, detail, status, and download. JWTs are not trusted for role or Department authorization; `get_current_user` reloads the User from PostgreSQL for each request.
+
+## TASK-021 Feedback RBAC
+
+Feedback submission:
+
+- Admin, Manager, and Staff can submit or update feedback only for ASSISTANT messages in their own ChatSessions.
+- Admin and Manager do not bypass ChatSession ownership for feedback submission.
+- Missing, non-owned, USER, and SYSTEM messages all return the same `404 FEEDBACK_TARGET_NOT_FOUND` contract.
+
+Feedback reporting:
+
+- Admin can view all Feedback rows through `GET /api/v1/feedback`.
+- Manager can view Feedback submitted by Users in the Manager's current Department.
+- Manager report scope is based on the feedback submitter's current `users.department_id`, not source Documents or ChatSession ownership.
+- Manager without a Department receives `403 FEEDBACK_REPORT_SCOPE_UNAVAILABLE`.
+- Staff cannot access the management Feedback report. Staff own-feedback visibility in the MVP is via the PUT upsert response, not a report endpoint.
+
+## TASK-022 AuditLog RBAC
+
+Audit reporting:
+
+- Admin can view AuditLog rows through `GET /api/v1/audit-logs`.
+- Manager cannot access the AuditLog report and receives `403 AUDIT_REPORT_FORBIDDEN`.
+- Staff cannot access the AuditLog report and receives `403 AUDIT_REPORT_FORBIDDEN`.
+- Audit event creation is internal system behavior, not a role permission exposed to clients.
+- TASK-022 does not add Manager Department-scoped AuditLog reporting or User self-audit access.

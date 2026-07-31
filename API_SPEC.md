@@ -439,17 +439,379 @@ Not implemented yet:
 - Embeddings.
 - Preview endpoint.
 - Signed download URLs.
+
 ## 8. Chat
 
-Not implemented yet.
+Implemented Chat endpoints require an active authenticated User. Admin, Manager, and Staff can create and read only their own sessions; Admin does not bypass chat-session ownership.
+
+### POST `/chat/sessions`
+
+Request body is optional:
+
+```json
+{
+  "title": "Quy dinh nghi phep"
+}
+```
+
+Success: `HTTP 201`. The response contains session metadata only.
+
+### GET `/chat/sessions`
+
+Query parameters:
+
+- `page`, default `1`, must be `>= 1`.
+- `page_size`, default from `CHAT_SESSION_LIST_PAGE_SIZE`, maximum `CHAT_SESSION_LIST_MAX_PAGE_SIZE`.
+- `include_archived`, optional boolean, default `false`.
+
+Behavior:
+
+- Returns only sessions owned by the current User.
+- Ordering is `updated_at DESC, id DESC`.
+- `message_count` counts visible USER and ASSISTANT messages only.
+
+### GET `/chat/sessions/{session_id}`
+
+Query parameters:
+
+- `message_page`, default `1`, must be `>= 1`.
+- `message_page_size`, default from `CHAT_HISTORY_PAGE_SIZE`, maximum `CHAT_HISTORY_MAX_PAGE_SIZE`.
+
+Behavior:
+
+- Missing and non-owned sessions both return `404 CHAT_SESSION_NOT_FOUND`.
+- History returns USER and ASSISTANT messages only, ordered by `created_at ASC, id ASC`.
+- SYSTEM messages are hidden.
+- Assistant messages include `citations` for the current page, loaded in a batch query.
+- Historical citation metadata may be omitted if the current User no longer has access to the cited Document.
+- The historical Assistant answer text is not redacted in TASK-020.
+- `retrieval_query`, token usage, prompt, vectors, scores, storage keys, permission metadata, and internal source markers are not returned.
+
+### POST `/chat/sessions/{session_id}/messages`
+
+Request:
+
+```json
+{
+  "content": "Nhan vien duoc nghi phep bao nhieu ngay?"
+}
+```
+
+Rules:
+
+- Only `content` is accepted from the client.
+- Clients cannot set role, `user_id`, body `session_id`, model, temperature, max tokens, system prompt, Document IDs, retrieval mode, citations, or sources.
+- Missing and non-owned sessions both return `404 CHAT_SESSION_NOT_FOUND`.
+- Ownership is checked before history, retrieval, LLM, or persistence.
+- The service calls permission-aware `HybridRetrievalService` for context.
+- Empty retrieval or empty context returns a successful fixed no-answer and does not call the LLM.
+- LLM source markers are validated before the generated answer is returned or persisted.
+- Unknown, malformed, missing, or too many source markers return `502 CITATION_VALIDATION_FAILED` and persist no messages.
+- Permission revalidation failure after LLM generation downgrades to the fixed no-answer with empty citations.
+- USER, ASSISTANT, and MessageCitation rows are persisted atomically.
+
+Success: `HTTP 201`.
+
+Answered response example:
+
+```json
+{
+  "data": {
+    "session_id": "uuid",
+    "user_message": {
+      "id": "uuid",
+      "role": "USER",
+      "content": "Nhan vien duoc nghi phep bao nhieu ngay?",
+      "citations": [],
+      "created_at": "2026-07-20T00:00:00Z"
+    },
+    "assistant_message": {
+      "id": "uuid",
+      "role": "ASSISTANT",
+      "content": "Nhan vien duoc huong 12 ngay nghi phep moi nam [1].",
+      "citations": [
+        {
+          "document_id": "uuid",
+          "document_title": "Quy che nhan su",
+          "chunk_id": "uuid",
+          "page_number": 14,
+          "excerpt": "Nhan vien chinh thuc duoc huong 12 ngay nghi phep...",
+          "relevance_score": 0.87,
+          "citation_order": 1
+        }
+      ],
+      "created_at": "2026-07-20T00:00:01Z"
+    },
+    "grounding_status": "ANSWERED",
+    "retrieved_chunk_count": 3
+  },
+  "meta": null
+}
+```
+
+No-answer response:
+
+- `grounding_status` is `NO_ANSWER`.
+- Assistant `citations` is `[]`.
+- The answer contains no `[SOURCE_n]` marker.
+
+Inline answer markers are public numeric markers `[1]`, `[2]`, and match `citation_order`. The API does not expose citations as a top-level `sources` array.
+
+### POST `/chat/sessions/{session_id}/messages/stream`
+
+TASK-027 adds a backward-compatible SSE transport for chat answers. The existing `POST /chat/sessions/{session_id}/messages` endpoint keeps its JSON request, JSON response, status code, and error contract.
+
+Request:
+
+```http
+POST /api/v1/chat/sessions/{session_id}/messages/stream
+Accept: text/event-stream
+Content-Type: application/json
+Authorization: Bearer <access-token>
+```
+
+```json
+{
+  "content": "Synthetic question"
+}
+```
+
+Response headers on a started stream:
+
+```text
+Content-Type: text/event-stream
+Cache-Control: no-cache
+Connection: keep-alive
+X-Accel-Buffering: no
+```
+
+The response does not set `Content-Length`. Authentication, active-user checks, request validation, and chat rate limiting run before the stream is opened where possible. The endpoint does not accept JWTs in query strings.
+
+Event contract:
+
+```text
+stream.started
+message.delta
+citations.ready
+message.completed
+stream.error
+stream.cancelled
+heartbeat
+```
+
+Each event frame is UTF-8 SSE:
+
+```text
+id: <request-id>-<sequence>
+event: <event_name>
+data: <JSON>
+
+```
+
+Valid success order is `stream.started -> heartbeat* -> message.delta -> citations.ready? -> message.completed`. Valid failure order is `stream.started -> heartbeat* -> stream.error`. A terminal event is emitted at most once; no delta, citation, heartbeat, or completed event is emitted after a terminal event.
+
+`stream.started` includes safe metadata: `request_id`, `session_id`, selected provider name, selected model when configured, and `strategy="buffer_after_validation"`.
+
+`message.delta` contains:
+
+```json
+{
+  "sequence": 1,
+  "content": "Validated answer text"
+}
+```
+
+TASK-027 deliberately emits the validated final answer as one delta. It does not public-stream raw provider chunks because grounding and citation validation currently operate on the complete answer.
+
+`citations.ready` contains only the same safe citation payload shape used by the non-streaming Chat API. It is omitted when there are no citations.
+
+`message.completed` contains the final `message_id`, `session_id`, `content`, `citations`, selected `provider`, selected `model`, optional token `usage`, `grounding_status`, and `retrieved_chunk_count`.
+
+`stream.error` contains only safe client-facing fields:
+
+```json
+{
+  "code": "LLM_PROVIDER_BAD_RESPONSE",
+  "message": "Safe client-facing message",
+  "retryable": false
+}
+```
+
+The stream never sends API keys, provider headers, raw provider events, raw provider response bodies, prompts, retrieved context, chunk text, citation source registries, SQL details, stack traces, or internal exceptions.
+
+Persistence behavior matches the grounded Chat service: the USER message, ASSISTANT message, citations, and audit events are committed atomically only after retrieval, generation, grounding, citation validation, and final persistence succeed. Provider failure, grounding failure, citation failure, timeout, or disconnect persists no partial ASSISTANT message.
+
+Client disconnect is the TASK-027 stop-generation mechanism. The serving instance cancels active provider work where the underlying coroutine is cancellable and closes the HTTP stream. A cross-instance cancel endpoint is not included.
+
+Reverse proxies must disable buffering for SSE, avoid caching, and use a read timeout longer than `LLM_STREAM_MAX_DURATION_SECONDS` plus deployment margin.
+
+TASK-026 multi-LLM behavior:
+
+- Chat request bodies do not accept provider names, model names, API keys, endpoint URLs, or provider headers.
+- The default provider and model are selected server-side from configuration.
+- Provider/model override is not exposed in the public Chat API in TASK-026.
+- Safe provider display name, selected model display name, enabled/disabled state, configuration status, and standardized provider errors are prepared in the backend LLM service/registry layer for future Admin/UI use.
+- LLM disabled or misconfigured responses use the standard error envelope and safe LLM error codes from `API_ERROR_CODES.md`.
+- Provider timeout, rate limit, authentication, unavailable, rejected-request, and bad-response failures never include raw provider bodies, prompts, retrieved context, answers, citation excerpts, endpoint credentials, API keys, or request headers.
 
 ## 9. Feedback
 
-Not implemented yet.
+### PUT `/messages/{message_id}/feedback`
+
+Upserts the authenticated User's feedback for an owned ASSISTANT message.
+
+Request:
+
+```json
+{
+  "rating": "NOT_HELPFUL",
+  "reason": "Nguon chua phu hop"
+}
+```
+
+Rules:
+
+- `rating` must be `HELPFUL` or `NOT_HELPFUL`.
+- `reason` is optional, trimmed, and blank values become `null`.
+- `reason` must not exceed `FEEDBACK_REASON_MAX_CHARACTERS` and the database hard maximum of `1000` characters.
+- Client cannot send `message_id`, `user_id`, feedback id, timestamps, role, Department, or arbitrary metadata in the body.
+- The target query filters `chat_messages.id`, `chat_messages.role = ASSISTANT`, and `chat_sessions.user_id = current_user.id` in PostgreSQL.
+- Missing, non-owned, USER, and SYSTEM messages all return `404 FEEDBACK_TARGET_NOT_FOUND`.
+- Admin and Manager cannot submit feedback on another User's message.
+- Assistant no-answer messages can receive feedback.
+- The upsert is atomic through PostgreSQL `ON CONFLICT(message_id, user_id) DO UPDATE`.
+
+Success: `HTTP 200` for both create and update.
+
+Response:
+
+```json
+{
+  "data": {
+    "id": "uuid",
+    "message_id": "uuid",
+    "rating": "NOT_HELPFUL",
+    "reason": "Nguon chua phu hop",
+    "created_at": "2026-07-20T00:00:00Z",
+    "updated_at": "2026-07-20T00:00:00Z"
+  },
+  "meta": null
+}
+```
+
+The upsert response does not expose `user_id`, message content, question text, citations, retrieval query, token usage, Document metadata, or internal metadata.
+
+### GET `/feedback`
+
+Returns a paginated management report for Admin and Manager users.
+
+Query parameters:
+
+- `page`, default `1`, must be `>= 1`.
+- `page_size`, default `FEEDBACK_REPORT_PAGE_SIZE`, maximum `FEEDBACK_REPORT_MAX_PAGE_SIZE`.
+- `rating`, optional `HELPFUL` or `NOT_HELPFUL`.
+- `date_from`, optional timezone-aware datetime.
+- `date_to`, optional timezone-aware datetime.
+- `department_id`, optional Admin filter; Manager scope is still restricted to the Manager current Department.
+- `user_id`, optional Admin filter; Manager scope is still restricted to the Manager current Department.
+
+Behavior:
+
+- Admin sees all feedback after filters.
+- Manager sees only feedback submitted by Users whose current `users.department_id` matches the Manager current Department.
+- Manager with no Department receives `403 FEEDBACK_REPORT_SCOPE_UNAVAILABLE`.
+- Staff receives `403 FEEDBACK_REPORT_FORBIDDEN` and no partial own rows.
+- Scope and filters are applied in PostgreSQL before `LIMIT/OFFSET` and before `total` is computed.
+- Date filters use `feedback.updated_at`; invalid ranges return `422 FEEDBACK_DATE_RANGE_INVALID`.
+- Sorting is stable: `updated_at DESC, id DESC`.
+
+Response:
+
+```json
+{
+  "data": [
+    {
+      "id": "uuid",
+      "message_id": "uuid",
+      "user_id": "uuid",
+      "department_id": "uuid",
+      "rating": "HELPFUL",
+      "reason": null,
+      "created_at": "2026-07-20T00:00:00Z",
+      "updated_at": "2026-07-20T00:00:00Z"
+    }
+  ],
+  "meta": {
+    "page": 1,
+    "page_size": 20,
+    "total": 1,
+    "total_pages": 1
+  }
+}
+```
+
+The report does not return Assistant answers, User questions, session titles, Chat history, SYSTEM messages, retrieval query, token usage, prompts, citation excerpts, Document titles, storage keys, or permission metadata.
 
 ## 10. Audit logs
 
-Not implemented yet.
+### GET `/audit-logs`
+
+Returns an Admin-only paginated AuditLog report.
+
+Query parameters:
+
+- `page`, default `1`, must be `>= 1`.
+- `page_size`, default `AUDIT_REPORT_PAGE_SIZE`, maximum `AUDIT_REPORT_MAX_PAGE_SIZE`.
+- `event_type`, optional stable audit event type.
+- `outcome`, optional `SUCCESS` or `FAILURE`.
+- `actor_user_id`, optional actor UUID.
+- `target_type`, optional safe target type: `USER`, `DEPARTMENT`, `DOCUMENT`, `DOCUMENT_PERMISSION`, `CHAT_SESSION`, `CHAT_MESSAGE`, or `FEEDBACK`.
+- `target_id`, optional target UUID.
+- `date_from`, optional timezone-aware datetime using `audit_logs.created_at`.
+- `date_to`, optional timezone-aware datetime using `audit_logs.created_at`.
+- `request_id`, optional exact correlation id.
+- `error_code`, optional sanitized error code.
+
+Behavior:
+
+- Admin receives global AuditLog rows after filters.
+- Manager and Staff receive `403 AUDIT_REPORT_FORBIDDEN` and no partial rows.
+- Missing or invalid Bearer token receives the standard authentication error.
+- Filters and total counts are applied in PostgreSQL before `LIMIT/OFFSET`.
+- Sorting is stable: `created_at DESC, id DESC`.
+- Invalid date ranges return `422 AUDIT_DATE_RANGE_INVALID`.
+- Invalid enum/string filters return `422 AUDIT_FILTER_INVALID`.
+- Reading AuditLog does not create an audit event.
+- There is no public create, update, delete, export, dashboard, or SIEM AuditLog API.
+
+Response:
+
+```json
+{
+  "items": [
+    {
+      "id": "uuid",
+      "event_type": "FEEDBACK_UPSERTED",
+      "outcome": "SUCCESS",
+      "actor_user_id": "uuid",
+      "target_type": "FEEDBACK",
+      "target_id": "uuid",
+      "request_id": null,
+      "error_code": null,
+      "metadata": {
+        "rating": "HELPFUL"
+      },
+      "created_at": "2026-07-22T00:00:00Z"
+    }
+  ],
+  "page": 1,
+  "page_size": 50,
+  "total": 1,
+  "total_pages": 1
+}
+```
+
+The report does not return actor email, actor full name, request/response bodies, raw headers, exceptions, stack traces, Chat question/answer content, prompts, retrieved context, citation excerpts, Feedback reason, Document filename, storage path, storage key, API key, access token, or refresh token.
 
 ## 11. Health
 
@@ -458,3 +820,29 @@ Not implemented yet.
 
 Readiness checks database connectivity.
 
+## TASK-025 hardening errors
+
+All API error responses keep the standard envelope:
+
+```json
+{
+  "error": {
+    "code": "ERROR_CODE",
+    "message": "Safe message.",
+    "details": null,
+    "request_id": null
+  }
+}
+```
+
+Additional hardening responses:
+
+- `REQUEST_TOO_LARGE` with HTTP `413` for request bodies over `MAX_REQUEST_BODY_BYTES`.
+- `RATE_LIMIT_EXCEEDED` with HTTP `429` and `Retry-After` for configured endpoint rate limits.
+- `DOCUMENT_FILE_TOO_LARGE` with HTTP `413` for upload stream size violations.
+- `DOCUMENT_FILE_EMPTY` with HTTP `400` for empty uploads.
+- `DOCUMENT_FILE_TYPE_INVALID` with HTTP `415` for unsupported extension or MIME type.
+- `DOCUMENT_FILE_SIGNATURE_INVALID` with HTTP `415` for missing/invalid `%PDF-` signature.
+- `DOCUMENT_FILENAME_INVALID` with HTTP `400` for missing, empty, or overlong filenames.
+
+Production can disable `/docs`, `/redoc`, and `/openapi.json` with `API_DOCS_ENABLED=false`; health and API routes remain available.

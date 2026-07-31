@@ -12,9 +12,12 @@ from fastapi import UploadFile
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.audit import AuditEventType, AuditTargetType
 from app.core.exceptions import (
     ApplicationError,
     BusinessValidationError,
+    DocumentFilenameInvalidError,
+    DocumentFileSignatureInvalidError,
     DocumentFileUnavailableError,
     DuplicateDocumentError,
     EmptyFileError,
@@ -36,6 +39,7 @@ from app.models import (
 from app.repositories import department_repository, document_repository
 from app.schemas.common import PaginationMeta, build_pagination_meta, calculate_offset
 from app.schemas.document import DocumentUpdate
+from app.services.audit_service import AuditContext, AuditService
 from app.storage.base import FileStorage
 from app.storage.local import StorageError
 
@@ -106,7 +110,7 @@ class UploadFileProcessor:
         if self.total_size == 0:
             raise EmptyFileError()
         if not self._signature_checked:
-            raise InvalidFileTypeError()
+            raise DocumentFileSignatureInvalidError()
 
     def _validate_signature_chunk(self, chunk: bytes) -> None:
         if self._signature_checked:
@@ -117,7 +121,7 @@ class UploadFileProcessor:
             return
         self._signature_checked = True
         if bytes(self._signature_prefix) != PDF_SIGNATURE:
-            raise InvalidFileTypeError()
+            raise DocumentFileSignatureInvalidError()
 
 
 class DocumentService:
@@ -143,6 +147,7 @@ class DocumentService:
         access_scope: DocumentAccessScope,
         department_id: UUID | None,
         current_user: User,
+        audit_context: AuditContext | None = None,
     ) -> Document:
         storage = self._require_storage()
         upload_limits = self._require_upload_limits()
@@ -190,6 +195,17 @@ class DocumentService:
                 uploaded_by=current_user.id,
             )
             await self.session.flush()
+            await AuditService(self.session).record_success(
+                actor_user_id=current_user.id,
+                event_type=AuditEventType.DOCUMENT_UPLOADED,
+                target_type=AuditTargetType.DOCUMENT,
+                target_id=document.id,
+                context=audit_context,
+                metadata={
+                    "document_status": document.status,
+                    "access_scope": document.access_scope,
+                },
+            )
             await self.session.commit()
             await self.session.refresh(document)
             file_saved = False
@@ -280,6 +296,7 @@ class DocumentService:
         *,
         document_id: UUID,
         current_user: User,
+        audit_context: AuditContext | None = None,
     ) -> DocumentDownload:
         storage = self._require_storage()
         upload_limits = self._require_upload_limits()
@@ -296,6 +313,14 @@ class DocumentService:
             raise DocumentFileUnavailableError() from exc
         if not file_exists:
             raise DocumentFileUnavailableError()
+        await AuditService(self.session).record_success(
+            actor_user_id=current_user.id,
+            event_type=AuditEventType.DOCUMENT_DOWNLOADED,
+            target_type=AuditTargetType.DOCUMENT,
+            target_id=document.id,
+            context=audit_context,
+            metadata={},
+        )
         await self.session.commit()
         return DocumentDownload(
             filename=filename,
@@ -310,6 +335,7 @@ class DocumentService:
         document_id: UUID,
         payload: DocumentUpdate,
         current_user: User,
+        audit_context: AuditContext | None = None,
     ) -> Document:
         try:
             document = await self._get_viewable_document_or_404(
@@ -347,6 +373,17 @@ class DocumentService:
                 final_department_id=final_department_id,
             )
             await self.session.flush()
+            metadata: dict[str, object] = {}
+            if changes_scope:
+                metadata["access_scope"] = document.access_scope
+            await AuditService(self.session).record_success(
+                actor_user_id=current_user.id,
+                event_type=AuditEventType.DOCUMENT_UPDATED,
+                target_type=AuditTargetType.DOCUMENT,
+                target_id=document.id,
+                context=audit_context,
+                metadata=metadata,
+            )
             await self.session.commit()
             await self.session.refresh(document)
         except IntegrityError as exc:
@@ -362,6 +399,7 @@ class DocumentService:
         *,
         document_id: UUID,
         current_user: User,
+        audit_context: AuditContext | None = None,
     ) -> None:
         try:
             document = await document_repository.get_by_id_including_deleted(
@@ -387,8 +425,17 @@ class DocumentService:
                 raise ResourceNotFoundError()
             if not can_manage_document(current_user, document, direct_permission):
                 raise PermissionDeniedError()
+            status_before = document.status
             document.is_deleted = True
             await self.session.flush()
+            await AuditService(self.session).record_success(
+                actor_user_id=current_user.id,
+                event_type=AuditEventType.DOCUMENT_DELETED,
+                target_type=AuditTargetType.DOCUMENT,
+                target_id=document.id,
+                context=audit_context,
+                metadata={"status_before": status_before},
+            )
             await self.session.commit()
         except Exception:
             await self.session.rollback()
@@ -614,15 +661,15 @@ def normalize_search(search: str | None) -> str | None:
 
 def sanitize_original_filename(filename: str | None) -> str:
     if filename is None:
-        raise InvalidFileTypeError()
+        raise DocumentFilenameInvalidError()
     normalized = filename.replace("\\", "/").split("/")[-1].strip()
     normalized = "".join(
         character for character in normalized if character >= " " and character != "\x7f"
     )
     if not normalized:
-        raise InvalidFileTypeError()
+        raise DocumentFilenameInvalidError()
     if len(normalized) > MAX_ORIGINAL_FILENAME_LENGTH:
-        raise BusinessValidationError("Original filename is too long.")
+        raise DocumentFilenameInvalidError()
     return normalized
 
 

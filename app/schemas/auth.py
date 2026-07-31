@@ -2,21 +2,20 @@ from __future__ import annotations
 
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, SecretStr, field_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 
 from app.models import User, UserRole
+from app.schemas.email import normalize_email_address
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    email: str
     password: SecretStr = Field(min_length=1)
 
     @field_validator("email", mode="before")
     @classmethod
-    def normalize_email(cls, value: object) -> object:
-        if isinstance(value, str):
-            return value.strip().lower()
-        return value
+    def normalize_email(cls, value: object) -> str:
+        return normalize_email_address(value)
 
 
 class RefreshTokenRequest(BaseModel):

@@ -16,9 +16,12 @@ env/
 
 # Test and lint caches
 .coverage
+coverage.xml
 htmlcov/
 .pytest_cache/
 .ruff_cache/
+.ci-data/
+reports/
 
 # Build artifacts
 build/
@@ -33,3 +36,15 @@ logs/
 # IDE
 .vscode/
 .idea/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/coverage/
+frontend/playwright-report/
+frontend/test-results/
+frontend/*.tsbuildinfo
+frontend/*.js
+frontend/*.d.ts
+artifacts/
+

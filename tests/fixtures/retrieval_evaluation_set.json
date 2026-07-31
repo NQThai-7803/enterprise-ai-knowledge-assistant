@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "purpose": "MVP retrieval release-readiness evaluation fixture. This is static test data only; it does not change retrieval behavior.",
+  "items": [
+    {
+      "id": "policy-benefits-en",
+      "query": "What benefits are available to employees?",
+      "expected_document_title": "Employee Handbook",
+      "expected_terms": ["benefits", "employee", "policy"],
+      "permission_scope": "authorized_user"
+    },
+    {
+      "id": "security-vn",
+      "query": "Chính sách bảo mật nội bộ yêu cầu gì?",
+      "expected_document_title": "Security Policy",
+      "expected_terms": ["bảo mật", "nội bộ", "chính sách"],
+      "permission_scope": "authorized_user"
+    },
+    {
+      "id": "access-denied-private",
+      "query": "Find private payroll notes",
+      "expected_document_title": null,
+      "expected_terms": [],
+      "permission_scope": "unauthorized_user"
+    }
+  ]
+}

@@ -15,9 +15,9 @@ PDF_BYTES = b"%PDF-1.7\nunit upload enqueue"
 
 
 class FakeUploadFile:
-    def __init__(self, content: bytes = PDF_BYTES) -> None:
+    def __init__(self, content: bytes = PDF_BYTES, *, filename: str = "enqueue.pdf") -> None:
         self.content = content
-        self.filename = "enqueue.pdf"
+        self.filename = filename
         self.content_type = "application/pdf"
         self.offset = 0
 
@@ -61,6 +61,10 @@ class FakeSession:
         self.rollback_count = 0
         self.refreshed = False
         self.events: list[str] = []
+        self.added: list[object] = []
+
+    def add(self, item: object) -> None:
+        self.added.append(item)
 
     async def flush(self) -> None:
         self.events.append("flush")
@@ -135,6 +139,7 @@ async def upload_with(
     storage: FakeStorage | None = None,
     enqueue_processing=None,
     content: bytes = PDF_BYTES,
+    filename: str = "enqueue.pdf",
 ) -> tuple[Document, FakeSession, FakeStorage]:
     fake_session = session or FakeSession()
     fake_storage = storage or FakeStorage()
@@ -145,7 +150,7 @@ async def upload_with(
         enqueue_processing=enqueue_processing,
     )
     document = await service.upload_document(
-        file=FakeUploadFile(content),
+        file=FakeUploadFile(content, filename=filename),
         title="Enqueue PDF",
         description=None,
         access_scope=DocumentAccessScope.PRIVATE,
@@ -312,3 +317,27 @@ async def test_enqueue_failure_does_not_expose_broker_error(
 
     assert "redis://" not in caplog.text
     assert "password" not in caplog.text
+
+
+@pytest.mark.anyio
+async def test_file_removed_after_database_failure() -> None:
+    session = FakeSession(fail_flush=True)
+    storage = FakeStorage()
+
+    with pytest.raises(InternalServerError):
+        await upload_with(session=session, storage=storage)
+
+    assert storage.saved_key is not None
+    assert storage.deleted_keys == [storage.saved_key]
+
+
+@pytest.mark.anyio
+async def test_upload_audit_metadata_does_not_store_original_filename() -> None:
+    marker = "confidential-original-name.pdf"
+    _, session, _ = await upload_with(filename=marker)
+
+    audit_logs = [item for item in session.added if hasattr(item, "metadata_json")]
+
+    assert audit_logs
+    assert marker not in repr([audit_log.metadata_json for audit_log in audit_logs])
+    assert "filename" not in repr([audit_log.metadata_json for audit_log in audit_logs]).lower()

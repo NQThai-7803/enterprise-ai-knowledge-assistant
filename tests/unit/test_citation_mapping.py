@@ -1,0 +1,129 @@
+from __future__ import annotations
+
+from uuid import UUID
+
+import pytest
+
+from app.chat.models import SelectedContextItem
+from app.citations.errors import CitationMappingError
+from app.citations.excerpt import build_excerpt
+from app.citations.mapper import map_validated_citations, rewrite_internal_markers
+from app.citations.registry import build_prompt_source_registry
+
+
+def item(index: int, *, semantic_score: float | None = 0.87) -> SelectedContextItem:
+    return SelectedContextItem(
+        ordinal=index,
+        text="Nhân viên chính thức được hưởng 12 ngày nghỉ phép theo HD-2026-AL.",
+        token_count=10,
+        chunk_id=UUID(f"00000000-0000-0000-0000-{index:012d}"),
+        document_id=UUID(f"00000000-0000-0000-0001-{index:012d}"),
+        document_title=f"Quy chế {index}",
+        page_numbers=(index,),
+        start_page=index,
+        end_page=index,
+        semantic_score=semantic_score,
+        keyword_score=1.2 if semantic_score is None else None,
+        hybrid_score=1.0,
+    )
+
+
+def registry():
+    return build_prompt_source_registry(context_items=(item(1), item(2)), max_sources=8)
+
+
+def test_internal_marker_rewritten_to_public_number() -> None:
+    assert rewrite_internal_markers("A [SOURCE_1].", {"[SOURCE_1]": "[1]"}) == "A [1]."
+
+
+def test_non_contiguous_internal_markers_are_renumbered() -> None:
+    answer = "A [SOURCE_4]. B [SOURCE_2]. A again [SOURCE_4]."
+
+    rewritten = rewrite_internal_markers(answer, {"[SOURCE_4]": "[1]", "[SOURCE_2]": "[2]"})
+
+    assert rewritten == "A [1]. B [2]. A again [1]."
+
+
+def test_rewrite_preserves_non_marker_text_and_vietnamese() -> None:
+    answer = "Nhân viên được nghỉ phép [SOURCE_1]. [SOURCE_X]"
+
+    rewritten = rewrite_internal_markers(answer, {"[SOURCE_1]": "[1]"})
+
+    assert rewritten == "Nhân viên được nghỉ phép [1]. [SOURCE_X]"
+
+
+def test_excerpt_preserves_vietnamese_and_business_identifier() -> None:
+    excerpt = build_excerpt(
+        source_text="  Nhân viên dùng mã HD-2026-AL được nghỉ phép.  ",
+        max_characters=80,
+    )
+
+    assert excerpt == "Nhân viên dùng mã HD-2026-AL được nghỉ phép."
+
+
+def test_excerpt_respects_maximum_length_and_adds_ellipsis() -> None:
+    excerpt = build_excerpt(source_text="Một hai ba bốn năm sáu", max_characters=12)
+
+    assert len(excerpt) <= 12
+    assert excerpt.endswith("…")
+
+
+def test_excerpt_rejects_blank_source() -> None:
+    with pytest.raises(ValueError):
+        build_excerpt(source_text="   ", max_characters=20)
+
+
+def test_mapping_uses_backend_metadata_and_order() -> None:
+    source_registry = registry()
+
+    mapped = map_validated_citations(
+        answer="Nghỉ phép là 12 ngày [SOURCE_2]. Chính sách áp dụng [SOURCE_1].",
+        ordered_markers=("[SOURCE_2]", "[SOURCE_1]"),
+        source_registry=source_registry,
+        document_titles_by_id={
+            source.document_id: f"Current {source.document_title}"
+            for source in source_registry.sources
+        },
+        excerpt_max_characters=500,
+    )
+
+    assert mapped.answer == "Nghỉ phép là 12 ngày [1]. Chính sách áp dụng [2]."
+    assert [citation.citation_order for citation in mapped.citations] == [1, 2]
+    assert mapped.citations[0].document_id == item(2).document_id
+    assert mapped.citations[0].chunk_id == item(2).chunk_id
+    assert mapped.citations[0].page_number == 2
+    assert mapped.citations[0].document_title == "Current Quy chế 2"
+    assert "Nhân viên chính thức" in mapped.citations[0].excerpt
+    assert mapped.citations[0].relevance_score == 0.87
+
+
+def test_mapping_uses_null_relevance_for_keyword_only() -> None:
+    source_registry = build_prompt_source_registry(
+        context_items=(item(1, semantic_score=None),),
+        max_sources=8,
+    )
+
+    mapped = map_validated_citations(
+        answer="A [SOURCE_1].",
+        ordered_markers=("[SOURCE_1]",),
+        source_registry=source_registry,
+        document_titles_by_id={source_registry.sources[0].document_id: "Current"},
+        excerpt_max_characters=500,
+    )
+
+    assert mapped.citations[0].relevance_score is None
+
+
+def test_mapping_fails_when_page_metadata_is_invalid() -> None:
+    source_registry = build_prompt_source_registry(context_items=(item(1),), max_sources=8)
+    bad_source = source_registry.sources[0]
+    object.__setattr__(bad_source, "page_numbers", (2,))
+
+    with pytest.raises(CitationMappingError):
+        map_validated_citations(
+            answer="A [SOURCE_1].",
+            ordered_markers=("[SOURCE_1]",),
+            source_registry=source_registry,
+            document_titles_by_id={bad_source.document_id: "Current"},
+            excerpt_max_characters=500,
+        )

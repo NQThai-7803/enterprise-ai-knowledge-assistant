@@ -3,11 +3,13 @@ from __future__ import annotations
 from typing import Annotated, Literal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, Query, Response, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, Query, Request, Response, UploadFile, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import (
+    enforce_upload_rate_limit,
+    get_audit_context,
     get_current_user,
     get_document_processing_enqueue,
     get_document_upload_limits,
@@ -33,6 +35,7 @@ from app.schemas.document import (
     DocumentUpdate,
     DocumentUploadResponse,
 )
+from app.services.audit_service import AuditContext
 from app.services.document_permission_service import DocumentPermissionService
 from app.services.document_service import (
     DocumentService,
@@ -51,6 +54,7 @@ router = APIRouter(prefix="/documents", tags=["Documents"])
     status_code=status.HTTP_202_ACCEPTED,
 )
 async def upload_document(
+    request: Request,
     file: Annotated[UploadFile, File()],
     title: Annotated[str, Form(max_length=255)],
     access_scope: Annotated[DocumentAccessScope, Form()],
@@ -61,9 +65,11 @@ async def upload_document(
     enqueue_processing: Annotated[
         EnqueueDocumentProcessing, Depends(get_document_processing_enqueue)
     ],
+    audit_context: Annotated[AuditContext, Depends(get_audit_context)],
     description: Annotated[str | None, Form()] = None,
     department_id: Annotated[UUID | None, Form()] = None,
 ) -> DataResponse[DocumentUploadResponse]:
+    await enforce_upload_rate_limit(request, current_user)
     document = await DocumentService(
         session,
         storage=storage,
@@ -76,6 +82,7 @@ async def upload_document(
         access_scope=access_scope,
         department_id=department_id,
         current_user=current_user,
+        audit_context=audit_context,
     )
     return DataResponse[DocumentUploadResponse](
         data=DocumentUploadResponse.from_document(document),
@@ -136,6 +143,7 @@ async def download_document(
     session: Annotated[AsyncSession, Depends(get_db_session)],
     storage: Annotated[FileStorage, Depends(get_file_storage)],
     upload_limits: Annotated[DocumentUploadLimits, Depends(get_document_upload_limits)],
+    audit_context: Annotated[AuditContext, Depends(get_audit_context)],
 ) -> StreamingResponse:
     download = await DocumentService(
         session,
@@ -144,6 +152,7 @@ async def download_document(
     ).get_document_download(
         document_id=document_id,
         current_user=current_user,
+        audit_context=audit_context,
     )
     return StreamingResponse(
         download.chunks,
@@ -183,11 +192,13 @@ async def create_document_permission(
     payload: DocumentPermissionCreate,
     current_user: Annotated[User, Depends(require_admin)],
     session: Annotated[AsyncSession, Depends(get_db_session)],
+    audit_context: Annotated[AuditContext, Depends(get_audit_context)],
 ) -> DataResponse[DocumentPermissionResponse]:
     permission = await DocumentPermissionService(session).create_permission(
         document_id=document_id,
         payload=payload,
         current_user=current_user,
+        audit_context=audit_context,
     )
     return DataResponse[DocumentPermissionResponse](
         data=DocumentPermissionResponse.from_permission(permission),
@@ -205,11 +216,14 @@ async def update_document_permission(
     payload: DocumentPermissionUpdate,
     current_user: Annotated[User, Depends(require_admin)],
     session: Annotated[AsyncSession, Depends(get_db_session)],
+    audit_context: Annotated[AuditContext, Depends(get_audit_context)],
 ) -> DataResponse[DocumentPermissionResponse]:
     permission = await DocumentPermissionService(session).update_permission(
         document_id=document_id,
         permission_id=permission_id,
         payload=payload,
+        current_user=current_user,
+        audit_context=audit_context,
     )
     return DataResponse[DocumentPermissionResponse](
         data=DocumentPermissionResponse.from_permission(permission),
@@ -226,10 +240,13 @@ async def delete_document_permission(
     permission_id: UUID,
     current_user: Annotated[User, Depends(require_admin)],
     session: Annotated[AsyncSession, Depends(get_db_session)],
+    audit_context: Annotated[AuditContext, Depends(get_audit_context)],
 ) -> Response:
     await DocumentPermissionService(session).delete_permission(
         document_id=document_id,
         permission_id=permission_id,
+        current_user=current_user,
+        audit_context=audit_context,
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -256,11 +273,13 @@ async def update_document(
     payload: DocumentUpdate,
     current_user: Annotated[User, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_db_session)],
+    audit_context: Annotated[AuditContext, Depends(get_audit_context)],
 ) -> DataResponse[DocumentDetailResponse]:
     document = await DocumentService(session).update_document(
         document_id=document_id,
         payload=payload,
         current_user=current_user,
+        audit_context=audit_context,
     )
     return DataResponse[DocumentDetailResponse](
         data=DocumentDetailResponse.from_document(document),
@@ -273,9 +292,11 @@ async def delete_document(
     document_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_db_session)],
+    audit_context: Annotated[AuditContext, Depends(get_audit_context)],
 ) -> Response:
     await DocumentService(session).soft_delete_document(
         document_id=document_id,
         current_user=current_user,
+        audit_context=audit_context,
     )
     return Response(status_code=status.HTTP_204_NO_CONTENT)

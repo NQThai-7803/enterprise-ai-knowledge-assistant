@@ -27,6 +27,8 @@ celery_app.conf.update(
     task_acks_late=settings.celery_task_acks_late,
     task_reject_on_worker_lost=settings.celery_task_reject_on_worker_lost,
     worker_prefetch_multiplier=settings.celery_worker_prefetch_multiplier,
-    broker_connection_retry_on_startup=True,
+    broker_connection_retry_on_startup=settings.celery_broker_connection_retry_on_startup,
+    task_soft_time_limit=settings.celery_task_soft_time_limit_seconds,
+    task_time_limit=settings.celery_task_time_limit_seconds,
     result_expires=settings.celery_result_expires_seconds,
 )

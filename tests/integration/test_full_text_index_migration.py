@@ -130,7 +130,7 @@ def test_downgrade_removes_only_full_text_index(
     async_session_factory_for_tests: async_sessionmaker[AsyncSession],
 ) -> None:
     async def scenario() -> None:
-        run_alembic(integration_database_url, "downgrade", "-1")
+        run_alembic(integration_database_url, "downgrade", "e0528b8ba735")
         try:
             async with async_session_factory_for_tests() as session:
                 assert await indexdef(session, "ix_document_chunks_text_fts_simple") is None
@@ -155,7 +155,7 @@ def test_reupgrade_restores_full_text_index(
     async_session_factory_for_tests: async_sessionmaker[AsyncSession],
 ) -> None:
     async def scenario() -> None:
-        run_alembic(integration_database_url, "downgrade", "-1")
+        run_alembic(integration_database_url, "downgrade", "e0528b8ba735")
         try:
             async with async_session_factory_for_tests() as session:
                 assert await indexdef(session, "ix_document_chunks_text_fts_simple") is None

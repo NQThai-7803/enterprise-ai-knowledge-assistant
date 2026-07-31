@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
 
+from app.audit import AuditEventType, AuditTargetType
 from app.core.exceptions import (
     BusinessValidationError,
     LastActiveAdminError,
@@ -19,7 +20,7 @@ from app.models import User, UserRole
 from app.repositories import department_repository, refresh_token_repository, user_repository
 from app.schemas.common import PaginationMeta, build_pagination_meta, calculate_offset
 from app.schemas.user import UserCreate, UserUpdate
-from app.services.audit_service import AuditAction, AuditContext, AuditService
+from app.services.audit_service import AuditContext, AuditService
 
 USER_SAFE_AUDIT_FIELDS = ("email", "full_name", "role", "department_id", "is_active")
 
@@ -106,15 +107,15 @@ class UserService:
                 department_id=department_id,
             )
             await self.session.flush()
-            await AuditService(self.session).create_audit_log(
+            await AuditService(self.session).record_success(
                 actor_user_id=actor_user_id,
-                action=AuditAction.USER_CREATED.value,
-                entity_type="User",
-                entity_id=user.id,
+                event_type=AuditEventType.USER_CREATED,
+                target_type=AuditTargetType.USER,
+                target_id=user.id,
                 context=audit_context,
                 metadata={
-                    "email": user.email,
                     "role": user.role,
+                    "status_after": _user_status(user.is_active),
                     "department_id": user.department_id,
                 },
             )
@@ -178,31 +179,32 @@ class UserService:
                 await self.session.commit()
                 return user
 
-            action = AuditAction.USER_UPDATED.value
+            action = AuditEventType.USER_UPDATED
             if before["is_active"] is True and after["is_active"] is False:
                 await refresh_token_repository.revoke_all_active_for_user(
                     self.session,
                     user_id=user.id,
                     revoked_at=utc_now(),
                 )
-                action = AuditAction.USER_DEACTIVATED.value
+                action = AuditEventType.USER_STATUS_CHANGED
             elif before["is_active"] is False and after["is_active"] is True:
-                action = AuditAction.USER_REACTIVATED.value
+                action = AuditEventType.USER_STATUS_CHANGED
 
             await self.session.flush()
-            await AuditService(self.session).create_audit_log(
+            metadata: dict[str, object] = {
+                "role": user.role,
+                "department_id": user.department_id,
+            }
+            if "is_active" in changed_fields:
+                metadata["status_before"] = _user_status(before["is_active"])
+                metadata["status_after"] = _user_status(after["is_active"])
+            await AuditService(self.session).record_success(
                 actor_user_id=current_user.id,
-                action=action,
-                entity_type="User",
-                entity_id=user.id,
+                event_type=action,
+                target_type=AuditTargetType.USER,
+                target_id=user.id,
                 context=audit_context,
-                metadata={
-                    "changed_fields": changed_fields,
-                    "before": {field: before[field] for field in changed_fields},
-                    "after": {field: after[field] for field in changed_fields},
-                    "role": user.role,
-                    "department_id": user.department_id,
-                },
+                metadata=metadata,
             )
             await self.session.commit()
             await self.session.refresh(user)
@@ -246,16 +248,15 @@ class UserService:
                 revoked_at=utc_now(),
             )
             await self.session.flush()
-            await AuditService(self.session).create_audit_log(
+            await AuditService(self.session).record_success(
                 actor_user_id=current_user.id,
-                action=AuditAction.USER_DEACTIVATED.value,
-                entity_type="User",
-                entity_id=user.id,
+                event_type=AuditEventType.USER_STATUS_CHANGED,
+                target_type=AuditTargetType.USER,
+                target_id=user.id,
                 context=audit_context,
                 metadata={
-                    "changed_fields": ["is_active"],
-                    "before": {"is_active": before["is_active"]},
-                    "after": {"is_active": after["is_active"]},
+                    "status_before": _user_status(before["is_active"]),
+                    "status_after": _user_status(after["is_active"]),
                     "role": user.role,
                     "department_id": user.department_id,
                 },
@@ -362,3 +363,7 @@ def _user_audit_snapshot(user: User) -> dict[str, Any]:
         "department_id": user.department_id,
         "is_active": user.is_active,
     }
+
+
+def _user_status(is_active: bool) -> str:
+    return "ACTIVE" if is_active else "INACTIVE"

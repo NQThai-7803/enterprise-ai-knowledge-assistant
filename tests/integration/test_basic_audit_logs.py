@@ -81,7 +81,9 @@ async def count_audit_logs(session: AsyncSession, action: AuditAction | None = N
 
 
 async def latest_audit_log(session: AsyncSession) -> AuditLog:
-    audit_log = await session.scalar(select(AuditLog).order_by(AuditLog.created_at.desc()))
+    audit_log = await session.scalar(
+        select(AuditLog).order_by(AuditLog.created_at.desc(), AuditLog.id.desc())
+    )
     assert audit_log is not None
     return audit_log
 
@@ -151,7 +153,7 @@ def test_deactivate_user_creates_audit_log(
                 audit_context=AuditContext(),
             )
 
-            assert await count_audit_logs(session, AuditAction.USER_DEACTIVATED) == 1
+            assert await count_audit_logs(session, AuditAction.USER_STATUS_CHANGED) == 1
 
     run_async(scenario())
 
@@ -176,7 +178,7 @@ def test_reactivate_user_creates_audit_log(
                 audit_context=AuditContext(),
             )
 
-            assert await count_audit_logs(session, AuditAction.USER_REACTIVATED) == 1
+            assert await count_audit_logs(session, AuditAction.USER_STATUS_CHANGED) == 1
 
     run_async(scenario())
 
@@ -326,5 +328,55 @@ def test_audit_insert_failure_rolls_back_business_mutation(
                 )
 
             assert await session.scalar(select(User).where(User.email == email)) is None
+
+    run_async(scenario())
+
+
+def test_admin_audit_metadata_has_no_email(
+    async_session_factory_for_tests: async_sessionmaker[AsyncSession],
+) -> None:
+    async def scenario() -> None:
+        marker = "confidential-audit-email@example.com"
+        async with async_session_factory_for_tests() as session:
+            admin = await create_admin(session)
+            department = await create_department_record(session)
+
+            await UserService(session).create_user(
+                payload=user_create_payload(department.id, email=marker),
+                current_user=admin,
+                audit_context=AuditContext(),
+            )
+            audit_log = await latest_audit_log(session)
+
+            assert marker not in str(audit_log.metadata_json)
+            assert "email" not in str(audit_log.metadata_json).lower()
+
+    run_async(scenario())
+
+
+def test_admin_audit_metadata_has_no_full_name(
+    async_session_factory_for_tests: async_sessionmaker[AsyncSession],
+) -> None:
+    async def scenario() -> None:
+        marker = "CONFIDENTIAL_AUDIT_FULL_NAME"
+        async with async_session_factory_for_tests() as session:
+            admin = await create_admin(session)
+            department = await create_department_record(session)
+
+            await UserService(session).create_user(
+                payload=UserCreate(
+                    email=f"created-{uuid.uuid4()}@example.com",
+                    full_name=marker,
+                    password="StrongPassword123!",
+                    role=UserRole.STAFF,
+                    department_id=department.id,
+                ),
+                current_user=admin,
+                audit_context=AuditContext(),
+            )
+            audit_log = await latest_audit_log(session)
+
+            assert marker not in str(audit_log.metadata_json)
+            assert "full_name" not in str(audit_log.metadata_json).lower()
 
     run_async(scenario())

@@ -259,3 +259,55 @@ Not implemented yet:
 - Query rewriting.
 - Public Search API.
 - Feedback loops.
+
+## TASK-019 grounded answer generation
+
+Implemented Chat RAG answer flow:
+
+```text
+User question
+    -> owned ChatSession lookup
+    -> recent visible history
+    -> HybridRetrievalService
+    -> token-budget context selection
+    -> grounded prompt
+    -> LLMProvider
+    -> no-answer sentinel mapping
+    -> atomic message persistence
+```
+
+- The prompt instructs the model to answer only from retrieved context.
+- Retrieved context is explicitly untrusted and cannot override system instructions.
+- No context skips the LLM and returns the fixed no-answer.
+- No-answer sentinel output is mapped to the fixed public message.
+- Citations were not requested in TASK-019.
+
+## TASK-020 citation validation
+
+Implemented backend-managed citations:
+
+- Backend source markers are generated for selected context only: `[SOURCE_1]`, `[SOURCE_2]`, and so on.
+- Marker numbering follows final context ranking after token budget and source-count limits.
+- The prompt asks for exact source markers and does not request citation JSON or source objects.
+- The parser accepts only `[SOURCE_<positive integer>]` markers.
+- ANSWERED outputs require at least one known marker.
+- Missing, malformed, unknown, or too many markers fail validation safely.
+- Valid internal markers are normalized to public numeric markers `[1]`, `[2]` after validation.
+- Duplicate markers create one citation object.
+- Marker-to-source mapping uses only the backend PromptSourceRegistry.
+- LLM output is never trusted for `document_id`, `chunk_id`, page number, document title, excerpt, relevance score, or permission metadata.
+- Permission is revalidated in PostgreSQL after LLM generation and before persistence/response.
+- Revoked, deleted, archived, non-ready, missing, or unauthorized cited sources downgrade the response to NO_ANSWER with empty citations.
+- Server-generated excerpts come from chunk text and are bounded by `CITATION_EXCERPT_MAX_CHARACTERS`.
+- Citations are persisted with the ASSISTANT message in the same transaction.
+- Chat history loads citations for the current message page in a batch query.
+
+Not implemented yet:
+
+- Feedback.
+- Citation quality evaluation dashboard.
+- Citation correction workflow.
+- Historical answer redaction after permission revoke.
+- Streaming responses.
+- Reranking.
+- Claim-level semantic citation verification.

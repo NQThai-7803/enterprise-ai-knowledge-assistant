@@ -602,10 +602,15 @@ def test_permission_crud_and_immediate_effect(
                 document_id=document.id,
                 permission_id=created.id,
                 payload=DocumentPermissionUpdate(permission=DocumentPermissionLevel.MANAGE),
+                current_user=admin,
             )
             assert updated.permission == DocumentPermissionLevel.MANAGE
 
-            await service.delete_permission(document_id=document.id, permission_id=created.id)
+            await service.delete_permission(
+                document_id=document.id,
+                permission_id=created.id,
+                current_user=admin,
+            )
             assert document.id not in await document_ids_for_user(session, staff)
 
     run_async(scenario())
@@ -637,7 +642,11 @@ def test_department_grant_and_removed_grant_does_not_remove_scope_access(
             )
 
             assert private_doc.id in await document_ids_for_user(session, staff)
-            await service.delete_permission(document_id=private_doc.id, permission_id=grant.id)
+            await service.delete_permission(
+                document_id=private_doc.id,
+                permission_id=grant.id,
+                current_user=admin,
+            )
             visible_ids = await document_ids_for_user(session, staff)
 
             assert private_doc.id not in visible_ids

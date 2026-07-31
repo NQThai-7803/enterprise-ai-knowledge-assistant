@@ -7,6 +7,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
 
+from app.audit import AuditEventType, AuditTargetType
 from app.core.config import Settings, get_settings
 from app.core.exceptions import (
     InvalidCredentialsError,
@@ -22,6 +23,7 @@ from app.core.security import (
 )
 from app.models import User
 from app.repositories import refresh_token_repository, user_repository
+from app.services.audit_service import AuditContext, AuditService
 
 
 @dataclass(frozen=True)
@@ -37,12 +39,22 @@ class AuthService:
         self.session = session
         self.settings = settings or get_settings()
 
-    async def login(self, *, email: str, password: str) -> AuthTokenPair:
+    async def login(
+        self,
+        *,
+        email: str,
+        password: str,
+        audit_context: AuditContext | None = None,
+    ) -> AuthTokenPair:
         normalized_email = email.strip().lower()
         user = await user_repository.get_by_email(self.session, normalized_email)
         await self.session.commit()
 
         if user is None:
+            await self._record_login_failure(
+                audit_context=audit_context,
+                error_code="INVALID_CREDENTIALS",
+            )
             raise InvalidCredentialsError()
 
         password_is_valid = await run_in_threadpool(
@@ -51,13 +63,29 @@ class AuthService:
             user.hashed_password,
         )
         if not password_is_valid:
+            await self._record_login_failure(
+                audit_context=audit_context,
+                error_code="INVALID_CREDENTIALS",
+            )
             raise InvalidCredentialsError()
 
         if not user.is_active:
+            await self._record_login_failure(
+                audit_context=audit_context,
+                error_code="ACCOUNT_INACTIVE",
+            )
             raise UserInactiveError()
 
         try:
             token_pair = await self._create_token_pair(user)
+            await AuditService(self.session, settings=self.settings).record_success(
+                actor_user_id=user.id,
+                event_type=AuditEventType.AUTH_LOGIN_SUCCEEDED,
+                target_type=AuditTargetType.USER,
+                target_id=user.id,
+                context=audit_context,
+                metadata={"role": user.role, "status": "ACTIVE"},
+            )
             await self.session.commit()
         except Exception:
             await self.session.rollback()
@@ -150,6 +178,22 @@ class AuthService:
             refresh_token=raw_refresh_token,
             expires_in=self.settings.access_token_expire_minutes * 60,
             user=user,
+        )
+
+    async def _record_login_failure(
+        self,
+        *,
+        audit_context: AuditContext | None,
+        error_code: str,
+    ) -> None:
+        await AuditService(self.session, settings=self.settings).record_failure_best_effort(
+            actor_user_id=None,
+            event_type=AuditEventType.AUTH_LOGIN_FAILED,
+            target_type=None,
+            target_id=None,
+            context=audit_context,
+            error_code=error_code,
+            metadata={},
         )
 
 

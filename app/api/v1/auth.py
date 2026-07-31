@@ -5,7 +5,12 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.dependencies import get_current_user
+from app.api.dependencies import (
+    enforce_login_rate_limit,
+    enforce_refresh_rate_limit,
+    get_audit_context,
+    get_current_user,
+)
 from app.db.session import get_db_session
 from app.models import User
 from app.schemas.auth import (
@@ -17,6 +22,7 @@ from app.schemas.auth import (
     TokenPairData,
     TokenPairResponse,
 )
+from app.services.audit_service import AuditContext
 from app.services.auth_service import AuthService, AuthTokenPair
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -25,11 +31,14 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 @router.post("/login", response_model=TokenPairResponse)
 async def login(
     request: LoginRequest,
+    rate_limit: Annotated[None, Depends(enforce_login_rate_limit)],
     session: Annotated[AsyncSession, Depends(get_db_session)],
+    audit_context: Annotated[AuditContext, Depends(get_audit_context)],
 ) -> TokenPairResponse:
     token_pair = await AuthService(session).login(
         email=str(request.email),
         password=request.password.get_secret_value(),
+        audit_context=audit_context,
     )
     return _token_pair_response(token_pair)
 
@@ -37,6 +46,7 @@ async def login(
 @router.post("/refresh", response_model=TokenPairResponse)
 async def refresh(
     request: RefreshTokenRequest,
+    rate_limit: Annotated[None, Depends(enforce_refresh_rate_limit)],
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> TokenPairResponse:
     token_pair = await AuthService(session).refresh(

@@ -213,7 +213,7 @@ def test_non_pdf_extension_returns_415(
     )
 
     assert response.status_code == 415
-    assert response.json()["error"]["code"] == "INVALID_FILE_TYPE"
+    assert response.json()["error"]["code"] == "DOCUMENT_FILE_TYPE_INVALID"
 
 
 def test_wrong_mime_returns_415(
@@ -231,7 +231,7 @@ def test_wrong_mime_returns_415(
     )
 
     assert response.status_code == 415
-    assert response.json()["error"]["code"] == "INVALID_FILE_TYPE"
+    assert response.json()["error"]["code"] == "DOCUMENT_FILE_TYPE_INVALID"
 
 
 def test_wrong_signature_returns_415(
@@ -249,7 +249,7 @@ def test_wrong_signature_returns_415(
     )
 
     assert response.status_code == 415
-    assert response.json()["error"]["code"] == "INVALID_FILE_TYPE"
+    assert response.json()["error"]["code"] == "DOCUMENT_FILE_SIGNATURE_INVALID"
 
 
 def test_empty_file_returns_400(
@@ -263,7 +263,7 @@ def test_empty_file_returns_400(
     response = upload_request(api_client, headers=make_auth_headers(admin), content=b"")
 
     assert response.status_code == 400
-    assert response.json()["error"]["code"] == "EMPTY_FILE"
+    assert response.json()["error"]["code"] == "DOCUMENT_FILE_EMPTY"
 
 
 def test_oversized_file_returns_413(
@@ -278,7 +278,7 @@ def test_oversized_file_returns_413(
     response = upload_request(api_client, headers=make_auth_headers(admin))
 
     assert response.status_code == 413
-    assert response.json()["error"]["code"] == "FILE_TOO_LARGE"
+    assert response.json()["error"]["code"] == "DOCUMENT_FILE_TOO_LARGE"
 
 
 def test_duplicate_file_returns_409(
@@ -371,3 +371,43 @@ def test_manager_organization_scope_returns_403(
 
     assert response.status_code == 403
     assert response.json()["error"]["code"] == "FORBIDDEN"
+
+
+def test_path_traversal_filename_is_sanitized(
+    api_client: TestClient,
+    upload_storage: LocalFileStorage,
+    make_user: Any,
+    make_auth_headers: Any,
+) -> None:
+    admin = make_user(role=UserRole.ADMIN)
+
+    response = upload_request(
+        api_client,
+        headers=make_auth_headers(admin),
+        filename="..\\..\\confidential.pdf",
+    )
+
+    assert response.status_code == 202
+    assert response.json()["data"]["original_filename"] == "confidential.pdf"
+    assert ".." not in response.text
+
+
+def test_client_filename_does_not_control_storage_path(
+    api_client: TestClient,
+    upload_storage: LocalFileStorage,
+    make_user: Any,
+    make_auth_headers: Any,
+) -> None:
+    admin = make_user(role=UserRole.ADMIN)
+    client_filename = "client-controlled.pdf"
+
+    response = upload_request(
+        api_client,
+        headers=make_auth_headers(admin),
+        filename=client_filename,
+    )
+
+    saved_files = [path.name for path in upload_storage.root_path.rglob("*.pdf")]
+    assert response.status_code == 202
+    assert client_filename not in saved_files
+    assert saved_files

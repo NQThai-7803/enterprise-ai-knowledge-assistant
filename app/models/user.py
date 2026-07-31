@@ -12,7 +12,9 @@ from app.models.enums import UserRole
 from app.models.refresh_token import RefreshToken
 
 if TYPE_CHECKING:
+    from app.models.chat_session import ChatSession
     from app.models.department import Department
+    from app.models.feedback import Feedback
 
 
 class User(Base):
@@ -52,6 +54,16 @@ class User(Base):
 
     department: Mapped[Department | None] = relationship(back_populates="users")
     refresh_tokens: Mapped[list[RefreshToken]] = relationship(
+        back_populates="user",
+        passive_deletes=True,
+    )
+    chat_sessions: Mapped[list[ChatSession]] = relationship(
+        "ChatSession",
+        back_populates="user",
+        passive_deletes=True,
+    )
+    feedback: Mapped[list[Feedback]] = relationship(
+        "Feedback",
         back_populates="user",
         passive_deletes=True,
     )
