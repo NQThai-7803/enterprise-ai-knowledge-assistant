@@ -1,4 +1,4 @@
-import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+﻿import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 import { mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
@@ -304,11 +304,11 @@ test("live document upload, processing, permissions, and authorization", async (
 
   await page.getByRole("link", { name: "Permissions" }).click();
   await page.getByLabel("Grantee type").selectOption("user");
-  await page.getByLabel("Grantee ID").fill(managerUser.id);
+  await page.getByLabel("User").selectOption(managerUser.id);
   await page.getByLabel("Permission").selectOption("VIEW");
   await page.getByRole("button", { name: "Grant" }).click();
-  await expect(page.getByText(`User ${managerUser.id}`)).toBeVisible();
-  await page.getByLabel("Grantee ID").fill(managerUser.id);
+  await expect(page.getByText(/User UAT Manager/).first()).toBeVisible();
+  await page.getByLabel("User").selectOption(managerUser.id);
   await page.getByLabel("Permission").selectOption("VIEW");
   await expect(page.getByText("This exact direct grant already exists.")).toBeVisible();
 
@@ -522,5 +522,7 @@ function buildPdf(text: string): Buffer {
   body += `trailer\n<< /Root 1 0 R /Size ${objects.length + 1} >>\nstartxref\n${xrefOffset}\n%%EOF\n`;
   return Buffer.from(body, "utf8");
 }
+
+
 
 

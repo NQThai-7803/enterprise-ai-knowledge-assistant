@@ -12,7 +12,7 @@ from app.citations.mapper import map_validated_citations
 from app.citations.models import PromptSourceRegistry, ValidatedCitationAnswer
 from app.citations.parser import parse_citation_markers
 from app.core.config import Settings, get_settings
-from app.models import User
+from app.models import CitationSourceType, User
 from app.repositories import citation_source_repository
 
 
@@ -41,18 +41,29 @@ class CitationValidationService:
             max_sources=self.settings.citation_max_sources_per_answer,
         )
         cited_sources = tuple(source_registry.require_marker(marker) for marker in ordered_markers)
+        internal_sources = tuple(
+            source for source in cited_sources if source.source_type == CitationSourceType.INTERNAL
+        )
+        internal_chunk_ids = tuple(
+            source.chunk_id for source in internal_sources if source.chunk_id is not None
+        )
         async with self.session_provider() as session:
-            permitted_rows = await self.source_repository.get_permitted_ready_chunks_by_ids(
-                session,
-                chunk_ids=tuple(source.chunk_id for source in cited_sources),
-                current_user=current_user,
+            permitted_rows = (
+                await self.source_repository.get_permitted_ready_chunks_by_ids(
+                    session,
+                    chunk_ids=internal_chunk_ids,
+                    current_user=current_user,
+                )
+                if internal_chunk_ids
+                else ()
             )
         permitted_by_chunk_id = {row.chunk_id: row for row in permitted_rows}
-        if set(permitted_by_chunk_id) != {source.chunk_id for source in cited_sources}:
+        if set(permitted_by_chunk_id) != set(internal_chunk_ids):
             raise CitationPermissionRevalidationError()
         if any(
-            permitted_by_chunk_id[source.chunk_id].document_id != source.document_id
-            for source in cited_sources
+            source.chunk_id is None
+            or permitted_by_chunk_id[source.chunk_id].document_id != source.document_id
+            for source in internal_sources
         ):
             raise CitationPermissionRevalidationError()
         document_titles_by_id = {row.document_id: row.document_title for row in permitted_rows}

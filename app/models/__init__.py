@@ -7,6 +7,7 @@ from app.models.document_chunk import DocumentChunk
 from app.models.document_permission import DocumentPermission
 from app.models.enums import (
     ChatMessageRole,
+    CitationSourceType,
     DocumentAccessScope,
     DocumentPermissionLevel,
     DocumentStatus,
@@ -23,6 +24,7 @@ __all__ = [
     "ChatMessage",
     "ChatMessageRole",
     "ChatSession",
+    "CitationSourceType",
     "Department",
     "Document",
     "DocumentAccessScope",

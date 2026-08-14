@@ -101,7 +101,10 @@ class FakeLLMProvider:
 
 class FakeCitationValidationService:
     async def validate_and_map(self, *, answer: str, source_registry, current_user: User):  # noqa: ANN001
-        return SimpleNamespace(answer=answer.replace("[SOURCE_1]", "[1]"), citations=())
+        return SimpleNamespace(
+            answer=answer.replace("[SOURCE_1]", "[1]"),
+            citations=(SimpleNamespace(citation_order=1),),
+        )
 
 
 class FakeCitationRepository:
@@ -127,7 +130,9 @@ async def list_messages(session: AsyncSession, chat: ChatSession) -> list[ChatMe
     return list(rows)
 
 
-def llm_answer(content: str = "Grounded answer [SOURCE_1]") -> LLMGenerationResult:
+def llm_answer(
+    content: str = '{"answer":"Grounded answer","citations":["SOURCE_1"]}',
+) -> LLMGenerationResult:
     return LLMGenerationResult(
         content=content,
         model="fake",
@@ -252,12 +257,12 @@ def test_llm_failure_rolls_back_both_messages(
     run_async(scenario())
 
 
-def test_system_messages_remain_hidden_after_answer(
+def test_internal_system_messages_are_not_grounding_prompt_memory(
     async_session_factory_for_tests: async_sessionmaker[AsyncSession],
 ) -> None:
     async def scenario() -> None:
         async with async_session_factory_for_tests() as session:
-            owner = await create_user(session, "grounded-system-hidden", role=UserRole.STAFF)
+            owner = await create_user(session, "grounded-system-memory", role=UserRole.STAFF)
             chat = await create_chat_session(session, owner)
             session.add(
                 ChatMessage(
@@ -272,7 +277,10 @@ def test_system_messages_remain_hidden_after_answer(
 
         await service.answer_question(current_user=owner, session_id=chat.id, question="Q")
 
-        assert all(CONFIDENTIAL_MARKER not in message.content for message in llm.messages)
+        assert [message.role for message in llm.messages] == ["system", "user"]
+        assert CONFIDENTIAL_MARKER not in llm.messages[0].content
+        assert CONFIDENTIAL_MARKER in llm.messages[1].content
+        assert "INTERNAL_SYSTEM" in llm.messages[1].content
 
     run_async(scenario())
 
@@ -347,7 +355,7 @@ def test_grounded_answer_uses_authorized_chunks_only(
                 text=f"groundedkeyword {CONFIDENTIAL_MARKER}",
                 similarity=1.0,
             )
-        llm = FakeLLMProvider(llm_answer("safe answer [SOURCE_1]"))
+        llm = FakeLLMProvider(llm_answer('{"answer":"safe answer","citations":["SOURCE_1"]}'))
         service = GroundedAnswerService(
             settings=settings,
             session_provider=async_session_factory_for_tests,

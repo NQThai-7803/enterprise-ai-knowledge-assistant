@@ -114,8 +114,14 @@ class LLMProviderRegistry:
             return OpenAICompatibleLLMProvider(
                 base_url=append_v1_if_missing(self.settings.llm_ollama_base_url),
                 api_key=None,
-                model=_required_model(self.settings.llm_ollama_model, self.settings.llm_model),
+                model=_required_model(
+                    self.settings.llm_ollama_model,
+                    self.settings.llm_model,
+                ),
                 provider_name=provider_name,
+                reasoning_effort=self.settings.llm_ollama_reasoning_effort,
+                ollama_num_ctx=self.settings.llm_ollama_num_ctx,
+                ollama_keep_alive=self.settings.llm_ollama_keep_alive,
                 **common,
             )
         if provider_name == LM_STUDIO_PROVIDER:

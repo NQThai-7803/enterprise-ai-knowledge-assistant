@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Coroutine
+from dataclasses import replace
 from datetime import UTC, datetime
 from types import SimpleNamespace
 from typing import Any
@@ -14,16 +15,22 @@ from app.core.config import Settings
 from app.core.exceptions import (
     ChatRetrievalFailedError,
     ChatSessionNotFoundError,
-    CitationValidationFailedApplicationError,
     LLMProviderTimeoutStandardApplicationError,
     LLMTimeoutApplicationError,
 )
 from app.llm.errors import LLMError, LLMFailureCode
 from app.llm.models import LLMGenerationResult
 from app.models import AuditLog, ChatMessage, ChatMessageRole, ChatSession, User, UserRole
+from app.repositories.chat_message_repository import ConversationMemoryMessageRow
 from app.retrieval.errors import RetrievalError, RetrievalFailureCode
 from app.retrieval.models import HybridRetrievalHit, HybridRetrievalResult
-from app.services.grounded_answer_service import GroundedAnswerService
+from app.services.grounded_answer_service import (
+    GroundedAnswerService,
+    _person_name_sequences_near_terms,
+    _rank_hits_for_prompt,
+)
+from app.web_search.errors import WebSearchError, WebSearchFailureCode
+from app.web_search.models import WebSearchResult, WebSearchResults
 
 
 def run_async(coro: Coroutine[Any, Any, None]) -> None:
@@ -39,6 +46,7 @@ def settings(**overrides: object) -> Settings:
         "chat_context_max_tokens": 1000,
         "chat_retrieval_top_k": 2,
         "chat_history_max_messages": 2,
+        "chat_history_max_tokens": 200,
         "citation_max_sources_per_answer": 2,
     }
     defaults.update(overrides)
@@ -84,6 +92,15 @@ def hit(text: str = "allowed context") -> HybridRetrievalHit:
         keyword_score=None,
         keyword_rank=None,
         matched_by=("semantic",),
+    )
+
+
+def memory_row(index: int, role: ChatMessageRole, content: str) -> ConversationMemoryMessageRow:
+    return ConversationMemoryMessageRow(
+        id=UUID(f"00000000-0000-0000-0000-{index:012d}"),
+        role=role,
+        content=content,
+        created_at=datetime(2026, 1, 1, tzinfo=UTC),
     )
 
 
@@ -177,8 +194,11 @@ class FakeSessionRepository:
 
 
 class FakeMessageRepository:
-    def __init__(self) -> None:
+    def __init__(self, history: tuple[ConversationMemoryMessageRow, ...] = ()) -> None:
+        self.history = history
         self.history_calls = 0
+        self.memory_calls = 0
+        self.memory_call_args: list[dict[str, object]] = []
 
     async def list_recent_visible_owned_messages(
         self, session: object, *, session_id: UUID, owner_user_id: UUID, limit: int
@@ -186,19 +206,41 @@ class FakeMessageRepository:
         self.history_calls += 1
         return ()
 
+    async def list_owned_messages_for_memory(
+        self, session: object, *, session_id: UUID, owner_user_id: UUID
+    ):
+        self.memory_calls += 1
+        self.memory_call_args.append(
+            {
+                "session": session,
+                "session_id": session_id,
+                "owner_user_id": owner_user_id,
+            }
+        )
+        return self.history
+
 
 class FakeRetrievalService:
-    def __init__(self, result: HybridRetrievalResult | Exception) -> None:
-        self.result = result
+    def __init__(
+        self,
+        result: HybridRetrievalResult | Exception | tuple[HybridRetrievalResult, ...],
+    ) -> None:
+        self.results = result if isinstance(result, tuple) else (result,)
         self.calls = 0
         self.users: list[User] = []
+        self.queries: list[str] = []
+        self.top_ks: list[int | None] = []
 
     async def retrieve(self, *, query: str, current_user: User, top_k: int | None = None):
         self.calls += 1
         self.users.append(current_user)
-        if isinstance(self.result, Exception):
-            raise self.result
-        return self.result
+        self.queries.append(query)
+        self.top_ks.append(top_k)
+        index = min(self.calls - 1, len(self.results) - 1)
+        result = self.results[index]
+        if isinstance(result, Exception):
+            raise result
+        return result
 
 
 class FakeLLMProvider:
@@ -212,6 +254,51 @@ class FakeLLMProvider:
         self.messages = messages
         if isinstance(self.result, Exception):
             raise self.result
+        return self.result
+
+
+class SequentialFakeLLMProvider(FakeLLMProvider):
+    def __init__(self, *results: LLMGenerationResult | Exception) -> None:
+        if not results:
+            raise ValueError("at least one result is required")
+        super().__init__(results[0])
+        self.results = results
+        self.message_history: list[object] = []
+
+    async def generate(self, *, messages, temperature: float, max_output_tokens: int):  # noqa: ANN001
+        self.calls += 1
+        self.messages = messages
+        self.message_history.append(messages)
+        result = self.results[min(self.calls - 1, len(self.results) - 1)]
+        if isinstance(result, Exception):
+            raise result
+        return result
+
+
+class SlowCancellableLLMProvider(FakeLLMProvider):
+    def __init__(self) -> None:
+        super().__init__(
+            LLMGenerationResult(
+                content='{"answer":"Grounded answer","citations":["SOURCE_1"]}',
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=11,
+                completion_tokens=5,
+                response_time_ms=123,
+            )
+        )
+        self.started = asyncio.Event()
+        self.cancelled = False
+
+    async def generate(self, *, messages, temperature: float, max_output_tokens: int):  # noqa: ANN001
+        self.calls += 1
+        self.messages = messages
+        self.started.set()
+        try:
+            await asyncio.sleep(60)
+        except asyncio.CancelledError:
+            self.cancelled = True
+            raise
         return self.result
 
 
@@ -235,9 +322,11 @@ class FakeMessageService:
 
 
 class FakeCitationValidationService:
-    def __init__(self, *, citations: tuple[object, ...] = ()) -> None:
+    def __init__(self, *, citations: tuple[object, ...] | None = None) -> None:
         self.calls = 0
-        self.citations = citations
+        self.citations = (
+            citations if citations is not None else (SimpleNamespace(citation_order=1),)
+        )
         self.answers: list[str] = []
 
     async def validate_and_map(self, *, answer: str, source_registry, current_user: User):  # noqa: ANN001
@@ -258,6 +347,39 @@ class FakeCitationRepository:
         return tuple(citations)
 
 
+class FakeWebSearchService:
+    def __init__(self, result: WebSearchResults | Exception) -> None:
+        self.result = result
+        self.queries: list[str] = []
+
+    async def search(self, *, query: str):
+        self.queries.append(query)
+        if isinstance(self.result, Exception):
+            raise self.result
+        return self.result
+
+
+def web_result(text: str = "web context") -> WebSearchResult:
+    return WebSearchResult(
+        title="Microsoft Learn",
+        url="https://learn.microsoft.com/en-us/azure/ai-services/",
+        snippet=text,
+        content=text,
+        provider="mock",
+        rank=1,
+        score=1.0,
+    )
+
+
+def web_results(text: str = "web context") -> WebSearchResults:
+    return WebSearchResults(
+        query="question",
+        provider="mock",
+        results=(web_result(text),),
+        requested_max_results=1,
+    )
+
+
 def make_service(
     *,
     session_repository: FakeSessionRepository | None = None,
@@ -267,6 +389,8 @@ def make_service(
     counter: FakeCounter | None = None,
     citation_validation: FakeCitationValidationService | None = None,
     citation_repository: FakeCitationRepository | None = None,
+    settings_obj: Settings | None = None,
+    web_search_service: FakeWebSearchService | None = None,
 ) -> tuple[
     GroundedAnswerService,
     FakeSessionRepository,
@@ -279,7 +403,7 @@ def make_service(
     resolved_retrieval = retrieval or FakeRetrievalService(retrieval_result(hit()))
     resolved_llm = llm or FakeLLMProvider(
         LLMGenerationResult(
-            content="Grounded answer [SOURCE_1]",
+            content='{"answer":"Grounded answer","citations":["SOURCE_1"]}',
             model="fake",
             finish_reason="stop",
             prompt_tokens=11,
@@ -292,7 +416,7 @@ def make_service(
     resolved_message_repository = message_repository or FakeMessageRepository()
     resolved_citation_repository = citation_repository or FakeCitationRepository()
     service = GroundedAnswerService(
-        settings=settings(),
+        settings=settings_obj or settings(),
         session_provider=FakeSessionProvider(),
         hybrid_retrieval_service=resolved_retrieval,
         llm_provider_factory=lambda: resolved_llm,
@@ -302,6 +426,7 @@ def make_service(
         citation_repository=resolved_citation_repository,
         message_service=message_service,
         citation_validation_service=citation_validation or FakeCitationValidationService(),
+        web_search_service=web_search_service,
     )
     return (
         service,
@@ -323,7 +448,7 @@ def test_service_checks_ownership_before_retrieval() -> None:
             await service.answer_question(
                 current_user=user(), session_id=chat_session().id, question="Question"
             )
-        assert message_repo.history_calls == 0
+        assert message_repo.memory_calls == 0
         assert retrieval.calls == 0
         assert llm.calls == 0
         assert message_service.calls == []
@@ -339,6 +464,791 @@ def test_service_calls_hybrid_retrieval_once_and_uses_current_user() -> None:
         )
         assert retrieval.calls == 1
         assert [retrieved_user.id for retrieved_user in retrieval.users] == [user().id]
+
+    run_async(scenario())
+
+
+def test_context_dependent_question_uses_resolved_retrieval_query() -> None:
+    async def scenario() -> None:
+        message_repo = FakeMessageRepository(
+            history=(
+                memory_row(1, ChatMessageRole.USER, "Leave policy?"),
+                memory_row(2, ChatMessageRole.ASSISTANT, "Employees get 12 annual leave days."),
+            )
+        )
+        service, _, _, retrieval, _, _, _ = make_service(
+            message_repository=message_repo,
+            retrieval=FakeRetrievalService(retrieval_result(hit())),
+        )
+
+        await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question="If working 5 years then what?",
+        )
+
+        assert retrieval.queries == ["Leave policy If working 5 years then what?"]
+        assert "12 annual leave days" not in retrieval.queries[0]
+        assert retrieval.top_ks == [2]
+        assert message_repo.memory_call_args[0]["session_id"] == chat_session().id
+        assert message_repo.memory_call_args[0]["owner_user_id"] == user().id
+
+    run_async(scenario())
+
+
+def test_current_question_hit_does_not_inherit_unrelated_ceo_history() -> None:
+    async def scenario() -> None:
+        message_repo = FakeMessageRepository(
+            history=(
+                memory_row(1, ChatMessageRole.USER, "CEO Nova Digital la ai?"),
+                memory_row(2, ChatMessageRole.ASSISTANT, "Nguyen Anh Khoa la CEO."),
+            )
+        )
+        service, _, _, retrieval, _, _, _ = make_service(message_repository=message_repo)
+
+        await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question="Nguoi lao dong duoc nghi hang nam bao nhieu ngay?",
+        )
+
+        assert retrieval.queries == ["Nguoi lao dong duoc nghi hang nam bao nhieu ngay?"]
+
+    run_async(scenario())
+
+
+def test_entity_follow_up_prompt_uses_new_role_without_assistant_answer() -> None:
+    async def scenario() -> None:
+        message_repo = FakeMessageRepository(
+            history=(
+                memory_row(1, ChatMessageRole.USER, "CEO Nova Digital la ai?"),
+                memory_row(2, ChatMessageRole.ASSISTANT, "Nguyen Anh Khoa [1]"),
+            )
+        )
+        service, _, _, retrieval, llm, _, _ = make_service(
+            message_repository=message_repo,
+            retrieval=FakeRetrievalService(
+                retrieval_result(hit("CTO source evidence for Nova Digital"))
+            ),
+        )
+
+        await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question="Con CTO thi sao?",
+        )
+
+        assert retrieval.queries == ["CTO Nova Digital la ai?"]
+        user_prompt = llm.messages[1].content
+        assert "CTO Nova Digital la ai?" in user_prompt
+        assert "CEO Nova Digital" not in user_prompt
+        assert "Nguyen Anh Khoa" not in user_prompt
+
+    run_async(scenario())
+
+
+def test_policy_follow_up_uses_resolved_five_year_grounding_question() -> None:
+    async def scenario() -> None:
+        message_repo = FakeMessageRepository(
+            history=(
+                memory_row(1, ChatMessageRole.USER, "Nghi hang nam bao nhieu ngay?"),
+                memory_row(2, ChatMessageRole.ASSISTANT, "12 ngay [1]"),
+            )
+        )
+        service, _, _, retrieval, llm, _, _ = make_service(
+            message_repository=message_repo,
+            retrieval=FakeRetrievalService(retrieval_result(hit("5-year source evidence"))),
+        )
+
+        await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question="Con sau 5 nam thi sao?",
+        )
+
+        query = retrieval.queries[0]
+        assert "Nghi hang nam" in query
+        assert "5 nam" in query
+        assert "12 ngay" not in query
+        assert "bao nhieu" not in query
+        user_prompt = llm.messages[1].content
+        assert query in user_prompt
+        assert "12 ngay" not in user_prompt
+
+    run_async(scenario())
+
+
+def test_empty_conversation_memory_uses_current_question_for_retrieval() -> None:
+    async def scenario() -> None:
+        service, _, _, retrieval, _, _, _ = make_service()
+
+        await service.answer_question(
+            current_user=user(), session_id=chat_session().id, question="Current question"
+        )
+
+        assert retrieval.queries == ["Current question"]
+
+    run_async(scenario())
+
+
+def test_llm_prompt_excludes_assistant_history_and_contains_retrieved_context() -> None:
+    async def scenario() -> None:
+        message_repo = FakeMessageRepository(
+            history=(
+                memory_row(1, ChatMessageRole.USER, "Working policy?"),
+                memory_row(2, ChatMessageRole.ASSISTANT, "08:00-17:00 schedule."),
+            )
+        )
+        service, _, _, retrieval, llm, _, _ = make_service(message_repository=message_repo)
+
+        await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question="Does it apply on Saturday?",
+        )
+
+        assert retrieval.queries == ["Working policy - Does it apply on Saturday?"]
+        assert [message.role for message in llm.messages[:2]] == ["system", "user"]
+        user_prompt = llm.messages[1].content
+        assert "<conversation_history>\n</conversation_history>" in user_prompt
+        assert "--- CONVERSATION MESSAGE" not in user_prompt
+        assert "08:00-17:00 schedule." not in user_prompt
+        assert "<retrieved_context>" in user_prompt
+        assert "allowed context" in user_prompt
+        assert "Working policy - Does it apply on Saturday?" in user_prompt
+        assert "Working policy" not in llm.messages[0].content
+
+    run_async(scenario())
+
+
+def test_follow_up_after_no_answer_does_not_hallucinate_without_retrieved_context() -> None:
+    async def scenario() -> None:
+        message_repo = FakeMessageRepository(
+            history=(
+                memory_row(1, ChatMessageRole.USER, "Who is the CEO?"),
+                memory_row(2, ChatMessageRole.ASSISTANT, "No answer available."),
+            )
+        )
+        service, _, _, retrieval, llm, _, _ = make_service(
+            message_repository=message_repo,
+            retrieval=FakeRetrievalService(retrieval_result()),
+        )
+
+        result = await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question="Does he appear in another document?",
+        )
+
+        assert retrieval.queries == ["Does the CEO appear in another document?"]
+        assert llm.calls == 0
+        assert result.grounding_status == GroundingStatus.NO_ANSWER
+
+    run_async(scenario())
+
+
+def test_reason_question_without_causal_evidence_returns_no_answer_before_llm() -> None:
+    async def scenario() -> None:
+        llm = FakeLLMProvider(
+            LLMGenerationResult(
+                content='{"answer":"Unsupported reason","citations":["SOURCE_1"]}',
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            )
+        )
+        service, _, _, retrieval, resolved_llm, _, _ = make_service(
+            retrieval=FakeRetrievalService(retrieval_result(hit("Nguyen is listed as CEO."))),
+            llm=llm,
+        )
+
+        result = await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question="Why was Nguyen chosen as CEO?",
+        )
+
+        assert retrieval.calls == 1
+        assert resolved_llm.calls == 0
+        assert result.grounding_status == GroundingStatus.NO_ANSWER
+
+    run_async(scenario())
+
+
+def test_person_role_candidate_prefers_previous_record_name() -> None:
+    text = (
+        "Alice Minh Nguyen - accountable for company results and operations\n"
+        "Chief Executive Officer (CEO)\n"
+        "Bob Thu Tran - accountable for technology platforms\n"
+        "Chief Technology Officer (CTO)\n"
+    )
+
+    assert _person_name_sequences_near_terms(text, ("CEO",)) == ("Alice Minh Nguyen",)
+    assert _person_name_sequences_near_terms(text, ("CTO",)) == ("Bob Thu Tran",)
+
+
+def test_person_role_extraction_ignores_committee_name_false_positive() -> None:
+    text = "Hoi dong Kien truc Cong nghe\nCTO chu tri va phe duyet nguyen tac kien truc cong nghe."
+
+    assert _person_name_sequences_near_terms(text, ("CTO",)) == ()
+
+
+def test_prompt_reranking_keeps_numeric_condition_hit_first() -> None:
+    topic_only_hit = replace(
+        hit(
+            "Nguoi lao dong lam viec trong dieu kien binh thuong duoc nghi hang nam "
+            "va cac quy dinh ve ngay nghi hang nam thay doi theo chinh sach."
+        ),
+        chunk_id=UUID("00000000-0000-0000-0000-000000000111"),
+        chunk_index=4,
+    )
+    conditioned_hit = replace(
+        hit(
+            "Cu du 05 nam lam viec cho cung mot nguoi su dung lao dong thi so ngay "
+            "nghi hang nam duoc tang them 01 ngay."
+        ),
+        chunk_id=UUID("00000000-0000-0000-0000-000000000112"),
+        chunk_index=5,
+    )
+
+    ranked = _rank_hits_for_prompt(
+        (topic_only_hit, conditioned_hit),
+        question="Nghi hang nam sau 5 nam thay doi nhu the nao?",
+    )
+
+    assert ranked[0].chunk_index == 5
+
+
+def test_prompt_reranking_prefers_distinct_product_name_over_generic_usage_terms() -> None:
+    generic_usage_hit = replace(
+        hit(
+            "Chinh sach lam viec duoc ap dung tu nam 2026 va dung cho cac quy trinh "
+            "lam viec noi bo."
+        ),
+        chunk_id=UUID("00000000-0000-0000-0000-000000000113"),
+        chunk_index=1,
+    )
+    product_hit = replace(
+        hit(
+            "AtlasSearch\nVai tro: Tro ly tim kiem tri thuc noi bo. Mo ta: tra cuu "
+            "tai lieu co trich dan va kiem tra phan quyen."
+        ),
+        chunk_id=UUID("00000000-0000-0000-0000-000000000114"),
+        chunk_index=2,
+    )
+
+    ranked = _rank_hits_for_prompt(
+        (generic_usage_hit, product_hit),
+        question="AtlasSearch dung de lam gi?",
+    )
+
+    assert ranked[0].chunk_index == 2
+
+
+def test_prompt_reranking_prefers_requested_role_over_proposed_person_role() -> None:
+    proposed_person_role_hit = replace(
+        hit("Le Thu Ha - Chief Technology Officer (CTO) of Example Digital."),
+        chunk_id=UUID("00000000-0000-0000-0000-000000000115"),
+        chunk_index=3,
+    )
+    requested_role_hit = replace(
+        hit("Nguyen Anh Khoa - Chief Executive Officer (CEO) of Example Digital."),
+        chunk_id=UUID("00000000-0000-0000-0000-000000000116"),
+        chunk_index=4,
+    )
+
+    ranked = _rank_hits_for_prompt(
+        (proposed_person_role_hit, requested_role_hit),
+        question="CEO Example Digital la Le Thu Ha dung khong?",
+    )
+
+    assert ranked[0].chunk_index == 4
+
+
+def test_product_purpose_no_answer_retries_on_distinct_product_evidence() -> None:
+    async def scenario() -> None:
+        llm = SequentialFakeLLMProvider(
+            LLMGenerationResult(
+                content="__NO_ANSWER__",
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            ),
+            LLMGenerationResult(
+                content=(
+                    '{"answer":"AtlasSearch is an internal knowledge search assistant.",'
+                    '"citations":["SOURCE_1"]}'
+                ),
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            ),
+        )
+        service, _, _, _, resolved_llm, _, _ = make_service(
+            retrieval=FakeRetrievalService(
+                retrieval_result(
+                    hit(
+                        "AtlasSearch\nRole: internal knowledge search assistant. "
+                        "Description: retrieves governed documents with citations."
+                    )
+                )
+            ),
+            llm=llm,
+        )
+
+        result = await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question="AtlasSearch dung de lam gi?",
+        )
+
+        assert resolved_llm.calls == 2
+        assert result.grounding_status == GroundingStatus.ANSWERED
+        assert "AtlasSearch" in result.assistant_message.content
+
+    run_async(scenario())
+
+
+def test_false_premise_multi_rule_question_retries_and_corrects() -> None:
+    async def scenario() -> None:
+        llm = SequentialFakeLLMProvider(
+            LLMGenerationResult(
+                content="__NO_ANSWER__",
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            ),
+            LLMGenerationResult(
+                content=(
+                    '{"answer":"No. The source states 12 days for the base condition, '
+                    "14 days for protected or hazardous categories, and 16 days for the "
+                    'special category.","citations":["SOURCE_1"]}'
+                ),
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            ),
+        )
+        service, _, _, _, resolved_llm, _, _ = make_service(
+            retrieval=FakeRetrievalService(
+                retrieval_result(
+                    hit(
+                        "Annual leave rules: 12 days for the base condition; 14 days for "
+                        "protected or hazardous categories; 16 days for the special category."
+                    )
+                )
+            ),
+            llm=llm,
+        )
+
+        result = await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question="Does every employee receive 12 annual leave days?",
+        )
+
+        assert resolved_llm.calls == 2
+        assert result.grounding_status == GroundingStatus.ANSWERED
+        assert result.assistant_message.content.startswith("No.")
+
+    run_async(scenario())
+
+
+def test_yes_no_answer_without_polarity_retries() -> None:
+    async def scenario() -> None:
+        llm = SequentialFakeLLMProvider(
+            LLMGenerationResult(
+                content=(
+                    '{"answer":"CEO Nova Digital la Nguyen Anh Khoa","citations":["SOURCE_1"]}'
+                ),
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            ),
+            LLMGenerationResult(
+                content=(
+                    '{"answer":"Khong, CEO Nova Digital la Nguyen Anh Khoa",'
+                    '"citations":["SOURCE_1"]}'
+                ),
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            ),
+        )
+        service, _, _, _, _, _, _ = make_service(
+            retrieval=FakeRetrievalService(
+                retrieval_result(
+                    hit("CEO Nova Digital la Nguyen Anh Khoa. CTO Nova Digital la Le Thu Ha.")
+                )
+            ),
+            llm=llm,
+        )
+
+        result = await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question="CEO Nova Digital la Le Thu Ha dung khong?",
+        )
+
+        assert llm.calls == 2
+        assert result.assistant_message.content.startswith("Khong")
+        assert "Nguyen Anh Khoa" in result.assistant_message.content
+
+    run_async(scenario())
+
+
+def test_open_person_negative_polarity_answer_retries() -> None:
+    async def scenario() -> None:
+        llm = SequentialFakeLLMProvider(
+            LLMGenerationResult(
+                content=('{"answer":"Khong Nguyen Anh Khoa la CEO","citations":["SOURCE_1"]}'),
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            ),
+            LLMGenerationResult(
+                content=('{"answer":"CEO la Nguyen Anh Khoa.","citations":["SOURCE_1"]}'),
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            ),
+        )
+        service, _, _, _, _, _, _ = make_service(
+            retrieval=FakeRetrievalService(
+                retrieval_result(hit("Nguyen Anh Khoa - Tong Giam doc (CEO) of Example Digital."))
+            ),
+            llm=llm,
+        )
+
+        result = await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question="CEO Example Digital la ai?",
+        )
+
+        assert llm.calls == 2
+        assert result.grounding_status == GroundingStatus.ANSWERED
+        assert result.assistant_message.content.startswith("CEO la Nguyen Anh Khoa")
+
+    run_async(scenario())
+
+
+def test_absent_named_entity_role_question_skips_llm() -> None:
+    async def scenario() -> None:
+        llm = FakeLLMProvider(
+            LLMGenerationResult(
+                content='{"answer":"CEO la Nguyen Anh Khoa.","citations":["SOURCE_1"]}',
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            )
+        )
+        service, _, _, retrieval, resolved_llm, _, _ = make_service(
+            retrieval=FakeRetrievalService(
+                retrieval_result(hit("Nguyen Anh Khoa - Tong Giam doc (CEO) cua Nova Digital."))
+            ),
+            llm=llm,
+        )
+
+        result = await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question="CEO Apple la ai?",
+        )
+
+        assert retrieval.calls == 1
+        assert resolved_llm.calls == 0
+        assert result.grounding_status == GroundingStatus.NO_ANSWER
+
+    run_async(scenario())
+
+
+def test_incomplete_person_answer_retries_without_auto_selecting_source() -> None:
+    async def scenario() -> None:
+        llm = SequentialFakeLLMProvider(
+            LLMGenerationResult(
+                content=(
+                    '{"answer":"The CTO is Technology Strategy Office.","citations":["SOURCE_1"]}'
+                ),
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            ),
+            LLMGenerationResult(
+                content='{"answer":"The CTO is Le Thu Ha.","citations":["SOURCE_1"]}',
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            ),
+        )
+        service, _, _, _, resolved_llm, _, _ = make_service(
+            retrieval=FakeRetrievalService(
+                retrieval_result(
+                    hit("The CTO of Nova Digital is Le Thu Ha and manages technology.")
+                )
+            ),
+            llm=llm,
+        )
+
+        result = await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question="CTO Nova Digital la ai?",
+        )
+
+        assert resolved_llm.calls == 2
+        assert "Le Thu Ha" in result.assistant_message.content
+        assert result.grounding_status == GroundingStatus.ANSWERED
+
+    run_async(scenario())
+
+
+def test_numeric_answer_missing_source_unit_retries() -> None:
+    async def scenario() -> None:
+        llm = SequentialFakeLLMProvider(
+            LLMGenerationResult(
+                content='{"answer":"The standard work week is 40.","citations":["SOURCE_1"]}',
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            ),
+            LLMGenerationResult(
+                content='{"answer":"The standard work week is 40 hours.","citations":["SOURCE_1"]}',
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            ),
+        )
+        service, _, _, _, resolved_llm, _, _ = make_service(
+            retrieval=FakeRetrievalService(
+                retrieval_result(hit("The standard work week is 40 hours."))
+            ),
+            llm=llm,
+        )
+
+        result = await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question="How many hours is the standard work week?",
+        )
+
+        assert resolved_llm.calls == 2
+        assert "40 hours" in result.assistant_message.content
+        assert result.grounding_status == GroundingStatus.ANSWERED
+
+    run_async(scenario())
+
+
+def test_negated_qualifier_quantity_answer_is_not_retried() -> None:
+    async def scenario() -> None:
+        llm = SequentialFakeLLMProvider(
+            LLMGenerationResult(
+                content=(
+                    '{"answer":"Nguoi lao dong lam cong viec nang nhoc, doc hai, nguy '
+                    'hiem nhung khong thuoc loai dac biet thi duoc nghi 14 ngay.",'
+                    '"citations":["SOURCE_1"]}'
+                ),
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            ),
+            LLMGenerationResult(
+                content="__NO_ANSWER__",
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            ),
+        )
+        source_text = (
+            "12 ngay Cong viec trong dieu kien binh thuong. "
+            "Nguoi chua thanh nien hoac cong viec nang nhoc, doc hai, nguy hiem "
+            "theo danh muc phap luat: 14 ngay. "
+            "16 ngay Cong viec dac biet nang nhoc, doc hai, nguy hiem."
+        )
+        service, _, _, _, resolved_llm, _, _ = make_service(
+            retrieval=FakeRetrievalService(retrieval_result(hit(source_text))),
+            llm=llm,
+        )
+
+        result = await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question=(
+                "Nguoi lao dong lam cong viec nang nhoc, doc hai, nguy hiem nhung "
+                "khong thuoc loai dac biet thi duoc nghi hang nam bao nhieu ngay?"
+            ),
+        )
+
+        assert resolved_llm.calls == 1
+        assert result.grounding_status == GroundingStatus.ANSWERED
+        assert "14 ngay" in result.assistant_message.content
+
+    run_async(scenario())
+
+
+def test_weekly_limit_quantity_answer_is_not_retried_for_daily_numbers() -> None:
+    async def scenario() -> None:
+        llm = SequentialFakeLLMProvider(
+            LLMGenerationResult(
+                content='{"answer":"48 gio/tuan","citations":["SOURCE_1"]}',
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            ),
+            LLMGenerationResult(
+                content="__NO_ANSWER__",
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            ),
+        )
+        source_text = (
+            "Gio lam viec binh thuong khong vuot gioi han phap luat: "
+            "thong thuong khong qua 08 gio/ngay va 48 gio/tuan; "
+            "truong hop bo tri theo tuan co the khong qua 10 gio/ngay "
+            "nhung van khong qua 48 gio/tuan."
+        )
+        service, _, _, _, resolved_llm, _, _ = make_service(
+            retrieval=FakeRetrievalService(retrieval_result(hit(source_text))),
+            llm=llm,
+        )
+
+        result = await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question="Phap luat cho phep toi da bao nhieu gio trong mot tuan?",
+        )
+
+        assert resolved_llm.calls == 1
+        assert result.grounding_status == GroundingStatus.ANSWERED
+        assert "48 gio/tuan" in result.assistant_message.content
+
+    run_async(scenario())
+
+
+def test_quantity_answer_missing_source_number_retries() -> None:
+    async def scenario() -> None:
+        llm = SequentialFakeLLMProvider(
+            LLMGenerationResult(
+                content=('{"answer":"Employees receive 1 day.","citations":["SOURCE_1"]}'),
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            ),
+            LLMGenerationResult(
+                content=(
+                    '{"answer":"Employees receive 12 days of annual leave.",'
+                    '"citations":["SOURCE_1"]}'
+                ),
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            ),
+        )
+        service, _, _, _, resolved_llm, _, _ = make_service(
+            retrieval=FakeRetrievalService(
+                retrieval_result(
+                    hit("Employees in normal conditions receive 12 days. Seniority adds 1 day.")
+                )
+            ),
+            llm=llm,
+        )
+
+        result = await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question="How many annual leave days do employees receive?",
+        )
+
+        assert resolved_llm.calls == 2
+        assert "12 days" in result.assistant_message.content
+        assert result.grounding_status == GroundingStatus.ANSWERED
+
+    run_async(scenario())
+
+
+def test_change_answer_missing_source_amount_retries() -> None:
+    async def scenario() -> None:
+        llm = SequentialFakeLLMProvider(
+            LLMGenerationResult(
+                content=(
+                    '{"answer":"Annual leave changes under the stated condition.",'
+                    '"citations":["SOURCE_1"]}'
+                ),
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            ),
+            LLMGenerationResult(
+                content=(
+                    '{"answer":"After 5 years, annual leave increases by 1 day.",'
+                    '"citations":["SOURCE_1"]}'
+                ),
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            ),
+        )
+        service, _, _, _, resolved_llm, _, _ = make_service(
+            retrieval=FakeRetrievalService(
+                retrieval_result(hit("After 5 years, annual leave increases by 1 day."))
+            ),
+            llm=llm,
+        )
+
+        result = await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question="How does annual leave change after 5 years?",
+        )
+
+        assert resolved_llm.calls == 2
+        assert "1 day" in result.assistant_message.content
+        assert result.grounding_status == GroundingStatus.ANSWERED
 
     run_async(scenario())
 
@@ -499,7 +1409,7 @@ def test_answered_chat_creates_safe_audit() -> None:
         assert audit_logs[0].metadata_json == {"grounding_status": "ANSWERED"}
         assert audit_logs[1].metadata_json == {
             "grounding_status": "ANSWERED",
-            "citation_count": 0,
+            "citation_count": 1,
         }
 
     run_async(scenario())
@@ -540,7 +1450,7 @@ def test_chat_audit_has_no_sensitive_content(marker: str) -> None:
     async def scenario() -> None:
         llm = FakeLLMProvider(
             LLMGenerationResult(
-                content=f"{marker} [SOURCE_1]",
+                content=f'{{"answer":"{marker}","citations":["SOURCE_1"]}}',
                 model="fake",
                 finish_reason="stop",
                 prompt_tokens=11,
@@ -609,7 +1519,7 @@ def test_grounded_answer_is_provider_independent() -> None:
     async def scenario() -> None:
         llm = FakeLLMProvider(
             LLMGenerationResult(
-                content="Provider-independent answer [SOURCE_1]",
+                content='{"answer":"Provider-independent answer","citations":["SOURCE_1"]}',
                 model="fake",
                 finish_reason="stop",
                 prompt_tokens=1,
@@ -630,6 +1540,67 @@ def test_grounded_answer_is_provider_independent() -> None:
     run_async(scenario())
 
 
+def test_answered_result_without_citations_returns_no_answer_safely() -> None:
+    async def scenario() -> None:
+        service, _, _, _, _, message_service, _ = make_service(
+            citation_validation=FakeCitationValidationService(citations=())
+        )
+
+        result = await service.answer_question(
+            current_user=user(), session_id=chat_session().id, question="Question"
+        )
+
+        assert result.grounding_status == GroundingStatus.NO_ANSWER
+        assert result.assistant_message.content.strip()
+        assert "Grounded answer" not in result.assistant_message.content
+        assert [call["role"] for call in message_service.calls] == [
+            ChatMessageRole.USER,
+            ChatMessageRole.ASSISTANT,
+        ]
+
+    run_async(scenario())
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        '{"answer":"Grounded answer"}',
+        '{"answer":"","citations":["SOURCE_1"]}',
+        '{"answer":"[SOURCE_1]","citations":["SOURCE_1"]}',
+        '{"answer":"Grounded answer","citations":[]}',
+        '{"answer":"<complete answer>","citations":["SOURCE_1"]}',
+    ],
+)
+def test_invalid_structured_llm_output_returns_no_answer_safely(content: str) -> None:
+    async def scenario() -> None:
+        service, _, _, _, _, message_service, _ = make_service(
+            llm=FakeLLMProvider(
+                LLMGenerationResult(
+                    content=content,
+                    model="fake",
+                    finish_reason="stop",
+                    prompt_tokens=1,
+                    completion_tokens=1,
+                    response_time_ms=1,
+                )
+            )
+        )
+
+        result = await service.answer_question(
+            current_user=user(), session_id=chat_session().id, question="Question"
+        )
+
+        assert result.grounding_status == GroundingStatus.NO_ANSWER
+        assert result.assistant_message.content.strip()
+        assert content not in result.assistant_message.content
+        assert [call["role"] for call in message_service.calls] == [
+            ChatMessageRole.USER,
+            ChatMessageRole.ASSISTANT,
+        ]
+
+    run_async(scenario())
+
+
 def test_provider_cannot_inject_unselected_citation() -> None:
     async def scenario() -> None:
         from app.citations.errors import CitationFailureCode, CitationValidationError
@@ -641,7 +1612,7 @@ def test_provider_cannot_inject_unselected_citation() -> None:
         service, _, _, _, _, message_service, _ = make_service(
             llm=FakeLLMProvider(
                 LLMGenerationResult(
-                    content="Invented citation [SOURCE_999]",
+                    content='{"answer":"Invented citation","citations":["SOURCE_999"]}',
                     model="fake",
                     finish_reason="stop",
                     prompt_tokens=1,
@@ -652,11 +1623,16 @@ def test_provider_cannot_inject_unselected_citation() -> None:
             citation_validation=RejectingCitationValidationService(),
         )
 
-        with pytest.raises(CitationValidationFailedApplicationError):
-            await service.answer_question(
-                current_user=user(), session_id=chat_session().id, question="Question"
-            )
-        assert message_service.calls == []
+        result = await service.answer_question(
+            current_user=user(), session_id=chat_session().id, question="Question"
+        )
+
+        assert result.grounding_status == GroundingStatus.NO_ANSWER
+        assert "Invented citation" not in result.assistant_message.content
+        assert [call["role"] for call in message_service.calls] == [
+            ChatMessageRole.USER,
+            ChatMessageRole.ASSISTANT,
+        ]
 
     run_async(scenario())
 
@@ -697,5 +1673,204 @@ def test_provider_error_does_not_create_assistant_message() -> None:
                 current_user=user(), session_id=chat_session().id, question="Question"
             )
         assert message_service.calls == []
+
+    run_async(scenario())
+
+
+def test_internal_only_does_not_call_web_search() -> None:
+    async def scenario() -> None:
+        web_search = FakeWebSearchService(web_results())
+        service, _, _, _, _, _, _ = make_service(
+            settings_obj=settings(
+                web_search_enabled=True,
+                web_search_mode="internal_only",
+                web_search_provider="mock",
+            ),
+            web_search_service=web_search,
+        )
+
+        await service.answer_question(
+            current_user=user(), session_id=chat_session().id, question="latest policy"
+        )
+
+        assert web_search.queries == []
+
+    run_async(scenario())
+
+
+def test_hybrid_current_question_merges_internal_and_web_context() -> None:
+    async def scenario() -> None:
+        web_search = FakeWebSearchService(web_results("web docs context"))
+        service, _, _, retrieval, llm, _, _ = make_service(
+            settings_obj=settings(
+                web_search_enabled=True,
+                web_search_mode="hybrid",
+                web_search_provider="mock",
+            ),
+            web_search_service=web_search,
+        )
+
+        await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question="latest Azure AI update",
+        )
+
+        assert retrieval.calls == 1
+        assert web_search.queries == ["latest Azure AI update"]
+        user_prompt = llm.messages[1].content
+        assert "Document title: Document" in user_prompt
+        assert "Source type: WEB" in user_prompt
+        assert "web docs context" in user_prompt
+        assert "https://learn.microsoft.com" not in user_prompt
+
+    run_async(scenario())
+
+
+def test_web_only_skips_internal_retrieval_and_uses_web_context() -> None:
+    async def scenario() -> None:
+        web_search = FakeWebSearchService(web_results("web-only context"))
+        retrieval = FakeRetrievalService(
+            RetrievalError(RetrievalFailureCode.HYBRID_RETRIEVAL_FAILED)
+        )
+        llm = FakeLLMProvider(
+            LLMGenerationResult(
+                content='{"answer":"Web answer","citations":["SOURCE_1"]}',
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            )
+        )
+        service, _, _, _, resolved_llm, _, _ = make_service(
+            settings_obj=settings(
+                web_search_enabled=True,
+                web_search_mode="web_only",
+                web_search_provider="mock",
+            ),
+            retrieval=retrieval,
+            llm=llm,
+            web_search_service=web_search,
+        )
+
+        result = await service.answer_question(
+            current_user=user(), session_id=chat_session().id, question="Search web"
+        )
+
+        assert retrieval.calls == 0
+        assert web_search.queries == ["Search web"]
+        assert "Source type: WEB" in resolved_llm.messages[1].content
+        assert "Document title: Document" not in resolved_llm.messages[1].content
+        assert result.grounding_status == GroundingStatus.ANSWERED
+
+    run_async(scenario())
+
+
+def test_hybrid_web_search_failure_falls_back_to_internal_context() -> None:
+    async def scenario() -> None:
+        web_search = FakeWebSearchService(
+            WebSearchError(WebSearchFailureCode.WEB_SEARCH_PROVIDER_TIMEOUT)
+        )
+        service, _, _, _, llm, _, _ = make_service(
+            settings_obj=settings(
+                web_search_enabled=True,
+                web_search_mode="hybrid",
+                web_search_provider="mock",
+            ),
+            web_search_service=web_search,
+        )
+
+        result = await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question="latest policy update",
+        )
+
+        assert web_search.queries == ["latest policy update"]
+        assert "Document title: Document" in llm.messages[1].content
+        assert "Source type: WEB" not in llm.messages[1].content
+        assert result.grounding_status == GroundingStatus.ANSWERED
+
+    run_async(scenario())
+
+
+def test_web_only_provider_failure_returns_no_answer_without_llm() -> None:
+    async def scenario() -> None:
+        web_search = FakeWebSearchService(
+            WebSearchError(WebSearchFailureCode.WEB_SEARCH_PROVIDER_UNAVAILABLE)
+        )
+        service, _, _, retrieval, llm, _, _ = make_service(
+            settings_obj=settings(
+                web_search_enabled=True,
+                web_search_mode="web_only",
+                web_search_provider="mock",
+            ),
+            web_search_service=web_search,
+        )
+
+        result = await service.answer_question(
+            current_user=user(), session_id=chat_session().id, question="Search web"
+        )
+
+        assert retrieval.calls == 0
+        assert llm.calls == 0
+        assert result.grounding_status == GroundingStatus.NO_ANSWER
+
+    run_async(scenario())
+
+
+def test_web_search_query_uses_current_question_not_conversation_memory() -> None:
+    async def scenario() -> None:
+        message_repo = FakeMessageRepository(
+            history=(
+                memory_row(1, ChatMessageRole.USER, "CONFIDENTIAL_HISTORY"),
+                memory_row(2, ChatMessageRole.ASSISTANT, "CONFIDENTIAL_ANSWER"),
+            )
+        )
+        web_search = FakeWebSearchService(web_results("web context"))
+        service, _, _, retrieval, _, _, _ = make_service(
+            message_repository=message_repo,
+            retrieval=FakeRetrievalService(retrieval_result()),
+            settings_obj=settings(
+                web_search_enabled=True,
+                web_search_mode="hybrid",
+                web_search_provider="mock",
+            ),
+            web_search_service=web_search,
+        )
+
+        await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question="Current web question",
+        )
+
+        assert retrieval.queries[0] == "Current web question"
+        assert web_search.queries == ["Current web question"]
+
+    run_async(scenario())
+
+
+def test_answer_question_cancellation_reaches_provider_and_persists_nothing() -> None:
+    async def scenario() -> None:
+        slow_provider = SlowCancellableLLMProvider()
+        service, _, _, _, _, message_service, citation_repository = make_service(llm=slow_provider)
+        task = asyncio.create_task(
+            service.answer_question(
+                current_user=user(),
+                session_id=chat_session().id,
+                question="Question",
+            )
+        )
+        await asyncio.wait_for(slow_provider.started.wait(), timeout=1.0)
+
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+        assert slow_provider.cancelled is True
+        assert message_service.calls == []
+        assert citation_repository.calls == []
 
     run_async(scenario())

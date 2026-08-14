@@ -36,3 +36,8 @@ class ChatMessageRole(StrEnum):
 class FeedbackRating(StrEnum):
     HELPFUL = "HELPFUL"
     NOT_HELPFUL = "NOT_HELPFUL"
+
+
+class CitationSourceType(StrEnum):
+    INTERNAL = "INTERNAL"
+    WEB = "WEB"

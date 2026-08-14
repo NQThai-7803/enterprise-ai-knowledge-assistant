@@ -43,6 +43,26 @@ def test_unselected_provider_does_not_require_key() -> None:
     assert settings.llm_provider == "ollama"
 
 
+def test_ollama_reasoning_effort_defaults_to_none() -> None:
+    settings = make_settings(
+        llm_enabled=True,
+        llm_provider="ollama",
+        llm_ollama_model="qwen3:4b",
+    )
+
+    assert settings.llm_ollama_reasoning_effort == "none"
+
+
+def test_ollama_reasoning_effort_rejects_unknown_value() -> None:
+    with pytest.raises(ValidationError):
+        make_settings(
+            llm_enabled=True,
+            llm_provider="ollama",
+            llm_ollama_model="qwen3:4b",
+            llm_ollama_reasoning_effort="verbose",
+        )
+
+
 def test_provider_secrets_hidden_from_repr() -> None:
     settings = make_settings(
         llm_enabled=True,

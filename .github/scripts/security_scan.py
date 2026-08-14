@@ -11,15 +11,22 @@ SCAN_TARGETS = (
     REPO_ROOT / "app",
     REPO_ROOT / "Dockerfile",
     REPO_ROOT / "compose.yaml",
+    REPO_ROOT / "compose.prod.yaml",
+    REPO_ROOT / ".env.production.example",
+    REPO_ROOT / "deploy",
+    REPO_ROOT / "scripts" / "backup",
     REPO_ROOT / "pyproject.toml",
     REPO_ROOT / "alembic.ini",
 )
-TEXT_SUFFIXES = {".py", ".toml", ".yaml", ".yml", ".ini", ""}
+TEXT_SUFFIXES = {".py", ".toml", ".yaml", ".yml", ".ini", ".conf", ".disabled", ".json", ".ps1", ""}
 ALLOWED_SECRET_VALUES = {
     "",
     "change-me",
     "change-me-for-local-development",
     "replace-with-a-long-random-secret-key",
+    "replace-with-production-postgres-password",
+    "replace-with-production-secret-key",
+    "replace-with-grafana-admin-password",
 }
 
 FINDINGS: list[str] = []

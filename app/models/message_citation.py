@@ -10,6 +10,7 @@ from sqlalchemy import (
     Index,
     Integer,
     Numeric,
+    String,
     Text,
     UniqueConstraint,
     Uuid,
@@ -17,6 +18,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+from app.models.enums import CitationSourceType
 
 if TYPE_CHECKING:
     from app.models.chat_message import ChatMessage
@@ -37,6 +39,22 @@ class MessageCitation(Base):
             "relevance_score IS NULL OR (relevance_score >= 0 AND relevance_score <= 1)",
             name="ck_message_citations_relevance_score_range",
         ),
+        CheckConstraint(
+            "source_type IN ('INTERNAL', 'WEB')",
+            name="ck_message_citations_source_type_valid",
+        ),
+        CheckConstraint(
+            "source_type != 'INTERNAL' OR document_id IS NOT NULL",
+            name="ck_message_citations_internal_document_required",
+        ),
+        CheckConstraint(
+            "source_type != 'WEB' OR ("
+            "document_id IS NULL AND chunk_id IS NULL "
+            "AND source_url IS NOT NULL AND char_length(btrim(source_url)) > 0 "
+            "AND source_title IS NOT NULL AND char_length(btrim(source_title)) > 0"
+            ")",
+            name="ck_message_citations_web_source_required",
+        ),
         UniqueConstraint(
             "message_id",
             "citation_order",
@@ -44,6 +62,7 @@ class MessageCitation(Base):
         ),
         Index("ix_message_citations_message_order", "message_id", "citation_order"),
         Index("ix_message_citations_document", "document_id"),
+        Index("ix_message_citations_source_type", "source_type"),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
@@ -52,10 +71,16 @@ class MessageCitation(Base):
         ForeignKey("chat_messages.id", ondelete="CASCADE"),
         nullable=False,
     )
-    document_id: Mapped[uuid.UUID] = mapped_column(
+    source_type: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+        default=CitationSourceType.INTERNAL.value,
+        server_default=CitationSourceType.INTERNAL.value,
+    )
+    document_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid,
         ForeignKey("documents.id", ondelete="RESTRICT"),
-        nullable=False,
+        nullable=True,
     )
     chunk_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid,
@@ -66,9 +91,14 @@ class MessageCitation(Base):
     excerpt: Mapped[str] = mapped_column(Text, nullable=False)
     relevance_score: Mapped[Decimal | None] = mapped_column(Numeric(10, 6), nullable=True)
     citation_order: Mapped[int] = mapped_column(Integer, nullable=False)
+    source_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source_title: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     message: Mapped[ChatMessage] = relationship("ChatMessage", back_populates="citations")
-    document: Mapped[Document] = relationship("Document", back_populates="message_citations")
+    document: Mapped[Document | None] = relationship(
+        "Document",
+        back_populates="message_citations",
+    )
     chunk: Mapped[DocumentChunk | None] = relationship(
         "DocumentChunk",
         back_populates="message_citations",

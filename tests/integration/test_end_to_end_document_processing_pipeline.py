@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from app.core.config import Settings
 from app.document_processing.chunking.factory import create_document_chunker
 from app.document_processing.extractors.pymupdf_extractor import PyMuPDFTextExtractor
+from app.document_processing.models import ExtractedPage, ExtractionResult
 from app.embeddings.errors import EmbeddingError, EmbeddingFailureCode
 from app.embeddings.factory import create_embedding_provider
 from app.embeddings.models import EmbeddingBatch, EmbeddingVector
@@ -904,5 +905,86 @@ def test_real_pipeline_embeds_and_persists_vietnamese_pdf(
             assert len(rows) == result.chunk_count
             assert all(len(row.embedding) == 384 for row in rows)
             assert all(abs(norm - 1.0) <= 1e-3 for norm in norms)
+
+    run_async(scenario())
+
+
+class FakeImageExtractionRouter:
+    def __init__(self, expected_mime_type: str, expected_content: bytes) -> None:
+        self.expected_mime_type = expected_mime_type
+        self.expected_content = expected_content
+        self.calls = 0
+
+    async def extract_document(self, metadata, source: bytes):  # noqa: ANN001
+        self.calls += 1
+        assert metadata.mime_type == self.expected_mime_type
+        assert source == self.expected_content
+        text = "OCR image policy text page one."
+        page = ExtractedPage(
+            page_number=1,
+            text=text,
+            raw_character_count=len(text),
+            normalized_character_count=len(text),
+            usable_character_count=len(text.replace(" ", "")),
+            extraction_method="ocr_fake",
+            source_type="png",
+            width=120,
+            height=80,
+        )
+        return ExtractionResult(
+            page_count=1,
+            pages=(page,),
+            pages_with_usable_text=1,
+            total_raw_characters=page.raw_character_count,
+            total_normalized_characters=page.normalized_character_count,
+            total_usable_characters=page.usable_character_count,
+        )
+
+
+def test_pipeline_processes_image_document_with_ocr_text_and_page_metadata(
+    async_session_factory_for_tests: async_sessionmaker[AsyncSession],
+    tmp_path: Path,
+) -> None:
+    async def scenario() -> None:
+        storage = LocalFileStorage(tmp_path)
+        image_bytes = b"\x89PNG\r\n\x1a\nvalid-enough-uploaded-image"
+        async with async_session_factory_for_tests() as session:
+            uploader = await create_user(session)
+            storage_key = f"documents/pipeline/{uuid.uuid4()}.png"
+            await storage.save(storage_key, one_chunk(image_bytes))
+            document = Document(
+                title="Pipeline Image Document",
+                original_filename="scan.png",
+                storage_key=storage_key,
+                mime_type="image/png",
+                file_size=len(image_bytes),
+                checksum_sha256=checksum_bytes(image_bytes),
+                uploaded_by=uploader.id,
+                access_scope=DocumentAccessScope.PRIVATE,
+                status=DocumentStatus.PROCESSING,
+            )
+            session.add(document)
+            await session.commit()
+            await session.refresh(document)
+            document_id = document.id
+
+        extractor = FakeImageExtractionRouter("image/png", image_bytes)
+        result = await make_pipeline(
+            async_session_factory_for_tests,
+            storage,
+            extractor=extractor,  # type: ignore[arg-type]
+        ).process(document_id)
+
+        async with async_session_factory_for_tests() as session:
+            document = await get_document(session, document_id)
+            rows = await get_chunks(session, document_id)
+            assert result.outcome == DocumentProcessingOutcome.READY
+            assert document.status == DocumentStatus.READY
+            assert extractor.calls == 1
+            assert len(rows) == result.chunk_count
+            assert rows[0].page_numbers == [1]
+            assert rows[0].start_page == 1
+            assert rows[0].end_page == 1
+            assert "OCR image policy text" in rows[0].text
 
     run_async(scenario())

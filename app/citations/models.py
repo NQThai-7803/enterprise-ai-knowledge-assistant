@@ -5,27 +5,33 @@ from dataclasses import dataclass, field
 from math import isfinite
 from uuid import UUID
 
+from app.models import CitationSourceType
+
 _SOURCE_MARKER_RE = re.compile(r"\[SOURCE_([1-9][0-9]*)\]")
 
 
 @dataclass(frozen=True, slots=True)
 class PromptSource:
     marker: str
-    chunk_id: UUID
-    document_id: UUID
+    source_type: CitationSourceType
     document_title: str
     text: str = field(repr=False)
     page_numbers: tuple[int, ...]
     start_page: int
     end_page: int
-    semantic_score: float | None
-    keyword_score: float | None
     hybrid_score: float
+    reranker_score: float | None = None
+    chunk_id: UUID | None = None
+    document_id: UUID | None = None
+    source_url: str | None = None
+    semantic_score: float | None = None
+    keyword_score: float | None = None
 
     def __post_init__(self) -> None:
         if _SOURCE_MARKER_RE.fullmatch(self.marker) is None:
             msg = "source marker must use [SOURCE_n] format."
             raise ValueError(msg)
+        object.__setattr__(self, "source_type", CitationSourceType(self.source_type))
         if not self.document_title.strip():
             msg = "document_title must not be empty."
             raise ValueError(msg)
@@ -39,6 +45,23 @@ class PromptSource:
             raise ValueError(msg)
         if self.start_page <= 0 or self.end_page < self.start_page:
             msg = "source page range is invalid."
+            raise ValueError(msg)
+        if self.source_type == CitationSourceType.INTERNAL:
+            if self.document_id is None or self.chunk_id is None:
+                msg = "internal source must include document_id and chunk_id."
+                raise ValueError(msg)
+            if self.source_url is not None:
+                msg = "internal source must not include source_url."
+                raise ValueError(msg)
+        elif self.source_type == CitationSourceType.WEB:
+            if self.document_id is not None or self.chunk_id is not None:
+                msg = "web source must not include internal document or chunk IDs."
+                raise ValueError(msg)
+            if self.source_url is None or not self.source_url.strip():
+                msg = "web source must include source_url."
+                raise ValueError(msg)
+        else:  # pragma: no cover - enum construction above is the validation path.
+            msg = "source_type is invalid."
             raise ValueError(msg)
         if self.semantic_score is not None and (
             not isfinite(self.semantic_score)
@@ -72,9 +95,19 @@ class PromptSourceRegistry:
         if len(markers) != len(set(markers)):
             msg = "source markers must be unique."
             raise ValueError(msg)
-        chunk_ids = [source.chunk_id for source in sources]
-        if len(chunk_ids) != len(set(chunk_ids)):
-            msg = "source chunk IDs must be unique."
+        internal_chunk_ids = [
+            source.chunk_id
+            for source in sources
+            if source.source_type == CitationSourceType.INTERNAL
+        ]
+        if len(internal_chunk_ids) != len(set(internal_chunk_ids)):
+            msg = "internal source chunk IDs must be unique."
+            raise ValueError(msg)
+        web_urls = [
+            source.source_url for source in sources if source.source_type == CitationSourceType.WEB
+        ]
+        if len(web_urls) != len(set(web_urls)):
+            msg = "web source URLs must be unique."
             raise ValueError(msg)
 
     def by_marker(self, marker: str) -> PromptSource | None:
@@ -99,15 +132,18 @@ class ParsedCitationMarkers:
 
 @dataclass(frozen=True, slots=True)
 class ValidatedCitation:
-    document_id: UUID
     document_title: str
-    chunk_id: UUID
     page_number: int
     excerpt: str = field(repr=False)
-    relevance_score: float | None
     citation_order: int
+    source_type: CitationSourceType = CitationSourceType.INTERNAL
+    document_id: UUID | None = None
+    chunk_id: UUID | None = None
+    source_url: str | None = None
+    relevance_score: float | None = None
 
     def __post_init__(self) -> None:
+        object.__setattr__(self, "source_type", CitationSourceType(self.source_type))
         if not self.document_title.strip():
             msg = "document_title must not be empty."
             raise ValueError(msg)
@@ -116,6 +152,23 @@ class ValidatedCitation:
             raise ValueError(msg)
         if not self.excerpt.strip():
             msg = "excerpt must not be empty."
+            raise ValueError(msg)
+        if self.source_type == CitationSourceType.INTERNAL:
+            if self.document_id is None:
+                msg = "internal citation must include document_id."
+                raise ValueError(msg)
+            if self.source_url is not None:
+                msg = "internal citation must not include source_url."
+                raise ValueError(msg)
+        elif self.source_type == CitationSourceType.WEB:
+            if self.document_id is not None or self.chunk_id is not None:
+                msg = "web citation must not include internal document or chunk IDs."
+                raise ValueError(msg)
+            if self.source_url is None or not self.source_url.strip():
+                msg = "web citation must include source_url."
+                raise ValueError(msg)
+        else:  # pragma: no cover - enum construction above is the validation path.
+            msg = "source_type is invalid."
             raise ValueError(msg)
         if self.relevance_score is not None and (
             not isfinite(self.relevance_score)

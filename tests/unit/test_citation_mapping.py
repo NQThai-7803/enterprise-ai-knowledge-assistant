@@ -127,3 +127,43 @@ def test_mapping_fails_when_page_metadata_is_invalid() -> None:
             document_titles_by_id={bad_source.document_id: "Current"},
             excerpt_max_characters=500,
         )
+
+
+def web_item(index: int) -> SelectedContextItem:
+    from app.models import CitationSourceType
+
+    return SelectedContextItem(
+        ordinal=index,
+        text="OpenAI Docs describe the Responses API.",
+        token_count=10,
+        document_title="OpenAI Docs",
+        source_type=CitationSourceType.WEB,
+        source_url="https://platform.openai.com/docs/api-reference/responses",
+        page_numbers=(1,),
+        start_page=1,
+        end_page=1,
+        hybrid_score=1.0,
+    )
+
+
+def test_mapping_web_citation_uses_backend_url_and_no_internal_ids() -> None:
+    from app.models import CitationSourceType
+
+    source_registry = build_prompt_source_registry(context_items=(web_item(1),), max_sources=8)
+
+    mapped = map_validated_citations(
+        answer="Responses are documented online [SOURCE_1].",
+        ordered_markers=("[SOURCE_1]",),
+        source_registry=source_registry,
+        document_titles_by_id={},
+        excerpt_max_characters=500,
+    )
+
+    citation = mapped.citations[0]
+    assert mapped.answer == "Responses are documented online [1]."
+    assert citation.source_type == CitationSourceType.WEB
+    assert citation.document_id is None
+    assert citation.chunk_id is None
+    assert citation.document_title == "OpenAI Docs"
+    assert citation.source_url == "https://platform.openai.com/docs/api-reference/responses"
+    assert citation.relevance_score is None

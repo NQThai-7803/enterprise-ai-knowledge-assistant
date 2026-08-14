@@ -566,3 +566,54 @@ async def test_transient_model_load_error_retries_when_classified_transient(
 
     with pytest.raises(TransientDocumentProcessingError):
         await pipeline.process(document.id)
+
+
+class AsyncFakeExtractionRouter:
+    def __init__(self, order: list[str]) -> None:
+        self.order = order
+        self.metadata = None
+        self.sources: list[bytes] = []
+
+    async def extract_document(self, metadata, source: bytes):  # noqa: ANN001
+        self.order.append("extraction")
+        self.metadata = metadata
+        self.sources.append(source)
+        return make_extraction()
+
+
+@pytest.mark.anyio
+async def test_pipeline_passes_mime_metadata_to_async_extraction_router(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    document = make_document()
+    document.mime_type = "image/png"
+    document.original_filename = "scan.png"
+    document.storage_key = "documents/unit/scan.png"
+    order: list[str] = []
+    storage = FakeStorage(order)
+    extractor = AsyncFakeExtractionRouter(order)
+    chunker = FakeChunker(order)
+    provider = FakeEmbeddingProvider(order)
+    FakeRepository.rows = []
+    FakeRepository.order = order
+    FakeRepository.document = document
+    FakeRepository.fail = False
+    monkeypatch.setattr(pipeline_module, "DocumentChunkRepository", FakeRepository)
+    pipeline = DocumentProcessingPipeline(
+        storage=storage,
+        extractor=extractor,
+        chunker=chunker,
+        embedding_provider=provider,
+        session_provider=lambda: session_provider(document),
+        max_pdf_bytes=1024,
+        read_chunk_size_bytes=10,
+    )
+
+    result = await pipeline.process(document.id)
+
+    assert result.outcome.value == "READY"
+    assert extractor.metadata is not None
+    assert extractor.metadata.mime_type == "image/png"
+    assert extractor.sources == [PDF_BYTES]
+    assert provider.passages == (CHUNK_TEXT,)
+    assert order == ["storage", "extraction", "chunking", "embedding", "persistence"]

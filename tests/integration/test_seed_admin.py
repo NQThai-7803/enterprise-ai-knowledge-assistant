@@ -31,7 +31,12 @@ def make_settings(*, email: str, password: str, app_env: str = "test") -> Settin
         app_env=app_env,
         app_debug=app_env != "production",
         secret_key="test-secret-key-for-seed-admin-123456789",
-        database_url="postgresql+asyncpg://app_user:change-me-for-local-development@localhost:5432/enterprise_ai",
+        database_url="postgresql+asyncpg://app_user:test-db-password@localhost:5432/enterprise_ai",
+        redis_url=(
+            "redis://redis.example.internal:6379/0"
+            if app_env == "production"
+            else "redis://localhost:6379/0"
+        ),
         dev_admin_email=email,
         dev_admin_full_name="Development Admin",
         dev_admin_password=password,

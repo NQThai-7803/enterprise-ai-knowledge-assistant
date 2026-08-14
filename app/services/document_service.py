@@ -28,6 +28,18 @@ from app.core.exceptions import (
     ResourceNotFoundError,
 )
 from app.core.permissions import can_edit_document, can_manage_document, can_view_document
+from app.document_processing.document_types import (
+    JPEG_EXTENSION,
+    JPG_EXTENSION,
+    PDF_EXTENSION,
+    PDF_MIME_TYPE,
+    PNG_EXTENSION,
+    SUPPORTED_DOCUMENT_TYPES,
+    SupportedDocumentFileType,
+    extension_for_mime_type,
+    resolve_supported_document_file_type,
+    validate_document_signature,
+)
 from app.models import (
     Document,
     DocumentAccessScope,
@@ -43,9 +55,6 @@ from app.services.audit_service import AuditContext, AuditService
 from app.storage.base import FileStorage
 from app.storage.local import StorageError
 
-PDF_SIGNATURE = b"%PDF-"
-PDF_MIME_TYPE = "application/pdf"
-PDF_EXTENSION = ".pdf"
 MAX_TITLE_LENGTH = 255
 MAX_ORIGINAL_FILENAME_LENGTH = 255
 MAX_SEARCH_LENGTH = 200
@@ -76,6 +85,7 @@ class UploadFileProcessor:
         *,
         max_upload_size_bytes: int,
         upload_chunk_size_bytes: int,
+        file_type: SupportedDocumentFileType | None = None,
     ) -> None:
         if max_upload_size_bytes <= 0:
             msg = "max_upload_size_bytes must be greater than zero."
@@ -86,6 +96,7 @@ class UploadFileProcessor:
         self.file = file
         self.max_upload_size_bytes = max_upload_size_bytes
         self.upload_chunk_size_bytes = upload_chunk_size_bytes
+        self.file_type = file_type or SUPPORTED_DOCUMENT_TYPES[PDF_MIME_TYPE]
         self.total_size = 0
         self._hasher = hashlib.sha256()
         self._signature_prefix = bytearray()
@@ -115,13 +126,12 @@ class UploadFileProcessor:
     def _validate_signature_chunk(self, chunk: bytes) -> None:
         if self._signature_checked:
             return
-        bytes_needed = len(PDF_SIGNATURE) - len(self._signature_prefix)
+        bytes_needed = self.file_type.signature_length - len(self._signature_prefix)
         self._signature_prefix.extend(chunk[:bytes_needed])
-        if len(self._signature_prefix) < len(PDF_SIGNATURE):
+        if len(self._signature_prefix) < self.file_type.signature_length:
             return
         self._signature_checked = True
-        if bytes(self._signature_prefix) != PDF_SIGNATURE:
-            raise DocumentFileSignatureInvalidError()
+        validate_document_signature(prefix=bytes(self._signature_prefix), file_type=self.file_type)
 
 
 class DocumentService:
@@ -154,18 +164,21 @@ class DocumentService:
         normalized_title = normalize_title(title)
         normalized_description = normalize_description(description)
         original_filename = sanitize_original_filename(file.filename)
-        validate_pdf_extension(original_filename)
-        validate_pdf_mime_type(file.content_type)
+        file_type = resolve_supported_document_file_type(
+            filename=original_filename,
+            content_type=file.content_type,
+        )
         validated_department_id = await self._validate_upload_scope(
             current_user=current_user,
             access_scope=access_scope,
             department_id=department_id,
         )
-        storage_key = generate_document_storage_key()
+        storage_key = generate_document_storage_key(extension=file_type.primary_extension)
         processor = UploadFileProcessor(
             file,
             max_upload_size_bytes=upload_limits.max_upload_size_bytes,
             upload_chunk_size_bytes=upload_limits.upload_chunk_size_bytes,
+            file_type=file_type,
         )
         file_saved = False
 
@@ -187,7 +200,7 @@ class DocumentService:
                 description=normalized_description,
                 original_filename=original_filename,
                 storage_key=storage_key,
-                mime_type=PDF_MIME_TYPE,
+                mime_type=file_type.mime_type,
                 file_size=processor.total_size,
                 checksum_sha256=processor.checksum_sha256,
                 access_scope=access_scope,
@@ -305,7 +318,7 @@ class DocumentService:
             current_user=current_user,
         )
         storage_key = document.storage_key
-        filename = safe_download_filename(document.original_filename)
+        filename = safe_download_filename(document.original_filename, document.mime_type)
         file_size = document.file_size
         try:
             file_exists = await storage.exists(storage_key)
@@ -325,7 +338,7 @@ class DocumentService:
         return DocumentDownload(
             filename=filename,
             file_size=file_size,
-            media_type=PDF_MIME_TYPE,
+            media_type=document.mime_type,
             chunks=storage.iter_chunks(storage_key, upload_limits.upload_chunk_size_bytes),
         )
 
@@ -673,15 +686,21 @@ def sanitize_original_filename(filename: str | None) -> str:
     return normalized
 
 
-def safe_download_filename(filename: str | None) -> str:
+def safe_download_filename(filename: str | None, mime_type: str = PDF_MIME_TYPE) -> str:
+    try:
+        expected_extension = extension_for_mime_type(mime_type)
+        allowed_extensions = SUPPORTED_DOCUMENT_TYPES[mime_type].extensions
+    except (ApplicationError, KeyError):
+        expected_extension = PDF_EXTENSION
+        allowed_extensions = (PDF_EXTENSION,)
     try:
         sanitized = sanitize_original_filename(filename)
     except ApplicationError:
-        sanitized = "document.pdf"
+        sanitized = f"document{expected_extension}"
     sanitized = sanitized.replace('"', "_").replace("\\", "_").replace(";", "_")
-    if not sanitized.lower().endswith(PDF_EXTENSION):
-        sanitized = "document.pdf"
-    return sanitized[:MAX_ORIGINAL_FILENAME_LENGTH] or "document.pdf"
+    if not sanitized.lower().endswith(allowed_extensions):
+        sanitized = f"document{expected_extension}"
+    return sanitized[:MAX_ORIGINAL_FILENAME_LENGTH] or f"document{expected_extension}"
 
 
 def validate_pdf_extension(filename: str) -> None:
@@ -694,14 +713,31 @@ def validate_pdf_mime_type(content_type: str | None) -> None:
         raise InvalidFileTypeError()
 
 
+def validate_supported_document_file_type(
+    *,
+    filename: str,
+    content_type: str | None,
+) -> SupportedDocumentFileType:
+    return resolve_supported_document_file_type(filename=filename, content_type=content_type)
+
+
 def generate_document_storage_key(
     *,
     now: datetime | None = None,
     document_uuid: uuid.UUID | None = None,
+    extension: str = PDF_EXTENSION,
 ) -> str:
     current_time = now.astimezone(UTC) if now is not None else datetime.now(UTC)
     storage_uuid = document_uuid or uuid.uuid4()
-    return f"documents/{current_time:%Y}/{current_time:%m}/{storage_uuid}.pdf"
+    normalized_extension = _validate_storage_extension(extension)
+    return f"documents/{current_time:%Y}/{current_time:%m}/{storage_uuid}{normalized_extension}"
+
+
+def _validate_storage_extension(extension: str) -> str:
+    normalized = extension.lower()
+    if normalized not in {PDF_EXTENSION, PNG_EXTENSION, JPG_EXTENSION, JPEG_EXTENSION}:
+        raise InvalidFileTypeError()
+    return normalized
 
 
 def _validate_document_sort(sort_by: str, sort_order: str) -> None:

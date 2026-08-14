@@ -75,6 +75,34 @@ async def test_provider_sends_configured_model_and_messages() -> None:
 
 
 @pytest.mark.anyio
+async def test_provider_omits_reasoning_effort_by_default() -> None:
+    captured: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["json"] = request.read().decode()
+        return httpx.Response(200, json=ok_response())
+
+    await call_provider(make_provider(handler))
+
+    assert "reasoning_effort" not in captured["json"]
+
+
+@pytest.mark.anyio
+async def test_provider_sends_configured_reasoning_effort() -> None:
+    captured: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["json"] = request.read().decode()
+        return httpx.Response(200, json=ok_response())
+
+    await call_provider(make_provider(handler, provider_name="ollama", reasoning_effort="none"))
+
+    assert '"reasoning_effort":"none"' in captured["json"]
+    assert '"reasoning":{"effort":"none"}' in captured["json"]
+    assert "/no_think" in captured["json"]
+
+
+@pytest.mark.anyio
 async def test_provider_adds_authorization_when_configured() -> None:
     captured: dict[str, str | None] = {}
 
@@ -124,6 +152,35 @@ async def test_provider_accepts_missing_usage() -> None:
     assert result.prompt_tokens is None
     assert result.completion_tokens is None
     assert result.usage is None
+
+
+@pytest.mark.anyio
+async def test_provider_strips_visible_thinking_before_returning_content() -> None:
+    result = await call_provider(
+        make_provider(
+            lambda request: httpx.Response(
+                200,
+                json=ok_response("<think>draft</think>\n\nFinal answer [SOURCE_1]"),
+            )
+        )
+    )
+
+    assert result.content == "Final answer [SOURCE_1]"
+
+
+@pytest.mark.anyio
+async def test_provider_rejects_thinking_only_content() -> None:
+    provider = make_provider(
+        lambda request: httpx.Response(
+            200,
+            json=ok_response("<think>draft only</think>"),
+        )
+    )
+
+    with pytest.raises(LLMError) as exc_info:
+        await call_provider(provider)
+
+    assert exc_info.value.code == LLMFailureCode.LLM_PROVIDER_BAD_RESPONSE
 
 
 @pytest.mark.anyio

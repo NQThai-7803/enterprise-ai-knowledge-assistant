@@ -5,23 +5,32 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.permissions import build_accessible_document_filter
-from app.models import ChatMessage, ChatMessageRole, Document, MessageCitation, User
+from app.models import (
+    ChatMessage,
+    ChatMessageRole,
+    CitationSourceType,
+    Document,
+    MessageCitation,
+    User,
+)
 
 
 @dataclass(frozen=True, slots=True)
 class MessageCitationRow:
     message_id: UUID
-    document_id: UUID
+    source_type: CitationSourceType
+    document_id: UUID | None
     document_title: str
     chunk_id: UUID | None
     page_number: int
     excerpt: str = field(repr=False)
     relevance_score: float | None
     citation_order: int
+    source_url: str | None = None
 
 
 async def create_many(
@@ -40,17 +49,24 @@ async def create_many(
     rows: list[MessageCitation] = []
     for citation in sorted(citations, key=lambda item: item.citation_order):
         relevance_score = citation.relevance_score
+        source_type = CitationSourceType(
+            getattr(citation, "source_type", CitationSourceType.INTERNAL)
+        )
+        is_web = source_type == CitationSourceType.WEB
         rows.append(
             MessageCitation(
                 message_id=assistant_message.id,
-                document_id=citation.document_id,
-                chunk_id=citation.chunk_id,
+                source_type=source_type.value,
+                document_id=None if is_web else citation.document_id,
+                chunk_id=None if is_web else citation.chunk_id,
                 page_number=citation.page_number,
                 excerpt=citation.excerpt,
                 relevance_score=(
                     None if relevance_score is None else Decimal(str(relevance_score))
                 ),
                 citation_order=citation.citation_order,
+                source_url=citation.source_url if is_web else None,
+                source_title=citation.document_title if is_web else None,
             )
         )
     session.add_all(rows)
@@ -69,18 +85,27 @@ async def list_by_message_ids(
     statement = (
         select(
             MessageCitation.message_id,
+            MessageCitation.source_type,
             MessageCitation.document_id,
             Document.title.label("document_title"),
+            MessageCitation.source_title,
             MessageCitation.chunk_id,
             MessageCitation.page_number,
             MessageCitation.excerpt,
             MessageCitation.relevance_score,
             MessageCitation.citation_order,
+            MessageCitation.source_url,
         )
-        .join(Document, Document.id == MessageCitation.document_id)
+        .outerjoin(Document, Document.id == MessageCitation.document_id)
         .where(
             MessageCitation.message_id.in_(unique_message_ids),
-            build_accessible_document_filter(current_user),
+            or_(
+                MessageCitation.source_type == CitationSourceType.WEB.value,
+                and_(
+                    MessageCitation.source_type == CitationSourceType.INTERNAL.value,
+                    build_accessible_document_filter(current_user),
+                ),
+            ),
         )
         .order_by(MessageCitation.message_id.asc(), MessageCitation.citation_order.asc())
     )
@@ -103,13 +128,18 @@ async def list_by_message(
 
 def _row_from_result(row) -> MessageCitationRow:  # noqa: ANN001
     relevance = row.relevance_score
+    source_type = CitationSourceType(row.source_type)
     return MessageCitationRow(
         message_id=row.message_id,
+        source_type=source_type,
         document_id=row.document_id,
-        document_title=row.document_title,
+        document_title=(
+            row.source_title if source_type == CitationSourceType.WEB else row.document_title
+        ),
         chunk_id=row.chunk_id,
         page_number=row.page_number,
         excerpt=row.excerpt,
         relevance_score=None if relevance is None else float(relevance),
         citation_order=row.citation_order,
+        source_url=row.source_url if source_type == CitationSourceType.WEB else None,
     )

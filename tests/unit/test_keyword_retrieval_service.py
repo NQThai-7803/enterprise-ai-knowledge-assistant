@@ -10,7 +10,7 @@ import pytest
 from app.core.config import Settings
 from app.models import User, UserRole
 from app.retrieval.errors import RetrievalError, RetrievalFailureCode
-from app.retrieval.keyword_repository import KeywordRetrievalRow
+from app.retrieval.keyword_repository import KeywordRetrievalRow, _fallback_tsquery_text
 from app.retrieval.keyword_service import KeywordRetrievalService
 
 
@@ -234,3 +234,31 @@ def test_keyword_logs_do_not_include_chunk_text(caplog: pytest.LogCaptureFixture
         assert marker not in caplog.text
 
     run_async(scenario())
+
+
+def test_fallback_query_keeps_meaningful_vietnamese_terms() -> None:
+    query_text = _fallback_tsquery_text(
+        "Trong công việc điều kiện bình thường, mức nghỉ hằng năm hưởng nguyên lương "
+        "là bao nhiêu ngày?"
+    )
+
+    assert "công <-> việc" in query_text
+    assert "điều <-> kiện" in query_text
+    assert "bình <-> thường" in query_text
+    assert "hằng" in query_text
+    assert "nguyên" in query_text
+    assert "lương" in query_text
+    assert "trong" not in query_text
+    assert "bao" not in query_text
+    assert "nhiêu" not in query_text
+
+
+def test_fallback_query_sanitizes_user_tsquery_syntax() -> None:
+    query_text = _fallback_tsquery_text("' OR 1=1 -- nghỉ (phép) / ../../ nguyên lương")
+
+    assert "'" not in query_text
+    assert ";" not in query_text
+    assert "&" not in query_text
+    assert "nghỉ" in query_text
+    assert "phép" in query_text
+    assert "nguyên" in query_text

@@ -127,7 +127,7 @@ docker compose exec api alembic current
 docker compose exec api alembic heads
 ```
 
-Expected Alembic head for TASK-023 is `20260722_0009`. Do not use `Base.metadata.create_all()` in this project.
+Current Alembic source head after TASK-031 is `20260803_0010`. TASK-023 originally used `20260722_0009`. Do not use `Base.metadata.create_all()` in this project.
 
 ## 10. Python runtime checks
 
@@ -225,6 +225,54 @@ Azure OpenAI requires `LLM_AZURE_ENDPOINT`, `LLM_AZURE_API_KEY`, `LLM_AZURE_DEPL
 Docker Desktop for Windows supports `host.docker.internal`. On Linux, that host name may require an explicit Docker host-gateway configuration outside the default TASK-026 Compose stack.
 
 Do not add an LLM container, install Ollama, download a model, or call a real provider as part of the default backend startup or CI flow.
+
+### UAT deterministic local LLM
+
+The default development stack intentionally keeps `LLM_ENABLED=false`. For local UAT chat without a real provider key, use the UAT overlay:
+
+```powershell
+docker compose -f compose.yaml -f compose.uat.yaml up -d
+```
+
+If API or worker containers were already started without the overlay, recreate the UAT services without deleting volumes:
+
+```powershell
+docker compose -f compose.yaml -f compose.uat.yaml up -d --force-recreate uat-seed api worker uat-llm
+```
+
+The UAT overlay sets:
+
+```text
+LLM_ENABLED=true
+LLM_PROVIDER=openai_compatible
+LLM_MODEL=uat-deterministic-model
+LLM_OPENAI_BASE_URL=http://uat-llm:18080/v1
+```
+
+No real OpenAI, Gemini, Anthropic, or OpenRouter key is required for the UAT provider. The overlay also runs the one-shot `uat-seed` service after migrations. It upserts `admin.uat@example.test`, `manager.uat@example.test`, and `staff.uat@example.test` with deterministic local-only passwords, updates stale hashes/roles/departments in place, and preserves unrelated users. Do not use `docker compose down -v` for UAT recovery unless you intentionally want to delete local UAT data.
+
+
+## Web Search During Local Development
+
+Web search is disabled by default:
+
+```text
+WEB_SEARCH_ENABLED=false
+WEB_SEARCH_MODE=internal_only
+WEB_SEARCH_PROVIDER=mock
+WEB_SEARCH_ALLOW_EXTERNAL=false
+```
+
+For local backend tests without internet, keep `WEB_SEARCH_PROVIDER=mock`. To test a real provider, set `WEB_SEARCH_ENABLED=true`, choose `WEB_SEARCH_MODE=hybrid` or `web_only`, set `WEB_SEARCH_ALLOW_EXTERNAL=true`, and provide the selected provider credentials where required. Do not put real provider keys in committed files.
+
+Admin-only configuration checks are available after login:
+
+```text
+GET  /api/v1/web-search/provider-status
+POST /api/v1/web-search/test
+```
+
+The public Chat API body is unchanged; source mode is not a per-request client option in TASK-031.
 
 ## 14. Stop containers but keep data
 
@@ -703,7 +751,7 @@ python -m pytest tests/integration/test_document_embedding_persistence.py -m int
 Manual embedding smoke test with non-sensitive sample text should print only aggregate metadata:
 
 ```powershell
-python -c "from app.core.config import get_settings; from app.embeddings.factory import create_embedding_provider; settings = get_settings(); provider = create_embedding_provider(settings); result = provider.embed_passages(['NhÃƒÂ¢n viÃƒÂªn Ã„â€˜Ã†Â°Ã¡Â»Â£c hÃ†Â°Ã¡Â»Å¸ng 12 ngÃƒÂ y nghÃ¡Â»â€° phÃƒÂ©p mÃ¡Â»â€”i nÃ„Æ’m.', 'HÃ¡Â»â€¡ thÃ¡Â»â€˜ng sao lÃ†Â°u dÃ¡Â»Â¯ liÃ¡Â»â€¡u vÃƒÂ o ban Ã„â€˜ÃƒÂªm.']); print({'count': result.count, 'dimensions': result.dimensions, 'normalized': result.normalized, 'model_name': result.model_name})"
+python -c "from app.core.config import get_settings; from app.embeddings.factory import create_embedding_provider; settings = get_settings(); provider = create_embedding_provider(settings); result = provider.embed_passages(['Nhân viên được hưởng 12 ngày nghỉ phép mỗi năm.', 'Hệ thống sao lưu dữ liệu vào ban đêm.']); print({'count': result.count, 'dimensions': result.dimensions, 'normalized': result.normalized, 'model_name': result.model_name})"
 ```
 
 Do not print source text, vector values, storage keys, absolute paths, or model cache absolute paths in demos or logs.
@@ -1051,18 +1099,263 @@ docs/ui/USER_EXPERIENCE_GUIDE.md
 The short path is:
 
 ```powershell
-$env:UAT_SEED_ENABLED="true"
-$env:UAT_ADMIN_PASSWORD="<local-only-password>"
-$env:UAT_MANAGER_PASSWORD="<local-only-password>"
-$env:UAT_STAFF_PASSWORD="<local-only-password>"
-
-docker compose -f compose.yaml -f compose.uat.yaml --profile frontend --profile test build
-docker compose -f compose.yaml -f compose.uat.yaml --profile frontend up -d
-docker compose -f compose.yaml -f compose.uat.yaml run --rm api python -m app.scripts.seed_uat_data
+docker compose -f compose.yaml -f compose.uat.yaml up -d
+docker compose -f compose.yaml -f compose.uat.yaml --profile frontend up -d frontend
 ```
 
-Open `http://localhost:5173`. Stop without deleting volumes using:
+The UAT overlay seeds these local-only deterministic login accounts: `admin.uat@example.test` / `LocalUatAdmin!2026`, `manager.uat@example.test` / `LocalUatManager!2026`, and `staff.uat@example.test` / `LocalUatStaff!2026`. To rerun the idempotent seed manually without deleting volumes, use `docker compose -f compose.yaml -f compose.uat.yaml run --rm uat-seed`. Open `http://localhost:5173`. Stop without deleting volumes using:
 
 ```powershell
 docker compose -f compose.yaml -f compose.uat.yaml stop
 ```
+
+## TASK-032 Admin Monitoring Checks
+
+After starting the backend, login as an Admin and call the monitoring endpoints with a normal bearer token in the `Authorization` header:
+
+```text
+GET /api/v1/admin/system
+GET /api/v1/admin/health
+GET /api/v1/admin/providers
+GET /api/v1/admin/workers
+GET /api/v1/admin/statistics
+GET /api/v1/admin/queues
+GET /api/v1/admin/version
+```
+
+Manual checks should confirm:
+
+- Manager and Staff receive `403 FORBIDDEN` for all `/api/v1/admin/*` endpoints.
+- Health includes API, PostgreSQL, Redis, worker, OCR, embedding, LLM, Web Search, streaming, and conversation checks.
+- Providers show enabled/disabled/configuration state without API keys or endpoint credentials.
+- Queues reflect the existing Celery architecture: `documents` is the active document queue; OCR, embedding, retry, and dead-letter are not dedicated queues.
+- Statistics are aggregate counts only and do not include chat text, prompts, context, citation excerpts, feedback reasons, filenames, storage keys, or vectors.
+
+Host verification commands:
+
+```powershell
+python -m pytest tests/unit/test_admin_monitoring_service.py -v
+python -m pytest tests/api/test_admin_monitoring.py -m integration -v
+python -m ruff check app/api/v1/admin.py app/services/admin_monitoring_service.py app/schemas/admin_monitoring.py tests/unit/test_admin_monitoring_service.py tests/api/test_admin_monitoring.py
+python -m compileall app tests
+```
+
+Docker verification remains the same stack flow:
+
+```powershell
+docker compose config
+docker compose build
+docker compose up -d
+docker compose ps
+curl.exe -i http://127.0.0.1:8000/health/live
+curl.exe -i http://127.0.0.1:8000/health/ready
+```
+
+
+## TASK-033 Admin Analytics Checks
+
+After starting the backend, login as an Admin and call the analytics endpoints with a bearer token in the `Authorization` header:
+
+```text
+GET /api/v1/admin/analytics/overview
+GET /api/v1/admin/analytics/chat
+GET /api/v1/admin/analytics/users
+GET /api/v1/admin/analytics/search
+GET /api/v1/admin/analytics/ocr
+GET /api/v1/admin/analytics/llm
+GET /api/v1/admin/analytics/feedback
+GET /api/v1/admin/analytics/audit
+GET /api/v1/admin/reports/export?report=overview&format=json
+GET /api/v1/admin/reports/export?report=overview&format=csv
+```
+
+Supported date filters:
+
+```text
+period=today
+period=7d
+period=30d
+period=90d
+period=custom&date_from=2026-08-01T00:00:00Z&date_to=2026-08-04T23:59:59Z
+```
+
+Manual checks should confirm Manager and Staff receive `403 FORBIDDEN`, missing bearer tokens receive `401`, JSON/CSV exports omit sensitive content, and `format=pdf` returns `422 VALIDATION_ERROR` until a safe PDF export backend is added.
+
+Focused verification commands:
+
+```powershell
+python -m pytest tests/unit/test_admin_analytics_service.py -v
+python -m pytest tests/api/test_admin_analytics.py -m integration -v
+python -m pytest tests/api/test_admin_analytics.py tests/api/test_admin_monitoring.py tests/api/test_web_search_admin.py tests/api/test_rbac_dependencies.py -m integration -v
+python -m ruff check app/api/v1/admin_analytics.py app/services/admin_analytics_service.py app/schemas/admin_analytics.py tests/unit/test_admin_analytics_service.py tests/api/test_admin_analytics.py
+python -m compileall app tests
+```
+
+Docker verification remains the same backend stack flow:
+
+```powershell
+docker compose config
+docker compose build
+docker compose up -d
+docker compose ps
+curl.exe -i http://127.0.0.1:8000/health/live
+curl.exe -i http://127.0.0.1:8000/health/ready
+curl.exe -i http://127.0.0.1:8000/api/v1/admin/analytics/overview
+```
+
+The final curl should return `401 ACCESS_TOKEN_INVALID` without a token, confirming the route exists and RBAC is enforced.
+
+## TASK-034 production deployment and observability
+
+The local development stack remains `compose.yaml`. Use `compose.prod.yaml` for production-oriented runtime checks.
+
+1. Create a private production env file outside source control:
+
+```powershell
+Copy-Item .env.production.example .env.production
+```
+
+Replace every placeholder secret before starting containers. The example file is intentionally not production-safe.
+
+2. Validate and start production runtime:
+
+```powershell
+docker compose --env-file .env.production -f compose.prod.yaml config
+docker compose --env-file .env.production -f compose.prod.yaml build
+docker compose --env-file .env.production -f compose.prod.yaml up -d
+docker compose --env-file .env.production -f compose.prod.yaml ps
+```
+
+3. Verify reverse proxy and API health:
+
+```powershell
+curl.exe -i http://127.0.0.1:8080/health/live
+curl.exe -i http://127.0.0.1:8080/health/ready
+```
+
+Production Nginx forwards `X-Forwarded-*` and `X-Request-ID`, applies security headers, enforces `client_max_body_size 25m`, and disables proxy buffering for the SSE stream route. The committed HTTPS file is disabled by extension and contains no certificate. Mount real certificates at runtime before enabling TLS.
+
+4. Verify internal metrics from the API container or Prometheus:
+
+```powershell
+docker compose --env-file .env.production -f compose.prod.yaml exec api python -c "import urllib.request; print(urllib.request.urlopen('http://127.0.0.1:8000/metrics', timeout=5).read().decode()[:500])"
+```
+
+The reverse proxy intentionally returns `404` for external `/metrics`.
+
+5. Optional Prometheus/Grafana provisioning check:
+
+```powershell
+docker compose --profile observability --env-file .env.production -f compose.prod.yaml config
+```
+
+Starting the observability profile may require pulling Prometheus and Grafana images if they are not already present.
+
+### TASK-034 backup and restore helpers
+
+PostgreSQL backup:
+
+```powershell
+.\scripts\backup\postgres_backup.ps1 -ComposeFile compose.prod.yaml -BackupDir .backups
+```
+
+PostgreSQL restore verification into an isolated database:
+
+```powershell
+.\scripts\backup\postgres_restore.ps1 -DumpPath .\.backups\enterprise_ai_postgres_YYYYMMDD-HHMMSS.dump -TargetDatabase enterprise_ai_restore_check
+```
+
+Uploads volume backup:
+
+```powershell
+.\scripts\backup\uploads_backup.ps1 -BackupDir .backups
+```
+
+Uploads restore verification into an isolated volume:
+
+```powershell
+.\scripts\backup\uploads_restore.ps1 -ArchivePath .\.backups\enterprise_ai_uploads_YYYYMMDD-HHMMSS.tgz -TargetVolumeName enterprise-ai-knowledge-assistant-prod_uploads_restore_check
+```
+
+Restore scripts refuse production overwrite unless the explicit overwrite switch is provided. Backups are not valid until an isolated restore has been tested.
+
+### TASK-034 failure recovery smoke
+
+Use controlled stops/restarts only in a non-production verification environment:
+
+```powershell
+docker compose --env-file .env.production -f compose.prod.yaml restart api
+docker compose --env-file .env.production -f compose.prod.yaml restart worker
+docker compose --env-file .env.production -f compose.prod.yaml stop redis
+docker compose --env-file .env.production -f compose.prod.yaml start redis
+docker compose --env-file .env.production -f compose.prod.yaml stop postgres
+docker compose --env-file .env.production -f compose.prod.yaml start postgres
+```
+
+After each restart, verify `docker compose ps`, `/health/ready`, Celery worker ping, and migration state.
+
+## TASK-035 Final Acceptance
+
+TASK-035 -- Final Acceptance Test & Release Candidate is not started by the UAT UX + LLM configuration fix. Do not treat focused UAT selector, fake-provider, Docker, or chat verification as release-candidate sign-off.
+## TASK-034.1 Local Real LLM Acceptance Setup
+
+TASK-034.1 requires a real local or explicitly configured external provider. Do not use `compose.uat.yaml` or `fake-openai-provider.mjs` for real answer-quality acceptance.
+
+Current recommended local path on Docker Desktop:
+
+1. Install and start Ollama on the host.
+2. Pull the selected model deliberately, for example:
+
+```powershell
+ollama pull qwen3:4b
+```
+
+If the machine cannot run that model comfortably, choose a smaller multilingual instruct model such as `qwen2.5:3b`. Do not download a multi-GB model without operator approval.
+
+3. Configure `.env` with actual settings names read by `app.core.config.Settings`:
+
+```env
+LLM_ENABLED=true
+LLM_PROVIDER=ollama
+LLM_OLLAMA_BASE_URL=http://host.docker.internal:11434
+LLM_OLLAMA_MODEL=qwen3:4b
+LLM_OLLAMA_REASONING_EFFORT=none
+LLM_TIMEOUT_SECONDS=180
+LLM_STREAM_HEARTBEAT_SECONDS=15
+LLM_STREAM_MAX_DURATION_SECONDS=300
+LLM_TEMPERATURE=0.0
+LLM_MAX_OUTPUT_TOKENS=1024
+WEB_SEARCH_ENABLED=false
+WEB_SEARCH_MODE=internal_only
+```
+
+`LLM_MODEL_NAME` is not read by the backend. Use `LLM_MODEL` or provider-specific model variables such as `LLM_OLLAMA_MODEL` and `LLM_LM_STUDIO_MODEL`.
+
+Optional warm-up before live acceptance:
+
+```powershell
+$body = @{ model = "qwen3:4b"; messages = @(@{ role = "user"; content = "Reply OK." }); stream = $false; reasoning_effort = "none"; max_tokens = 16; temperature = 0 } | ConvertTo-Json -Depth 8 -Compress
+Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:11434/v1/chat/completions" -ContentType "application/json" -Body $body
+```
+
+This loads the local model before acceptance. Backend readiness must remain independent of Ollama availability.
+
+4. Start the normal development stack, not the UAT overlay:
+
+```powershell
+docker compose up -d
+```
+
+5. Verify the API container can reach the host provider by using `host.docker.internal`. Then upload the new local acceptance PDFs from `artifacts/task-034-1/` through the normal document upload workflow and wait for `READY`.
+
+6. Run the required strict grounded acceptance questions manually through both non-streaming and streaming chat. Record each answer, citation number, document title, page, excerpt, and claim support in `artifacts/task-034-1/real-llm-acceptance-report.json`.
+
+7. Validate the completed report explicitly:
+
+```powershell
+$env:RUN_REAL_LLM_ACCEPTANCE="true"
+$env:REAL_LLM_ACCEPTANCE_REPORT="artifacts/task-034-1/real-llm-acceptance-report.json"
+python -m pytest tests/integration/test_real_llm_strict_grounded_acceptance.py -m real_llm_acceptance -q
+```
+
+Local status for TASK-034.1 follow-up: Ollama `qwen3:4b` connectivity and buffer-after-validation SSE have been verified for the Nova Digital CEO, CTO, and NovaAssist live questions with no `STREAM_TIMEOUT`. TASK-034.1 still requires the full strict matrix and manual claim report before completion.

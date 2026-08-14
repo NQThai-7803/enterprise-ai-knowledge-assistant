@@ -102,6 +102,39 @@ PDF extraction variable rules:
 - `PDF_TEXT_SORT` is a boolean.
 - These values are not secrets.
 - No PDF password environment variable is supported in MVP.
+
+## OCR and Image Extraction
+
+```text
+OCR_ENABLED=true
+OCR_LANGUAGES=vie,eng
+OCR_MAX_PAGES=100
+OCR_RENDER_DPI=200
+OCR_MAX_IMAGE_PIXELS=40000000
+OCR_MAX_IMAGE_WIDTH=10000
+OCR_MAX_IMAGE_HEIGHT=10000
+OCR_PAGE_TIMEOUT_SECONDS=30
+OCR_DOCUMENT_TIMEOUT_SECONDS=240
+OCR_MAX_EXTRACTED_CHARACTERS=2000000
+OCR_NATIVE_TEXT_MIN_CHARACTERS_PER_PAGE=40
+OCR_NATIVE_TEXT_MIN_ALNUM_RATIO=0.35
+OCR_MAX_REPLACEMENT_CHARACTER_RATIO=0.05
+OCR_MAX_CONTROL_CHARACTER_RATIO=0.02
+```
+
+OCR variable rules:
+
+- `OCR_ENABLED=false` rejects image-only OCR paths and scanned/low-quality PDF OCR fallback with a safe processing error.
+- `OCR_LANGUAGES` supports `eng` and `vie`; values are normalized and de-duplicated.
+- `OCR_MAX_PAGES` bounds OCR fallback for PDFs independently of the native PDF page limit.
+- `OCR_RENDER_DPI` controls PDF-page rasterization before OCR.
+- Image width, height, and total pixel limits are independent safety caps.
+- `OCR_PAGE_TIMEOUT_SECONDS` bounds each Tesseract page subprocess.
+- `OCR_DOCUMENT_TIMEOUT_SECONDS` bounds the whole extraction router call and must be lower than the Celery soft time limit.
+- `OCR_MAX_EXTRACTED_CHARACTERS` caps normalized extracted text before chunking.
+- OCR thresholds reject low-quality text with too few usable characters, too few alphanumeric characters, too many replacement characters, or too many control characters.
+- These values are not secrets and no OCR model download URL is configured.
+
 ## Chunking
 
 ```text
@@ -160,7 +193,20 @@ RETRIEVAL_TOP_K=10
 RETRIEVAL_MAX_TOP_K=50
 MIN_RELEVANCE_SCORE=0.50
 RETRIEVAL_MAX_QUERY_CHARACTERS=4000
-RERANK_TOP_K=5
+RERANKER_ENABLED=true
+RERANKER_PROVIDER=sentence_transformers
+RERANKER_MODEL=BAAI/bge-reranker-v2-m3
+RERANKER_MODEL_REVISION=
+RERANKER_DEVICE=cpu
+RERANKER_BATCH_SIZE=4
+RERANKER_TOP_K=6
+RERANKER_CANDIDATE_K=24
+RERANKER_MAX_LENGTH=512
+RERANKER_TIMEOUT_SECONDS=10
+RERANKER_LOCAL_FILES_ONLY=true
+RERANKER_MODEL_CACHE_PATH=./data/models
+CLAIM_VALIDATION_ENABLED=true
+RAG_DIAGNOSTICS_ENABLED=false
 
 KEYWORD_RETRIEVAL_TOP_K=20
 KEYWORD_RETRIEVAL_MAX_TOP_K=100
@@ -196,7 +242,46 @@ Retrieval variable rules:
 - `HYBRID_SEMANTIC_MIN_RELEVANCE_SCORE` is a finite number in `[0.0, 1.0]`.
 - Hybrid RRF scores are ranking scores, not probabilities.
 - These retrieval values are not secrets.
-- `RERANK_TOP_K` is reserved for a future reranking task and is not used by TASK-016 or TASK-017.
+- `RERANKER_ENABLED` enables the document/chunk reranking layer after hybrid retrieval and before final context packing.
+- `RERANKER_PROVIDER` accepts `sentence_transformers` or `heuristic`; `sentence_transformers` is the default local cross-encoder provider and falls back safely to heuristic alignment if the local model is unavailable.
+- `RERANKER_MODEL` defaults to `BAAI/bge-reranker-v2-m3` when `RERANKER_PROVIDER=sentence_transformers`; keep `RERANKER_LOCAL_FILES_ONLY=true` unless the model has been intentionally provisioned.
+- `RERANKER_CANDIDATE_K` controls how many hybrid candidates are reranked; `RERANKER_TOP_K` controls the final high-confidence source count. `RERANKER_TIMEOUT_SECONDS` bounds reranker latency before fallback.
+- `RERANKER_TOP_K <= RERANKER_CANDIDATE_K <= HYBRID_RETRIEVAL_MAX_TOP_K`.
+- `CLAIM_VALIDATION_ENABLED` enables local claim/evidence consistency checks after citation validation.
+- `RAG_DIAGNOSTICS_ENABLED` enables safe development diagnostics without full prompts, full documents, or chat histories; keep disabled in production unless explicitly debugging.
+
+
+## Web Search
+
+```text
+WEB_SEARCH_ENABLED=false
+WEB_SEARCH_MODE=internal_only
+WEB_SEARCH_PROVIDER=mock
+WEB_SEARCH_MAX_RESULTS=3
+WEB_SEARCH_TIMEOUT_SECONDS=5
+WEB_SEARCH_MAX_CONTENT_LENGTH=2000
+WEB_SEARCH_ALLOW_EXTERNAL=false
+WEB_SEARCH_USER_AGENT=EnterpriseAIKnowledgeAssistant/1.0
+WEB_SEARCH_MAX_RETRIES=1
+WEB_SEARCH_RETRY_BACKOFF_SECONDS=0.5
+WEB_SEARCH_BING_ENDPOINT=https://api.bing.microsoft.com/v7.0/search
+WEB_SEARCH_BING_API_KEY=
+WEB_SEARCH_DUCKDUCKGO_ENDPOINT=https://api.duckduckgo.com/
+WEB_SEARCH_GOOGLE_ENDPOINT=https://www.googleapis.com/customsearch/v1
+WEB_SEARCH_GOOGLE_API_KEY=
+WEB_SEARCH_GOOGLE_CX=
+```
+
+Web search variable rules:
+
+- `WEB_SEARCH_ENABLED=false` preserves internal-only RAG behavior.
+- `WEB_SEARCH_MODE` accepts `internal_only`, `hybrid`, or `web_only`.
+- `WEB_SEARCH_PROVIDER` accepts `mock`, `bing`, `duckduckgo`, or `google_custom_search`.
+- `WEB_SEARCH_ALLOW_EXTERNAL=false` blocks real external provider calls. The mock provider remains usable for local tests.
+- `WEB_SEARCH_MAX_RESULTS`, timeout, retry, backoff, and content-length values are bounded by settings validation.
+- Bing and Google Custom Search credentials are required only when their provider is selected, web search is enabled, and external calls are allowed.
+- Provider endpoints must be absolute `http` or `https` URLs without credentials, query strings, or fragments. Production remote endpoints must use HTTPS.
+- Provider API keys are secrets and must not be committed, logged, or returned by API responses.
 
 ## LLM
 
@@ -238,6 +323,8 @@ LLM_OPENAI_API_KEY=
 ```
 
 `LLM_BASE_URL` and `LLM_API_KEY` remain backward-compatible aliases for the OpenAI-compatible provider.
+
+Use `LLM_MODEL` for the common model setting. `LLM_MODEL_NAME` is not read by the backend settings.
 
 Remote OpenAI-compatible endpoints require `LLM_OPENAI_API_KEY`; local endpoints such as `localhost`, `127.0.0.1`, `::1`, and `host.docker.internal` may leave it empty.
 
@@ -354,6 +441,16 @@ The end-to-end pipeline uses the existing environment variable groups:
 - Embeddings: provider, model name, model revision, dimensions, device, batch size, normalization, prefixes, local-files-only, and model cache path.
 
 TASK-015 adds no new secret variables and no search or LLM variables.
+
+## TASK-029 conversation memory settings
+
+| Variable | Default | Type | Notes |
+| --- | --- | --- | --- |
+| `CHAT_HISTORY_MAX_MESSAGES` | `10` | integer | Maximum number of recent same-session USER, ASSISTANT, and internal SYSTEM messages selected for conversation memory. `0` disables memory selection. Not a secret. |
+| `CHAT_HISTORY_MAX_TOKENS` | `1200` | integer | Maximum estimated token budget for formatted conversation history. `0` disables memory selection. Not a secret. |
+| `CHAT_CONTEXT_MAX_TOKENS` | `6000` | positive integer | Total prompt context budget used when selecting retrieved chunks after system prompt, conversation history, and current question are counted. Not a secret. |
+
+Conversation memory is same-session only and does not add a new database table, Redis cache, vector memory, or summary memory. Formatted prompts and formatted conversation history are not persisted.
 
 ## TASK-020 citation settings
 
@@ -507,6 +604,104 @@ FAKE_LLM_DELAY_MS=250
 Rules:
 
 - `UAT_SEED_ENABLED=true` is required before `python -m app.scripts.seed_uat_data` creates or updates UAT data.
-- UAT passwords are read from the local shell environment and are not baked into Docker images or the frontend bundle.
+- UAT passwords are read from environment variables and are not baked into Docker images or the frontend bundle.
+- `compose.uat.yaml` provides deterministic local-only defaults for `UAT_ADMIN_PASSWORD`, `UAT_MANAGER_PASSWORD`, and `UAT_STAFF_PASSWORD`, and runs the one-shot `uat-seed` service before API/worker startup.
+- The fixed local UAT passwords are test credentials only and must never be reused in production.
 - `compose.uat.yaml` enables a local deterministic OpenAI-compatible provider for acceptance testing without external LLM calls or provider API keys.
+- The default compose.yaml stack keeps LLM_ENABLED=false and does not start uat-llm.
+- The UAT overlay sets API-side `LLM_ENABLED=true`, `LLM_PROVIDER=openai_compatible`, `LLM_MODEL=uat-deterministic-model`, and `LLM_OPENAI_BASE_URL=http://uat-llm:18080/v1`.
 - Use `http://localhost:5173` as the browser frontend origin unless CORS is explicitly expanded for another local origin.
+
+## TASK-034 production and observability variables
+
+Production deployment uses `compose.prod.yaml` and should be configured from a private `.env.production` file, injected environment variables, or Docker secret files. `.env.production.example` is documentation only and contains placeholders.
+
+| Variable | Default/example | Validation | Notes |
+| --- | --- | --- | --- |
+| `SECRET_KEY_FILE` | empty | readable UTF-8 file when set | Overrides `SECRET_KEY`; supports Docker secret-style mounts. |
+| `DATABASE_URL_FILE` | empty | readable UTF-8 file with `postgresql+asyncpg://` URL | Overrides `DATABASE_URL`. File contents are never logged. |
+| `REDIS_URL_FILE` | empty | readable UTF-8 file with `redis://` or `rediss://` URL | Overrides `REDIS_URL`. |
+| `CELERY_BROKER_URL_FILE` | empty | readable UTF-8 Redis URL file | Overrides `CELERY_BROKER_URL`. |
+| `CELERY_RESULT_BACKEND_FILE` | empty | readable UTF-8 Redis URL file | Overrides `CELERY_RESULT_BACKEND`. |
+| `LLM_API_KEY_FILE` | empty | readable UTF-8 file when set | Overrides OpenAI-compatible API key. |
+| `LLM_AZURE_API_KEY_FILE` | empty | readable UTF-8 file when set | Overrides Azure OpenAI key. |
+| `LLM_GEMINI_API_KEY_FILE` | empty | readable UTF-8 file when set | Overrides Gemini key. |
+| `LLM_ANTHROPIC_API_KEY_FILE` | empty | readable UTF-8 file when set | Overrides Anthropic key. |
+| `LLM_OPENROUTER_API_KEY_FILE` | empty | readable UTF-8 file when set | Overrides OpenRouter key. |
+| `WEB_SEARCH_BING_API_KEY_FILE` | empty | readable UTF-8 file when set | Overrides Bing Web Search key. |
+| `WEB_SEARCH_GOOGLE_API_KEY_FILE` | empty | readable UTF-8 file when set | Overrides Google Custom Search key. |
+| `OBSERVABILITY_ENABLED` | `true` | boolean | Enables request ID context, request metrics, and safe request completion logs. |
+| `REQUEST_LOG_ENABLED` | `true` | boolean | Logs method, safe route template, status, latency, request ID, and trace-present flag only. |
+| `METRICS_ENABLED` | `true` | boolean | Enables `/metrics`. Production reverse proxy blocks external access by default. |
+| `METRICS_INCLUDE_SUBSYSTEM_HEALTH` | `true` | boolean | Adds AdminMonitoring-derived runtime gauges to `/metrics`. |
+| `TRACING_HOOKS_ENABLED` | `true` | boolean | Captures valid `traceparent` into request context without exporting spans. |
+| `REQUEST_ID_HEADER` | `X-Request-ID` | HTTP token name | Response header used for request correlation. |
+| `TRACEPARENT_HEADER` | `traceparent` | HTTP token name | Header used for trace hook capture. |
+| `FORWARDED_ALLOW_IPS` | `*` in production compose | Uvicorn proxy setting | Safe only because production compose does not publish the API container port directly. |
+| `PROXY_HTTP_PORT` | `8080` | host port | Local host bind for production reverse proxy verification. |
+| `GRAFANA_ADMIN_PASSWORD` | placeholder | non-empty operator secret | Required only when starting the `observability` profile. |
+
+Production startup rejects placeholder `SECRET_KEY` values and placeholder database passwords, including `replace-with-production-secret-key` and `replace-with-production-postgres-password`.
+
+## TASK-034.1 Real LLM Acceptance Variables
+
+Use existing LLM settings; do not invent new provider variables.
+
+Local Ollama acceptance:
+
+```env
+LLM_ENABLED=true
+LLM_PROVIDER=ollama
+LLM_OLLAMA_BASE_URL=http://host.docker.internal:11434
+LLM_OLLAMA_MODEL=qwen3:4b
+LLM_OLLAMA_REASONING_EFFORT=none
+LLM_TIMEOUT_SECONDS=180
+LLM_STREAM_HEARTBEAT_SECONDS=15
+LLM_STREAM_MAX_DURATION_SECONDS=300
+LLM_TEMPERATURE=0.0
+LLM_MAX_OUTPUT_TOKENS=1024
+LLM_NO_ANSWER_SENTINEL=__NO_ANSWER__
+WEB_SEARCH_ENABLED=false
+WEB_SEARCH_MODE=internal_only
+```
+
+`LLM_TIMEOUT_SECONDS` is the provider HTTP request timeout. `LLM_STREAM_MAX_DURATION_SECONDS` is the bounded public SSE request budget for the buffer-after-validation wrapper. `LLM_STREAM_HEARTBEAT_SECONDS` only controls heartbeat cadence while the backend waits for validation to finish. Keep these separate.
+
+For Ollama thinking-capable models such as `qwen3:4b`, `LLM_OLLAMA_REASONING_EFFORT=none` sends `reasoning_effort: none` to the OpenAI-compatible endpoint. This keeps enterprise RAG answers focused on cited final content and prevents reasoning traces from being exposed or logged.
+
+Local LM Studio acceptance:
+
+```env
+LLM_ENABLED=true
+LLM_PROVIDER=lm_studio
+LLM_LM_STUDIO_BASE_URL=http://host.docker.internal:1234/v1
+LLM_LM_STUDIO_MODEL=<loaded-local-model>
+LLM_TEMPERATURE=0.0
+LLM_MAX_OUTPUT_TOKENS=1024
+WEB_SEARCH_ENABLED=false
+WEB_SEARCH_MODE=internal_only
+```
+
+Generic OpenAI-compatible local endpoint:
+
+```env
+LLM_ENABLED=true
+LLM_PROVIDER=openai_compatible
+LLM_OPENAI_BASE_URL=http://host.docker.internal:<port>/v1
+LLM_OPENAI_API_KEY=
+LLM_MODEL=<local-model>
+```
+
+External provider mode uses the same existing provider variables documented above. External mode sends selected prompt/context to the provider and must be enabled only after data-transfer approval.
+
+`LLM_MODEL_NAME` is a legacy local value and is not read by current backend settings. Use `LLM_MODEL` or provider-specific model variables.
+
+Manual report validator variables:
+
+```env
+RUN_REAL_LLM_ACCEPTANCE=true
+REAL_LLM_ACCEPTANCE_REPORT=artifacts/task-034-1/real-llm-acceptance-report.json
+```
+
+These validator variables do not configure the application runtime and are intentionally absent from normal CI.
+

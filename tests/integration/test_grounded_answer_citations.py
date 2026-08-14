@@ -108,6 +108,7 @@ def settings() -> Settings:
         llm_model="fake-model",
         chat_context_max_tokens=2000,
         chat_retrieval_top_k=2,
+        chat_history_max_tokens=200,
         citation_max_sources_per_answer=2,
     )
 
@@ -170,17 +171,28 @@ def test_answer_persists_citations_with_assistant_message(
                 session,
                 "citation-answer-doc",
                 uploader=owner,
-                title="Quy chế nhân sự",
+                title="Leave policy",
                 access_scope=DocumentAccessScope.ORGANIZATION,
             )
             chunk = await create_chunk(
                 session,
                 "citation-answer-chunk",
                 document=document,
-                text="Nhân viên chính thức được hưởng 12 ngày nghỉ phép mỗi năm.",
+                text="Nhan vien chinh thuc duoc huong 12 ngay nghi phep moi nam.",
                 page_numbers=(14,),
             )
-        llm = FakeLLMProvider("Nhân viên được hưởng 12 ngày nghỉ phép [SOURCE_1].")
+            session.add(
+                ChatMessage(
+                    session_id=chat.id,
+                    role=ChatMessageRole.ASSISTANT,
+                    content="Historical answer [SOURCE_999]",
+                    created_at=datetime(2026, 1, 1, tzinfo=UTC),
+                )
+            )
+            await session.commit()
+        llm = FakeLLMProvider(
+            '{"answer":"Nhan vien duoc huong 12 ngay nghi phep","citations":["SOURCE_1"]}'
+        )
         service = GroundedAnswerService(
             settings=settings(),
             session_provider=async_session_factory_for_tests,
@@ -194,7 +206,7 @@ def test_answer_persists_citations_with_assistant_message(
         result = await service.answer_question(
             current_user=owner,
             session_id=chat.id,
-            question="Nghỉ phép bao nhiêu ngày?",
+            question="Nghi phep bao nhieu ngay?",
         )
 
         async with async_session_factory_for_tests() as session:
@@ -205,17 +217,21 @@ def test_answer_persists_citations_with_assistant_message(
             )
             citations = list(await session.scalars(select(MessageCitation)))
             assert [message.role for message in messages] == [
+                ChatMessageRole.ASSISTANT,
                 ChatMessageRole.USER,
                 ChatMessageRole.ASSISTANT,
             ]
-            assert messages[1].content == "Nhân viên được hưởng 12 ngày nghỉ phép [1]."
+            assert messages[0].content == "Historical answer [SOURCE_999]"
+            assert "[1]" in messages[2].content
+            assert "Historical answer [SOURCE_999]" not in llm.messages[1].content
+            assert "--- SOURCE_999 START ---" not in llm.messages[1].content
             assert len(citations) == 1
-            assert citations[0].message_id == messages[1].id
+            assert citations[0].message_id == messages[2].id
             assert citations[0].document_id == document.id
             assert citations[0].chunk_id == chunk.id
             assert citations[0].page_number == 14
             assert citations[0].citation_order == 1
-            assert result.assistant_citations[0].document_title == "Quy chế nhân sự"
+            assert result.assistant_citations[0].document_title == document.title
             assert result.grounding_status == GroundingStatus.ANSWERED
 
     run_async(scenario())
@@ -236,7 +252,9 @@ def test_invalid_citation_persists_no_messages_or_citations(
             hybrid_retrieval_service=FakeRetrievalService(
                 result_for_hit(retrieval_hit(document, chunk))
             ),
-            llm_provider_factory=lambda: FakeLLMProvider("Invented source [SOURCE_999]."),
+            llm_provider_factory=lambda: FakeLLMProvider(
+                '{"answer":"Invented source","citations":["SOURCE_999"]}'
+            ),
             token_counter=FakeCounter(),
         )
 
@@ -270,7 +288,7 @@ def test_permission_revoked_during_llm_call_returns_no_answer(
                 user_id=grantee.id,
             )
         llm = RevokingLLMProvider(
-            content="Do not return this generated answer [SOURCE_1].",
+            content='{"answer":"Do not return this generated answer","citations":["SOURCE_1"]}',
             session_factory=async_session_factory_for_tests,
             grant_id=grant.id,
         )
@@ -287,7 +305,7 @@ def test_permission_revoked_during_llm_call_returns_no_answer(
         result = await service.answer_question(
             current_user=grantee,
             session_id=chat.id,
-            question="Q",
+            question="Nghi phep bao nhieu ngay?",
         )
 
         async with async_session_factory_for_tests() as session:

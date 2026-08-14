@@ -1,5 +1,6 @@
 from functools import lru_cache
 from math import isfinite
+from pathlib import Path
 from typing import Annotated, Literal
 from urllib.parse import urlsplit
 
@@ -21,6 +22,14 @@ from app.llm.provider_names import (
     SUPPORTED_PROVIDER_NAMES,
     normalize_provider_name,
 )
+from app.web_search.provider_names import (
+    BING_PROVIDER,
+    DUCKDUCKGO_PROVIDER,
+    GOOGLE_CUSTOM_SEARCH_PROVIDER,
+    MOCK_PROVIDER,
+    SUPPORTED_WEB_SEARCH_PROVIDERS,
+    normalize_web_search_provider_name,
+)
 
 PLACEHOLDER_SECRET_KEYS = {
     "",
@@ -31,6 +40,8 @@ PLACEHOLDER_SECRET_KEYS = {
     "example",
     "replace-me",
     "replace-with-a-long-random-secret-key",
+    "replace-with-production-postgres-password",
+    "replace-with-production-secret-key",
     "secret",
     "your-secret-here",
 }
@@ -54,12 +65,14 @@ class Settings(BaseSettings):
         default="replace-with-a-long-random-secret-key",
         repr=False,
     )
+    secret_key_file: str = Field(default="", repr=False)
     jwt_algorithm: Literal["HS256"] = "HS256"
     jwt_issuer: str = "enterprise-ai-knowledge-assistant"
     jwt_audience: str = "enterprise-ai-api"
     access_token_expire_minutes: int = Field(default=15, ge=1)
     refresh_token_expire_days: int = Field(default=7, ge=1)
     database_url: str = Field(default="postgresql+asyncpg:///enterprise_ai", repr=False)
+    database_url_file: str = Field(default="", repr=False)
     dev_admin_email: str = "admin@example.com"
     dev_admin_full_name: str = "Development Admin"
     dev_admin_password: str = ""
@@ -70,6 +83,20 @@ class Settings(BaseSettings):
     pdf_max_pages: int = Field(default=500, gt=0)
     pdf_min_usable_characters: int = Field(default=20, ge=0)
     pdf_text_sort: bool = True
+    ocr_enabled: bool = True
+    ocr_languages: Annotated[list[str], NoDecode] = Field(default_factory=lambda: ["vie", "eng"])
+    ocr_max_pages: int = Field(default=100, ge=1, le=1000)
+    ocr_render_dpi: int = Field(default=200, ge=72, le=400)
+    ocr_max_image_pixels: int = Field(default=40_000_000, ge=1, le=200_000_000)
+    ocr_max_image_width: int = Field(default=10_000, ge=1, le=20_000)
+    ocr_max_image_height: int = Field(default=10_000, ge=1, le=20_000)
+    ocr_page_timeout_seconds: int = Field(default=30, ge=1, le=600)
+    ocr_document_timeout_seconds: int = Field(default=240, ge=1, le=3600)
+    ocr_max_extracted_characters: int = Field(default=2_000_000, ge=1, le=10_000_000)
+    ocr_native_text_min_characters_per_page: int = Field(default=40, ge=0, le=10_000)
+    ocr_native_text_min_alnum_ratio: float = Field(default=0.35, ge=0.0, le=1.0)
+    ocr_max_replacement_character_ratio: float = Field(default=0.05, ge=0.0, le=1.0)
+    ocr_max_control_character_ratio: float = Field(default=0.02, ge=0.0, le=1.0)
     tokenizer_encoding_name: str = Field(default="cl100k_base", min_length=1)
     chunk_target_tokens: int = Field(default=500, gt=0)
     chunk_max_tokens: int = Field(default=700, gt=0)
@@ -100,6 +127,24 @@ class Settings(BaseSettings):
     hybrid_semantic_weight: float = Field(default=1.0, ge=0.0)
     hybrid_keyword_weight: float = Field(default=1.0, ge=0.0)
     hybrid_semantic_min_relevance_score: float = Field(default=0.30, ge=0.0, le=1.0)
+    reranker_enabled: bool = True
+    reranker_provider: Literal["sentence_transformers", "heuristic"] = "sentence_transformers"
+    reranker_model: str = Field(default="BAAI/bge-reranker-v2-m3", min_length=1)
+    reranker_model_revision: str = ""
+    reranker_device: str = Field(default="cpu", min_length=1)
+    reranker_batch_size: int = Field(default=4, gt=0)
+    reranker_top_k: int = Field(
+        default=6,
+        gt=0,
+        validation_alias=AliasChoices("RERANKER_TOP_K", "RERANK_TOP_K"),
+    )
+    reranker_candidate_k: int = Field(default=24, gt=0)
+    reranker_max_length: int = Field(default=512, gt=0)
+    reranker_timeout_seconds: float = Field(default=10.0, gt=0.0, le=120.0)
+    reranker_local_files_only: bool = True
+    reranker_model_cache_path: str = Field(default="./data/models", min_length=1)
+    claim_validation_enabled: bool = True
+    rag_diagnostics_enabled: bool = False
     chat_session_title_max_characters: int = Field(default=200, gt=0)
     chat_session_list_page_size: int = Field(default=20, gt=0)
     chat_session_list_max_page_size: int = Field(default=100, gt=0)
@@ -125,27 +170,36 @@ class Settings(BaseSettings):
         repr=False,
         validation_alias=AliasChoices("LLM_OPENAI_API_KEY", "LLM_API_KEY"),
     )
+    llm_api_key_file: str = Field(default="", repr=False)
     llm_azure_endpoint: str = Field(default="", repr=False)
     llm_azure_api_key: SecretStr = Field(default_factory=lambda: SecretStr(""), repr=False)
+    llm_azure_api_key_file: str = Field(default="", repr=False)
     llm_azure_deployment: str = ""
     llm_azure_api_version: str = ""
     llm_gemini_api_key: SecretStr = Field(default_factory=lambda: SecretStr(""), repr=False)
+    llm_gemini_api_key_file: str = Field(default="", repr=False)
     llm_gemini_model: str = ""
     llm_gemini_base_url: str = Field(default="https://generativelanguage.googleapis.com")
     llm_anthropic_api_key: SecretStr = Field(default_factory=lambda: SecretStr(""), repr=False)
+    llm_anthropic_api_key_file: str = Field(default="", repr=False)
     llm_anthropic_model: str = ""
     llm_anthropic_version: str = "2023-06-01"
     llm_anthropic_base_url: str = Field(default="https://api.anthropic.com")
     llm_ollama_base_url: str = Field(default="http://host.docker.internal:11434")
     llm_ollama_model: str = ""
+    llm_ollama_reasoning_effort: Literal["", "none", "low", "medium", "high"] = "none"
+    llm_ollama_num_ctx: int = Field(default=4096, ge=1024, le=32768)
+    llm_ollama_keep_alive: str = "10m"
     llm_lm_studio_base_url: str = Field(default="http://host.docker.internal:1234/v1")
     llm_lm_studio_model: str = ""
     llm_openrouter_base_url: str = Field(default="https://openrouter.ai/api/v1")
     llm_openrouter_api_key: SecretStr = Field(default_factory=lambda: SecretStr(""), repr=False)
+    llm_openrouter_api_key_file: str = Field(default="", repr=False)
     llm_openrouter_model: str = ""
     llm_no_answer_sentinel: str = Field(default="__NO_ANSWER__", min_length=1)
-    chat_retrieval_top_k: int = Field(default=8, gt=0)
+    chat_retrieval_top_k: int = Field(default=10, gt=0)
     chat_history_max_messages: int = Field(default=10, ge=0)
+    chat_history_max_tokens: int = Field(default=1200, ge=0)
     chat_context_max_tokens: int = Field(default=6000, gt=0)
     chat_no_answer_message: str = Field(
         default=(
@@ -154,8 +208,42 @@ class Settings(BaseSettings):
         ),
         min_length=1,
     )
+    web_search_enabled: bool = False
+    web_search_mode: Literal["internal_only", "hybrid", "web_only"] = "internal_only"
+    web_search_provider: str = MOCK_PROVIDER
+    web_search_max_results: int = Field(default=3, gt=0, le=20)
+    web_search_timeout_seconds: float = Field(default=5.0, gt=0.0, le=60.0)
+    web_search_max_content_length: int = Field(default=2000, gt=0, le=20_000)
+    web_search_allow_external: bool = False
+    web_search_user_agent: str = Field(
+        default="EnterpriseAIKnowledgeAssistant/1.0",
+        min_length=1,
+        max_length=200,
+    )
+    web_search_max_retries: int = Field(default=1, ge=0, le=5)
+    web_search_retry_backoff_seconds: float = Field(default=0.5, ge=0.0, le=30.0)
+    web_search_bing_endpoint: str = Field(
+        default="https://api.bing.microsoft.com/v7.0/search",
+        repr=False,
+    )
+    web_search_bing_api_key: SecretStr = Field(default_factory=lambda: SecretStr(""), repr=False)
+    web_search_bing_api_key_file: str = Field(default="", repr=False)
+    web_search_duckduckgo_endpoint: str = Field(
+        default="https://api.duckduckgo.com/",
+        repr=False,
+    )
+    web_search_google_endpoint: str = Field(
+        default="https://www.googleapis.com/customsearch/v1",
+        repr=False,
+    )
+    web_search_google_api_key: SecretStr = Field(
+        default_factory=lambda: SecretStr(""),
+        repr=False,
+    )
+    web_search_google_api_key_file: str = Field(default="", repr=False)
+    web_search_google_cx: str = Field(default="", repr=False)
     citation_excerpt_max_characters: int = Field(default=500, gt=0)
-    citation_max_sources_per_answer: int = Field(default=8, gt=0)
+    citation_max_sources_per_answer: int = Field(default=10, gt=0)
     feedback_reason_max_characters: int = Field(default=1000, ge=1, le=1000)
     feedback_report_page_size: int = Field(default=20, gt=0)
     feedback_report_max_page_size: int = Field(default=100, gt=0)
@@ -185,6 +273,7 @@ class Settings(BaseSettings):
     db_pool_recycle_seconds: int = Field(default=1800, ge=60, le=86_400)
     db_connect_timeout_seconds: int = Field(default=10, ge=1, le=60)
     redis_url: str = Field(default="redis://localhost:6379/0", repr=False)
+    redis_url_file: str = Field(default="", repr=False)
     redis_connect_timeout_seconds: int = Field(default=5, ge=1, le=60)
     redis_socket_timeout_seconds: int = Field(default=5, ge=1, le=60)
     redis_health_check_interval_seconds: int = Field(default=30, ge=1, le=3600)
@@ -200,7 +289,9 @@ class Settings(BaseSettings):
     rate_limit_feedback_requests: int = Field(default=30, ge=1, le=10_000)
     rate_limit_feedback_window_seconds: int = Field(default=60, ge=1, le=86_400)
     celery_broker_url: str = Field(default="redis://localhost:6379/1", repr=False)
+    celery_broker_url_file: str = Field(default="", repr=False)
     celery_result_backend: str = Field(default="redis://localhost:6379/2", repr=False)
+    celery_result_backend_file: str = Field(default="", repr=False)
     celery_task_default_queue: str = Field(default="default", min_length=1)
     celery_document_queue: str = Field(default="documents", min_length=1)
     celery_task_track_started: bool = True
@@ -215,12 +306,20 @@ class Settings(BaseSettings):
     celery_result_expires_seconds: int = Field(default=3600, ge=1)
     log_level: str = "INFO"
     log_format: Literal["json", "console"] = "json"
+    observability_enabled: bool = True
+    request_log_enabled: bool = True
+    metrics_enabled: bool = True
+    metrics_include_subsystem_health: bool = True
+    tracing_hooks_enabled: bool = True
+    request_id_header: str = Field(default="X-Request-ID", min_length=1, max_length=64)
+    traceparent_header: str = Field(default="traceparent", min_length=1, max_length=64)
 
     @field_validator(
         "cors_origins",
         "cors_allowed_methods",
         "cors_allowed_headers",
         "trusted_hosts",
+        "ocr_languages",
         mode="before",
     )
     @classmethod
@@ -238,12 +337,19 @@ class Settings(BaseSettings):
             return normalize_provider_name(value)
         return value
 
+    @field_validator("web_search_provider", mode="before")
+    @classmethod
+    def normalize_web_search_provider(cls, value: object) -> object:
+        if isinstance(value, str):
+            if not value.strip():
+                return MOCK_PROVIDER
+            return normalize_web_search_provider_name(value)
+        return value
+
     @field_validator("database_url")
     @classmethod
     def validate_database_url(cls, value: str) -> str:
-        if not value.startswith("postgresql+asyncpg://"):
-            msg = "DATABASE_URL must use the postgresql+asyncpg driver."
-            raise ValueError(msg)
+        _validate_database_url_value(value)
         return value
 
     @field_validator("local_storage_path")
@@ -268,6 +374,9 @@ class Settings(BaseSettings):
         "embedding_query_prefix",
         "embedding_passage_prefix",
         "embedding_model_cache_path",
+        "reranker_model",
+        "reranker_device",
+        "reranker_model_cache_path",
     )
     @classmethod
     def validate_embedding_string(cls, value: str) -> str:
@@ -279,9 +388,7 @@ class Settings(BaseSettings):
     @field_validator("redis_url", "celery_broker_url", "celery_result_backend")
     @classmethod
     def validate_redis_url(cls, value: str) -> str:
-        if not value.startswith(("redis://", "rediss://")):
-            msg = "Redis URLs must use redis:// or rediss://."
-            raise ValueError(msg)
+        _validate_redis_url_value(value)
         return value
 
     @field_validator(
@@ -314,6 +421,53 @@ class Settings(BaseSettings):
             msg = "Hardening integer settings must not be boolean values."
             raise ValueError(msg)
         return value
+
+    @field_validator("request_id_header", "traceparent_header")
+    @classmethod
+    def validate_http_header_name(cls, value: str) -> str:
+        normalized = value.strip()
+        allowed_characters = set("!#$%&'*+-.^_`|~")
+        if not normalized or any(
+            not (character.isalnum() or character in allowed_characters) for character in normalized
+        ):
+            msg = "HTTP header names must use valid token characters."
+            raise ValueError(msg)
+        return normalized
+
+    @model_validator(mode="after")
+    def load_secret_file_settings(self) -> "Settings":
+        secret_key = _optional_secret_file_value(self.secret_key_file)
+        if secret_key is not None:
+            self.secret_key = secret_key
+
+        database_url = _optional_secret_file_value(self.database_url_file)
+        if database_url is not None:
+            _validate_database_url_value(database_url)
+            self.database_url = database_url
+
+        for attr_name, file_attr_name in (
+            ("redis_url", "redis_url_file"),
+            ("celery_broker_url", "celery_broker_url_file"),
+            ("celery_result_backend", "celery_result_backend_file"),
+        ):
+            url_value = _optional_secret_file_value(getattr(self, file_attr_name))
+            if url_value is not None:
+                _validate_redis_url_value(url_value)
+                setattr(self, attr_name, url_value)
+
+        for attr_name, file_attr_name in (
+            ("llm_api_key", "llm_api_key_file"),
+            ("llm_azure_api_key", "llm_azure_api_key_file"),
+            ("llm_gemini_api_key", "llm_gemini_api_key_file"),
+            ("llm_anthropic_api_key", "llm_anthropic_api_key_file"),
+            ("llm_openrouter_api_key", "llm_openrouter_api_key_file"),
+            ("web_search_bing_api_key", "web_search_bing_api_key_file"),
+            ("web_search_google_api_key", "web_search_google_api_key_file"),
+        ):
+            secret_value = _optional_secret_file_value(getattr(self, file_attr_name))
+            if secret_value is not None:
+                setattr(self, attr_name, SecretStr(secret_value))
+        return self
 
     @model_validator(mode="after")
     def validate_chunk_settings(self) -> "Settings":
@@ -351,6 +505,19 @@ class Settings(BaseSettings):
         "hybrid_retrieval_max_top_k",
         "hybrid_candidate_multiplier",
         "hybrid_rrf_k",
+        "reranker_batch_size",
+        "reranker_top_k",
+        "reranker_candidate_k",
+        "reranker_max_length",
+        "ocr_max_pages",
+        "ocr_render_dpi",
+        "ocr_max_image_pixels",
+        "ocr_max_image_width",
+        "ocr_max_image_height",
+        "ocr_page_timeout_seconds",
+        "ocr_document_timeout_seconds",
+        "ocr_max_extracted_characters",
+        "ocr_native_text_min_characters_per_page",
         "chat_session_title_max_characters",
         "chat_session_list_page_size",
         "chat_session_list_max_page_size",
@@ -361,9 +528,13 @@ class Settings(BaseSettings):
         "llm_max_output_tokens",
         "chat_retrieval_top_k",
         "chat_history_max_messages",
+        "chat_history_max_tokens",
         "chat_context_max_tokens",
         "citation_excerpt_max_characters",
         "citation_max_sources_per_answer",
+        "web_search_max_results",
+        "web_search_max_content_length",
+        "web_search_max_retries",
         "feedback_reason_max_characters",
         "feedback_report_page_size",
         "feedback_report_max_page_size",
@@ -387,11 +558,17 @@ class Settings(BaseSettings):
         "hybrid_semantic_weight",
         "hybrid_keyword_weight",
         "hybrid_semantic_min_relevance_score",
+        "reranker_timeout_seconds",
         "llm_timeout_seconds",
         "llm_stream_heartbeat_seconds",
         "llm_stream_max_duration_seconds",
         "llm_retry_backoff_seconds",
         "llm_temperature",
+        "web_search_timeout_seconds",
+        "web_search_retry_backoff_seconds",
+        "ocr_native_text_min_alnum_ratio",
+        "ocr_max_replacement_character_ratio",
+        "ocr_max_control_character_ratio",
         mode="before",
     )
     @classmethod
@@ -407,11 +584,17 @@ class Settings(BaseSettings):
         "hybrid_semantic_weight",
         "hybrid_keyword_weight",
         "hybrid_semantic_min_relevance_score",
+        "reranker_timeout_seconds",
         "llm_timeout_seconds",
         "llm_stream_heartbeat_seconds",
         "llm_stream_max_duration_seconds",
         "llm_retry_backoff_seconds",
         "llm_temperature",
+        "web_search_timeout_seconds",
+        "web_search_retry_backoff_seconds",
+        "ocr_native_text_min_alnum_ratio",
+        "ocr_max_replacement_character_ratio",
+        "ocr_max_control_character_ratio",
     )
     @classmethod
     def validate_retrieval_float_settings(cls, value: float) -> float:
@@ -419,6 +602,28 @@ class Settings(BaseSettings):
             msg = "Retrieval float settings must be finite."
             raise ValueError(msg)
         return value
+
+    @model_validator(mode="after")
+    def validate_ocr_settings(self) -> "Settings":
+        allowed_languages = {"eng", "vie"}
+        normalized_languages = tuple(
+            dict.fromkeys(language.strip().lower() for language in self.ocr_languages)
+        )
+        if not normalized_languages:
+            msg = "OCR_LANGUAGES must not be empty."
+            raise ValueError(msg)
+        if any(language not in allowed_languages for language in normalized_languages):
+            msg = "OCR_LANGUAGES supports only eng and vie."
+            raise ValueError(msg)
+        self.ocr_languages = list(normalized_languages)
+        if self.ocr_document_timeout_seconds < self.ocr_page_timeout_seconds:
+            msg = "OCR_DOCUMENT_TIMEOUT_SECONDS must be >= OCR_PAGE_TIMEOUT_SECONDS."
+            raise ValueError(msg)
+
+        if self.ocr_document_timeout_seconds >= self.celery_task_soft_time_limit_seconds:
+            msg = "OCR_DOCUMENT_TIMEOUT_SECONDS must be < CELERY_TASK_SOFT_TIME_LIMIT_SECONDS."
+            raise ValueError(msg)
+        return self
 
     @model_validator(mode="after")
     def validate_retrieval_settings(self) -> "Settings":
@@ -435,6 +640,12 @@ class Settings(BaseSettings):
             raise ValueError(msg)
         if self.hybrid_semantic_weight == 0.0 and self.hybrid_keyword_weight == 0.0:
             msg = "HYBRID_SEMANTIC_WEIGHT and HYBRID_KEYWORD_WEIGHT must not both be zero."
+            raise ValueError(msg)
+        if self.reranker_enabled and self.reranker_top_k > self.reranker_candidate_k:
+            msg = "RERANKER_TOP_K must be less than or equal to RERANKER_CANDIDATE_K."
+            raise ValueError(msg)
+        if self.reranker_enabled and self.reranker_candidate_k > self.hybrid_retrieval_max_top_k:
+            msg = "RERANKER_CANDIDATE_K must be less than or equal to HYBRID_RETRIEVAL_MAX_TOP_K."
             raise ValueError(msg)
         return self
 
@@ -463,6 +674,40 @@ class Settings(BaseSettings):
             raise ValueError(msg)
         if self.llm_enabled:
             _validate_selected_llm_provider_configuration(self)
+        return self
+
+    @model_validator(mode="after")
+    def validate_web_search_settings(self) -> "Settings":
+        if self.web_search_provider not in SUPPORTED_WEB_SEARCH_PROVIDERS:
+            msg = "WEB_SEARCH_PROVIDER is not supported."
+            raise ValueError(msg)
+        if not self.web_search_user_agent.strip():
+            msg = "WEB_SEARCH_USER_AGENT must not be empty."
+            raise ValueError(msg)
+        _validate_web_search_endpoint_url(self.web_search_bing_endpoint, settings=self)
+        _validate_web_search_endpoint_url(self.web_search_duckduckgo_endpoint, settings=self)
+        _validate_web_search_endpoint_url(self.web_search_google_endpoint, settings=self)
+        if not self.web_search_enabled or self.web_search_mode == "internal_only":
+            return self
+        if (
+            self.web_search_provider == BING_PROVIDER
+            and self.web_search_allow_external
+            and _secret_is_empty(self.web_search_bing_api_key)
+        ):
+            msg = "Selected web search provider is missing required configuration."
+            raise ValueError(msg)
+        if (
+            self.web_search_provider == GOOGLE_CUSTOM_SEARCH_PROVIDER
+            and self.web_search_allow_external
+            and (
+                _secret_is_empty(self.web_search_google_api_key)
+                or not self.web_search_google_cx.strip()
+            )
+        ):
+            msg = "Selected web search provider is missing required configuration."
+            raise ValueError(msg)
+        if self.web_search_provider == DUCKDUCKGO_PROVIDER:
+            return self
         return self
 
     @model_validator(mode="after")
@@ -538,6 +783,18 @@ def _is_placeholder_secret(value: str | None) -> bool:
     return value.strip().lower() in PLACEHOLDER_SECRET_KEYS
 
 
+def _validate_database_url_value(value: str) -> None:
+    if not value.startswith("postgresql+asyncpg://"):
+        msg = "DATABASE_URL must use the postgresql+asyncpg driver."
+        raise ValueError(msg)
+
+
+def _validate_redis_url_value(value: str) -> None:
+    if not value.startswith(("redis://", "rediss://")):
+        msg = "Redis URLs must use redis:// or rediss://."
+        raise ValueError(msg)
+
+
 def _database_password_is_placeholder(database_url: str) -> bool:
     parsed = urlsplit(database_url)
     password = parsed.password
@@ -577,6 +834,33 @@ def _validate_trusted_host(host: str) -> None:
 
 def _secret_is_empty(value: SecretStr) -> bool:
     return not value.get_secret_value().strip()
+
+
+def _optional_secret_file_value(path_value: str) -> str | None:
+    normalized = path_value.strip()
+    if not normalized:
+        return None
+    path = Path(normalized)
+    try:
+        if not path.is_file():
+            msg = "Configured secret file is not readable."
+            raise ValueError(msg)
+        data = path.read_bytes()
+    except OSError as exc:
+        msg = "Configured secret file is not readable."
+        raise ValueError(msg) from exc
+    if len(data) > 65_536:
+        msg = "Configured secret file is too large."
+        raise ValueError(msg)
+    try:
+        value = data.decode("utf-8").strip()
+    except UnicodeDecodeError as exc:
+        msg = "Configured secret file must be UTF-8 text."
+        raise ValueError(msg) from exc
+    if not value:
+        msg = "Configured secret file must not be empty."
+        raise ValueError(msg)
+    return value
 
 
 def _model_or_default(provider_model: str, default_model: str) -> str:
@@ -690,6 +974,28 @@ def _validate_llm_url(
 def _llm_url_is_local(value: str) -> bool:
     parsed = urlsplit(value.strip())
     return bool(parsed.hostname and _is_local_provider_host(parsed.hostname))
+
+
+def _validate_web_search_endpoint_url(value: str, *, settings: Settings) -> None:
+    parsed = urlsplit(value.strip())
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc or not parsed.hostname:
+        msg = "Web search provider URL is invalid."
+        raise ValueError(msg)
+    try:
+        _ = parsed.port
+    except ValueError as exc:
+        msg = "Web search provider URL is invalid."
+        raise ValueError(msg) from exc
+    if parsed.username or parsed.password or parsed.query or parsed.fragment:
+        msg = "Web search provider URL is invalid."
+        raise ValueError(msg)
+    if (
+        parsed.scheme == "http"
+        and settings.app_env == "production"
+        and not _is_local_provider_host(parsed.hostname)
+    ):
+        msg = "Remote web search provider URLs must use HTTPS in production."
+        raise ValueError(msg)
 
 
 def _is_local_provider_host(hostname: str) -> bool:

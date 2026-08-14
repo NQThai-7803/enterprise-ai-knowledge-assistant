@@ -411,3 +411,39 @@ def test_client_filename_does_not_control_storage_path(
     assert response.status_code == 202
     assert client_filename not in saved_files
     assert saved_files
+
+
+@pytest.mark.parametrize(
+    ("filename", "content_type", "content", "extension"),
+    [
+        ("scan.png", "image/png", b"\x89PNG\r\n\x1a\nimage body", ".png"),
+        ("receipt.jpg", "image/jpeg", b"\xff\xd8\xffimage body", ".jpg"),
+        ("receipt.jpeg", "image/jpeg", b"\xff\xd8\xffimage body", ".jpg"),
+    ],
+)
+def test_upload_accepts_supported_image_documents(
+    api_client: TestClient,
+    upload_storage: LocalFileStorage,
+    make_user: Any,
+    make_auth_headers: Any,
+    filename: str,
+    content_type: str,
+    content: bytes,
+    extension: str,
+) -> None:
+    admin = make_user(role=UserRole.ADMIN)
+
+    response = upload_request(
+        api_client,
+        headers=make_auth_headers(admin),
+        content=content,
+        filename=filename,
+        content_type=content_type,
+    )
+
+    assert response.status_code == 202
+    assert response.json()["data"]["mime_type"] == content_type
+    assert response.json()["data"]["original_filename"] == filename
+    saved_files = [path.name for path in upload_storage.root_path.rglob(f"*{extension}")]
+    assert saved_files
+    assert filename not in saved_files

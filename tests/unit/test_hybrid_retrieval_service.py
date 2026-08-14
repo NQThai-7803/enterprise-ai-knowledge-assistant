@@ -43,6 +43,7 @@ def make_settings(**overrides: object) -> Settings:
         "hybrid_semantic_weight": 1.0,
         "hybrid_keyword_weight": 1.0,
         "hybrid_semantic_min_relevance_score": 0.3,
+        "reranker_enabled": False,
     }
     defaults.update(overrides)
     return Settings(_env_file=None, **defaults)

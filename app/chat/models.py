@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from uuid import UUID
 
-from app.models import ChatMessage
+from app.models import ChatMessage, CitationSourceType
 
 
 class GroundingStatus(StrEnum):
@@ -20,12 +20,15 @@ class SelectedContextItem:
     chunk_id: UUID | None = None
     document_id: UUID | None = None
     document_title: str | None = None
+    source_type: CitationSourceType = CitationSourceType.INTERNAL
+    source_url: str | None = None
     page_numbers: tuple[int, ...] | None = None
     start_page: int | None = None
     end_page: int | None = None
     semantic_score: float | None = None
     keyword_score: float | None = None
     hybrid_score: float | None = None
+    reranker_score: float | None = None
 
     def __post_init__(self) -> None:
         if self.ordinal < 1:
@@ -36,6 +39,10 @@ class SelectedContextItem:
             raise ValueError(msg)
         if self.token_count <= 0:
             msg = "Context item token count must be greater than zero."
+            raise ValueError(msg)
+        object.__setattr__(self, "source_type", CitationSourceType(self.source_type))
+        if self.source_type == CitationSourceType.WEB and not (self.source_url or "").strip():
+            msg = "Web context item source_url must not be empty."
             raise ValueError(msg)
         if self.page_numbers is not None:
             object.__setattr__(self, "page_numbers", tuple(self.page_numbers))

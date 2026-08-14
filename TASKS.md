@@ -3,15 +3,16 @@
 
 ## Summary
 
-TASK-001 -> TASK-028: Completed.
+TASK-001 -> TASK-034: Completed. TASK-035 is not started.
 
 Phase 1: Completed.
-Phase 2: In Progress.
-Current task: None.
-Next task: TASK-029.
+Phase 2 backend roadmap: Completed through TASK-034.
+Current task: UAT FIX -- UX Selectors + LLM_NOT_CONFIGURED completed. TASK-035 not started.
+Next roadmap task: TASK-035 -- Final Acceptance Test & Release Candidate is pending and not started.
 TASK-028 live acceptance: COMPLETED_AND_VERIFIED.
 READY FOR USER EXPERIENCE: YES.
-TASK-029 implementation started: No.
+TASK-029 implementation completed: Yes.
+TASK-030 implementation completed: Yes. TASK-031 status: Completed. TASK-032 status: Completed. TASK-033 status: Completed. TASK-034 status: Completed. TASK-035 status: Not started.
 
 ## Rules
 
@@ -524,7 +525,8 @@ TASK-028 is the working and testing interface for the existing system. TASK-032 
 - Frontend lint, typecheck, Vitest, Playwright smoke E2E, production build, and Docker frontend build passed.
 - Docker backend regression passed for streaming chat marker, LLM provider marker, auth/RBAC, documents, chat, citations, feedback, audit logs, rate limiting, security scan, Ruff, format, compile, host pip check, and Docker pip check.
 - TASK-028 live UI acceptance recovery passed with the real Docker frontend/backend stack, idempotent UAT seed, verified Admin/Manager/Staff accounts, upload-to-READY, permissions grant/revoke, live SSE chat, citations, feedback, audit, responsive and keyboard smoke, frontend quality gates, mock E2E, live E2E, and backend regression suites.
-- TASK-029 Conversation Memory was not started. TASK-032 analytics was not implemented.
+- UAT account stability fix keeps Development Admin separate from fixed UAT Admin/Manager/Staff accounts and makes `compose.uat.yaml` run an idempotent one-shot `uat-seed` without resetting volumes or deleting unrelated users.
+- TASK-029 Conversation Memory is completed. TASK-030 OCR and Image Understanding recovery is in progress and is not completed until Docker/API/integration acceptance passes. TASK-032 analytics was not implemented.
 
 ### Acceptance criteria
 
@@ -537,64 +539,151 @@ TASK-028 is the working and testing interface for the existing system. TASK-032 
 
 ---
 
-## TASK-029 — Conversation Memory
+## TASK-029 -- Conversation Memory
 
-**Status:** Pending.
+**Status:** Completed.
 
 ### Goal
 
-Add configurable conversation memory that improves follow-up questions without allowing old chat content to bypass document permissions or grounded-answer policy.
+Add configurable same-session conversation memory that improves follow-up questions without allowing old chat content to bypass document permissions or grounded-answer policy.
+
+### Implemented
+
+- Added `ConversationContextBuilder` in `app/chat/conversation_context_builder.py`.
+- Loads USER, ASSISTANT, and internal SYSTEM messages from the current owned ChatSession only.
+- Orders memory by `created_at ASC, id ASC` and removes duplicate message IDs.
+- Trims the memory window by `CHAT_HISTORY_MAX_MESSAGES` and `CHAT_HISTORY_MAX_TOKENS`.
+- Formats prompt history as a bounded `<conversation_history>` block.
+- Builds a bounded retrieval query that includes selected recent history plus the current question.
+- Keeps Hybrid Retrieval mandatory and preserves grounded no-answer behavior.
+- Keeps citations tied only to retrieved context source markers.
+- Applies the same behavior to non-streaming `/messages` and streaming `/messages/stream` because both use `GroundedAnswerService.answer_question()`.
+- Adds no migration, schema, memory table, cache, vector memory, summary memory, or LLM summarization.
+- Does not persist formatted prompts or formatted conversation history.
+
+### Verification
+
+- Unit tests cover builder formatting, ordering, de-duplication, message limit, token budget, retrieval-query bounding, prompt format, citation-source separation, and service behavior.
+- Integration tests cover leave-policy and working-policy follow-ups, no-answer follow-ups, repository filtering, internal SYSTEM memory handling, and citation mapping with source-like markers in history.
+- API tests cover non-streaming same-session isolation.
+- Streaming tests cover `/messages/stream` memory parity.
 
 ### Acceptance criteria
 
-- Memory strategy is explicit, bounded, and configurable.
-- Permission changes are respected when memory references prior answers or cited sources.
-- Memory content is not logged and is not exposed outside the owning ChatSession.
-- No-answer and citation rules continue to apply.
+- AI remembers conversation within the same session.
+- AI does not remember other sessions.
+- ConversationContextBuilder owns memory load, trim, token budget, and format.
+- Message and token limits are configurable.
+- No migration or schema change is introduced.
+- Prompts are not persisted.
+- Streaming, non-streaming, citation, grounding, no-answer, Docker, regression, and documentation checks are required for completion.
 
 ---
+## TASK-030 -- OCR and Image Understanding
 
-## TASK-030 — OCR & Image Understanding
-
-**Status:** Pending.
+**Status:** In Progress.
 
 ### Goal
 
 Extend ingestion and retrieval to support OCR and image-based document understanding with safe processing limits.
 
+### Implemented during recovery
+
+- Upload validation accepts `application/pdf`, `image/png`, and `image/jpeg` with matching extensions and signatures.
+- Storage keys use the server-selected primary extension (`.pdf`, `.png`, `.jpg`) and never trust client paths.
+- `ExtractionRouter` keeps native PDF text when usable, OCRs low-quality/scanned PDF pages, and OCRs standalone PNG/JPEG documents.
+- OCR runs through an `OCRProvider` abstraction backed by Tesseract; no OCR subprocess runs at import/startup.
+- Image safety validation uses Pillow verify/reopen, EXIF transpose, RGB conversion, PNG normalization, and bounded width/height/pixel limits.
+- Extracted pages preserve `page_number`, `extraction_method`, `source_type`, optional confidence, width, height, and warnings for downstream chunk/retrieval/citation metadata.
+- The existing Celery document-processing pipeline passes stored MIME metadata to the extractor without changing the upload or Chat API contracts.
+- Dockerfile runtime installs `tesseract-ocr`, `tesseract-ocr-eng`, and `tesseract-ocr-vie`.
+- No schema migration was added; Alembic source head remains `20260722_0009`.
+
+### Recovery verification completed
+
+- `python -m pytest tests/unit -q` passed: 876 passed.
+- TASK-030 focused OCR suite passed: 152 passed.
+- Conversation/grounding/citation/OCR-source unit compatibility passed: 65 passed.
+- Default non-integration suite passed: 957 passed, 643 deselected by configured integration marker filtering.
+- Default API directory passed: 46 passed, 226 deselected.
+- Default integration directory non-integration selection passed: 26 passed, 417 deselected.
+- `python -m ruff check .` passed.
+- `python -m ruff format --check .` passed.
+- `python .github/scripts/security_scan.py` passed.
+- `python -m compileall app tests` passed.
+- `alembic heads` reports `20260722_0009 (head)`.
+
+### Current blocker
+
+Docker runtime acceptance is blocked in the local environment. Docker Desktop Service is stopped; `Start-Service com.docker.service` is denied even with escalation; `docker compose ps`, `docker version`, `docker info`, and `docker desktop restart` time out. Local Postgres port `55432` is open, but asyncpg connection startup times out, so Alembic `upgrade head/current` and Docker-backed API/integration suites cannot be counted as passing.
+
 ### Acceptance criteria
 
-- OCR/image processing is asynchronous and bounded.
-- Extracted text keeps page/source metadata for retrieval and citations.
-- Unsupported, encrypted, oversized, or low-quality files fail safely.
-- No OCR model download or external call occurs during import/startup.
+- OCR/image processing is asynchronous and bounded: implemented locally, Docker worker runtime not verified.
+- Extracted text keeps page/source metadata for retrieval and citations: implemented and unit verified.
+- Unsupported, encrypted, oversized, or low-quality files fail safely: implemented and unit verified.
+- No OCR model download or external call occurs during import/startup: implemented by subprocess-only Tesseract provider and unit verified.
+- Docker/API/worker/Postgres/Redis/migration verification: blocked by Docker runtime availability.
 
 ---
 
-## TASK-031 — Web Search Integration
+## TASK-031 -- Web Search Integration
 
-**Status:** Pending.
+**Status:** Completed.
 
 ### Goal
 
 Add controlled web search as an optional source with clear provenance and policy separation from internal enterprise documents.
 
-### Acceptance criteria
+### Implemented
 
-- Web search is disabled by default and configured explicitly.
-- Search results are marked separately from internal document sources.
-- Data residency and external transfer warnings are documented.
-- Citations distinguish web sources from internal document citations.
+- Added `app/web_search/` with provider protocol, provider registry, provider manager, mock provider, Bing provider, DuckDuckGo provider, and Google Custom Search provider.
+- Added backend-only `WEB_SEARCH_MODE` values: `internal_only`, `hybrid`, and `web_only`.
+- Added config for enabled state, provider, max results, timeout, max content length, external-call allow flag, user agent, retry, provider endpoints, and provider credentials.
+- Added `WebSearchIntentClassifier` so hybrid mode keeps internal retrieval first and adds web search only for current/web intent or empty internal hits.
+- Integrated web search into `GroundedAnswerService` without changing non-streaming or streaming Chat API request bodies.
+- Added web content and URL normalization that strips HTML/script/style/hidden/comment/control data, bounds content, rejects unsafe URLs, and does not fetch raw webpages.
+- Added `CitationSourceType` with `INTERNAL` and `WEB`.
+- Added web citation persistence fields and migration `20260803_0010_add_web_search_citations.py`.
+- Internal citations keep document/chunk permission revalidation; web citations use backend provider title and URL and no internal document IDs.
+- Added Admin-only `/api/v1/web-search/provider-status` and `/api/v1/web-search/test` endpoints.
+- Added unit, API, streaming, and migration tests for web search behavior.
+
+### Final verification completed
+
+- Focused TASK-031 unit suite: 137 passed.
+- Web Search unit suite: 25 passed.
+- Web Search admin API integration suite: 3 passed.
+- Chat/citation/streaming API integration acceptance suite: 8 passed.
+- Web citation migration integration suite: 2 passed.
+- Conversation Memory integration suite: 4 passed.
+- Grounded answer citation/persistence integration suites: 8 passed.
+- Hybrid retrieval integration suite: 19 passed.
+- Citation revalidation and message citation migration integration suites: 17 passed.
+- Default non-integration regression suite: 997 passed, 650 deselected.
+- `python -m ruff check .` passed.
+- `python -m ruff format --check .` passed.
+- `python -m compileall app tests` passed.
+- `python .github/scripts/security_scan.py` passed.
+- `docker version`, `docker info`, `docker compose config`, `docker compose build --quiet`, `docker compose up -d`, and `docker compose ps` passed.
+- PostgreSQL, Redis, API, worker, migration, API health, and Alembic current/head/upgrade checks passed in Docker.
+- Runtime smoke verified default disabled/internal-only provider status, no-answer chat, SSE streaming, UAT internal citation, mock-provider `internal_only`, `web_only`, `hybrid`, no-internal-hit intent, and web citation source typing.
+
+### Acceptance criteria
+- Web search is disabled by default and configured explicitly: implemented and unit tested.
+- Search results are marked separately from internal document sources: implemented through `source_type` and schema/migration.
+- Data residency and external transfer warnings are documented: implemented in README, SECURITY, SETUP, ENVIRONMENT_VARIABLES, RAG_DESIGN, and API_SPEC.
+- Citations distinguish web sources from internal document citations: implemented and verified by unit, API, streaming, DB-backed migration, and runtime smoke checks.
 
 ---
 
-## TASK-032 — Admin Analytics Dashboard
+## TASK-032 -- Admin Dashboard & System Monitoring
 
-**Status:** Pending.
+**Status:** Completed.
 
 ### Goal
 
-Provide advanced administrative analytics for usage, feedback trends, document processing, retrieval quality, and system operations.
+Provide backend-only administrative monitoring for system health, providers, workers, queues, version, uptime, and safe aggregate statistics.
 
 ### Acceptance criteria
 
@@ -605,13 +694,34 @@ Provide advanced administrative analytics for usage, feedback trends, document p
 
 ---
 
-## TASK-033 — Monitoring & Observability
 
-**Status:** Pending.
+### TASK-032 completion notes
+
+Implemented backend-only Admin Monitoring APIs under `/api/v1/admin`:
+
+- `GET /api/v1/admin/system`
+- `GET /api/v1/admin/health`
+- `GET /api/v1/admin/providers`
+- `GET /api/v1/admin/workers`
+- `GET /api/v1/admin/statistics`
+- `GET /api/v1/admin/queues`
+- `GET /api/v1/admin/version`
+
+The APIs reuse existing Admin RBAC, return safe aggregate/status data only, and do not expose secrets, prompts, retrieved context, chat content, citation excerpts, feedback reasons, storage keys, database URLs, Redis URLs, or API keys.
+
+Monitoring covers API uptime, PostgreSQL, Redis, Celery worker, OCR, embedding configuration, LLM provider configuration, Web Search provider configuration, streaming registration, conversation memory configuration, queue state, statistics, and version/Alembic metadata.
+
+No migration was created; Alembic head remains `20260803_0010`. No frontend/UI/Localization/Chat/Streaming/Conversation/Citation/OCR/Web Search behavior was changed.
+
+Verification: focused unit/API integration, RBAC/provider API regression, default backend regression, Ruff, format check, compile, security scan, Alembic, Docker Compose, API/worker/PostgreSQL/Redis/migration/OCR runtime checks, Celery worker ping, and live Docker Admin monitoring endpoint smoke passed.
+
+## TASK-033 -- Analytics & Reporting
+
+**Status:** Completed.
 
 ### Goal
 
-Add production-grade operational telemetry without logging sensitive business content.
+Add analytics and reporting for usage, feedback trends, document processing, retrieval quality, and safe operational reporting.
 
 ### Acceptance criteria
 
@@ -620,42 +730,83 @@ Add production-grade operational telemetry without logging sensitive business co
 - Health/readiness and alerting guidance are documented.
 - Trace/span data does not contain prompts, document text, answers, or secrets.
 
+
+### TASK-033 completion notes
+
+Implemented backend-only Admin Analytics APIs under `/api/v1/admin`:
+
+- `GET /api/v1/admin/analytics/overview`
+- `GET /api/v1/admin/analytics/chat`
+- `GET /api/v1/admin/analytics/users`
+- `GET /api/v1/admin/analytics/search`
+- `GET /api/v1/admin/analytics/ocr`
+- `GET /api/v1/admin/analytics/llm`
+- `GET /api/v1/admin/analytics/feedback`
+- `GET /api/v1/admin/analytics/audit`
+- `GET /api/v1/admin/reports/export`
+
+The APIs reuse existing Admin RBAC, support today/7d/30d/90d/custom UTC date filters, return safe aggregate analytics only, and export sanitized JSON/CSV reports. PDF export is intentionally rejected until safe backend PDF report infrastructure exists.
+
+Analytics cover chat questions, sessions, average response time, token usage, active users, top users, top departments, new users, citation-inferred internal/hybrid/web searches, hashed top queries, top cited documents, image-document OCR success/failure, LLM latency/failures/token usage, feedback percentages/trends, and audit categories.
+
+No migration was created; Alembic head remains `20260803_0010`. No frontend/UI/React/charts/Localization/Chat/Streaming/Conversation/Citation/OCR/Web Search/Celery behavior was changed.
+
+Verification: unit analytics, API integration analytics, Admin/RBAC/Web Search monitoring regression, default backend regression, Ruff, format check, compile, security scan, Alembic, Docker Compose, API/worker/PostgreSQL/Redis/migration runtime checks, Celery worker ping, and live Docker Admin analytics route smoke passed.
 ---
 
-## TASK-034 — Kubernetes Deployment
+## TASK-034 -- Production Deployment & Observability
 
-**Status:** Pending.
+**Status:** Completed.
 
 ### Goal
 
-Create Kubernetes deployment artifacts and operational guidance for production-like environments.
+Prepare backend production deployment and observability without adding AI features, frontend UI, charting, localization, or changes to Chat/RAG/Citation/Conversation/Streaming/OCR/Web Search behavior.
 
 ### Acceptance criteria
 
-- API, worker, migration, PostgreSQL/Redis dependency assumptions, storage, secrets, and health probes are documented.
-- Manifests avoid baking secrets into images or source files.
-- Startup, rollback, scaling, and migration behavior are defined.
-- Local Docker Compose remains supported.
+- Production Compose provides PostgreSQL, Redis, one-shot migration, API, worker, reverse proxy, runtime validation, startup validation, restart policy, healthchecks, resource limits, and log limits.
+- Reverse proxy supports forward headers, request/upload limits, SSE compatibility, security headers, and HTTPS-ready example configuration without committed certificates.
+- Observability exposes safe Prometheus metrics for API, worker, Redis, PostgreSQL, OCR, embedding, LLM, Web Search, Streaming, Conversation, queues, version, and uptime.
+- Request IDs, trace hooks, latency metrics, and structured request logging avoid prompts, context, OCR text, citation excerpts, secrets, credentials, tokens, Redis URLs, and database passwords.
+- PostgreSQL and uploads backup/restore helpers include verification and guarded restore behavior.
+- Development Docker Compose remains supported.
+
+### TASK-034 completion notes
+
+Implemented backend-only production deployment and observability:
+
+- Added `compose.prod.yaml`, `.env.production.example`, runtime validation, Docker secret-file compatibility, resource limits, restart policies, healthchecks, log-size limits, and volume ownership initialization.
+- Added Nginx reverse proxy config with forward headers, security headers, upload/request limits, SSE buffering disabled for streaming routes, HTTPS example config, and external `/metrics` blocking.
+- Added in-process Prometheus metrics, request ID context, traceparent capture hooks, request latency/status logging, and `/metrics` for internal scrape use.
+- Added Prometheus scrape config and Grafana provisioning/dashboard files under `deploy/`.
+- Added PostgreSQL and uploads backup/restore PowerShell helpers with verification and guarded overwrite switches.
+- Added unit, API, and integration tests for metrics, logging safety, runtime validation, production compose, reverse proxy, Prometheus/Grafana provisioning, backup/restore guardrails, RBAC/security regression, and Docker config.
+- No database migration was created; Alembic head remains `20260803_0010`.
+- Verification passed: Ruff, format check, compileall, security scan, pip dependency audit, pip check, Alembic heads/current/upgrade, default regression, focused integration/API suites, production Compose config/build/up/ps, development Compose config/build/up/ps, API/worker/PostgreSQL/Redis/migration health, reverse proxy health, internal metrics safety, external metrics blocking, Celery ping, backup/restore checks, Redis/PostgreSQL degraded readiness and recovery, API restart, and worker restart.
 
 ---
 
-## TASK-035 — Enterprise Authentication
+## TASK-035 -- Final Acceptance Test & Release Candidate
 
-**Status:** Pending.
+**Status:** Not started.
 
 ### Goal
 
-Add enterprise authentication options such as SSO/OIDC while preserving existing local authentication where appropriate.
+Run final acceptance, release-candidate verification, and release-readiness documentation without starting post-release feature work.
 
 ### Acceptance criteria
 
-- Authentication provider configuration is explicit and secret-safe.
-- Role/department mapping is documented and auditable.
-- Existing RBAC and database user source-of-truth rules remain coherent.
-- Token handling, logout, inactive-user behavior, and tests are updated.
+- All completed-task acceptance criteria are verified or explicitly documented as deferred.
+- Release candidate checks cover backend, frontend status, security, Docker, deployment, observability, data protection, backup/restore, failure recovery, and rollback.
+- Documentation is current and does not include real secrets or fake production data.
+- TASK-035 status is marked completed only after final acceptance verification passes.
+
+### Notes
+
+- The UAT UX + LLM configuration fix is not TASK-035.
+- TASK-035 must not be marked completed by selector UX changes, fake UAT LLM verification, or focused UAT regressions alone.
 
 ---
-
 ## TASK-036 — Enterprise Release v2.0
 
 **Status:** Pending.
@@ -670,3 +821,38 @@ Prepare, verify, and document the Enterprise AI Knowledge Assistant v2.0 release
 - All Phase 2 acceptance criteria are verified or explicitly deferred.
 - Documentation is current and does not include real secrets or fake production data.
 - TASK-027 through TASK-035 statuses are accurate before release sign-off.
+
+## TASK-034.1 -- Real / Local LLM Strict Grounded Runtime Acceptance
+
+**Status:** In Progress.
+
+TASK-034.1 stream timeout follow-up: local Ollama `qwen3:4b` SSE was verified for Nova Digital CEO, CTO, and NovaAssist twice each with no `STREAM_TIMEOUT`; full strict matrix acceptance remains required before completion.
+
+### Goal
+
+Verify the system as a real Enterprise RAG Assistant using a real/local LLM, newly uploaded unseen documents, permission-aware retrieval, strict grounded prompting, citation validation, no-answer behavior, streaming parity, failure safety, and content-free logging.
+
+### Implemented so far
+
+- Completed audit before coding.
+- Kept deterministic UAT fake provider unchanged and excluded from real answer-quality acceptance.
+- Reused existing TASK-026 provider architecture; no new provider was added.
+- Selected Ollama as the recommended local acceptance provider path, with LM Studio as an alternative.
+- Strengthened grounded prompt policy for strict evidence-only behavior.
+- Added post-validation guard so `ANSWERED` cannot persist with zero validated citations.
+- Added focused unit tests for strict prompt and invalid answered/no-citation behavior.
+- Added skipped-by-default `real_llm_acceptance` report validator.
+- Created ignored local acceptance artifacts under `artifacts/task-034-1/`.
+
+### Remaining acceptance work
+
+- Start Docker Desktop and verify PostgreSQL, Redis, API, worker, and migration health.
+- Install/start a real local provider or configure an explicitly approved external provider.
+- Upload/process the new unseen acceptance documents to READY.
+- Run all required real-LLM question cases and existing regressions through non-streaming and streaming chat.
+- Verify permissions and provider failures.
+- Manually verify every factual claim against cited source excerpts.
+- Validate the completed acceptance report with the `real_llm_acceptance` marker.
+
+TASK-034.2 implementation started: No.
+TASK-035 implementation started: No.

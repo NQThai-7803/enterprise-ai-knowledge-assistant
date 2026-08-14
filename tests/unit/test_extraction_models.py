@@ -84,3 +84,51 @@ def test_extraction_result_rejects_inconsistent_counts() -> None:
             total_normalized_characters=page.normalized_character_count,
             total_usable_characters=page.usable_character_count,
         )
+
+
+def test_extracted_page_accepts_ocr_metadata() -> None:
+    page = ExtractedPage(
+        page_number=1,
+        text="OCR text",
+        raw_character_count=8,
+        normalized_character_count=8,
+        usable_character_count=7,
+        extraction_method="ocr_tesseract",
+        source_type="png",
+        confidence=0.75,
+        width=120,
+        height=80,
+        warnings=["LOW_CONTRAST"],
+    )
+
+    assert page.extraction_method == "ocr_tesseract"
+    assert page.source_type == "png"
+    assert page.confidence == 0.75
+    assert page.width == 120
+    assert page.height == 80
+    assert page.warnings == ("LOW_CONTRAST",)
+
+
+def test_extracted_page_rejects_invalid_ocr_metadata() -> None:
+    with pytest.raises(ValueError, match="confidence"):
+        ExtractedPage(
+            page_number=1,
+            text="OCR text",
+            raw_character_count=8,
+            normalized_character_count=8,
+            usable_character_count=7,
+            extraction_method="ocr",
+            source_type="png",
+            confidence=1.5,
+        )
+    with pytest.raises(ValueError, match="width"):
+        ExtractedPage(
+            page_number=1,
+            text="OCR text",
+            raw_character_count=8,
+            normalized_character_count=8,
+            usable_character_count=7,
+            extraction_method="ocr",
+            source_type="png",
+            width=0,
+        )

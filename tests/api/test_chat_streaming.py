@@ -4,7 +4,7 @@ import asyncio
 import json
 import uuid
 from collections.abc import Callable, Coroutine
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any
 
@@ -19,7 +19,14 @@ from app.core.config import Settings
 from app.core.exceptions import RateLimitExceededError
 from app.llm.errors import LLMError, LLMFailureCode
 from app.llm.models import LLMGenerationResult
-from app.models import ChatMessage, ChatSession, User, UserRole
+from app.models import (
+    ChatMessage,
+    ChatMessageRole,
+    ChatSession,
+    CitationSourceType,
+    User,
+    UserRole,
+)
 from app.retrieval.models import HybridRetrievalHit, HybridRetrievalResult
 from app.services.chat_stream_service import ChatStreamService
 from app.services.grounded_answer_service import GroundedAnswerService
@@ -42,9 +49,11 @@ class FakeRetrievalService:
     def __init__(self, result: HybridRetrievalResult) -> None:
         self.result = result
         self.calls = 0
+        self.queries: list[str] = []
 
     async def retrieve(self, *, query: str, current_user: User, top_k: int | None = None):
         self.calls += 1
+        self.queries.append(query)
         return self.result
 
 
@@ -53,9 +62,11 @@ class FakeLLMProvider:
         self.result = result
         self.calls = 0
         self.closed = False
+        self.messages = None
 
     async def generate(self, *, messages, temperature: float, max_output_tokens: int):  # noqa: ANN001
         self.calls += 1
+        self.messages = messages
         if isinstance(self.result, Exception):
             raise self.result
         return self.result
@@ -68,7 +79,7 @@ class FakeCitationValidationService:
     def __init__(
         self,
         *,
-        citations: tuple[object, ...] = (),
+        citations: tuple[object, ...] | None = None,
         error: Exception | None = None,
     ) -> None:
         self.citations = citations
@@ -86,6 +97,12 @@ class FakeCitationValidationService:
 class FakeCitationRepository:
     async def create_many(self, session: object, *, assistant_message: ChatMessage, citations):  # noqa: ANN001
         return tuple(citations)
+
+
+class ConnectedRequest:
+    async def is_disconnected(self) -> bool:
+        await asyncio.sleep(0)
+        return False
 
 
 class DisconnectingRequest:
@@ -131,6 +148,46 @@ def create_session(
     return run_async(create_chat_session_record(session_factory, owner=owner))
 
 
+async def create_chat_message_record(
+    session_factory: async_sessionmaker[AsyncSession],
+    *,
+    chat_session: ChatSession,
+    role: ChatMessageRole,
+    content: str,
+    seconds: int,
+) -> ChatMessage:
+    async with session_factory() as session:
+        message = ChatMessage(
+            session_id=chat_session.id,
+            role=role,
+            content=content,
+            created_at=datetime(2026, 1, 1, tzinfo=UTC) + timedelta(seconds=seconds),
+        )
+        session.add(message)
+        await session.commit()
+        await session.refresh(message)
+        return message
+
+
+def create_message(
+    session_factory: async_sessionmaker[AsyncSession],
+    *,
+    chat_session: ChatSession,
+    role: ChatMessageRole,
+    content: str,
+    seconds: int,
+) -> ChatMessage:
+    return run_async(
+        create_chat_message_record(
+            session_factory,
+            chat_session=chat_session,
+            role=role,
+            content=content,
+            seconds=seconds,
+        )
+    )
+
+
 async def count_messages(
     session_factory: async_sessionmaker[AsyncSession],
     *,
@@ -158,6 +215,7 @@ def make_settings(**overrides: object) -> Settings:
         "chat_context_max_tokens": 1000,
         "chat_retrieval_top_k": 2,
         "chat_history_max_messages": 2,
+        "chat_history_max_tokens": 200,
         "citation_max_sources_per_answer": 2,
     }
     defaults.update(overrides)
@@ -198,7 +256,9 @@ def retrieval_result(*hits: HybridRetrievalHit) -> HybridRetrievalResult:
     )
 
 
-def llm_answer(content: str = "Grounded answer [SOURCE_1]") -> LLMGenerationResult:
+def llm_answer(
+    content: str = '{"answer":"Grounded answer","citations":["SOURCE_1"]}',
+) -> LLMGenerationResult:
     return LLMGenerationResult(
         content=content,
         model="fake-model",
@@ -210,6 +270,18 @@ def llm_answer(content: str = "Grounded answer [SOURCE_1]") -> LLMGenerationResu
     )
 
 
+def default_citation() -> SimpleNamespace:
+    return SimpleNamespace(
+        document_id=uuid.UUID("00000000-0000-0000-0000-000000000901"),
+        document_title="Quy che nhan su",
+        chunk_id=uuid.UUID("00000000-0000-0000-0000-000000000902"),
+        page_number=14,
+        excerpt="Nhan vien chinh thuc duoc huong 12 ngay nghi phep.",
+        relevance_score=0.87,
+        citation_order=1,
+    )
+
+
 def install_service(
     api_client: TestClient,
     session_factory: async_sessionmaker[AsyncSession],
@@ -217,7 +289,7 @@ def install_service(
     retrieval: FakeRetrievalService | None = None,
     llm: FakeLLMProvider | None = None,
     settings: Settings | None = None,
-    citations: tuple[object, ...] = (),
+    citations: tuple[object, ...] | None = None,
     citation_error: Exception | None = None,
 ) -> tuple[FakeRetrievalService, FakeLLMProvider]:
     resolved_retrieval = retrieval or FakeRetrievalService(retrieval_result(hit()))
@@ -230,7 +302,7 @@ def install_service(
         token_counter=FakeCounter(),
         citation_repository=FakeCitationRepository(),
         citation_validation_service=FakeCitationValidationService(
-            citations=citations,
+            citations=citations if citations is not None else (default_citation(),),
             error=citation_error,
         ),
     )
@@ -353,6 +425,44 @@ def test_stream_success_persists_assistant_message_once_and_returns_final_payloa
     assert run_async(count_messages(async_session_factory_for_tests, chat_session=chat)) == 2
 
 
+def test_stream_uses_current_session_conversation_memory(
+    api_client: TestClient,
+    async_session_factory_for_tests: async_sessionmaker[AsyncSession],
+    make_user: Callable[..., User],
+    make_auth_headers: Callable[[User], dict[str, str]],
+) -> None:
+    owner = make_user(role=UserRole.STAFF)
+    chat = create_session(async_session_factory_for_tests, owner=owner)
+    create_message(
+        async_session_factory_for_tests,
+        chat_session=chat,
+        role=ChatMessageRole.USER,
+        content="Working policy?",
+        seconds=1,
+    )
+    create_message(
+        async_session_factory_for_tests,
+        chat_session=chat,
+        role=ChatMessageRole.ASSISTANT,
+        content="08:00-17:00 applies on working days.",
+        seconds=2,
+    )
+    retrieval, llm = install_service(api_client, async_session_factory_for_tests)
+
+    response = post_stream(
+        api_client,
+        make_auth_headers,
+        owner,
+        chat,
+        {"content": "Does it apply on Saturday?"},
+    )
+
+    events = parse_sse(response.text)
+    assert events[-1][0] == "message.completed"
+    assert retrieval.queries == ["Does it apply on Saturday?"]
+    assert "Working policy?" in llm.messages[1].content
+
+
 def test_stream_endpoint_checks_session_ownership(
     api_client: TestClient,
     async_session_factory_for_tests: async_sessionmaker[AsyncSession],
@@ -465,11 +575,50 @@ def test_stream_endpoint_rate_limited_before_headers(
     assert not response.headers.get("content-type", "").startswith("text/event-stream")
 
 
-def test_client_disconnect_cancels_provider_work() -> None:
-    async def collect() -> tuple[list[bytes], bool]:
-        service = ChatStreamService(settings=make_settings(llm_stream_heartbeat_seconds=0.01))
+def test_stream_timeout_emits_heartbeat_error_once_and_cancels_task() -> None:
+    async def collect() -> tuple[list[tuple[str, dict[str, object]]], bool]:
+        service = ChatStreamService(
+            settings=make_settings(
+                llm_stream_heartbeat_seconds=0.01,
+                llm_stream_max_duration_seconds=0.035,
+            )
+        )
         answer_service = SlowAnswerService()
+        frames: list[bytes] = []
+        async for frame in service.stream_answer(
+            request=ConnectedRequest(),  # type: ignore[arg-type]
+            current_user=SimpleNamespace(id=uuid.uuid4()),  # type: ignore[arg-type]
+            session_id=uuid.uuid4(),
+            question="Q",
+            answer_service=answer_service,  # type: ignore[arg-type]
+            audit_context=None,
+        ):
+            frames.append(frame)
+        return parse_sse(b"".join(frames).decode("utf-8")), answer_service.cancelled
+
+    events, cancelled = run_async(collect())
+    event_names = [event for event, _ in events]
+
+    assert event_names[0] == "stream.started"
+    assert "heartbeat" in event_names
+    assert "message.delta" not in event_names
+    assert "message.completed" not in event_names
+    assert event_names[-1] == "stream.error"
+    assert sum(1 for event in event_names if event in {"stream.error", "message.completed"}) == 1
+    assert events[-1][1]["code"] == "STREAM_TIMEOUT"
+    assert cancelled is True
+
+
+def test_client_disconnect_cancels_provider_work() -> None:
+
+    async def collect() -> tuple[list[bytes], bool]:
+
+        service = ChatStreamService(settings=make_settings(llm_stream_heartbeat_seconds=0.01))
+
+        answer_service = SlowAnswerService()
+
         events: list[bytes] = []
+
         async for frame in service.stream_answer(
             request=DisconnectingRequest(),  # type: ignore[arg-type]
             current_user=SimpleNamespace(id=uuid.uuid4()),  # type: ignore[arg-type]
@@ -479,12 +628,15 @@ def test_client_disconnect_cancels_provider_work() -> None:
             audit_context=None,
         ):
             events.append(frame)
+
         return events, answer_service.cancelled
 
     frames, cancelled = run_async(collect())
 
     assert len(frames) == 1
+
     assert "event: stream.started" in frames[0].decode("utf-8")
+
     assert cancelled is True
 
 
@@ -514,3 +666,44 @@ def test_existing_non_streaming_chat_endpoint_unchanged(
         "retrieved_chunk_count",
     }
     assert response.headers["content-type"].startswith("application/json")
+
+
+def test_stream_success_returns_web_citations_ready_event(
+    api_client: TestClient,
+    async_session_factory_for_tests: async_sessionmaker[AsyncSession],
+    make_user: Callable[..., User],
+    make_auth_headers: Callable[[User], dict[str, str]],
+) -> None:
+    owner = make_user(role=UserRole.STAFF)
+    chat = create_session(async_session_factory_for_tests, owner=owner)
+    citation = SimpleNamespace(
+        source_type=CitationSourceType.WEB,
+        document_id=None,
+        document_title="Microsoft Learn",
+        chunk_id=None,
+        page_number=1,
+        excerpt="Microsoft Learn describes Azure AI services.",
+        relevance_score=None,
+        citation_order=1,
+        source_url="https://learn.microsoft.com/en-us/azure/ai-services/",
+    )
+    install_service(api_client, async_session_factory_for_tests, citations=(citation,))
+
+    response = post_stream(api_client, make_auth_headers, owner, chat)
+
+    assert response.status_code == 200
+    events = parse_sse(response.text)
+    citations_event = [payload for event, payload in events if event == "citations.ready"][0]
+    assert citations_event["citations"] == [
+        {
+            "document_id": None,
+            "document_title": "Microsoft Learn",
+            "chunk_id": None,
+            "page_number": 1,
+            "excerpt": "Microsoft Learn describes Azure AI services.",
+            "relevance_score": None,
+            "citation_order": 1,
+            "source_type": "WEB",
+            "source_url": "https://learn.microsoft.com/en-us/azure/ai-services/",
+        }
+    ]

@@ -198,6 +198,10 @@ jobs:
           docker build --target runtime -t enterprise-ai-knowledge-assistant-backend:ci . \
             2>&1 | tee logs/docker-build.log
           docker compose config 2>&1 | tee logs/docker-compose-config.log
+          docker compose --env-file .env.production.example -f compose.prod.yaml config \
+            2>&1 | tee logs/docker-compose-prod-config.log
+          docker compose --profile observability --env-file .env.production.example -f compose.prod.yaml config \
+            2>&1 | tee logs/docker-compose-prod-observability-config.log
 
       - name: Upload CI artifacts
         if: always()

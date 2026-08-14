@@ -82,3 +82,33 @@ def test_source_count_is_bounded() -> None:
     )
 
     assert len(registry.sources) == 2
+
+
+def web_item(index: int, text: str = "web source text") -> SelectedContextItem:
+    from app.models import CitationSourceType
+
+    return SelectedContextItem(
+        ordinal=index,
+        text=text,
+        token_count=10,
+        document_title=f"Web Source {index}",
+        source_type=CitationSourceType.WEB,
+        source_url=f"https://example.com/source-{index}",
+        page_numbers=(1,),
+        start_page=1,
+        end_page=1,
+        hybrid_score=1.0,
+    )
+
+
+def test_source_registry_supports_web_sources_without_internal_ids() -> None:
+    from app.models import CitationSourceType
+
+    registry = build_prompt_source_registry(context_items=(web_item(1),), max_sources=8)
+
+    source = registry.sources[0]
+    assert source.marker == "[SOURCE_1]"
+    assert source.source_type == CitationSourceType.WEB
+    assert source.document_id is None
+    assert source.chunk_id is None
+    assert source.source_url == "https://example.com/source-1"

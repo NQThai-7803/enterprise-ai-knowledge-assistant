@@ -1,0 +1,90 @@
+"""add web search citations
+
+Revision ID: 20260803_0010
+Revises: 20260722_0009
+Create Date: 2026-08-03 00:00:00.000000
+"""
+
+from collections.abc import Sequence
+
+import sqlalchemy as sa
+from alembic import op
+
+revision: str = "20260803_0010"
+down_revision: str | Sequence[str] | None = "20260722_0009"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
+
+
+def upgrade() -> None:
+    op.add_column(
+        "message_citations",
+        sa.Column(
+            "source_type",
+            sa.String(length=16),
+            server_default=sa.text("'INTERNAL'"),
+            nullable=False,
+        ),
+    )
+    op.add_column("message_citations", sa.Column("source_url", sa.Text(), nullable=True))
+    op.add_column("message_citations", sa.Column("source_title", sa.Text(), nullable=True))
+    op.alter_column(
+        "message_citations",
+        "document_id",
+        existing_type=sa.Uuid(),
+        nullable=True,
+    )
+    op.create_check_constraint(
+        "ck_message_citations_source_type_valid",
+        "message_citations",
+        "source_type IN ('INTERNAL', 'WEB')",
+    )
+    op.create_check_constraint(
+        "ck_message_citations_internal_document_required",
+        "message_citations",
+        "source_type <> 'INTERNAL' OR document_id IS NOT NULL",
+    )
+    op.create_check_constraint(
+        "ck_message_citations_web_source_required",
+        "message_citations",
+        (
+            "source_type <> 'WEB' OR (document_id IS NULL AND chunk_id IS NULL "
+            "AND source_url IS NOT NULL AND char_length(btrim(source_url)) > 0 "
+            "AND source_title IS NOT NULL AND char_length(btrim(source_title)) > 0)"
+        ),
+    )
+    op.create_index(
+        "ix_message_citations_source_type",
+        "message_citations",
+        ["source_type"],
+        unique=False,
+    )
+
+
+def downgrade() -> None:
+    op.execute("DELETE FROM message_citations WHERE source_type = 'WEB'")
+    op.drop_index("ix_message_citations_source_type", table_name="message_citations")
+    op.drop_constraint(
+        "ck_message_citations_web_source_required",
+        "message_citations",
+        type_="check",
+    )
+    op.drop_constraint(
+        "ck_message_citations_internal_document_required",
+        "message_citations",
+        type_="check",
+    )
+    op.drop_constraint(
+        "ck_message_citations_source_type_valid",
+        "message_citations",
+        type_="check",
+    )
+    op.alter_column(
+        "message_citations",
+        "document_id",
+        existing_type=sa.Uuid(),
+        nullable=False,
+    )
+    op.drop_column("message_citations", "source_title")
+    op.drop_column("message_citations", "source_url")
+    op.drop_column("message_citations", "source_type")

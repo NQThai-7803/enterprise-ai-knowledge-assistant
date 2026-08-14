@@ -49,6 +49,7 @@ interface DownloadResponse {
 }
 
 let refreshPromise: Promise<TokenPairData> | null = null;
+const ACCESS_TOKEN_REFRESH_SKEW_SECONDS = 30;
 
 export const apiClient = {
   auth: {
@@ -353,7 +354,15 @@ async function download(path: string): Promise<DownloadResponse> {
   };
 }
 
-async function refreshAccessToken(): Promise<boolean> {
+export async function ensureFreshAccessToken(): Promise<boolean> {
+  const accessToken = getAccessToken();
+  if (accessToken && !isAccessTokenExpired(accessToken)) {
+    return true;
+  }
+  return refreshAccessToken();
+}
+
+export async function refreshAccessToken(): Promise<boolean> {
   const refreshToken = getRefreshToken();
   if (!refreshToken) {
     clearStoredTokens();
@@ -382,6 +391,39 @@ async function refreshAccessToken(): Promise<boolean> {
     window.dispatchEvent(new CustomEvent("auth:expired"));
     return false;
   }
+}
+
+export function isAccessTokenExpired(
+  token: string,
+  nowSeconds = Math.floor(Date.now() / 1000),
+  skewSeconds = ACCESS_TOKEN_REFRESH_SKEW_SECONDS,
+): boolean {
+  const payload = decodeJwtPayload(token);
+  if (typeof payload?.exp !== "number") {
+    return false;
+  }
+  return payload.exp <= nowSeconds + skewSeconds;
+}
+
+function decodeJwtPayload(token: string): { exp?: unknown } | null {
+  const payload = token.split(".")[1];
+  if (!payload) {
+    return null;
+  }
+  try {
+    return JSON.parse(base64UrlDecode(payload)) as { exp?: unknown };
+  } catch {
+    return null;
+  }
+}
+
+function base64UrlDecode(value: string): string {
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized.padEnd(
+    normalized.length + ((4 - (normalized.length % 4)) % 4),
+    "=",
+  );
+  return window.atob(padded);
 }
 
 function buildHeaders({

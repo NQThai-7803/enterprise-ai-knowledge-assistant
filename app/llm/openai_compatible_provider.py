@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Sequence
 from typing import Any
 
@@ -32,9 +33,12 @@ class OpenAICompatibleLLMProvider(BaseHTTPProvider):
         retry_backoff_seconds: float,
         provider_name: str = OPENAI_COMPATIBLE_PROVIDER,
         display_name: str | None = None,
+        reasoning_effort: str | None = None,
         app_env: str = "development",
         extra_headers: dict[str, str] | None = None,
         transport: httpx.AsyncBaseTransport | None = None,
+        ollama_num_ctx: int | None = None,
+        ollama_keep_alive: str | None = None,
     ) -> None:
         if not model.strip():
             raise LLMError(LLMFailureCode.LLM_NOT_CONFIGURED)
@@ -55,6 +59,9 @@ class OpenAICompatibleLLMProvider(BaseHTTPProvider):
         self.model = model.strip()
         self._api_key = api_key
         self._extra_headers = dict(extra_headers or {})
+        self._reasoning_effort = (reasoning_effort or "").strip() or None
+        self._ollama_num_ctx = ollama_num_ctx
+        self._ollama_keep_alive = (ollama_keep_alive or "").strip() or None
 
     async def generate(
         self,
@@ -92,15 +99,35 @@ class OpenAICompatibleLLMProvider(BaseHTTPProvider):
         return await self._connectivity_health(self.base_url, model=self.model)
 
     def _build_payload(self, request: LLMRequest) -> dict[str, object]:
-        return {
+        payload: dict[str, object] = {
             "model": self.model,
-            "messages": [
-                {"role": message.role, "content": message.content} for message in request.messages
-            ],
+            "messages": self._payload_messages(request),
             "temperature": request.temperature,
             "max_tokens": request.max_output_tokens,
             "stream": False,
         }
+        if self._reasoning_effort:
+            payload["reasoning_effort"] = self._reasoning_effort
+            payload["reasoning"] = {"effort": self._reasoning_effort}
+        if self.provider_name == "ollama":
+            if self._ollama_num_ctx is not None:
+                payload["options"] = {
+                    "num_ctx": self._ollama_num_ctx,
+                }
+
+            if self._ollama_keep_alive:
+                payload["keep_alive"] = self._ollama_keep_alive
+        return payload
+
+    def _payload_messages(self, request: LLMRequest) -> list[dict[str, str]]:
+        messages = [
+            {"role": message.role, "content": message.content} for message in request.messages
+        ]
+        if self.provider_name == "ollama" and self._reasoning_effort == "none":
+            first = messages[0]
+            if "/no_think" not in first["content"]:
+                first["content"] = f"/no_think\n{first['content']}"
+        return messages
 
     def _headers(self) -> dict[str, str]:
         headers = bearer_headers(self._api_key)
@@ -133,6 +160,9 @@ def _parse_generation_response(
     content = message.get("content")
     if not isinstance(content, str) or not content.strip():
         raise LLMError(LLMFailureCode.LLM_PROVIDER_BAD_RESPONSE)
+    content = _strip_visible_reasoning(content)
+    if not content:
+        raise LLMError(LLMFailureCode.LLM_PROVIDER_BAD_RESPONSE)
     model = payload.get("model") or default_model
     if not isinstance(model, str) or not model.strip():
         raise LLMError(LLMFailureCode.LLM_PROVIDER_BAD_RESPONSE)
@@ -151,6 +181,19 @@ def _parse_generation_response(
         )
     except ValueError as exc:
         raise LLMError(LLMFailureCode.LLM_PROVIDER_BAD_RESPONSE) from exc
+
+
+_VISIBLE_THINKING_BLOCK = re.compile(r"<think>.*?</think>", re.IGNORECASE | re.DOTALL)
+_THINKING_CLOSE_TAG = "</think>"
+
+
+def _strip_visible_reasoning(content: str) -> str:
+    stripped = content.strip()
+    lower = stripped.lower()
+    close_index = lower.rfind(_THINKING_CLOSE_TAG)
+    if close_index >= 0:
+        return stripped[close_index + len(_THINKING_CLOSE_TAG) :].strip()
+    return _VISIBLE_THINKING_BLOCK.sub("", stripped).strip()
 
 
 def _usage_from_openai(usage: Any) -> LLMUsage | None:

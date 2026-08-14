@@ -15,7 +15,7 @@ from app.citations.errors import (
 )
 from app.citations.registry import build_prompt_source_registry
 from app.core.config import Settings
-from app.models import User, UserRole
+from app.models import CitationSourceType, User, UserRole
 from app.repositories.citation_source_repository import PermittedCitationSourceRow
 from app.services.citation_validation_service import CitationValidationService
 
@@ -171,5 +171,51 @@ def test_permission_revalidation_failure_is_distinct() -> None:
                 source_registry=source_registry(),
                 current_user=user(),
             )
+
+    run_async(scenario())
+
+
+def web_source_registry():
+    return build_prompt_source_registry(
+        context_items=(
+            SelectedContextItem(
+                ordinal=1,
+                text="Microsoft Learn describes Azure AI services.",
+                token_count=6,
+                document_title="Microsoft Learn",
+                source_type=CitationSourceType.WEB,
+                source_url="https://learn.microsoft.com/en-us/azure/ai-services/",
+                page_numbers=(1,),
+                start_page=1,
+                end_page=1,
+                hybrid_score=1.0,
+            ),
+        ),
+        max_sources=8,
+    )
+
+
+def test_web_citation_does_not_revalidate_internal_document_permissions() -> None:
+    async def scenario() -> None:
+        repository = FakeSourceRepository(())
+        validator = CitationValidationService(
+            settings=Settings(_env_file=None),
+            session_provider=FakeSessionProvider(),
+            source_repository=repository,
+        )
+
+        validated = await validator.validate_and_map(
+            answer="Azure AI is documented [SOURCE_1].",
+            source_registry=web_source_registry(),
+            current_user=user(),
+        )
+
+        assert repository.chunk_ids == ()
+        assert validated.answer == "Azure AI is documented [1]."
+        assert validated.citations[0].source_type == CitationSourceType.WEB
+        assert (
+            validated.citations[0].source_url
+            == "https://learn.microsoft.com/en-us/azure/ai-services/"
+        )
 
     run_async(scenario())

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import inspect
 import logging
 from collections.abc import Callable
 from contextlib import AbstractAsyncContextManager
@@ -19,10 +20,10 @@ from app.document_processing.errors import (
     SAFE_CHUNKING_MESSAGES,
     SAFE_PDF_EXTRACTION_MESSAGES,
     ChunkingError,
+    DocumentExtractionError,
     PDFExtractionError,
 )
-from app.document_processing.extractors.base import TextExtractor
-from app.document_processing.extractors.pymupdf_extractor import create_pdf_text_extractor
+from app.document_processing.extraction_router import create_extraction_router
 from app.embeddings.base import EmbeddingProvider
 from app.embeddings.constants import EMBEDDING_SCHEMA_DIMENSIONS
 from app.embeddings.errors import EmbeddingError, EmbeddingFailureCode
@@ -144,7 +145,7 @@ class DocumentProcessingPipeline:
         self,
         *,
         storage: FileStorage,
-        extractor: TextExtractor,
+        extractor: object,
         chunker: TextChunker,
         embedding_provider: EmbeddingProvider,
         session_provider: SessionProvider,
@@ -168,7 +169,7 @@ class DocumentProcessingPipeline:
     async def process(self, document_id: UUID) -> DocumentProcessingResult:
         metadata = await self._load_processing_metadata(document_id)
         pdf_bytes = await self._load_pdf_bytes(metadata)
-        extraction = self._extract(pdf_bytes)
+        extraction = await self._extract(metadata, pdf_bytes)
         chunking_result = self._chunk(extraction)
         embedding_batch = self._embed(chunking_result)
         rows = build_document_chunk_rows(chunking_result.chunks, embedding_batch.vectors)
@@ -245,9 +246,21 @@ class DocumentProcessingPipeline:
             )
         return b"".join(chunks)
 
-    def _extract(self, pdf_bytes: bytes):
+    async def _extract(self, metadata: DocumentProcessingMetadata, pdf_bytes: bytes):
         try:
-            return self.extractor.extract(pdf_bytes)
+            extract_document = getattr(self.extractor, "extract_document", None)
+            if extract_document is not None:
+                result = extract_document(metadata, pdf_bytes)
+            else:
+                result = self.extractor.extract(pdf_bytes)  # type: ignore[attr-defined]
+            if inspect.isawaitable(result):
+                return await result
+            return result
+        except DocumentExtractionError as exc:
+            raise PermanentDocumentProcessingError(
+                code=exc.code.value,
+                safe_message=exc.safe_message,
+            ) from exc
         except PDFExtractionError as exc:
             raise PermanentDocumentProcessingError(
                 code=exc.code.value,
@@ -364,7 +377,7 @@ def create_document_processing_pipeline(
     settings: Settings | None = None,
     *,
     storage: FileStorage | None = None,
-    extractor: TextExtractor | None = None,
+    extractor: object | None = None,
     chunker: TextChunker | None = None,
     embedding_provider: EmbeddingProvider | None = None,
     session_provider: SessionProvider = worker_session,
@@ -372,7 +385,7 @@ def create_document_processing_pipeline(
     resolved_settings = settings or get_settings()
     return DocumentProcessingPipeline(
         storage=storage or get_file_storage(),
-        extractor=extractor or create_pdf_text_extractor(resolved_settings),
+        extractor=extractor or create_extraction_router(resolved_settings),
         chunker=chunker or create_document_chunker(resolved_settings),
         embedding_provider=embedding_provider or create_embedding_provider(resolved_settings),
         session_provider=session_provider,

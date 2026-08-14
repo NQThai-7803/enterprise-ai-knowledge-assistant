@@ -193,8 +193,10 @@ services:
       dockerfile: Dockerfile
       target: test
     restart: "no"
-    env_file: *app_env_file
-    environment: *app_environment
+    environment:
+      <<: *app_environment
+      APP_DEBUG: "false"
+      LLM_TIMEOUT_SECONDS: "30"
     command: ["python", "-m", "pytest", "tests/unit", "-v"]
     security_opt:
       - no-new-privileges:true

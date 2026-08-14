@@ -1,4 +1,5 @@
 import { appConfig } from "../lib/config";
+import { ensureFreshAccessToken, refreshAccessToken } from "./client";
 import { parseApiError } from "./errors";
 import { getAccessToken } from "./tokenStore";
 import type { StreamEvent, StreamEventName } from "./types";
@@ -133,20 +134,14 @@ export async function streamChatMessage({
   signal,
   onEvent,
 }: ChatStreamRequest): Promise<void> {
-  const token = getAccessToken();
-  const response = await fetch(
-    `${appConfig.apiBaseUrl}${appConfig.apiPrefix}/chat/sessions/${sessionId}/messages/stream`,
-    {
-      method: "POST",
-      headers: {
-        Accept: "text/event-stream",
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({ content }),
-      signal,
-    },
-  );
+  await ensureFreshAccessToken();
+  let response = await fetchStreamResponse({ sessionId, content, signal });
+  if (response.status === 401) {
+    await response.body?.cancel().catch(() => undefined);
+    if (await refreshAccessToken()) {
+      response = await fetchStreamResponse({ sessionId, content, signal });
+    }
+  }
 
   if (!response.ok) {
     throw await parseApiError(response);
@@ -192,6 +187,27 @@ export async function streamChatMessage({
   } finally {
     reader.releaseLock();
   }
+}
+
+async function fetchStreamResponse({
+  sessionId,
+  content,
+  signal,
+}: Pick<ChatStreamRequest, "sessionId" | "content" | "signal">): Promise<Response> {
+  const token = getAccessToken();
+  return fetch(
+    `${appConfig.apiBaseUrl}${appConfig.apiPrefix}/chat/sessions/${sessionId}/messages/stream`,
+    {
+      method: "POST",
+      headers: {
+        Accept: "text/event-stream",
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ content }),
+      signal,
+    },
+  );
 }
 
 function isKnownStreamEvent(value: string): value is StreamEventName {

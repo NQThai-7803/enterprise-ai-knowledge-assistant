@@ -1,0 +1,322 @@
+name: enterprise-ai-knowledge-assistant-prod
+
+x-app-image: &app_image ${APP_IMAGE:-enterprise-ai-knowledge-assistant-backend:prod}
+x-app-build: &app_build
+  context: .
+  dockerfile: Dockerfile
+  target: runtime
+x-default-logging: &default_logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+x-app-environment: &app_environment
+  APP_ENV: ${APP_ENV:-production}
+  APP_DEBUG: ${APP_DEBUG:-false}
+  DEBUG: ${DEBUG:-false}
+  API_DOCS_ENABLED: ${API_DOCS_ENABLED:-false}
+  SECRET_KEY: ${SECRET_KEY}
+  SECRET_KEY_FILE: ${SECRET_KEY_FILE:-}
+  DATABASE_URL: ${DATABASE_URL}
+  DATABASE_URL_FILE: ${DATABASE_URL_FILE:-}
+  REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+  REDIS_URL_FILE: ${REDIS_URL_FILE:-}
+  CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/1}
+  CELERY_BROKER_URL_FILE: ${CELERY_BROKER_URL_FILE:-}
+  CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/2}
+  CELERY_RESULT_BACKEND_FILE: ${CELERY_RESULT_BACKEND_FILE:-}
+  CELERY_WORKER_CONCURRENCY: ${CELERY_WORKER_CONCURRENCY:-2}
+  LOCAL_STORAGE_PATH: /app/data/uploads
+  EMBEDDING_MODEL_CACHE_PATH: /app/data/models
+  HF_HOME: /app/data/models/huggingface
+  SENTENCE_TRANSFORMERS_HOME: /app/data/models/sentence-transformers
+  CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS}
+  CORS_ALLOW_CREDENTIALS: ${CORS_ALLOW_CREDENTIALS:-true}
+  TRUSTED_HOSTS: ${TRUSTED_HOSTS}
+  MAX_REQUEST_BODY_BYTES: ${MAX_REQUEST_BODY_BYTES:-26214400}
+  OBSERVABILITY_ENABLED: ${OBSERVABILITY_ENABLED:-true}
+  REQUEST_LOG_ENABLED: ${REQUEST_LOG_ENABLED:-true}
+  METRICS_ENABLED: ${METRICS_ENABLED:-true}
+  METRICS_INCLUDE_SUBSYSTEM_HEALTH: ${METRICS_INCLUDE_SUBSYSTEM_HEALTH:-true}
+  TRACING_HOOKS_ENABLED: ${TRACING_HOOKS_ENABLED:-true}
+  REQUEST_ID_HEADER: ${REQUEST_ID_HEADER:-X-Request-ID}
+  TRACEPARENT_HEADER: ${TRACEPARENT_HEADER:-traceparent}
+  LLM_ENABLED: ${LLM_ENABLED:-false}
+  LLM_PROVIDER: ${LLM_PROVIDER:-openai_compatible}
+  LLM_MODEL: ${LLM_MODEL:-}
+  LLM_BASE_URL: ${LLM_BASE_URL:-}
+  LLM_API_KEY: ${LLM_API_KEY:-}
+  LLM_API_KEY_FILE: ${LLM_API_KEY_FILE:-}
+  WEB_SEARCH_ENABLED: ${WEB_SEARCH_ENABLED:-false}
+  WEB_SEARCH_ALLOW_EXTERNAL: ${WEB_SEARCH_ALLOW_EXTERNAL:-false}
+  WEB_SEARCH_PROVIDER: ${WEB_SEARCH_PROVIDER:-mock}
+  WEB_SEARCH_BING_API_KEY: ${WEB_SEARCH_BING_API_KEY:-}
+  WEB_SEARCH_BING_API_KEY_FILE: ${WEB_SEARCH_BING_API_KEY_FILE:-}
+  WEB_SEARCH_GOOGLE_API_KEY: ${WEB_SEARCH_GOOGLE_API_KEY:-}
+  WEB_SEARCH_GOOGLE_API_KEY_FILE: ${WEB_SEARCH_GOOGLE_API_KEY_FILE:-}
+  WEB_SEARCH_GOOGLE_CX: ${WEB_SEARCH_GOOGLE_CX:-}
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-enterprise_ai}
+      POSTGRES_USER: ${POSTGRES_USER:-app_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 15s
+    networks:
+      - backend
+    cpus: "2.0"
+    mem_limit: 2g
+    pids_limit: 256
+    security_opt:
+      - no-new-privileges:true
+    logging: *default_logging
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--save", "60", "1"]
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+      start_period: 10s
+    networks:
+      - backend
+    cpus: "0.5"
+    mem_limit: 512m
+    pids_limit: 128
+    security_opt:
+      - no-new-privileges:true
+    logging: *default_logging
+
+  volume-init:
+    image: *app_image
+    build: *app_build
+    restart: "no"
+    user: root
+    command:
+      - sh
+      - -c
+      - >-
+        mkdir -p /app/data/uploads /app/data/models &&
+        chown -R 10001:10001 /app/data/uploads /app/data/models &&
+        chmod 750 /app/data/uploads /app/data/models
+    volumes:
+      - uploads_data:/app/data/uploads
+      - model_cache:/app/data/models
+    networks:
+      - backend
+    cpus: "0.25"
+    mem_limit: 256m
+    pids_limit: 64
+    security_opt:
+      - no-new-privileges:true
+    logging: *default_logging
+  migration:
+    image: *app_image
+    build: *app_build
+    restart: "no"
+    environment: *app_environment
+    command:
+      - sh
+      - -c
+      - >-
+        python -m app.scripts.runtime_validation --print-ok &&
+        alembic upgrade head
+    depends_on:
+      postgres:
+        condition: service_healthy
+      volume-init:
+        condition: service_completed_successfully
+    networks:
+      - backend
+    cpus: "1.0"
+    mem_limit: 1g
+    pids_limit: 128
+    security_opt:
+      - no-new-privileges:true
+    logging: *default_logging
+
+  api:
+    image: *app_image
+    build: *app_build
+    restart: unless-stopped
+    environment:
+      <<: *app_environment
+      FORWARDED_ALLOW_IPS: ${FORWARDED_ALLOW_IPS:-*}
+    command:
+      - sh
+      - -c
+      - >-
+        python -m app.scripts.runtime_validation --print-ok &&
+        exec uvicorn app.main:app --host 0.0.0.0 --port 8000
+        --proxy-headers --forwarded-allow-ips="$${FORWARDED_ALLOW_IPS}"
+    expose:
+      - "8000"
+    volumes:
+      - uploads_data:/app/data/uploads
+      - model_cache:/app/data/models
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=5).read()"
+      interval: 15s
+      timeout: 10s
+      retries: 8
+      start_period: 30s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migration:
+        condition: service_completed_successfully
+    networks:
+      - backend
+    cpus: "2.0"
+    mem_limit: 2g
+    pids_limit: 256
+    security_opt:
+      - no-new-privileges:true
+    logging: *default_logging
+
+  worker:
+    image: *app_image
+    build: *app_build
+    restart: unless-stopped
+    environment: *app_environment
+    command:
+      - sh
+      - -c
+      - >-
+        python -m app.scripts.runtime_validation --print-ok &&
+        exec celery -A app.workers.celery_app:celery_app worker --loglevel=INFO
+        --queues=default,documents --concurrency="$${CELERY_WORKER_CONCURRENCY}"
+        --hostname=worker@%h
+    volumes:
+      - uploads_data:/app/data/uploads
+      - model_cache:/app/data/models
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "celery -A app.workers.celery_app:celery_app inspect ping -d worker@$$(hostname) --timeout=10 | grep -q pong"
+      interval: 30s
+      timeout: 15s
+      retries: 8
+      start_period: 45s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migration:
+        condition: service_completed_successfully
+    networks:
+      - backend
+    cpus: "2.0"
+    mem_limit: 3g
+    pids_limit: 256
+    security_opt:
+      - no-new-privileges:true
+    logging: *default_logging
+
+  reverse-proxy:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${PROXY_HTTP_PORT:-8080}:8080"
+    volumes:
+      - ./deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./deploy/nginx/conf.d:/etc/nginx/conf.d:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - backend
+    cpus: "0.5"
+    mem_limit: 256m
+    pids_limit: 128
+    security_opt:
+      - no-new-privileges:true
+    logging: *default_logging
+
+  prometheus:
+    profiles: ["observability"]
+    image: prom/prometheus:v2.55.0
+    restart: unless-stopped
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=15d
+      - --web.enable-lifecycle
+    volumes:
+      - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - backend
+    cpus: "0.5"
+    mem_limit: 512m
+    pids_limit: 128
+    security_opt:
+      - no-new-privileges:true
+    logging: *default_logging
+
+  grafana:
+    profiles: ["observability"]
+    image: grafana/grafana:11.3.0
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./deploy/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+    networks:
+      - backend
+    cpus: "0.5"
+    mem_limit: 512m
+    pids_limit: 256
+    security_opt:
+      - no-new-privileges:true
+    logging: *default_logging
+
+volumes:
+  postgres_data:
+  redis_data:
+  uploads_data:
+  model_cache:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  backend:
+    driver: bridge

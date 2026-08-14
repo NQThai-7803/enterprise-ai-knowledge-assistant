@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import uuid
 from collections.abc import Callable, Coroutine
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any
 
@@ -16,7 +16,14 @@ from app.api.dependencies import get_grounded_answer_service
 from app.core.config import Settings
 from app.llm.errors import LLMError, LLMFailureCode
 from app.llm.models import LLMGenerationResult
-from app.models import ChatMessage, ChatSession, User, UserRole
+from app.models import (
+    ChatMessage,
+    ChatMessageRole,
+    ChatSession,
+    CitationSourceType,
+    User,
+    UserRole,
+)
 from app.retrieval.models import HybridRetrievalHit, HybridRetrievalResult
 from app.services.grounded_answer_service import GroundedAnswerService
 
@@ -48,6 +55,46 @@ def create_session(
     return run_async(create_chat_session_record(session_factory, owner=owner))
 
 
+async def create_chat_message_record(
+    session_factory: async_sessionmaker[AsyncSession],
+    *,
+    chat_session: ChatSession,
+    role: ChatMessageRole,
+    content: str,
+    seconds: int,
+) -> ChatMessage:
+    async with session_factory() as session:
+        message = ChatMessage(
+            session_id=chat_session.id,
+            role=role,
+            content=content,
+            created_at=datetime(2026, 1, 1, tzinfo=UTC) + timedelta(seconds=seconds),
+        )
+        session.add(message)
+        await session.commit()
+        await session.refresh(message)
+        return message
+
+
+def create_message(
+    session_factory: async_sessionmaker[AsyncSession],
+    *,
+    chat_session: ChatSession,
+    role: ChatMessageRole,
+    content: str,
+    seconds: int,
+) -> ChatMessage:
+    return run_async(
+        create_chat_message_record(
+            session_factory,
+            chat_session=chat_session,
+            role=role,
+            content=content,
+            seconds=seconds,
+        )
+    )
+
+
 async def count_messages(
     session_factory: async_sessionmaker[AsyncSession],
     *,
@@ -73,6 +120,7 @@ def make_settings(**overrides: object) -> Settings:
         "chat_context_max_tokens": 1000,
         "chat_retrieval_top_k": 2,
         "chat_history_max_messages": 2,
+        "chat_history_max_tokens": 200,
         "citation_max_sources_per_answer": 2,
     }
     defaults.update(overrides)
@@ -128,9 +176,11 @@ class FakeRetrievalService:
     def __init__(self, result: HybridRetrievalResult) -> None:
         self.result = result
         self.calls = 0
+        self.queries: list[str] = []
 
     async def retrieve(self, *, query: str, current_user: User, top_k: int | None = None):
         self.calls += 1
+        self.queries.append(query)
         return self.result
 
 
@@ -138,9 +188,11 @@ class FakeLLMProvider:
     def __init__(self, result: LLMGenerationResult | Exception) -> None:
         self.result = result
         self.calls = 0
+        self.messages = None
 
     async def generate(self, *, messages, temperature: float, max_output_tokens: int):  # noqa: ANN001
         self.calls += 1
+        self.messages = messages
         if isinstance(self.result, Exception):
             raise self.result
         return self.result
@@ -162,7 +214,9 @@ class FakeCitationRepository:
         return tuple(citations)
 
 
-def llm_answer(content: str = "Grounded answer [SOURCE_1]") -> LLMGenerationResult:
+def llm_answer(
+    content: str = '{"answer":"Grounded answer","citations":["SOURCE_1"]}',
+) -> LLMGenerationResult:
     return LLMGenerationResult(
         content=content,
         model="fake",
@@ -173,6 +227,18 @@ def llm_answer(content: str = "Grounded answer [SOURCE_1]") -> LLMGenerationResu
     )
 
 
+def default_citation() -> SimpleNamespace:
+    return SimpleNamespace(
+        document_id=uuid.UUID("00000000-0000-0000-0000-000000000901"),
+        document_title="Quy che nhan su",
+        chunk_id=uuid.UUID("00000000-0000-0000-0000-000000000902"),
+        page_number=14,
+        excerpt="Nhan vien chinh thuc duoc huong 12 ngay nghi phep.",
+        relevance_score=0.87,
+        citation_order=1,
+    )
+
+
 def install_service(
     api_client: TestClient,
     session_factory: async_sessionmaker[AsyncSession],
@@ -180,7 +246,7 @@ def install_service(
     retrieval: FakeRetrievalService | None = None,
     llm: FakeLLMProvider | None = None,
     settings: Settings | None = None,
-    citations: tuple[object, ...] = (),
+    citations: tuple[object, ...] | None = None,
 ) -> tuple[FakeRetrievalService, FakeLLMProvider]:
     resolved_retrieval = retrieval or FakeRetrievalService(retrieval_result(hit()))
     resolved_llm = llm or FakeLLMProvider(llm_answer())
@@ -191,7 +257,9 @@ def install_service(
         llm_provider_factory=lambda: resolved_llm,
         token_counter=FakeCounter(),
         citation_repository=FakeCitationRepository(),
-        citation_validation_service=FakeCitationValidationService(citations=citations),
+        citation_validation_service=FakeCitationValidationService(
+            citations=citations if citations is not None else (default_citation(),)
+        ),
     )
     api_client.app.dependency_overrides[get_grounded_answer_service] = lambda: service
     return resolved_retrieval, resolved_llm
@@ -207,7 +275,7 @@ def post_question(
     return api_client.post(
         f"/api/v1/chat/sessions/{chat.id}/messages",
         headers=make_auth_headers(user),
-        json=payload or {"content": "Nhân viên được nghỉ phép bao nhiêu ngày?"},
+        json=payload or {"content": "Nhan vien duoc nghi phep bao nhieu ngay?"},
     )
 
 
@@ -228,6 +296,53 @@ def test_owner_submits_question_returns_201(
     assert data["session_id"] == str(chat.id)
     assert data["grounding_status"] == "ANSWERED"
     assert data["retrieved_chunk_count"] == 1
+
+
+def test_non_streaming_chat_uses_current_session_conversation_memory_only(
+    api_client: TestClient,
+    async_session_factory_for_tests: async_sessionmaker[AsyncSession],
+    make_user: Callable[..., User],
+    make_auth_headers: Callable[[User], dict[str, str]],
+) -> None:
+    owner = make_user(role=UserRole.STAFF)
+    chat = create_session(async_session_factory_for_tests, owner=owner)
+    other_chat = create_session(async_session_factory_for_tests, owner=owner)
+    create_message(
+        async_session_factory_for_tests,
+        chat_session=chat,
+        role=ChatMessageRole.USER,
+        content="Leave policy?",
+        seconds=1,
+    )
+    create_message(
+        async_session_factory_for_tests,
+        chat_session=chat,
+        role=ChatMessageRole.ASSISTANT,
+        content="Employees get 12 annual leave days.",
+        seconds=2,
+    )
+    create_message(
+        async_session_factory_for_tests,
+        chat_session=other_chat,
+        role=ChatMessageRole.USER,
+        content="Other session confidential topic",
+        seconds=3,
+    )
+    retrieval, llm = install_service(api_client, async_session_factory_for_tests)
+
+    response = post_question(
+        api_client,
+        make_auth_headers,
+        owner,
+        chat,
+        {"content": "If working 5 years then what?"},
+    )
+
+    assert response.status_code == 201
+    assert retrieval.queries == ["If working 5 years then what?"]
+    assert "Leave policy?" in llm.messages[1].content
+    assert "Employees get 12 annual leave days." in llm.messages[1].content
+    assert "Other session confidential topic" not in llm.messages[1].content
 
 
 def test_answered_response_returns_citations(
@@ -398,7 +513,7 @@ def test_answer_response_excludes_out_of_scope_fields(
     }
     assert forbidden.isdisjoint(data.keys())
     assert forbidden.isdisjoint(data["assistant_message"].keys())
-    assert data["assistant_message"]["citations"] == []
+    assert data["assistant_message"]["citations"]
     assert data["user_message"]["role"] == "USER"
     assert data["assistant_message"]["role"] == "ASSISTANT"
 
@@ -493,3 +608,43 @@ def test_provider_errors_are_sanitized_and_persist_no_messages(
     assert response.json()["error"]["code"] == "LLM_AUTHENTICATION_FAILED"
     assert secret not in response.text
     assert run_async(count_messages(async_session_factory_for_tests, chat_session=chat)) == 0
+
+
+def test_answered_response_returns_web_citations(
+    api_client: TestClient,
+    async_session_factory_for_tests: async_sessionmaker[AsyncSession],
+    make_user: Callable[..., User],
+    make_auth_headers: Callable[[User], dict[str, str]],
+) -> None:
+    owner = make_user(role=UserRole.STAFF)
+    chat = create_session(async_session_factory_for_tests, owner=owner)
+    citation = SimpleNamespace(
+        source_type=CitationSourceType.WEB,
+        document_id=None,
+        document_title="OpenAI Docs",
+        chunk_id=None,
+        page_number=1,
+        excerpt="The Responses API is documented by OpenAI.",
+        relevance_score=None,
+        citation_order=1,
+        source_url="https://platform.openai.com/docs/api-reference/responses",
+    )
+    install_service(api_client, async_session_factory_for_tests, citations=(citation,))
+
+    response = post_question(api_client, make_auth_headers, owner, chat)
+
+    assert response.status_code == 201
+    citations = response.json()["data"]["assistant_message"]["citations"]
+    assert citations == [
+        {
+            "document_id": None,
+            "document_title": "OpenAI Docs",
+            "chunk_id": None,
+            "page_number": 1,
+            "excerpt": "The Responses API is documented by OpenAI.",
+            "relevance_score": None,
+            "citation_order": 1,
+            "source_type": "WEB",
+            "source_url": "https://platform.openai.com/docs/api-reference/responses",
+        }
+    ]

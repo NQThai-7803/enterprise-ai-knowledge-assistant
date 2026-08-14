@@ -119,6 +119,7 @@ class HybridRetrievalHit:
     keyword_score: float | None
     keyword_rank: int | None
     matched_by: tuple[str, ...]
+    reranker_score: float | None = None
 
     def __post_init__(self) -> None:
         _validate_common_hit_fields(self)
@@ -139,6 +140,12 @@ class HybridRetrievalHit:
             object.__setattr__(self, "semantic_rank", _coerce_one_based_rank(self.semantic_rank))
         if self.keyword_rank is not None:
             object.__setattr__(self, "keyword_rank", _coerce_one_based_rank(self.keyword_rank))
+        if self.reranker_score is not None:
+            object.__setattr__(
+                self,
+                "reranker_score",
+                _coerce_non_negative_score(self.reranker_score, field_name="reranker_score"),
+            )
         object.__setattr__(self, "matched_by", _coerce_matched_by(self.matched_by))
         if ("semantic" in self.matched_by) != (self.semantic_rank is not None):
             msg = "semantic match state must be consistent."

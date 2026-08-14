@@ -91,6 +91,56 @@ def test_keyword_search_finds_vietnamese_phrase(
     run_async(scenario())
 
 
+def test_keyword_fallback_finds_vietnamese_leave_policy_question(
+    async_session_factory_for_tests: async_sessionmaker[AsyncSession],
+) -> None:
+    async def scenario() -> None:
+        query = (
+            "Trong công việc điều kiện bình thường, mức nghỉ hằng năm hưởng nguyên lương "
+            "là bao nhiêu ngày?"
+        )
+        async with async_session_factory_for_tests() as session:
+            admin = await create_user(session, "keyword-vn-leave-admin", role=UserRole.ADMIN)
+            leave_document = await create_document(
+                session,
+                "keyword-vn-leave-doc",
+                uploader=admin,
+                title="Chính sách nghỉ của người lao động",
+                access_scope=DocumentAccessScope.ORGANIZATION,
+            )
+            unrelated_document = await create_document(
+                session,
+                "keyword-vn-leave-unrelated",
+                uploader=admin,
+                title="Giới thiệu về công ty",
+                access_scope=DocumentAccessScope.ORGANIZATION,
+            )
+            leave_chunk = await create_chunk(
+                session,
+                "keyword-vn-leave-chunk",
+                document=leave_document,
+                text=(
+                    "Mức nghỉ hằng năm hưởng nguyên lương là 12 ngày. "
+                    "Áp dụng cho công việc trong điều kiện bình thường."
+                ),
+            )
+            await create_chunk(
+                session,
+                "keyword-vn-leave-company",
+                document=unrelated_document,
+                text="Giới thiệu về công ty, cơ cấu tổ chức và các phòng ban nội bộ.",
+            )
+
+            rows = await keyword_rows(session, user=admin, query=query, top_k=8)
+
+            assert rows
+            assert rows[0].chunk_id == leave_chunk.id
+            assert rows[0].document_id == leave_document.id
+            assert rows[0].keyword_rank > 0.0
+
+    run_async(scenario())
+
+
 def test_keyword_search_finds_contract_code(
     async_session_factory_for_tests: async_sessionmaker[AsyncSession],
 ) -> None:

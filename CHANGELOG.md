@@ -6,8 +6,43 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### Fixed
+
+- Replaced document upload raw Department ID entry with a Department selector backed by `GET /api/v1/departments`, conditional scope validation, loading/empty/error/retry states, and safe validation copy.
+- Replaced document permission raw Grantee ID entry with User and Department selectors backed by existing list APIs, stale-selection clearing when grantee type changes, cached display-name resolution, and safe grant-error copy.
+- Extended the local deterministic UAT OpenAI-compatible provider to answer the current UAT leave follow-up and Nova Digital CEO questions from retrieved context.
+- Restored project status/version metadata so TASK-035 remains not started and no Release Candidate version is marked by this UAT fix.
+
+### Changed
+
+- Documented that default development Compose keeps `LLM_ENABLED=false`, while `compose.uat.yaml` enables the local deterministic provider with `LLM_MODEL=uat-deterministic-model` and `LLM_OPENAI_BASE_URL=http://uat-llm:18080/v1`.
+
+### Verified
+
+- Verified default Compose keeps LLM disabled and UAT Compose enables only the local deterministic provider.
+- Verified focused frontend selector tests, frontend typecheck/build, focused backend chat/grounding/citation/memory/streaming/permission/LLM provider tests, Docker UAT health, live deterministic chat, streaming, Ruff, format check, compileall, and security scan.
 ### Added
 
+- Implemented TASK-034 Production Deployment & Observability with backend-only Prometheus metrics, request ID middleware, safe request latency logging, traceparent capture hooks, production runtime validation, and Docker secret-file configuration support.
+- Added standalone `compose.prod.yaml`, `.env.production.example`, Nginx reverse proxy config, Prometheus scrape config, Grafana datasource/dashboard provisioning, and PostgreSQL/uploads backup-restore helper scripts.
+- Added TASK-034 unit/API/integration tests for metrics, request IDs, logging safety, production config, reverse proxy settings, Prometheus/Grafana provisioning, backup/restore guardrails, and secret-file startup validation.
+- Verified TASK-034 final acceptance: production and development Compose config/build/up/ps, production runtime health, reverse proxy, metrics safety, Celery worker ping, backup/restore, Redis/PostgreSQL failure recovery, Alembic, dependency audit, security scan, and regression suites passed.
+- Implemented TASK-033 Analytics & Reporting with backend-only Admin analytics APIs under `/api/v1/admin/analytics` and report export under `/api/v1/admin/reports/export`.
+- Added safe analytics schemas and `AdminAnalyticsService` for overview, chat, users, search, OCR, LLM, feedback, audit, and export aggregates using existing PostgreSQL rows.
+- Added CSV and JSON report export while rejecting PDF export until safe backend PDF report infrastructure exists.
+- Added TASK-033 unit/API integration tests for filters, RBAC, aggregate correctness, security non-disclosure, export, regression, and performance smoke.
+- Implemented TASK-032 Admin Dashboard & System Monitoring with backend-only Admin monitoring APIs under /api/v1/admin.
+- Added safe Admin health, providers, workers, queues, statistics, version, and system dashboard response schemas and service aggregation.
+- Added TASK-032 unit and API integration tests for Admin RBAC, health subsystem coverage, provider safety, worker/queue reporting, statistics, version, and secret/content non-disclosure.
+
+- Implemented TASK-031 Web Search Integration with backend-only internal-only, hybrid, and web-only source modes.
+- Added `WebSearchProvider` abstraction, web search provider registry/manager, mock provider, Bing provider, DuckDuckGo provider, and Google Custom Search provider.
+- Added web search configuration for enabled state, provider, max results, timeout, max content length, external-call allow flag, user agent, retries, endpoints, and provider credentials.
+- Added intent detection for current/web questions and no-internal-hit fallback while preserving internal hybrid retrieval first in hybrid mode.
+- Added web content and URL normalization to strip unsafe HTML/script/style/hidden/comment content, bound result content, and reject unsafe URLs.
+- Added `CitationSourceType` and web citation persistence fields with migration `20260803_0010_add_web_search_citations`.
+- Added Admin-only web search provider status and provider search-test endpoints.
+- Added TASK-031 unit, API, streaming, and migration tests for web search, citation, provider failure, timeout/retry, and source-mode behavior.
 - Initialized Phase 2 roadmap.
 - Started TASK-026 Multi-LLM Provider Support.
 - Completed TASK-026 recovery with missing-usage normalization, explicit provider connectivity health, remote OpenAI-compatible API key validation, and Docker runtime verification.
@@ -15,7 +50,11 @@ Format follows a simplified Keep a Changelog style.
 - Added a protected SSE chat endpoint, centralized SSE serializer/state machine, bounded heartbeat/stream timeout settings, and Docker streaming integration tests.
 - Verified streaming preserves grounded-answer policy, citation validation, atomic final-message persistence, safe provider errors, cancellation cleanup, and the non-streaming Chat API.
 - Added TASK-028 Frontend UI Foundation & Test Console to the roadmap.
-
+- Completed TASK-029 Conversation Memory.
+- Added `ConversationContextBuilder` for same-session memory loading, ordering, de-duplication, message-limit trimming, token-budget trimming, prompt-history formatting, and bounded retrieval-query construction.
+- Added `CHAT_HISTORY_MAX_TOKENS` configuration alongside `CHAT_HISTORY_MAX_MESSAGES`.
+- Updated grounded prompt construction to use SYSTEM policy, Conversation History, Retrieved Context, and Current Question while preserving grounded no-answer and citation policy.
+- Added non-streaming and SSE streaming regressions for same-session Conversation Memory.
 - Production configuration validation for environment mode, debug policy, placeholder secrets, database password, CORS, trusted hosts, request limits, database pool, Redis timeouts, rate limits, and Celery time limits.
 - Configurable API docs policy.
 - CORS middleware with explicit origin, method, header, and credentials configuration.
@@ -240,6 +279,18 @@ Format follows a simplified Keep a Changelog style.
 
 ### Verified
 
+- Verified TASK-033 final acceptance: focused unit/API integration suites, Admin/RBAC/Web Search regression, default backend regression, Ruff, format check, compileall, security scan, Alembic current/head/upgrade, Docker Compose config/build/up/ps, API/worker/PostgreSQL/Redis/migration runtime checks, Celery worker ping, and live Docker Admin analytics route RBAC smoke passed.
+
+- Verified TASK-032 final acceptance: focused unit/API integration suites, RBAC/provider API regression, default backend regression, Ruff, format check, compileall, security scan, Alembic current/head/upgrade, Docker Compose config/build/up/ps, API/worker/PostgreSQL/Redis/migration/OCR runtime checks, Celery worker ping, and live Docker Admin monitoring endpoint smoke passed.
+
+- Verified TASK-031 final Docker acceptance: Docker version/info, Compose config/build/up/ps, PostgreSQL, Redis, API, worker, one-shot migration exit 0, API health, and Alembic current/heads/upgrade head all passed with head `20260803_0010`.
+- Verified TASK-031 final test acceptance: focused Web Search unit suite, Web Search admin API integration, chat/citation/streaming API integration, web citation migration integration, Conversation Memory integration, grounded answer citation/persistence integration, full hybrid retrieval integration, citation revalidation/message citation migration integration, and full default regression passed.
+- Verified TASK-031 quality/security acceptance: Ruff check, Ruff format check, compileall, and security scan passed; runtime smoke covered internal-only disabled provider status, web-only/hybrid mock-provider paths, no-answer, SSE streaming, internal citation, and web citation source typing.
+- Verified TASK-030 local gates: full unit suite, focused OCR suite, default non-integration suite, default API/integration selections, Ruff lint, Ruff format, security scan, compileall, and Alembic source head 20260722_0009.
+- Attempted TASK-030 Docker/API/integration runtime verification; completion remains blocked by local Docker Desktop daemon unavailability and asyncpg connection timeout to the Docker-backed PostgreSQL endpoint.
+
+- Verified TASK-029 focused unit, integration, API, and streaming regression suites for Conversation Memory, no-answer, grounding, citation, token-budget, message-limit, and same-session isolation behavior.
+- Verified TASK-029 Docker build, Docker restart, healthy API/worker/Postgres/Redis, API readiness, host quality gates, runtime API `pip check`, default pytest, streaming integration marker, chat API integration, and focused conversation-memory integration regressions.
 - Verified TASK-028 live UI acceptance recovery against the real local Docker frontend/backend stack with PostgreSQL, Redis, deterministic UAT LLM provider, idempotent UAT seed, live role workflows, upload-to-READY, permissions, SSE chat, citations, feedback, audit, responsive/accessibility smoke, frontend gates, mock E2E, live E2E, and backend regressions.
 - Completed Docker/Python 3.12 runtime verification for TASK-026.
 - Verified Multi-LLM providers, grounding, privacy, and LLM-disabled startup in Docker.
@@ -247,11 +298,18 @@ Format follows a simplified Keep a Changelog style.
 - Completed DB-backed hardening regression.
 - Completed end-to-end release smoke test.
 - Completed persistence and failure-recovery verification.
+
 ### Changed
 
-- None.
+- UAT overlay now runs `python -m app.scripts.seed_uat_data` before API/worker startup with fixed local-only test credentials for Admin, Manager, and Staff UAT accounts.
 
 ### Fixed
+
+- Made UAT account seeding deterministic and idempotent across Docker rebuild/recreate/mode switching by adding a one-shot `uat-seed` service and repairing existing known UAT users in place.
+- Fixed TASK-034.1 local Ollama SSE `STREAM_TIMEOUT` by separating provider timeout, stream max duration, and heartbeat budgets while preserving buffer-after-validation grounding.
+- Disabled Ollama reasoning effort for local `qwen3:4b` requests where supported and stripped visible `<think>` blocks before citation validation.
+- Fixed OCR configuration validation so maximum width, height, and pixel caps remain independent bounded limits.
+- Fixed TASK-030 Ruff import ordering and formatting issues in OCR/document-processing code and tests.
 
 - Fixed TASK-028 live acceptance blockers for `.example.test` UAT email validation, Admin user edit/reactivation controls, Department edit/delete controls, toast click interception, mobile drawer Escape handling, and feedback controls on completed live SSE answers.
 - Released the Document download read transaction before streaming file bytes and kept download response metadata detached from ORM state.
@@ -264,3 +322,19 @@ Format follows a simplified Keep a Changelog style.
 - Added UI documentation for Stitch workflow, Stitch screen prompts, design system, screen inventory, React Bits motion policy, frontend architecture, and frontend testing.
 - Added controlled motion primitives for login background, chat spotlight, and waiting text with reduced-motion support.
 - Added frontend lint, typecheck, Vitest, Playwright smoke E2E, production build, and optional Docker Compose frontend profile.
+
+### TASK-034.1 In Progress
+
+- Audited real/local LLM grounded runtime boundaries before implementation.
+- Strengthened grounded prompt policy to require retrieved-context-only evidence, no unsupported inference, exact preservation of numbers/dates/names/conditions/exceptions, conflict reporting, and no approximate-to-exact conversion.
+- Added a grounded-answer service guard so `ANSWERED` results without validated citations are rejected before persistence.
+- Added focused unit tests for strict prompt requirements and invalid answered/no-citation rejection.
+- Added a skipped-by-default `real_llm_acceptance` report validator and marker for manual real-provider acceptance.
+- Created local ignored synthetic acceptance PDFs and report template under `artifacts/task-034-1/`.
+- Documented deterministic UAT versus real LLM acceptance, local Ollama/LM Studio configuration, external-provider privacy implications, and current local runtime blockers.
+
+### TASK-034.1 Runtime Status
+
+- Docker Desktop, PostgreSQL, Redis, API, worker, and host Ollama `qwen3:4b` are reachable in the current local environment.
+- Live SSE verification for Nova Digital CEO, CTO, and NovaAssist completed twice each with no `STREAM_TIMEOUT`.
+- TASK-034.1 remains in progress until the full strict real-LLM matrix and manual claim report are complete.

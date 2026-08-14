@@ -25,10 +25,12 @@ from app.db.session import async_session_factory, get_db_session
 from app.document_processing.tokenization import TiktokenTokenCounter
 from app.models import User, UserRole
 from app.retrieval.factory import create_hybrid_retrieval_service
+from app.retrieval.reranker_factory import create_retrieval_reranker
 from app.services.audit_service import MAX_USER_AGENT_LENGTH, AuditContext
 from app.services.auth_service import AuthService
 from app.services.document_service import DocumentUploadLimits, EnqueueDocumentProcessing
 from app.services.grounded_answer_service import GroundedAnswerService
+from app.web_search.service import WebSearchService
 from app.workers.document_tasks import try_enqueue_document_processing
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -131,13 +133,21 @@ def get_document_processing_enqueue() -> EnqueueDocumentProcessing:
 def get_grounded_answer_service(request: Request) -> GroundedAnswerService:
     settings = get_settings()
     llm_provider_manager = request.app.state.llm_provider_manager
+    web_search_provider_manager = request.app.state.web_search_provider_manager
     return GroundedAnswerService(
         settings=settings,
         session_provider=async_session_factory,
         hybrid_retrieval_service=create_hybrid_retrieval_service(settings),
+        retrieval_reranker=(
+            create_retrieval_reranker(settings) if settings.reranker_enabled else None
+        ),
         llm_provider_factory=llm_provider_manager.get_provider,
         close_llm_provider_after_generate=False,
         token_counter=TiktokenTokenCounter(settings.tokenizer_encoding_name),
+        web_search_service=WebSearchService(
+            settings=settings,
+            provider_factory=web_search_provider_manager.get_provider,
+        ),
     )
 
 

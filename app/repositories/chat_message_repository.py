@@ -10,6 +10,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import ChatMessage, ChatMessageRole, ChatSession
 
 VISIBLE_MESSAGE_ROLES = (ChatMessageRole.USER, ChatMessageRole.ASSISTANT)
+MEMORY_MESSAGE_ROLES = (
+    ChatMessageRole.USER,
+    ChatMessageRole.ASSISTANT,
+    ChatMessageRole.SYSTEM,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -18,6 +23,14 @@ class VisibleChatMessageRow:
     role: ChatMessageRole
     content: str
     response_time_ms: int | None
+    created_at: datetime
+
+
+@dataclass(frozen=True, slots=True)
+class ConversationMemoryMessageRow:
+    id: UUID
+    role: ChatMessageRole
+    content: str
     created_at: datetime
 
 
@@ -124,6 +137,39 @@ async def list_recent_visible_owned_messages(
             created_at=created_at,
         )
         for message_id, role, content, response_time_ms, created_at in rows
+    )
+
+
+async def list_owned_messages_for_memory(
+    session: AsyncSession,
+    *,
+    session_id: UUID,
+    owner_user_id: UUID,
+) -> tuple[ConversationMemoryMessageRow, ...]:
+    statement = (
+        select(
+            ChatMessage.id,
+            ChatMessage.role,
+            ChatMessage.content,
+            ChatMessage.created_at,
+        )
+        .join(ChatSession, ChatSession.id == ChatMessage.session_id)
+        .where(
+            ChatSession.id == session_id,
+            ChatSession.user_id == owner_user_id,
+            ChatMessage.role.in_(MEMORY_MESSAGE_ROLES),
+        )
+        .order_by(ChatMessage.created_at.asc(), ChatMessage.id.asc())
+    )
+    rows = (await session.execute(statement)).all()
+    return tuple(
+        ConversationMemoryMessageRow(
+            id=message_id,
+            role=role,
+            content=content,
+            created_at=created_at,
+        )
+        for message_id, role, content, created_at in rows
     )
 
 

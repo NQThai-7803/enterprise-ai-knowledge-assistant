@@ -226,7 +226,9 @@ def test_real_worker_does_not_duplicate_chunks(
 ) -> None:
     assert celery_pipeline_worker_process.poll() is None
     storage = LocalFileStorage(celery_pipeline_storage_root)
-    pdf_bytes = make_pdf(["Celery duplicate delivery text."])
+    pdf_bytes = make_pdf(
+        ["Celery duplicate delivery text with enough native characters for extraction."]
+    )
     document = run_async(
         create_uploaded_document(async_session_factory_for_tests, storage, pdf_bytes)
     )

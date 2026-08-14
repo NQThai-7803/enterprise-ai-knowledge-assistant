@@ -120,3 +120,109 @@ def test_application_services_use_no_new_privileges() -> None:
 
     for service_name in ("migration", "api", "worker"):
         assert services[service_name]["security_opt"] == ["no-new-privileges:true"]
+
+
+def _compose_uat_config() -> dict[str, object]:
+    try:
+        result = subprocess.run(
+            [
+                "docker",
+                "compose",
+                "-f",
+                "compose.yaml",
+                "-f",
+                "compose.uat.yaml",
+                "config",
+                "--format",
+                "json",
+            ],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+    except FileNotFoundError:
+        pytest.skip("Docker Compose is not installed.")
+    assert result.returncode == 0, result.stderr
+    return json.loads(result.stdout)
+
+
+def test_default_compose_keeps_llm_local_safe() -> None:
+    services = _compose_config()["services"]
+    environment = services["api"]["environment"]
+
+    assert "uat-llm" not in services
+    assert (
+        environment["LLM_PROVIDER"] != "openai_compatible"
+        or environment.get("LLM_MODEL") != "uat-deterministic-model"
+    )
+    if environment["LLM_ENABLED"] == "true":
+        assert environment["LLM_PROVIDER"] == "ollama"
+        assert environment["LLM_OLLAMA_MODEL"] == "qwen2.5:3b"
+        assert environment["LLM_OLLAMA_NUM_CTX"] == "4096"
+        assert environment["LLM_OLLAMA_KEEP_ALIVE"] == "10m"
+        assert environment["LLM_TEMPERATURE"] == "0"
+        assert environment["LLM_MAX_OUTPUT_TOKENS"] == "512"
+    else:
+        assert environment["LLM_ENABLED"] == "false"
+        assert not environment.get("LLM_MODEL")
+        assert not environment.get("LLM_OPENAI_BASE_URL")
+
+
+def test_uat_compose_enables_local_deterministic_llm_provider() -> None:
+    services = _compose_uat_config()["services"]
+    environment = services["api"]["environment"]
+
+    assert "uat-llm" in services
+    assert environment["LLM_ENABLED"] == "true"
+    assert environment["LLM_PROVIDER"] == "openai_compatible"
+    assert environment["LLM_MODEL"] == "uat-deterministic-model"
+    assert environment["LLM_OPENAI_BASE_URL"] == "http://uat-llm:18080/v1"
+    assert services["api"]["depends_on"]["uat-llm"]["condition"] == "service_started"
+    assert services["uat-llm"]["command"] == [
+        "node",
+        "frontend/tests/e2e-live/fake-openai-provider.mjs",
+    ]
+
+
+def test_uat_compose_runs_idempotent_seed_before_api_and_worker() -> None:
+    services = _compose_uat_config()["services"]
+    seed = services["uat-seed"]
+    seed_environment = seed["environment"]
+
+    assert seed["image"] == services["api"]["image"]
+    assert seed["build"]["target"] == "runtime"
+    assert seed["command"] == ["python", "-m", "app.scripts.seed_uat_data"]
+    assert seed["depends_on"]["migration"]["condition"] == "service_completed_successfully"
+    assert seed["security_opt"] == ["no-new-privileges:true"]
+    assert seed_environment["UAT_SEED_ENABLED"] == "true"
+    assert seed_environment["UAT_ADMIN_PASSWORD"] == "LocalUatAdmin!2026"
+    assert seed_environment["UAT_MANAGER_PASSWORD"] == "LocalUatManager!2026"
+    assert seed_environment["UAT_STAFF_PASSWORD"] == "LocalUatStaff!2026"
+    assert seed_environment["LLM_ENABLED"] == "false"
+    assert seed_environment["DATABASE_URL"].endswith("@postgres:5432/enterprise_ai")
+    seed_volumes = {volume["target"]: volume["source"] for volume in seed["volumes"]}
+    assert seed_volumes["/app/data/uploads"] == "uploads_data"
+    assert seed_volumes["/app/data/models"] == "model_cache"
+    assert services["api"]["depends_on"]["uat-seed"]["condition"] == (
+        "service_completed_successfully"
+    )
+    assert services["worker"]["depends_on"]["uat-seed"]["condition"] == (
+        "service_completed_successfully"
+    )
+
+
+def test_uat_fake_provider_is_local_only_and_covers_acceptance_questions() -> None:
+    provider = (ROOT / "frontend/tests/e2e-live/fake-openai-provider.mjs").read_text(
+        encoding="utf-8"
+    )
+
+    assert "createServer" in provider
+    assert "0.0.0.0" in provider
+    assert "/v1/chat/completions" in provider
+    assert "api.openai.com" not in provider
+    assert "generativelanguage.googleapis.com" not in provider
+    assert "anthropic.com" not in provider
+    assert "CEO Nova Digital" in provider
+    assert "05 n" in provider

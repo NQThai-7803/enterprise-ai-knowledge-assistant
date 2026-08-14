@@ -4,10 +4,10 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_serializer
 
 from app.chat.models import ChatAnswerResult, GroundingStatus
-from app.models import ChatMessage, ChatSession
+from app.models import ChatMessage, ChatSession, CitationSourceType
 from app.repositories.chat_message_repository import VisibleChatMessageRow
 from app.repositories.chat_session_repository import ChatSessionListRow
 from app.schemas.common import PaginationMeta
@@ -79,24 +79,44 @@ class ChatSessionSummary(BaseModel):
 
 
 class CitationRead(BaseModel):
-    document_id: UUID
+    document_id: UUID | None
     document_title: str
     chunk_id: UUID | None
     page_number: int = Field(gt=0)
     excerpt: str
     relevance_score: float | None
     citation_order: int = Field(ge=1)
+    source_type: CitationSourceType | None = None
+    source_url: str | None = None
+
+    @model_serializer(mode="wrap")
+    def serialize_citation(self, handler):  # noqa: ANN001, ANN202
+        data = handler(self)
+        if data.get("source_type") is None:
+            data.pop("source_type", None)
+        if data.get("source_url") is None:
+            data.pop("source_url", None)
+        return data
 
     @classmethod
     def from_citation(cls, citation: object) -> CitationRead:
+        source_type = CitationSourceType(
+            getattr(citation, "source_type", CitationSourceType.INTERNAL)
+        )
         return cls(
-            document_id=citation.document_id,
+            document_id=getattr(citation, "document_id", None),
             document_title=citation.document_title,
-            chunk_id=citation.chunk_id,
+            chunk_id=getattr(citation, "chunk_id", None),
             page_number=citation.page_number,
             excerpt=citation.excerpt,
             relevance_score=citation.relevance_score,
             citation_order=citation.citation_order,
+            source_type=source_type if source_type == CitationSourceType.WEB else None,
+            source_url=(
+                getattr(citation, "source_url", None)
+                if source_type == CitationSourceType.WEB
+                else None
+            ),
         )
 
 

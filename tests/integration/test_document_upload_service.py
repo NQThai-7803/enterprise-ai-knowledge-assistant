@@ -668,3 +668,40 @@ def test_storage_failure_does_not_create_document(
             assert await count_documents(session) == 0
 
     run_async(scenario())
+
+
+@pytest.mark.parametrize(
+    ("filename", "content_type", "content", "extension"),
+    [
+        ("scan.png", "image/png", b"\x89PNG\r\n\x1a\nimage body", ".png"),
+        ("receipt.jpg", "image/jpeg", b"\xff\xd8\xffimage body", ".jpg"),
+        ("receipt.jpeg", "image/jpeg", b"\xff\xd8\xffimage body", ".jpg"),
+    ],
+)
+def test_upload_accepts_supported_image_documents(
+    async_session_factory_for_tests: async_sessionmaker[AsyncSession],
+    tmp_path: Path,
+    filename: str,
+    content_type: str,
+    content: bytes,
+    extension: str,
+) -> None:
+    async def scenario() -> None:
+        async with async_session_factory_for_tests() as session:
+            admin = await create_user(session, role=UserRole.ADMIN)
+
+            document = await upload_document(
+                session,
+                tmp_path,
+                current_user=admin,
+                content=content,
+                filename=filename,
+                content_type=content_type,
+            )
+
+            assert document.mime_type == content_type
+            assert document.original_filename == filename
+            assert document.storage_key.endswith(extension)
+            assert filename not in document.storage_key
+
+    run_async(scenario())

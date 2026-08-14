@@ -500,11 +500,11 @@ Implemented Docker controls:
 
 Known limitations after TASK-023:
 
-- No TLS or reverse proxy is configured.
+- The default development Compose stack does not terminate TLS. TASK-034 adds a production Nginx reverse proxy configuration; real certificates are mounted at runtime and are not committed.
 - No production secret manager is configured.
-- No container resource limits are configured.
+- TASK-034 production Compose defines CPU, memory, PID, restart, healthcheck, and log-size limits. Development Compose remains unchanged.
 - Local named volumes are not encrypted by the application layer.
-- The Docker stack is a local development stack, not a production deployment topology.
+- The default Docker stack remains local development. `compose.prod.yaml` is the production-oriented topology.
 
 ## TASK-025 MVP hardening security
 
@@ -533,8 +533,8 @@ Known limitations after TASK-025:
 - Uploaded files use local/shared storage; application-level storage encryption is not implemented.
 - Previously generated Assistant answers may remain in chat history after later permission changes.
 - Citation excerpts, chat messages, feedback reasons, chunk text, and selected plaintext fields remain plaintext in PostgreSQL.
-- No trusted-proxy configuration is implemented; forwarded host/IP headers are intentionally ignored.
-- No TLS termination, production secret manager, SIEM integration, container resource limits, Kubernetes, Terraform, or deployment automation is included.
+- Production Compose runs the API behind `reverse-proxy`, enables Uvicorn proxy-header handling for that isolated topology, and does not publish the API container port directly. TrustedHost validation remains configured by `TRUSTED_HOSTS`.
+- No real TLS certificates, cloud secret manager, SIEM integration, Kubernetes, Terraform, or CD automation is included. Certificates and secret rotation remain deployment-owner responsibilities.
 
 ## TASK-026 multi-LLM provider security
 
@@ -599,3 +599,107 @@ Known browser-token limitation: the current backend contract exposes bearer toke
 ### Frontend Dependency Advisory
 
 `npm audit --audit-level=high` currently reports a high advisory for `react-router` in the 7.12.0-8.2.0 range. The TASK-028 frontend uses React Router in SPA/browser mode only and does not use RSC mode, server actions, route actions, or SSR redirects. Downgrading to 7.11.0 was evaluated and exposed a broader set of React Router advisories, so the project remains pinned to `react-router-dom@7.18.2` until an upstream non-vulnerable release compatible with the SPA is available. Avoid enabling React Router RSC/action features without re-evaluating this advisory.
+
+## TASK-031 Web Search Security
+
+Web search is disabled by default and requires explicit backend configuration. External providers are blocked unless `WEB_SEARCH_ALLOW_EXTERNAL=true`.
+
+Security controls:
+
+- Only the current normalized user question is sent to a web provider; same-session conversation history and retrieved internal context are not sent externally.
+- Web result content is treated as untrusted data, not instructions.
+- Raw HTML is not sent to the LLM. Script, style, noscript, template, comments, hidden content, control characters, and excessive content are removed or bounded.
+- Web URLs must be normalized `http` or `https` URLs without credentials or fragments.
+- Localhost, private IP, link-local, multicast, reserved, unspecified, and `.local` hosts are rejected for web citation URLs.
+- HTTP providers use bounded timeout, bounded retry, no redirect following, safe user-agent configuration, and safe provider error mapping.
+- Provider API keys are `SecretStr` settings and must not be logged, returned, or committed.
+- The LLM cannot create trusted web citations. Web citation URLs and titles come only from backend provider results selected into the source registry.
+- Internal citation permission revalidation remains unchanged and applies only to `source_type=INTERNAL` citations.
+- Admin search-test endpoints are Admin-only and return normalized result metadata, not raw provider payloads.
+
+Known limitations:
+
+- TASK-031 does not fetch full webpages after search results. It normalizes provider result text/snippets only.
+- TASK-031 does not implement domain allowlists, denylist administration, or crawl-depth controls beyond single provider result handling.
+
+## TASK-032 Admin Monitoring Security
+
+Admin Monitoring endpoints are server-side Admin-only APIs under `/api/v1/admin`. They reuse the existing `require_admin` dependency, so role and active status are reloaded from PostgreSQL for each request and are not trusted from client-supplied fields.
+
+Security controls:
+
+- Monitoring responses are aggregate/status-only and do not return secrets, API keys, database URLs, Redis URLs, storage keys, passwords, authorization headers, access tokens, refresh tokens, prompt text, retrieved context, chat content, citation excerpts, feedback reasons, raw provider requests, raw provider responses, SQL details, or stack traces.
+- LLM and Web Search provider checks use existing provider manager configuration health and do not call external providers by default.
+- Embedding health validates configuration only and does not load the Sentence Transformers model.
+- Queue monitoring reads Redis broker queue length only and does not inspect task payload content.
+- Statistics count rows and group by safe enum fields only; they do not select plaintext business content columns.
+- Worker monitoring uses Celery inspect metadata and does not expose broker credentials.
+- OCR health uses the existing bounded Tesseract health check and returns only engine, version, and language metadata.
+
+Known limitations:
+
+- Admin monitoring endpoints require authenticated Admin access, so if PostgreSQL is fully unavailable the public `/health/ready` endpoint remains the unauthenticated readiness signal.
+- Queue lengths are Redis broker implementation details and are intended for local/operator diagnostics, not exact business analytics.
+- No metrics retention, alerting, tracing, dashboards, or advanced analytics are added in TASK-032.
+
+
+## TASK-033 Admin Analytics Security
+
+Admin Analytics endpoints are server-side Admin-only APIs under `/api/v1/admin/analytics` and `/api/v1/admin/reports/export`. They reuse the existing `require_admin` dependency, so role and active status are loaded from PostgreSQL for every request.
+
+Security controls:
+
+- Analytics responses are aggregate/report-only and do not return prompts, retrieved context, chat content, retrieval query text, citation excerpts, feedback reasons, storage keys, API keys, database URLs, Redis URLs, provider raw payloads, request bodies, stack traces, or secrets.
+- Top query reporting returns hashes and counts only. Raw user question text is not returned in JSON or CSV exports.
+- Feedback analytics aggregate ratings only and never select the public feedback report schema that includes `reason`.
+- Audit analytics aggregate actions and outcomes only. Audit metadata, IP address, user-agent, and target identifiers are not returned.
+- LLM token metrics use `input_tokens` and `output_tokens` field names to avoid exposing prompt text or prompt objects.
+- CSV and JSON exports use the same sanitized analytics payloads as the APIs. PDF export is rejected because no safe PDF report infrastructure exists.
+
+Known limitations:
+
+- Retrieval duration, per-message streaming usage, OCR duration, scanned-PDF OCR page attribution, and historical per-message provider/model attribution are not persisted and are reported as unavailable or partially inferred.
+- Top document analytics expose document titles to Admin users. They do not expose filenames, storage keys, chunk text, vectors, or citation excerpts.
+
+## TASK-034 Production Observability Security
+
+TASK-034 keeps the existing RBAC, citation validation, conversation memory, audit, feedback, Web Search, Streaming, and OCR security boundaries intact.
+
+Security controls:
+
+- `/metrics` returns Prometheus text and is not an Admin data API. It exposes only counters/gauges/status labels and does not return prompts, retrieved context, chat content, document text, OCR text, citation excerpts, feedback reasons, storage keys, API keys, Redis URLs, database URLs, passwords, tokens, request bodies, provider payloads, or SQL details.
+- Production Nginx blocks external `/metrics` by default. Prometheus scrapes the API on the private Docker backend network.
+- Request logs include request ID, method, route template, status code, latency, and trace-present boolean only. They do not log query strings, request bodies, response bodies, authorization headers, cookies, prompts, context, OCR text, citation excerpts, storage keys, or provider payloads.
+- Request IDs are accepted only when they match a bounded safe character set; invalid IDs are replaced server-side.
+- Trace hooks capture a valid W3C `traceparent` value into request context but do not export spans to a vendor backend in TASK-034.
+- `*_FILE` secret settings support Docker secret-style mounts without logging file paths or file contents in validation errors.
+- Production Compose publishes only the reverse proxy host port by default. API, PostgreSQL, Redis, Prometheus, and Grafana stay on the Docker backend network unless the operator explicitly changes the compose file.
+- The HTTPS example config is disabled and contains no real certificate. Real certificates, key rotation, and TLS policy are deployment-owner responsibilities.
+
+Known limitations:
+
+- TASK-034 does not add SIEM shipping, distributed tracing backend, alert rules, cloud backup, Kubernetes, Terraform, CD automation, WAF, malware scanning, or automatic data-retention deletion.
+- Metrics are in-process for HTTP request counters and reset on API restart. Runtime dependency metrics are point-in-time scrape values.
+
+## TASK-035 Security Review Freeze
+
+- Release version: v1.0.0-rc1.
+- TASK-035 reviewed RBAC, secrets, logging, metrics, prompts/context handling, citation payloads, uploads, storage, Docker hardening, reverse proxy behavior, and rate limiting.
+- Security scan, dependency audit, regression tests, production runtime validation, metrics non-disclosure checks, external `/metrics` blocking, `/docs` blocking in production, non-root container checks, and failure-path sanitization checks passed.
+- Known limitations remain documented: no malware scanning, no PII masking, no automatic chat/audit retention workflow, and sensitive business content can still exist in PostgreSQL by design.
+
+## TASK-034.1 Real LLM Acceptance Security
+
+Deterministic UAT and real LLM acceptance are separate security modes. The fake UAT provider may contain deterministic answer rules for regression, but it is not a real provider and must not be used to claim grounded answer quality.
+
+Local real LLM mode with Ollama or LM Studio keeps selected retrieved document context on the local machine when the provider runs locally. Docker containers must reach the host provider through `host.docker.internal` on Docker Desktop.
+
+External real LLM mode sends selected prompt messages and selected retrieved context to the configured provider. Operators must approve data residency, contractual, and compliance requirements before enabling external providers.
+
+TASK-034.1 logging and observability rules:
+
+- Do not log prompts, retrieved context, user questions, assistant answers, document text, citation excerpts, API keys, Authorization headers, or raw provider request/response bodies.
+- Metrics may record provider, model, latency, safe token counts, grounding status, retrieved chunk count, and citation count only.
+- Provider failure must return safe normalized errors with no partial Assistant message and no fake-answer fallback.
+
+The acceptance report may contain synthetic local test answers and excerpts. Do not use sensitive enterprise documents for TASK-034.1 acceptance artifacts.

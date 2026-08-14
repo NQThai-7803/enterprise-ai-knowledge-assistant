@@ -1,14 +1,16 @@
 # Document Processing Design
 
-## 1. MVP file type
+## 1. Supported file types
 
-- PDF có text.
+Current ingestion supports:
 
-OCR và các loại file khác thuộc giai đoạn mở rộng.
+- `application/pdf` (`.pdf`).
+- `image/png` (`.png`).
+- `image/jpeg` (`.jpg`, `.jpeg`).
 
-## 2. Processing states
+TASK-030 adds OCR for image documents and scanned/low-quality PDF pages through the asynchronous worker pipeline. Full TASK-030 completion is still blocked by Docker runtime verification.
 
-```text
+## 2. Processing states```text
 UPLOADED
 → PROCESSING
 → READY
@@ -239,3 +241,37 @@ TASK-014 persists chunk text and embeddings through the internal service. TASK-0
 - Citation rendering.
 
 The worker materializes bounded PDF bytes, generated chunks, and embedding vectors in memory during processing. Chunk text is persisted in PostgreSQL but is not returned through API responses, Celery results, or Redis messages.
+
+## 14. TASK-030 OCR and Document Image Understanding
+
+Recovery implementation status: In Progress until Docker/API/integration acceptance can be verified.
+
+Implemented OCR path:
+
+```text
+Upload PDF/PNG/JPEG
+    -> validate extension, MIME, and signature
+    -> save through FileStorage
+    -> enqueue documents.process_document
+    -> worker loads stored bytes and MIME metadata
+    -> ExtractionRouter
+       -> native PDF text when usable
+       -> Tesseract OCR for scanned/low-quality PDF pages
+       -> Tesseract OCR for standalone PNG/JPEG images
+    -> page-aware chunking
+    -> embeddings
+    -> document_chunks
+    -> READY or FAILED with sanitized error
+```
+
+OCR safety limits are controlled by `OCR_ENABLED`, `OCR_LANGUAGES`, `OCR_MAX_PAGES`, `OCR_RENDER_DPI`, `OCR_MAX_IMAGE_PIXELS`, `OCR_MAX_IMAGE_WIDTH`, `OCR_MAX_IMAGE_HEIGHT`, `OCR_PAGE_TIMEOUT_SECONDS`, `OCR_DOCUMENT_TIMEOUT_SECONDS`, `OCR_MAX_EXTRACTED_CHARACTERS`, and OCR text-quality thresholds.
+
+The OCR engine is Tesseract through `app.document_processing.ocr.tesseract_provider.TesseractOCRProvider`. The Docker runtime image installs English and Vietnamese language packs. The provider is lazy and subprocess based; it does not download models or call external services at import/startup.
+
+Page metadata includes page number, extraction method, source type, optional confidence, image width/height, and warnings. Retrieval and citation code continue to use existing chunk/page metadata and source-marker mapping; no Chat API, streaming, conversation memory, citation architecture, or database schema change was introduced.
+
+Known limitations until TASK-030 completion:
+
+- Docker runtime Tesseract, API, worker, Redis, Postgres, and migration verification is blocked by the local Docker Desktop daemon state.
+- OCR quality is best-effort plain text extraction; table reconstruction, handwriting understanding, layout analysis, and visual question answering are not implemented.
+- Host Tesseract is not required for unit tests and was not available on this machine; runtime OCR is expected inside the Docker image once Docker is healthy.

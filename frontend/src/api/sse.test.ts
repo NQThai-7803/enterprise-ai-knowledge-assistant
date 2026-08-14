@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { parseStreamEvent, SseParser, streamChatMessage } from "./sse";
+import { setStoredTokens } from "./tokenStore";
 
 describe("SseParser", () => {
   it("handles split chunks and parses event fields", () => {
@@ -57,6 +58,7 @@ describe("SseParser", () => {
 
 describe("streamChatMessage", () => {
   afterEach(() => {
+    sessionStorage.clear();
     vi.unstubAllGlobals();
   });
 
@@ -87,6 +89,78 @@ describe("streamChatMessage", () => {
     expect(events).toEqual(["message.completed"]);
   });
 
+
+  it("refreshes an expired token before the streaming POST without duplicating the message", async () => {
+    setStoredTokens({ accessToken: tokenWithExp(0), refreshToken: "refresh-token" });
+    const body = completedStreamBody();
+    const fetchMock = vi.fn(async (url: string | URL | Request) => {
+      const requestUrl = String(url);
+      if (requestUrl.includes("/auth/refresh")) {
+        return jsonResponse({
+          data: {
+            access_token: tokenWithExp(4_102_444_800),
+            refresh_token: "refresh-token-2",
+            token_type: "bearer",
+            expires_in: 3600,
+            user: authUser(),
+          },
+        });
+      }
+      return new Response(body, { status: 200, headers: { "Content-Type": "text/event-stream" } });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await streamChatMessage({
+      sessionId: "s1",
+      content: "Question",
+      signal: new AbortController().signal,
+      onEvent: () => undefined,
+    });
+
+    const chatCalls = fetchMock.mock.calls.filter(([url]) => String(url).includes("/messages/stream"));
+    expect(chatCalls).toHaveLength(1);
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/auth/refresh"))).toBe(true);
+    const [, init] = chatCalls[0] as unknown as [string, RequestInit];
+    expect((init.headers as Record<string, string>).Authorization).toBe(`Bearer ${tokenWithExp(4_102_444_800)}`);
+  });
+
+  it("retries a streaming POST once after a 401 refresh", async () => {
+    setStoredTokens({ accessToken: tokenWithExp(4_102_444_800), refreshToken: "refresh-token" });
+    const fetchMock = vi.fn(async (url: string | URL | Request) => {
+      const requestUrl = String(url);
+      const chatCallCount = fetchMock.mock.calls.filter(([calledUrl]) => String(calledUrl).includes("/messages/stream")).length;
+      if (requestUrl.includes("/messages/stream") && chatCallCount === 1) {
+        return jsonResponse({ error: { code: "TOKEN_EXPIRED", message: "Access token has expired." } }, 401);
+      }
+      if (requestUrl.includes("/auth/refresh")) {
+        return jsonResponse({
+          data: {
+            access_token: "fresh-token",
+            refresh_token: "refresh-token-2",
+            token_type: "bearer",
+            expires_in: 3600,
+            user: authUser(),
+          },
+        });
+      }
+      return new Response(completedStreamBody(), { status: 200, headers: { "Content-Type": "text/event-stream" } });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await streamChatMessage({
+      sessionId: "s1",
+      content: "Question",
+      signal: new AbortController().signal,
+      onEvent: () => undefined,
+    });
+
+    const chatCalls = fetchMock.mock.calls.filter(([url]) => String(url).includes("/messages/stream"));
+    expect(chatCalls).toHaveLength(2);
+    expect(fetchMock.mock.calls.filter(([url]) => String(url).includes("/auth/refresh"))).toHaveLength(1);
+    const [, retryInit] = chatCalls[1] as unknown as [string, RequestInit];
+    expect((retryInit.headers as Record<string, string>).Authorization).toBe("Bearer fresh-token");
+  });
+
   it("ignores events after the first terminal event", async () => {
     const body = new ReadableStream<Uint8Array>({
       start(controller) {
@@ -115,3 +189,36 @@ describe("streamChatMessage", () => {
     expect(events).toEqual(["message.completed"]);
   });
 });
+
+
+function completedStreamBody(): ReadableStream<Uint8Array> {
+  return new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode('event: message.completed\ndata: {"message_id":"m1","session_id":"s1","content":"Final","citations":[],"grounding_status":"ANSWERED","retrieved_chunk_count":1}\n\n'));
+      controller.close();
+    },
+  });
+}
+
+function jsonResponse(payload: unknown, status = 200): Response {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+function tokenWithExp(exp: number): string {
+  const payload = btoa(JSON.stringify({ exp })).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return `header.${payload}.signature`;
+}
+
+function authUser() {
+  return {
+    id: "u1",
+    email: "user@example.test",
+    full_name: "User Example",
+    role: "STAFF",
+    department_id: null,
+    is_active: true,
+  };
+}

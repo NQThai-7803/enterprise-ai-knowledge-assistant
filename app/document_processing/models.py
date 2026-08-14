@@ -10,8 +10,16 @@ class ExtractedPage:
     raw_character_count: int
     normalized_character_count: int
     usable_character_count: int
+    extraction_method: str = "native_pdf"
+    source_type: str = "pdf"
+    confidence: float | None = None
+    width: int | None = None
+    height: int | None = None
+    warnings: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
+        warnings = tuple(self.warnings)
+        object.__setattr__(self, "warnings", warnings)
         if self.page_number < 1:
             msg = "page_number must be 1-based."
             raise ValueError(msg)
@@ -28,6 +36,21 @@ class ExtractedPage:
             raise ValueError(msg)
         if self.usable_character_count > self.normalized_character_count:
             msg = "usable_character_count cannot exceed normalized_character_count."
+            raise ValueError(msg)
+        if not self.extraction_method.strip():
+            msg = "extraction_method must not be empty."
+            raise ValueError(msg)
+        if not self.source_type.strip():
+            msg = "source_type must not be empty."
+            raise ValueError(msg)
+        if self.confidence is not None and not 0.0 <= self.confidence <= 1.0:
+            msg = "confidence must be in [0, 1]."
+            raise ValueError(msg)
+        if self.width is not None and self.width <= 0:
+            msg = "width must be positive."
+            raise ValueError(msg)
+        if self.height is not None and self.height <= 0:
+            msg = "height must be positive."
             raise ValueError(msg)
 
 

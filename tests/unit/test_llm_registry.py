@@ -5,6 +5,7 @@ import pytest
 
 from app.core.config import Settings
 from app.llm.errors import LLMError, LLMFailureCode
+from app.llm.models import LLMMessage
 from app.llm.openai_compatible_provider import OpenAICompatibleLLMProvider
 from app.llm.registry import LLMProviderRegistry
 
@@ -86,6 +87,36 @@ def test_ollama_uses_compatible_adapter() -> None:
     assert isinstance(provider, OpenAICompatibleLLMProvider)
     assert provider.provider_name == "ollama"
     assert provider.base_url.endswith("/v1")
+
+
+@pytest.mark.anyio
+async def test_ollama_disables_reasoning_by_default_in_payload() -> None:
+    captured: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        captured["body"] = request.read().decode()
+        return httpx.Response(
+            200,
+            json={
+                "model": "qwen3:4b",
+                "choices": [{"message": {"content": "OK"}, "finish_reason": "stop"}],
+            },
+        )
+
+    provider = LLMProviderRegistry(
+        settings(llm_provider="ollama", llm_ollama_model="qwen3:4b"),
+        transport=httpx.MockTransport(handler),
+    ).create_provider()
+
+    await provider.generate(
+        messages=(LLMMessage(role="user", content="Say OK"),),
+        temperature=0.0,
+        max_output_tokens=16,
+    )
+
+    assert '"reasoning_effort":"none"' in captured["body"]
+    assert '"reasoning":{"effort":"none"}' in captured["body"]
+    assert "/no_think" in captured["body"]
 
 
 def test_lm_studio_uses_compatible_adapter() -> None:

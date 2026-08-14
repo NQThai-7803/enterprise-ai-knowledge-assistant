@@ -182,8 +182,9 @@ def test_default_llm_and_chat_answer_settings() -> None:
     assert settings.llm_temperature == 0.0
     assert settings.llm_max_output_tokens == 1024
     assert settings.llm_no_answer_sentinel == "__NO_ANSWER__"
-    assert settings.chat_retrieval_top_k == 8
+    assert settings.chat_retrieval_top_k == 10
     assert settings.chat_history_max_messages == 10
+    assert settings.chat_history_max_tokens == 1200
     assert settings.chat_context_max_tokens == 6000
     assert settings.chat_no_answer_message.strip()
 
@@ -231,6 +232,8 @@ def test_chat_answer_settings_validation() -> None:
     with pytest.raises(ValidationError):
         make_settings(chat_history_max_messages=-1)
     with pytest.raises(ValidationError):
+        make_settings(chat_history_max_tokens=-1)
+    with pytest.raises(ValidationError):
         make_settings(chat_context_max_tokens=0)
     with pytest.raises(ValidationError):
         make_settings(chat_no_answer_message="")
@@ -240,7 +243,7 @@ def test_default_citation_settings() -> None:
     settings = make_settings()
 
     assert settings.citation_excerpt_max_characters == 500
-    assert settings.citation_max_sources_per_answer == 8
+    assert settings.citation_max_sources_per_answer == 10
 
 
 def test_citation_settings_validation() -> None:
@@ -259,3 +262,91 @@ def test_llm_integer_settings_reject_boolean_values() -> None:
         make_settings(llm_max_retries=True)
     with pytest.raises(ValidationError):
         make_settings(chat_retrieval_top_k=True)
+    with pytest.raises(ValidationError):
+        make_settings(chat_history_max_tokens=True)
+
+
+def test_default_ocr_settings() -> None:
+    settings = make_settings()
+
+    assert settings.ocr_enabled is True
+    assert settings.ocr_languages == ["vie", "eng"]
+    assert settings.ocr_max_pages == 100
+    assert settings.ocr_render_dpi == 200
+    assert settings.ocr_max_image_pixels == 40_000_000
+    assert settings.ocr_page_timeout_seconds == 30
+    assert settings.ocr_document_timeout_seconds == 240
+    assert settings.ocr_max_extracted_characters == 2_000_000
+
+
+def test_ocr_languages_are_normalized_and_deduplicated() -> None:
+    settings = make_settings(ocr_languages=" ENG, vie,eng ")
+
+    assert settings.ocr_languages == ["eng", "vie"]
+
+
+def test_ocr_rejects_unsupported_language() -> None:
+    with pytest.raises(ValidationError):
+        make_settings(ocr_languages="eng,fra")
+
+
+def test_ocr_document_timeout_must_fit_worker_soft_time_limit() -> None:
+    with pytest.raises(ValidationError):
+        make_settings(ocr_document_timeout_seconds=30, celery_task_soft_time_limit_seconds=30)
+
+
+def test_ocr_dimension_and_pixel_limits_are_independent() -> None:
+    settings = make_settings(ocr_max_image_width=3, ocr_max_image_height=10)
+
+    assert settings.ocr_max_image_width == 3
+    assert settings.ocr_max_image_pixels == 40_000_000
+
+
+def test_ocr_integer_and_float_settings_reject_invalid_values() -> None:
+    with pytest.raises(ValidationError):
+        make_settings(ocr_max_pages=True)
+    with pytest.raises(ValidationError):
+        make_settings(ocr_native_text_min_alnum_ratio=nan)
+    with pytest.raises(ValidationError):
+        make_settings(ocr_max_replacement_character_ratio=inf)
+
+
+def test_default_web_search_settings() -> None:
+    settings = make_settings()
+
+    assert settings.web_search_enabled is False
+    assert settings.web_search_mode == "internal_only"
+    assert settings.web_search_provider == "mock"
+    assert settings.web_search_max_results == 3
+    assert settings.web_search_timeout_seconds == 5.0
+    assert settings.web_search_max_content_length == 2000
+    assert settings.web_search_allow_external is False
+    assert settings.web_search_user_agent.strip()
+
+
+def test_web_search_numeric_settings_validation() -> None:
+    with pytest.raises(ValidationError):
+        make_settings(web_search_max_results=0)
+    with pytest.raises(ValidationError):
+        make_settings(web_search_timeout_seconds=0)
+    with pytest.raises(ValidationError):
+        make_settings(web_search_max_content_length=0)
+    with pytest.raises(ValidationError):
+        make_settings(web_search_max_retries=-1)
+    with pytest.raises(ValidationError):
+        make_settings(web_search_retry_backoff_seconds=-0.1)
+    with pytest.raises(ValidationError):
+        make_settings(web_search_timeout_seconds=nan)
+
+
+def test_web_search_endpoint_urls_must_be_safe() -> None:
+    with pytest.raises(ValidationError):
+        make_settings(web_search_bing_endpoint="javascript:alert(1)")
+    with pytest.raises(ValidationError):
+        make_settings(web_search_google_endpoint="https://user:pass@example.com/search")
+
+
+def test_web_search_provider_names_are_normalized() -> None:
+    settings = make_settings(web_search_provider="DuckDuckGo")
+
+    assert settings.web_search_provider == "duckduckgo"

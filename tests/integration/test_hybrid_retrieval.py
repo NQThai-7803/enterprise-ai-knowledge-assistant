@@ -329,6 +329,92 @@ def test_hybrid_results_are_stable(
     run_async(scenario())
 
 
+def test_hybrid_vietnamese_keyword_fallback_promotes_leave_chunk_into_top_8(
+    async_session_factory_for_tests: async_sessionmaker[AsyncSession],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    async def scenario() -> None:
+        query = (
+            "Trong công việc điều kiện bình thường, mức nghỉ hằng năm hưởng nguyên lương "
+            "là bao nhiêu ngày?"
+        )
+        async with async_session_factory_for_tests() as session:
+            dept_a = await create_department(session, "hybrid-vn-leave-a")
+            dept_b = await create_department(session, "hybrid-vn-leave-b")
+            admin = await create_user(session, "hybrid-vn-leave-admin", role=UserRole.ADMIN)
+            staff_a = await create_user(
+                session,
+                "hybrid-vn-leave-staff-a",
+                department_id=dept_a.id,
+            )
+            for index in range(12):
+                document = await create_document(
+                    session,
+                    f"hybrid-vn-leave-semantic-{index}",
+                    uploader=admin,
+                    title=f"Giới thiệu về công ty {index}",
+                    access_scope=DocumentAccessScope.ORGANIZATION,
+                )
+                await create_chunk(
+                    session,
+                    f"hybrid-vn-leave-semantic-{index}",
+                    document=document,
+                    text=(
+                        "Giới thiệu về công ty Nova Digital, cơ cấu tổ chức, "
+                        "sản phẩm và phòng ban nội bộ."
+                    ),
+                    similarity=0.99 - (index * 0.01),
+                )
+            leave_document = await create_document(
+                session,
+                "hybrid-vn-leave-doc",
+                uploader=admin,
+                title="Chính sách nghỉ của người lao động",
+                access_scope=DocumentAccessScope.ORGANIZATION,
+            )
+            leave_chunk = await create_chunk(
+                session,
+                "hybrid-vn-leave-chunk",
+                document=leave_document,
+                text=(
+                    "Mức nghỉ hằng năm hưởng nguyên lương là 12 ngày. "
+                    "Áp dụng cho công việc trong điều kiện bình thường."
+                ),
+                similarity=0.80,
+            )
+            hidden_document = await create_document(
+                session,
+                "hybrid-vn-leave-hidden",
+                uploader=admin,
+                title=HIDDEN_MARKER,
+                access_scope=DocumentAccessScope.DEPARTMENT,
+                department_id=dept_b.id,
+            )
+            await create_chunk(
+                session,
+                "hybrid-vn-leave-hidden",
+                document=hidden_document,
+                text=(
+                    f"{HIDDEN_MARKER} Mức nghỉ hằng năm hưởng nguyên lương là 99 ngày. "
+                    "Áp dụng cho công việc trong điều kiện bình thường."
+                ),
+                similarity=1.0,
+            )
+        service = make_service(async_session_factory_for_tests, hybrid_retrieval_max_top_k=8)
+
+        result = await service.retrieve(query=query, current_user=staff_a, top_k=8)
+
+        matching_hits = [hit for hit in result.hits if hit.chunk_id == leave_chunk.id]
+        assert matching_hits
+        assert matching_hits[0].document_id == leave_document.id
+        assert "keyword" in matching_hits[0].matched_by
+        assert result.keyword_candidate_count > 0
+        assert hidden_document.id not in [hit.document_id for hit in result.hits]
+        assert_marker_absent(result.hits, HIDDEN_MARKER, caplog.text)
+
+    run_async(scenario())
+
+
 def test_hybrid_empty_channels_return_empty_result(
     async_session_factory_for_tests: async_sessionmaker[AsyncSession],
 ) -> None:

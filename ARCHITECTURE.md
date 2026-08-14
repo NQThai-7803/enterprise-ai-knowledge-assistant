@@ -1,19 +1,19 @@
 # System Architecture
 
-## 1. Kiáº¿n trÃºc tá»•ng thá»ƒ
+## 1. Kiến trúc tổng thể
 
 ```text
 Web Client
     |
     v
 FastAPI Application
-    â”œâ”€â”€ Auth Module
-    â”œâ”€â”€ User & Department Module
-    â”œâ”€â”€ Document Module
-    â”œâ”€â”€ Chat Module
-    â”œâ”€â”€ Retrieval Module
-    â”œâ”€â”€ Feedback Module
-    â””â”€â”€ Audit Module
+    ├── Auth Module
+    ├── User & Department Module
+    ├── Document Module
+    ├── Chat Module
+    ├── Retrieval Module
+    ├── Feedback Module
+    └── Audit Module
           |
           +--> PostgreSQL + pgvector
           +--> Redis
@@ -23,69 +23,69 @@ FastAPI Application
           +--> LLM Provider
 ```
 
-## 2. Kiáº¿n trÃºc backend
+## 2. Kiến trúc backend
 
 ```text
 app/
-â”œâ”€â”€ api/
-â”‚   â”œâ”€â”€ dependencies.py
-â”‚   â””â”€â”€ v1/
-â”‚       â”œâ”€â”€ auth.py
-â”‚       â”œâ”€â”€ users.py
-â”‚       â”œâ”€â”€ departments.py
-â”‚       â”œâ”€â”€ documents.py
-â”‚       â”œâ”€â”€ chat.py
-â”‚       â”œâ”€â”€ feedback.py
-â”‚       â””â”€â”€ audit_logs.py
-â”œâ”€â”€ core/
-â”‚   â”œâ”€â”€ config.py
-â”‚   â”œâ”€â”€ security.py
-â”‚   â”œâ”€â”€ logging.py
-â”‚   â””â”€â”€ exceptions.py
-â”œâ”€â”€ db/
-â”‚   â”œâ”€â”€ base.py
-â”‚   â”œâ”€â”€ session.py
-â”‚   â””â”€â”€ migrations/
-â”œâ”€â”€ models/
-â”œâ”€â”€ schemas/
-â”œâ”€â”€ repositories/
-â”œâ”€â”€ services/
-â”œâ”€â”€ rag/
-â”‚   â”œâ”€â”€ chunking.py
-â”‚   â”œâ”€â”€ embeddings.py
-â”‚   â”œâ”€â”€ retrieval.py
-â”‚   â”œâ”€â”€ reranking.py
-â”‚   â”œâ”€â”€ prompts.py
-â”‚   â””â”€â”€ citations.py
-â”œâ”€â”€ workers/
-â”‚   â”œâ”€â”€ celery_app.py
-â”‚   â””â”€â”€ document_tasks.py
-â”œâ”€â”€ storage/
-â”œâ”€â”€ tests/
-â””â”€â”€ main.py
+├── api/
+│   ├── dependencies.py
+│   └── v1/
+│       ├── auth.py
+│       ├── users.py
+│       ├── departments.py
+│       ├── documents.py
+│       ├── chat.py
+│       ├── feedback.py
+│       └── audit_logs.py
+├── core/
+│   ├── config.py
+│   ├── security.py
+│   ├── logging.py
+│   └── exceptions.py
+├── db/
+│   ├── base.py
+│   ├── session.py
+│   └── migrations/
+├── models/
+├── schemas/
+├── repositories/
+├── services/
+├── rag/
+│   ├── chunking.py
+│   ├── embeddings.py
+│   ├── retrieval.py
+│   ├── reranking.py
+│   ├── prompts.py
+│   └── citations.py
+├── workers/
+│   ├── celery_app.py
+│   └── document_tasks.py
+├── storage/
+├── tests/
+└── main.py
 ```
 
 ## 3. Layer responsibilities
 
 ### API layer
 
-- Nháº­n request.
-- Validate dá»¯ liá»‡u báº±ng schema.
-- Gá»i service.
-- Chuyá»ƒn exception thÃ nh HTTP response.
-- KhÃ´ng chá»©a truy váº¥n database phá»©c táº¡p.
+- Nhận request.
+- Validate dữ liệu bằng schema.
+- Gọi service.
+- Chuyển exception thành HTTP response.
+- Không chứa truy vấn database phức tạp.
 
 ### Service layer
 
-- Chá»©a business logic.
-- Äiá»u phá»‘i repository, storage, RAG vÃ  audit.
-- Quáº£n lÃ½ transaction khi cáº§n.
+- Chứa business logic.
+- Điều phối repository, storage, RAG và audit.
+- Quản lý transaction khi cần.
 
 ### Repository layer
 
-- Truy váº¥n database.
-- KhÃ´ng chá»©a logic HTTP.
-- Ãp dá»¥ng filter permission á»Ÿ query phÃ¹ há»£p.
+- Truy vấn database.
+- Không chứa logic HTTP.
+- Áp dụng filter permission ở query phù hợp.
 
 ### RAG layer
 
@@ -98,29 +98,29 @@ app/
 
 ### Worker layer
 
-- Xá»­ lÃ½ document báº¥t Ä‘á»“ng bá»™.
-- Retry cÃ³ kiá»ƒm soÃ¡t.
-- Cáº­p nháº­t tráº¡ng thÃ¡i vÃ  error message.
+- Xử lý document bất đồng bộ.
+- Retry có kiểm soát.
+- Cập nhật trạng thái và error message.
 
 ## 4. Dependency rules
 
 ```text
-API â†’ Service â†’ Repository â†’ Database
-               â†˜ RAG Provider
-               â†˜ Storage Provider
-               â†˜ Audit Service
+API → Service → Repository → Database
+               ↘ RAG Provider
+               ↘ Storage Provider
+               ↘ Audit Service
 ```
 
-KhÃ´ng cho phÃ©p:
+Không cho phép:
 
 - Model import router.
-- Repository gá»i HTTP response.
-- RAG module truy cáº­p global user mÃ  khÃ´ng truyá»n permission scope.
-- Router gá»i trá»±c tiáº¿p Celery hoáº·c database ngoÃ i service.
+- Repository gọi HTTP response.
+- RAG module truy cập global user mà không truyền permission scope.
+- Router gọi trực tiếp Celery hoặc database ngoài service.
 
 ## 5. Provider abstractions
 
-NÃªn táº¡o interface hoáº·c protocol cho:
+Nên tạo interface hoặc protocol cho:
 
 - `EmbeddingProvider`
 - `LLMProvider`
@@ -128,17 +128,17 @@ NÃªn táº¡o interface hoáº·c protocol cho:
 - `TextExtractor`
 - `Reranker`
 
-Má»¥c tiÃªu lÃ  cÃ³ thá»ƒ thay provider mÃ  khÃ´ng sá»­a toÃ n bá»™ há»‡ thá»‘ng.
+Mục tiêu là có thể thay provider mà không sửa toàn bộ hệ thống.
 
 ## 6. Async strategy
 
-- FastAPI endpoint dÃ¹ng async khi thao tÃ¡c I/O phÃ¹ há»£p.
-- Document processing cháº¡y báº±ng Celery worker.
-- KhÃ´ng gá»i OCR hoáº·c embedding hÃ ng loáº¡t trá»±c tiáº¿p trong request upload.
+- FastAPI endpoint dùng async khi thao tác I/O phù hợp.
+- Document processing chạy bằng Celery worker.
+- Không gọi OCR hoặc embedding hàng loạt trực tiếp trong request upload.
 
 ## 7. Error handling
 
-Error response thá»‘ng nháº¥t:
+Error response thống nhất:
 
 ```json
 {
@@ -345,7 +345,7 @@ Implemented grounded answer generation:
 ```text
 POST message
     -> owned-session lookup
-    -> recent visible history
+    -> ConversationContextBuilder same-session memory
     -> HybridRetrievalService
     -> context token budget
     -> grounded prompt
@@ -358,7 +358,7 @@ POST message
 - Retrieved context is treated as untrusted data and is not sent as a SYSTEM message.
 - Empty retrieval or empty context skips the LLM and returns the configured fixed no-answer.
 - USER and ASSISTANT messages are committed together after the answer is ready.
-- Prompt, retrieved chunks, embeddings, token usage internals, and retrieval scores are not exposed in public Chat responses.
+- Prompt, conversation prompt history, retrieved chunks, embeddings, token usage internals, and retrieval scores are not exposed in public Chat responses.
 
 ## 17. TASK-020 citation validation flow
 
@@ -572,3 +572,199 @@ Frontend layers:
 The chat route consumes TASK-027 SSE through `fetch` and `ReadableStream`, not `EventSource`, because the backend stream requires POST body and Authorization header. The UI reflects the backend `buffer_after_validation` strategy: it can show waiting/heartbeat state while retrieval, answer generation, grounding, and citation validation complete, then renders final validated content and citations.
 
 The frontend Docker image builds static assets and serves them from a small Node HTTP server as the non-root `node` user. Compose exposes this through the optional `frontend` profile and keeps browser API configuration public via `VITE_API_BASE_URL`.
+## TASK-029 Conversation Memory Architecture
+
+TASK-029 adds bounded same-session memory without adding long-term memory or schema state.
+
+```text
+Question
+    -> owned ChatSession lookup
+    -> ConversationContextBuilder
+       -> chat_messages for current owned session only
+       -> USER, ASSISTANT, internal SYSTEM roles
+       -> order by created_at ASC, id ASC
+       -> de-duplicate by message id
+       -> trim by CHAT_HISTORY_MAX_MESSAGES and CHAT_HISTORY_MAX_TOKENS
+       -> format conversation history
+       -> build bounded retrieval query
+    -> HybridRetrievalService
+    -> retrieved-context token budget
+    -> grounded prompt
+    -> LLMProvider
+    -> citation validation
+    -> atomic USER/ASSISTANT/citation/audit persistence
+```
+
+`app.chat.conversation_context_builder.ConversationContextBuilder` owns loading, trimming, token-budget accounting, retrieval-query construction, and prompt-history formatting. The Chat API and streaming service do not implement memory logic directly; both non-streaming and `/messages/stream` continue to call `GroundedAnswerService.answer_question()`.
+
+Conversation history is a prompt aid only. It can resolve references in the current question, but it does not replace Hybrid Retrieval, does not create citations, and does not authorize access to document content. The prompt order is SYSTEM policy, Conversation History, Retrieved Context, then Current Question. Citation validation still maps only backend-generated source markers from selected retrieved context.
+
+No migration, table, Redis cache, vector memory, summary memory, or LLM summarization was added. PostgreSQL continues to persist the normal chat message pair and citations; formatted prompts and formatted conversation history are not stored.
+## TASK-030 OCR Architecture
+
+TASK-030 extends document ingestion without changing the upload API contract, Chat API contract, streaming architecture, Conversation Memory, or citation architecture.
+
+```text
+Upload request
+    -> validate and store PDF/PNG/JPEG
+    -> enqueue document_id only
+    -> Celery worker
+    -> ExtractionRouter
+       -> PyMuPDF native PDF text
+       -> Tesseract OCR fallback for scanned/low-quality PDF pages
+       -> Tesseract OCR for standalone images
+    -> chunking, embeddings, pgvector
+    -> existing retrieval, grounding, and citation flow
+```
+
+OCR is not executed in the FastAPI upload request. It is bounded by document/page timeouts, page count, image dimensions, image pixels, extracted-character limits, and text-quality thresholds. Tesseract is invoked only by the OCR provider during worker processing or explicit provider health checks; no OCR model download or external service call occurs during import/startup.
+
+No migration was added for TASK-030 recovery. Existing `documents.mime_type`, `documents.storage_key`, and `document_chunks` page metadata are sufficient for the implemented PDF/PNG/JPEG OCR path.
+
+## TASK-031 Web Search Integration Architecture
+
+TASK-031 adds `app/web_search/` as a provider-backed subsystem beside retrieval and LLM providers. The Chat API contract remains unchanged.
+
+```text
+Question
+  -> same-session ConversationContextBuilder
+  -> internal HybridRetrievalService unless WEB_SEARCH_MODE=web_only
+  -> WebSearchIntentClassifier
+  -> WebSearchProviderManager / WebSearchProviderRegistry
+  -> WebSearchService normalize/dedupe/limit
+  -> selected internal + web context
+  -> grounded prompt
+  -> LLM provider
+  -> CitationValidationService
+  -> atomic chat/citation persistence
+```
+
+Provider boundaries:
+
+- `WebSearchProvider` is the protocol.
+- `WebSearchProviderRegistry` validates and lazily creates `mock`, `bing`, `duckduckgo`, or `google_custom_search` providers.
+- `WebSearchProviderManager` owns provider lifecycle in `app.state`, parallel to the LLM manager.
+- Real HTTP providers use bounded timeout, bounded retry, no redirects, safe error codes, and no raw request/response logging.
+- `WEB_SEARCH_ALLOW_EXTERNAL=false` blocks external provider calls.
+
+Citation boundaries:
+
+- `MessageCitation.source_type` distinguishes `INTERNAL` from `WEB`.
+- Internal citations retain `document_id`/`chunk_id` and permission revalidation.
+- Web citations require backend-sourced `source_url`/`source_title` and do not use internal document IDs.
+- The LLM can only cite backend source markers; it cannot create trusted URLs or document IDs.
+
+## TASK-032 Admin Monitoring Architecture
+
+TASK-032 adds a backend-only Admin monitoring layer without changing domain workflows.
+
+```text
+Admin request
+    -> /api/v1/admin/* router
+    -> require_admin RBAC dependency
+    -> AdminMonitoringService
+       |-- PostgreSQL aggregate counts and Alembic revision
+       |-- Redis ping and Celery broker queue length
+       |-- Celery inspect ping/stats for workers
+       |-- Tesseract OCR health check
+       |-- Embedding configuration health without model load
+       |-- LLMProviderManager configuration health without external call
+       |-- WebSearchProviderManager configuration health without external call
+       |-- Streaming route/configuration registration
+       `-- Conversation memory configuration
+```
+
+The service is read-only. It does not enqueue tasks, modify Celery routing, load the embedding model during health checks, call live LLM providers, call live Web Search providers, read prompts, read retrieved context, read chat content for monitoring responses, read citation excerpts, or expose secrets. OCR health runs the existing bounded Tesseract health probe only when OCR is enabled.
+
+Queue reporting reflects the existing Celery architecture: `documents` is the only document-processing queue. OCR and embedding run inside `documents.process_document`; retry uses Celery retry/backoff without a dedicated retry queue; no dead-letter queue is configured.
+
+No database migration is introduced for TASK-032 because all statistics use existing tables and the system version endpoint reads the existing Alembic metadata.
+
+
+## TASK-033 Analytics & Reporting Architecture
+
+TASK-033 adds a backend-only Admin analytics layer without changing Chat, Streaming, Conversation Memory, Citation, OCR, Web Search, Celery routing, or the database schema.
+
+```text
+Admin request
+    -> /api/v1/admin/analytics/* router
+    -> require_admin RBAC dependency
+    -> AdminAnalyticsService
+       |-- PostgreSQL time-window aggregates
+       |-- Chat message/session counts and token totals
+       |-- Citation source-type inference for internal/web/hybrid search usage
+       |-- Image-document OCR status inference
+       |-- LLM latency/token/failure aggregates from existing chat/audit rows
+       |-- Feedback rating aggregates without reasons
+       `-- Audit action/outcome category aggregates without metadata payloads
+```
+
+Analytics are read-only and use existing persisted rows. No `create_all()` call, migration, queue change, analytics worker, dashboard UI, charting layer, or frontend route is introduced.
+
+Data availability is explicit. Average response time and token usage are available from assistant messages. Retrieval duration, per-message streaming usage, OCR duration, exact scanned-PDF OCR page counts, and historical per-message LLM provider/model attribution are not persisted, so the API reports those metrics as unavailable or partially inferred rather than manufacturing values.
+
+Report export is implemented server-side for safe JSON and CSV payloads. PDF export is not implemented because the project has no existing PDF report infrastructure.
+
+## TASK-034 Production Deployment & Observability Architecture
+
+TASK-034 adds production deployment and observability without changing Chat, RAG, Citation, Conversation Memory, Streaming, OCR, Web Search, or Celery task routing.
+
+```text
+Client / load balancer
+    -> Nginx reverse-proxy container
+       |-- security headers
+       |-- request and upload limits
+       |-- X-Forwarded-* and X-Request-ID forwarding
+       `-- SSE buffering disabled for /messages/stream
+    -> FastAPI API container
+       -> RequestObservabilityMiddleware
+          |-- safe request ID context
+          |-- bounded route-template request metrics
+          |-- latency/status logging without bodies or queries
+       -> existing routers and services
+
+Prometheus profile
+    -> scrape api:8000/metrics on backend network
+    -> Grafana provisioning reads Prometheus datasource and dashboards
+```
+
+Production Compose is independent from development Compose. `compose.prod.yaml` defines PostgreSQL, Redis, one-shot migration, API, worker, reverse-proxy, and optional Prometheus/Grafana services with restart policy, healthchecks, json-file log rotation, CPU/RAM/PID limits, and `no-new-privileges:true` where supported.
+
+Metrics are Prometheus text format and are intentionally low-cardinality. HTTP labels use method, safe route template, and status code. Runtime gauges reuse `AdminMonitoringService` for API, PostgreSQL, Redis, worker, OCR, embedding, LLM, Web Search, streaming, conversation, providers, queues, version, and uptime. Metrics do not select prompts, retrieved context, document text, storage keys, citation excerpts, feedback reasons, API keys, Redis URLs, or database URLs.
+
+Secret-file support is implemented through `*_FILE` settings for JWT secret, database URL, Redis/Celery URLs, LLM provider keys, and Web Search provider keys. Secret-file validation errors are generic and never print file contents. The committed production env file is an example only.
+
+Backup and restore remain operator-run procedures. PostgreSQL backup uses `pg_dump` custom format and verifies with `pg_restore --list`; upload backup archives the uploads Docker volume and verifies with `tar tzf`. Restore helpers default to isolated check databases/volumes to avoid accidental production overwrite.
+
+## TASK-035 Architecture Freeze
+
+- Release version: v1.0.0-rc1.
+- TASK-035 made no architecture changes and added no new service, queue, storage backend, API surface, or database schema.
+- Final acceptance validated the existing FastAPI, PostgreSQL/pgvector, Redis, Celery worker, local storage, OCR, embedding, retrieval, LLM, Web Search, analytics, monitoring, metrics, backup/restore, and production reverse-proxy architecture.
+- Alembic head remains 20260803_0010.
+
+## TASK-034.1 Real LLM Grounded Runtime Acceptance Architecture
+
+TASK-034.1 does not add a new provider architecture. It uses the existing TASK-026 provider registry and the existing TASK-019/TASK-020 grounded-answer and citation contracts.
+
+```text
+Local real acceptance
+    -> Docker API/worker/PostgreSQL/Redis
+    -> uploaded unseen PDF artifacts
+    -> document processing to READY
+    -> permission-aware hybrid retrieval
+    -> strict grounded prompt
+    -> local real LLM provider through LLMProviderRegistry
+    -> citation validation and permission revalidation
+    -> atomic persistence only after validation
+```
+
+Provider mode separation:
+
+- `compose.uat.yaml` plus `fake-openai-provider.mjs` remains deterministic regression infrastructure only.
+- `LLM_PROVIDER=ollama` and `LLM_PROVIDER=lm_studio` reuse the OpenAI-compatible adapter and require no new service or database schema.
+- External providers are explicit deployment choices and can transfer selected prompt/context to the provider.
+
+Streaming keeps the existing `buffer_after_validation` strategy. No provider token stream is public before grounding, citation validation, permission revalidation, and persistence succeed.
+
+TASK-034.1 adds stricter prompt policy and an extra service invariant that `ANSWERED` results must carry validated citations. It still does not implement claim-level semantic entailment verification; manual claim verification is required for this acceptance track and automated claim-level verification is deferred to a later task.

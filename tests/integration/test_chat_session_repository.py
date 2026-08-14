@@ -183,6 +183,78 @@ def test_visible_messages_hide_system_and_internal_fields(
     run_async(scenario())
 
 
+def test_memory_messages_include_internal_system_and_filter_owned_session(
+    async_session_factory_for_tests: async_sessionmaker[AsyncSession],
+) -> None:
+    async def scenario() -> None:
+        async with async_session_factory_for_tests() as session:
+            owner = await create_user(session)
+            other = await create_user(session)
+            chat = await create_chat_session(session, user=owner)
+            other_owned_chat = await create_chat_session(session, user=owner)
+            other_user_chat = await create_chat_session(session, user=other)
+            base = datetime(2026, 1, 1, tzinfo=UTC)
+            system_message = await create_message(
+                session,
+                chat_session=chat,
+                role=ChatMessageRole.SYSTEM,
+                content="Internal system memory",
+                created_at=base,
+            )
+            user_message = await create_message(
+                session,
+                chat_session=chat,
+                role=ChatMessageRole.USER,
+                content="User memory",
+                created_at=base + timedelta(seconds=1),
+            )
+            assistant_message = await create_message(
+                session,
+                chat_session=chat,
+                role=ChatMessageRole.ASSISTANT,
+                content="Assistant memory",
+                created_at=base + timedelta(seconds=2),
+            )
+            await create_message(
+                session,
+                chat_session=other_owned_chat,
+                role=ChatMessageRole.USER,
+                content="Other owned session memory",
+                created_at=base + timedelta(seconds=3),
+            )
+            await create_message(
+                session,
+                chat_session=other_user_chat,
+                role=ChatMessageRole.USER,
+                content="Other user memory",
+                created_at=base + timedelta(seconds=4),
+            )
+
+            rows = await chat_message_repository.list_owned_messages_for_memory(
+                session,
+                session_id=chat.id,
+                owner_user_id=owner.id,
+            )
+
+            assert [row.id for row in rows] == [
+                system_message.id,
+                user_message.id,
+                assistant_message.id,
+            ]
+            assert [row.role for row in rows] == [
+                ChatMessageRole.SYSTEM,
+                ChatMessageRole.USER,
+                ChatMessageRole.ASSISTANT,
+            ]
+            assert [row.content for row in rows] == [
+                "Internal system memory",
+                "User memory",
+                "Assistant memory",
+            ]
+
+    run_async(scenario())
+
+
 def test_append_message_updates_session_updated_at_same_transaction(
     async_session_factory_for_tests: async_sessionmaker[AsyncSession],
 ) -> None:

@@ -1,5 +1,6 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 
 from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
@@ -7,6 +8,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.api.routes.health import router as health_router
+from app.api.routes.metrics import router as metrics_router
+from app.api.v1.admin import router as admin_router
+from app.api.v1.admin_analytics import router as admin_analytics_router
 from app.api.v1.audit_logs import router as audit_logs_router
 from app.api.v1.auth import router as auth_router
 from app.api.v1.chat import router as chat_router
@@ -14,6 +18,7 @@ from app.api.v1.departments import router as departments_router
 from app.api.v1.documents import router as documents_router
 from app.api.v1.feedback import router as feedback_router
 from app.api.v1.users import router as users_router
+from app.api.v1.web_search import router as web_search_router
 from app.core.config import Settings, get_settings
 from app.core.exceptions import (
     ApplicationError,
@@ -22,9 +27,14 @@ from app.core.exceptions import (
     unhandled_exception_handler,
 )
 from app.core.logging import configure_logging_redaction
-from app.core.middleware import RequestSizeLimitMiddleware, SecurityHeadersMiddleware
+from app.core.middleware import (
+    RequestObservabilityMiddleware,
+    RequestSizeLimitMiddleware,
+    SecurityHeadersMiddleware,
+)
 from app.db.session import dispose_database_engine
 from app.llm.manager import LLMProviderManager
+from app.web_search.manager import WebSearchProviderManager
 
 
 @asynccontextmanager
@@ -35,6 +45,13 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         llm_provider_manager = getattr(application.state, "llm_provider_manager", None)
         if llm_provider_manager is not None:
             await llm_provider_manager.aclose()
+        web_search_provider_manager = getattr(
+            application.state,
+            "web_search_provider_manager",
+            None,
+        )
+        if web_search_provider_manager is not None:
+            await web_search_provider_manager.aclose()
         await dispose_database_engine()
 
 
@@ -49,7 +66,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         redoc_url="/redoc" if settings.api_docs_enabled else None,
         openapi_url="/openapi.json" if settings.api_docs_enabled else None,
     )
+    application.state.settings = settings
     application.state.llm_provider_manager = LLMProviderManager(settings)
+    application.state.web_search_provider_manager = WebSearchProviderManager(settings)
+    application.state.started_at = datetime.now(UTC)
     application.add_middleware(
         RequestSizeLimitMiddleware,
         max_body_bytes=settings.max_request_body_bytes,
@@ -63,10 +83,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     application.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.trusted_hosts)
     application.add_middleware(SecurityHeadersMiddleware, settings=settings)
+    application.add_middleware(RequestObservabilityMiddleware, settings=settings)
     application.add_exception_handler(ApplicationError, application_error_handler)
     application.add_exception_handler(RequestValidationError, request_validation_error_handler)
     application.add_exception_handler(Exception, unhandled_exception_handler)
     application.include_router(health_router)
+    application.include_router(metrics_router)
+    application.include_router(admin_router, prefix=settings.api_v1_prefix)
+    application.include_router(admin_analytics_router, prefix=settings.api_v1_prefix)
     application.include_router(auth_router, prefix=settings.api_v1_prefix)
     application.include_router(audit_logs_router, prefix=settings.api_v1_prefix)
     application.include_router(chat_router, prefix=settings.api_v1_prefix)
@@ -74,6 +98,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.include_router(departments_router, prefix=settings.api_v1_prefix)
     application.include_router(documents_router, prefix=settings.api_v1_prefix)
     application.include_router(feedback_router, prefix=settings.api_v1_prefix)
+    application.include_router(web_search_router, prefix=settings.api_v1_prefix)
     return application
 
 

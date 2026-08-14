@@ -7,7 +7,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.config import Settings, get_settings
@@ -268,6 +268,10 @@ async def _upsert_user(
     normalized_email = email.strip().lower()
     user = await session.scalar(select(User).where(User.email == normalized_email))
     if user is None:
+        user = await session.scalar(
+            select(User).where(func.lower(User.email) == normalized_email).limit(1)
+        )
+    if user is None:
         user = User(
             email=normalized_email,
             full_name=full_name,
@@ -278,6 +282,7 @@ async def _upsert_user(
         )
         session.add(user)
     else:
+        user.email = normalized_email
         user.full_name = full_name
         user.hashed_password = hash_password(password)
         user.role = role
@@ -444,9 +449,8 @@ async def _upsert_feedback_fixture(
         select(ChatMessage).where(
             ChatMessage.session_id == chat_session.id,
             ChatMessage.role == ChatMessageRole.ASSISTANT,
-            ChatMessage.content == (
-                "Seeded UAT answer for feedback reporting with validated source [SOURCE_1]."
-            ),
+            ChatMessage.content
+            == ("Seeded UAT answer for feedback reporting with validated source [SOURCE_1]."),
         )
     )
     if assistant_message is None:
@@ -522,7 +526,8 @@ endobj
 << /Type /Pages /Kids [3 0 R] /Count 1 >>
 endobj
 3 0 obj
-<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792]
+/Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>
 endobj
 4 0 obj
 << /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
@@ -550,7 +555,7 @@ trailer
 startxref
 430
 %%EOF
-""".encode("utf-8")
+""".encode()
 
 
 async def run_seed_command() -> int:
