@@ -73,7 +73,51 @@ async def list_chat_sessions(
     )
 
 
-@router.get("/sessions/{session_id}", response_model=DataResponse[ChatSessionDetail])
+# @router.get("/sessions/{session_id}", response_model=DataResponse[ChatSessionDetail])
+# @router.delete(
+#     "/sessions/{session_id}",
+#     status_code=status.HTTP_204_NO_CONTENT,
+#     response_model=None,
+# )
+# async def delete_chat_session(
+#     session_id: UUID,
+#     current_user: Annotated[User, Depends(get_current_user)],
+#     session: Annotated[AsyncSession, Depends(get_db_session)],
+#     audit_context: Annotated[AuditContext, Depends(get_audit_context)],
+# ) -> None:
+#     await ChatSessionService(session).delete_session(
+#         session_id=session_id,
+#         current_user=current_user,
+#         audit_context=audit_context,
+#     )
+# async def read_chat_session(
+#     session_id: UUID,
+#     current_user: Annotated[User, Depends(get_current_user)],
+#     session: Annotated[AsyncSession, Depends(get_db_session)],
+#     message_page: Annotated[int, Query(ge=1)] = DEFAULT_PAGE,
+#     message_page_size: Annotated[int | None, Query(ge=1)] = None,
+# ) -> DataResponse[ChatSessionDetail]:
+#     detail = await ChatSessionService(session).get_session_detail(
+#         session_id=session_id,
+#         current_user=current_user,
+#         message_page=message_page,
+#         message_page_size=message_page_size,
+#     )
+#     return DataResponse[ChatSessionDetail](
+#         data=ChatSessionDetail.from_parts(
+#             chat_session=detail.chat_session,
+#             messages=detail.messages,
+#             citations_by_message_id=detail.citations_by_message_id,
+#             message_pagination=detail.message_pagination,
+#         ),
+#         meta=None,
+#     )
+
+
+@router.get(
+    "/sessions/{session_id}",
+    response_model=DataResponse[ChatSessionDetail],
+)
 async def read_chat_session(
     session_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
@@ -87,6 +131,7 @@ async def read_chat_session(
         message_page=message_page,
         message_page_size=message_page_size,
     )
+
     return DataResponse[ChatSessionDetail](
         data=ChatSessionDetail.from_parts(
             chat_session=detail.chat_session,
@@ -95,6 +140,23 @@ async def read_chat_session(
             message_pagination=detail.message_pagination,
         ),
         meta=None,
+    )
+
+
+@router.delete(
+    "/sessions/{session_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_chat_session(
+    session_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    audit_context: Annotated[AuditContext, Depends(get_audit_context)],
+) -> None:
+    await ChatSessionService(session).delete_session(
+        session_id=session_id,
+        current_user=current_user,
+        audit_context=audit_context,
     )
 
 

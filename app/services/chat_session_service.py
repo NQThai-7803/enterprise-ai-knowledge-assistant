@@ -178,6 +178,56 @@ class ChatSessionService:
             ),
         )
 
+    async def delete_session(
+        self,
+        *,
+        session_id: UUID,
+        current_user: User,
+        audit_context: AuditContext | None = None,
+    ) -> None:
+        try:
+            chat_session = await self.session_repository.get_owned_by_id_for_update(
+                self.session,
+                session_id=session_id,
+                owner_user_id=current_user.id,
+            )
+
+            if chat_session is None:
+                raise ChatSessionNotFoundError()
+
+            deleted_session_id = chat_session.id
+
+            await self.session_repository.delete(
+                self.session,
+                chat_session=chat_session,
+            )
+
+            await self.session.flush()
+
+            await AuditService(
+                self.session,
+                settings=self.settings,
+            ).record_success(
+                actor_user_id=current_user.id,
+                event_type=AuditEventType.CHAT_SESSION_DELETED,
+                target_type=AuditTargetType.CHAT_SESSION,
+                target_id=deleted_session_id,
+                context=audit_context,
+                metadata={},
+            )
+
+            await self.session.commit()
+
+        except ApplicationError:
+            await self.session.rollback()
+            raise
+        except IntegrityError as exc:
+            await self.session.rollback()
+            raise InternalServerError() from exc
+        except Exception as exc:
+            await self.session.rollback()
+            raise InternalServerError() from exc
+
 
 def normalize_chat_session_title(title: str | None, *, max_characters: int) -> str | None:
     if title is None:

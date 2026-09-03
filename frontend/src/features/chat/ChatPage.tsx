@@ -1,10 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bot, Plus, Send, Square, ThumbsDown, ThumbsUp, UserRound } from "lucide-react";
+import {Bot, Plus, Send, Square, ThumbsDown, ThumbsUp, Trash2, UserRound,} from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { apiClient } from "../../api/client";
 import { ApiError, safeErrorMessage } from "../../api/errors";
 import { streamChatMessage } from "../../api/sse";
-import type { ChatMessage, Citation } from "../../api/types";
+import type {ChatMessage, ChatSessionSummary, Citation, ListResponse,} from "../../api/types";
 import { useToast } from "../../components/feedback/ToastProvider";
 import { PageHeader } from "../../components/layout/PageHeader";
 import { ShimmerText } from "../../components/motion/ShimmerText";
@@ -15,12 +15,12 @@ import { TextArea } from "../../components/ui/Field";
 import { Panel } from "../../components/ui/Panel";
 import { EmptyState, ErrorState, LoadingState } from "../../components/ui/State";
 import { formatDateTime } from "../../lib/format";
-import {
-  applyChatStreamEvent,
-  cancelChatStreamState,
-  connectingChatStreamState,
-  initialChatStreamState,
-} from "./streamState";
+import {applyChatStreamEvent, cancelChatStreamState, connectingChatStreamState, initialChatStreamState,} from "./streamState";
+
+type ConversationCitation = Citation & {
+  globalOrder: number;
+  messageId: string | null;
+};
 
 export function ChatPage() {
   const queryClient = useQueryClient();
@@ -30,10 +30,20 @@ export function ChatPage() {
   const [pendingUserMessage, setPendingUserMessage] = useState<string | null>(null);
   const [streamState, setStreamState] = useState(initialChatStreamState);
   const abortRef = useRef<AbortController | null>(null);
+  const messagesContainerRef = useRef<HTMLDivElement | null>(null);
+  const [autoFollowConversation, setAutoFollowConversation] = useState(true);
+  const citationHighlightTimerRef = useRef<number | null>(null);
+  const [highlightedCitation, setHighlightedCitation] = useState<number | null>(
+    null,
+  );
 
   useEffect(() => {
     return () => {
       abortRef.current?.abort();
+
+      if (citationHighlightTimerRef.current !== null) {
+        window.clearTimeout(citationHighlightTimerRef.current);
+      }
     };
   }, []);
 
@@ -45,10 +55,26 @@ export function ChatPage() {
   const sessions = sessionsQuery.data?.data ?? [];
   const selectedSessionId = activeSessionId ?? sessions[0]?.id ?? null;
 
+
+
   const sessionQuery = useQuery({
     queryKey: ["chat", "session", selectedSessionId],
-    queryFn: () => apiClient.chat.session(selectedSessionId as string, { message_page: 1, message_page_size: 100 }),
+    queryFn: () =>
+      apiClient.chat.session(selectedSessionId as string, {
+        message_page: 1,
+        message_page_size: 100,
+      }),
     enabled: Boolean(selectedSessionId),
+    retry: (failureCount, error) => {
+      if (
+        error instanceof ApiError &&
+        error.code === "CHAT_SESSION_NOT_FOUND"
+      ) {
+        return false;
+      }
+
+      return failureCount < 2;
+    },
   });
 
   const createSessionMutation = useMutation({
@@ -66,19 +92,261 @@ export function ChatPage() {
     onError: (error) => pushToast({ tone: "error", title: "Feedback failed", message: safeErrorMessage(error) }),
   });
 
-  const activeCitations = useMemo<Citation[]>(() => {
-    if (streamState.completed?.citations.length) {
-      return streamState.completed.citations;
-    }
-    const messages = sessionQuery.data?.data.messages ?? [];
-    return [...messages].reverse().find((message) => message.role === "ASSISTANT" && message.citations.length > 0)?.citations ?? [];
-  }, [sessionQuery.data?.data.messages, streamState.completed?.citations]);
+  const deleteSessionMutation = useMutation({
+    mutationFn: (sessionId: string) =>
+      apiClient.chat.deleteSession(sessionId),
 
+    onSuccess: async (_, deletedSessionId) => {
+      queryClient.setQueryData<ListResponse<ChatSessionSummary>>(
+        ["chat", "sessions"],
+        (current) => {
+          if (!current) {
+            return current;
+          }
+
+          const nextData = current.data.filter(
+            (session) => session.id !== deletedSessionId,
+          );
+
+          const nextTotal = Math.max(0, current.meta.total - 1);
+
+          return {
+            ...current,
+            data: nextData,
+            meta: {
+              ...current.meta,
+              total: nextTotal,
+              total_pages:
+                nextTotal === 0
+                  ? 0
+                  : Math.ceil(nextTotal / current.meta.page_size),
+            },
+          };
+        },
+      );
+
+      queryClient.removeQueries({
+        queryKey: ["chat", "session", deletedSessionId],
+        exact: true,
+      });
+
+      if (selectedSessionId === deletedSessionId) {
+        setActiveSessionId(null);
+        setPendingUserMessage(null);
+        setStreamState(initialChatStreamState);
+        setAutoFollowConversation(true);
+      }
+
+      pushToast({
+        tone: "success",
+        title: "Conversation deleted",
+      });
+
+      await queryClient.invalidateQueries({
+        queryKey: ["chat", "sessions"],
+      });
+    },
+
+    onError: (error, deletedSessionId) => {
+      if (
+        error instanceof ApiError &&
+        error.code === "CHAT_SESSION_NOT_FOUND"
+      ) {
+        queryClient.setQueryData<ListResponse<ChatSessionSummary>>(
+          ["chat", "sessions"],
+          (current) => {
+            if (!current) {
+              return current;
+            }
+
+            const nextData = current.data.filter(
+              (session) => session.id !== deletedSessionId,
+            );
+
+            const removed =
+              nextData.length !== current.data.length;
+
+            if (!removed) {
+              return current;
+            }
+
+            const nextTotal = Math.max(
+              0,
+              current.meta.total - 1,
+            );
+
+            return {
+              ...current,
+              data: nextData,
+              meta: {
+                ...current.meta,
+                total: nextTotal,
+                total_pages:
+                  nextTotal === 0
+                    ? 0
+                    : Math.ceil(
+                        nextTotal / current.meta.page_size,
+                      ),
+              },
+            };
+          },
+        );
+
+        queryClient.removeQueries({
+          queryKey: ["chat", "session", deletedSessionId],
+          exact: true,
+        });
+
+        if (
+          activeSessionId === deletedSessionId ||
+          selectedSessionId === deletedSessionId
+        ) {
+          setActiveSessionId(null);
+          setPendingUserMessage(null);
+          setStreamState(initialChatStreamState);
+          setAutoFollowConversation(true);
+        }
+
+        pushToast({
+          tone: "info",
+          title: "Conversation already removed",
+        });
+
+        void queryClient.invalidateQueries({
+          queryKey: ["chat", "sessions"],
+        });
+
+        return;
+      }
+
+      pushToast({
+        tone: "error",
+        title: "Delete failed",
+        message: safeErrorMessage(error),
+      });
+    },
+  });
+
+  
+  const messages = sessionQuery.data?.data.messages ?? [];
+
+  const focusCitation = (globalOrder: number) => {
+    setHighlightedCitation(globalOrder);
+
+    window.requestAnimationFrame(() => {
+      document
+        .getElementById(`citation-${globalOrder}`)
+        ?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+    });
+
+    if (citationHighlightTimerRef.current !== null) {
+      window.clearTimeout(citationHighlightTimerRef.current);
+    }
+
+    citationHighlightTimerRef.current = window.setTimeout(() => {
+      setHighlightedCitation((current) =>
+        current === globalOrder ? null : current,
+      );
+
+      citationHighlightTimerRef.current = null;
+    }, 1400);
+  };
+
+  const citationView = useMemo(() => {
+    const items: ConversationCitation[] = [];
+    const byMessage = new Map<string, Map<number, number>>();
+    const streamMap = new Map<number, number>();
+
+    let nextGlobalOrder = 1;
+
+    for (const message of messages) {
+      if (
+        message.role !== "ASSISTANT" ||
+        message.citations.length === 0
+      ) {
+        continue;
+      }
+
+      const localMap = new Map<number, number>();
+
+      const orderedCitations = [...message.citations].sort(
+        (left, right) =>
+          left.citation_order - right.citation_order,
+      );
+
+      for (const citation of orderedCitations) {
+        const globalOrder = nextGlobalOrder++;
+
+        localMap.set(
+          citation.citation_order,
+          globalOrder,
+        );
+
+        items.push({
+          ...citation,
+          globalOrder,
+          messageId: message.id,
+        });
+      }
+
+      byMessage.set(message.id, localMap);
+    }
+
+    const completedMessageId =
+      streamState.completed?.message_id ?? null;
+
+    const streamAlreadyInHistory =
+      completedMessageId !== null &&
+      messages.some(
+        (message) => message.id === completedMessageId,
+      );
+
+    if (
+      !streamAlreadyInHistory &&
+      streamState.citations.length > 0
+    ) {
+      const orderedStreamCitations = [
+        ...streamState.citations,
+      ].sort(
+        (left, right) =>
+          left.citation_order - right.citation_order,
+      );
+
+      for (const citation of orderedStreamCitations) {
+        const globalOrder = nextGlobalOrder++;
+
+        streamMap.set(
+          citation.citation_order,
+          globalOrder,
+        );
+
+        items.push({
+          ...citation,
+          globalOrder,
+          messageId: completedMessageId,
+        });
+      }
+    }
+
+    return {
+      items,
+      byMessage,
+      streamMap,
+    };
+  }, [
+    messages,
+    streamState.citations,
+    streamState.completed?.message_id,
+  ]);
   const startNewSession = async () => {
     const response = await createSessionMutation.mutateAsync("New chat");
     setActiveSessionId(response.data.id);
     setStreamState(initialChatStreamState);
     setPendingUserMessage(null);
+    setAutoFollowConversation(true);
   };
 
   const sendMessage = async () => {
@@ -88,6 +356,7 @@ export function ChatPage() {
     }
 
     setDraft("");
+    setAutoFollowConversation(true);
     setPendingUserMessage(content);
     setStreamState(connectingChatStreamState());
 
@@ -138,8 +407,98 @@ export function ChatPage() {
     setStreamState((current) => cancelChatStreamState(current));
   };
 
-  const messages = sessionQuery.data?.data.messages ?? [];
   const streamingActive = ["connecting", "started", "receiving"].includes(streamState.status);
+  const sessionNotFound =
+    (sessionQuery.error instanceof ApiError &&
+      sessionQuery.error.code === "CHAT_SESSION_NOT_FOUND") ||
+    streamState.error?.code === "CHAT_SESSION_NOT_FOUND";
+
+  useEffect(() => {
+    if (!selectedSessionId || !sessionNotFound) {
+      return;
+    }
+
+    const staleSessionId = selectedSessionId;
+
+    queryClient.setQueryData<ListResponse<ChatSessionSummary>>(
+      ["chat", "sessions"],
+      (current) => {
+        if (!current) {
+          return current;
+        }
+
+        const nextData = current.data.filter(
+          (session) => session.id !== staleSessionId,
+        );
+
+        if (nextData.length === current.data.length) {
+          return current;
+        }
+
+        const nextTotal = Math.max(0, current.meta.total - 1);
+
+        return {
+          ...current,
+          data: nextData,
+          meta: {
+            ...current.meta,
+            total: nextTotal,
+            total_pages:
+              nextTotal === 0
+                ? 0
+                : Math.ceil(nextTotal / current.meta.page_size),
+          },
+        };
+      },
+    );
+
+    queryClient.removeQueries({
+      queryKey: ["chat", "session", staleSessionId],
+      exact: true,
+    });
+
+    setActiveSessionId((current) =>
+      current === staleSessionId ? null : current,
+    );
+
+    setPendingUserMessage(null);
+    setStreamState(initialChatStreamState);
+    setAutoFollowConversation(true);
+
+    void queryClient.invalidateQueries({
+      queryKey: ["chat", "sessions"],
+    });
+  }, [
+    queryClient,
+    selectedSessionId,
+    sessionNotFound,
+  ]);
+
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+
+    if (!container || !autoFollowConversation) {
+      return;
+    }
+
+    const frameId = window.requestAnimationFrame(() => {
+      container.scrollTo({
+        top: container.scrollHeight,
+        behavior: "auto",
+      });
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+    };
+  }, [
+    autoFollowConversation,
+    messages.length,
+    pendingUserMessage,
+    selectedSessionId,
+    streamState.content,
+    streamState.status,
+  ]);
 
   return (
     <div>
@@ -155,34 +514,81 @@ export function ChatPage() {
 
       <div className="grid gap-4 xl:grid-cols-[18rem_minmax(0,1fr)_22rem]">
         <Panel className="min-h-[28rem] overflow-hidden">
-          <div className="border-b border-border px-4 py-3">
+          <div className="shrink-0 border-b border-border px-4 py-3">
             <h3 className="text-sm font-semibold">Sessions</h3>
           </div>
           <div className="app-scrollbar max-h-[calc(100dvh-13rem)] overflow-y-auto p-2">
             {sessionsQuery.isLoading ? <LoadingState label="Loading sessions" /> : null}
             {sessionsQuery.isError ? <ErrorState message={safeErrorMessage(sessionsQuery.error)} onRetry={() => void sessionsQuery.refetch()} /> : null}
             {!sessionsQuery.isLoading && sessions.length === 0 ? <EmptyState title="No chat sessions" /> : null}
-            {sessions.map((session) => (
-              <button
-                key={session.id}
-                type="button"
-                className={`mb-2 w-full rounded-token border px-3 py-2 text-left text-sm transition ${selectedSessionId === session.id ? "border-accent bg-accent/10" : "border-border bg-surface hover:bg-elevated"}`}
-                onClick={() => {
-                  setActiveSessionId(session.id);
-                  setStreamState(initialChatStreamState);
-                  setPendingUserMessage(null);
-                }}
-              >
-                <span className="block truncate font-semibold text-ink">{session.title ?? "Untitled chat"}</span>
-                <span className="mt-1 block text-xs text-muted">{session.message_count} messages</span>
-              </button>
-            ))}
+            {sessions.map((session) => {
+              const isSelected = selectedSessionId === session.id;
+
+              const deleteDisabled =
+                deleteSessionMutation.isPending ||
+                (streamingActive && isSelected);
+
+              return (
+                <div
+                  key={session.id}
+                  className={`mb-2 flex w-full items-stretch overflow-hidden rounded-token border text-sm transition ${
+                    isSelected
+                      ? "border-accent bg-accent/10"
+                      : "border-border bg-surface"
+                  }`}
+                >
+                  <button
+                    type="button"
+                    className="min-w-0 flex-1 px-3 py-2 text-left transition hover:bg-elevated/70"
+                    onClick={() => {
+                      setActiveSessionId(session.id);
+                      setStreamState(initialChatStreamState);
+                      setPendingUserMessage(null);
+                      setAutoFollowConversation(true);
+                    }}
+                  >
+                    <span className="block truncate font-semibold text-ink">
+                      {session.title ?? "Untitled chat"}
+                    </span>
+
+                    <span className="mt-1 block text-xs text-muted">
+                      {session.message_count} messages
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="flex w-10 shrink-0 items-center justify-center border-l border-border text-muted transition hover:bg-danger/10 hover:text-danger disabled:cursor-not-allowed disabled:opacity-40"
+                    disabled={deleteDisabled}
+                    title={
+                      streamingActive && isSelected
+                        ? "Stop the active response before deleting this session"
+                        : "Delete conversation"
+                    }
+                    aria-label={`Delete ${session.title ?? "Untitled chat"}`}
+                    onClick={() => {
+                      const confirmed = window.confirm(
+                        `Delete "${session.title ?? "Untitled chat"}"?\n\nThis conversation and its messages will be permanently deleted.`,
+                      );
+
+                      if (!confirmed) {
+                        return;
+                      }
+
+                      deleteSessionMutation.mutate(session.id);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4" aria-hidden="true" />
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </Panel>
 
-        <SpotlightPanel className="min-h-[34rem] border border-border bg-surface shadow-sm">
-          <div className="flex min-h-[34rem] flex-col">
-            <div className="border-b border-border px-4 py-3">
+        <SpotlightPanel className="h-[calc(100dvh-13rem)] min-h-[34rem] overflow-hidden border border-border bg-surface shadow-sm">
+          <div className="flex h-full min-h-0 flex-col">
+            <div className="shrink-0 border-b border-border px-4 py-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <h3 className="text-sm font-semibold">Conversation</h3>
@@ -192,17 +598,49 @@ export function ChatPage() {
               </div>
             </div>
 
-            <div className="app-scrollbar flex-1 space-y-4 overflow-y-auto p-4" aria-live="polite">
+            <div
+              ref={messagesContainerRef}
+              className="app-scrollbar min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4"
+              aria-live="polite"
+              onScroll={(event) => {
+                const container = event.currentTarget;
+
+                const distanceFromBottom =
+                  container.scrollHeight -
+                  container.scrollTop -
+                  container.clientHeight;
+
+                setAutoFollowConversation(distanceFromBottom <= 96);
+              }}
+            >
               {sessionQuery.isLoading && selectedSessionId ? <LoadingState label="Loading messages" /> : null}
-              {sessionQuery.isError ? <ErrorState message={safeErrorMessage(sessionQuery.error)} onRetry={() => void sessionQuery.refetch()} /> : null}
+              {sessionQuery.isError &&
+              selectedSessionId &&
+              !sessionNotFound ? (
+                <ErrorState
+                  message={safeErrorMessage(sessionQuery.error)}
+                  onRetry={() => void sessionQuery.refetch()}
+                />
+              ) : null}
               {!sessionQuery.isLoading && !selectedSessionId ? <EmptyState title="Start a chat session" description="Create a session or send a question to begin." /> : null}
               {!sessionQuery.isLoading && selectedSessionId && messages.length === 0 && !pendingUserMessage && streamState.status === "idle" ? (
                 <EmptyState title="No messages yet" description="Ask a question about documents you can access." />
               ) : null}
 
               {messages.map((message) => (
-                <MessageBubble key={message.id} message={message} onFeedback={(rating) => feedbackMutation.mutate({ messageId: message.id, rating })} />
-              ))}
+                <MessageBubble
+                  key={message.id}
+                  message={message}
+                  citationMap={citationView.byMessage.get(message.id)}
+                  onCitationClick={focusCitation}
+                  onFeedback={(rating) =>
+                    feedbackMutation.mutate({
+                      messageId: message.id,
+                      rating,
+                    })
+                  }
+                /> 
+             ))}
               {pendingUserMessage ? <UserBubble content={pendingUserMessage} /> : null}
               {streamingActive ? <AssistantWaiting status={streamState.status} /> : null}
               {streamState.content && (streamingActive || !messages.some((message) => message.id === streamState.completed?.message_id)) ? (
@@ -210,6 +648,8 @@ export function ChatPage() {
                   content={streamState.content}
                   citations={streamState.citations}
                   completedMessageId={streamState.completed?.message_id ?? null}
+                  citationMap={citationView.streamMap}
+                  onCitationClick={focusCitation}
                   onFeedback={(rating) => {
                     const messageId = streamState.completed?.message_id;
                     if (messageId) {
@@ -218,11 +658,19 @@ export function ChatPage() {
                   }}
                 />
               ) : null}
-              {streamState.status === "error" && streamState.error ? <ErrorState title={streamState.error.code} message={streamState.error.message} /> : null}
+              {streamState.status === "error" &&
+              streamState.error &&
+              selectedSessionId &&
+              !sessionNotFound ? (
+                <ErrorState
+                  title={streamState.error.code}
+                  message={streamState.error.message}
+                />
+              ) : null}
               {streamState.status === "cancelled" ? <ErrorState title="STREAM_CANCELLED" message="The active request was cancelled before completion." /> : null}
             </div>
 
-            <div className="border-t border-border p-4">
+            <div className="shrink-0 border-t border-border bg-surface p-4">
               <label htmlFor="chat-composer" className="sr-only">Message</label>
               <TextArea
                 id="chat-composer"
@@ -254,18 +702,40 @@ export function ChatPage() {
         </SpotlightPanel>
 
         <Panel className="min-h-[28rem] overflow-hidden">
-          <div className="border-b border-border px-4 py-3">
+          <div className="shrink-0 border-b border-border px-4 py-3">
             <h3 className="text-sm font-semibold">Citations</h3>
           </div>
           <div className="app-scrollbar max-h-[calc(100dvh-13rem)] space-y-3 overflow-y-auto p-4">
-            {activeCitations.length === 0 ? <EmptyState title="No citations" description="Citations appear when the validated answer includes sources." /> : null}
-            {activeCitations.map((citation) => (
-              <article key={`${citation.document_id}-${citation.citation_order}`} className="rounded-token border border-border bg-elevated p-3 text-sm">
+            {citationView.items.length === 0 ?  <EmptyState title="No citations" description="Citations appear when the validated answer includes sources." /> : null}
+            {citationView.items.map((citation) => (
+              <article
+                id={`citation-${citation.globalOrder}`}
+                key={`${citation.messageId ?? "stream"}-${citation.globalOrder}`}
+                className={`rounded-token border bg-elevated p-3 text-sm transition ${
+                  highlightedCitation === citation.globalOrder
+                    ? "citation-card-highlight border-danger/60"
+                    : "border-border"
+                }`}
+              >
                 <div className="flex items-start justify-between gap-3">
-                  <h4 className="font-semibold text-ink">[{citation.citation_order}] {citation.document_title}</h4>
+                  <h4 className="font-semibold text-ink">
+                    [{citation.globalOrder}]{" "}
+                    {citation.document_title}
+                  </h4>
                   <Badge tone="accent">Page {citation.page_number}</Badge>
                 </div>
-                <p className="mt-2 line-clamp-5 text-muted">{citation.excerpt}</p>
+                <div className="mt-3 rounded-token border border-border/70 bg-surface/70 px-3 py-2">
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+                    Evidence
+                  </p>
+
+                  <p className="line-clamp-5 text-sm leading-6">
+                    <CitationEvidenceText
+                      excerpt={citation.excerpt}
+                      evidenceText={citation.evidence_text}
+                    />
+                  </p>
+                </div>
               </article>
             ))}
           </div>
@@ -275,30 +745,229 @@ export function ChatPage() {
   );
 }
 
-function MessageBubble({ message, onFeedback }: { message: ChatMessage; onFeedback: (rating: "HELPFUL" | "NOT_HELPFUL") => void }) {
-  if (message.role === "USER") {
-    return <UserBubble content={message.content} timestamp={message.created_at} />;
+function CitationEvidenceText({
+  excerpt,
+  evidenceText,
+}: {
+  excerpt: string;
+  evidenceText?: string | null;
+}) {
+  const evidence = evidenceText?.trim();
+
+  if (!evidence) {
+    return <>{excerpt}</>;
   }
+
+  const exactIndex = excerpt.indexOf(evidence);
+
+  if (exactIndex >= 0) {
+    return (
+      <>
+        {excerpt.slice(0, exactIndex)}
+
+        <span className="citation-evidence font-bold underline decoration-danger decoration-2 underline-offset-4">
+          {excerpt.slice(
+            exactIndex,
+            exactIndex + evidence.length,
+          )}
+        </span>
+
+        {excerpt.slice(
+          exactIndex + evidence.length,
+        )}
+      </>
+    );
+  }
+
+  /*
+   * Fallback:
+   * evidence có thể đúng nhưng whitespace trong excerpt
+   * đã được normalize khác source_text.
+   *
+   * Ví dụ:
+   * "8 giờ / ngày"
+   * vs
+   * "8 giờ/ngày"
+   */
+  const escapedParts = evidence
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) =>
+      part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+    );
+
+  if (escapedParts.length === 0) {
+    return <>{excerpt}</>;
+  }
+
+  const flexiblePattern = new RegExp(
+    escapedParts.join("\\s+"),
+    "iu",
+  );
+
+  const match = flexiblePattern.exec(excerpt);
+
+  if (!match) {
+    /*
+     * Không tìm thấy evidence thật trong excerpt:
+     * tuyệt đối không highlight gần đúng/bừa.
+     */
+    return <>{excerpt}</>;
+  }
+
+  const start = match.index;
+  const end = start + match[0].length;
+
+  return (
+    <>
+      {excerpt.slice(0, start)}
+
+      <span className="citation-evidence font-bold underline decoration-danger decoration-2 underline-offset-4">
+        {excerpt.slice(start, end)}
+      </span>
+
+      {excerpt.slice(end)}
+    </>
+  );
+}
+
+function MessageBubble({
+  message,
+  citationMap,
+  onCitationClick,
+  onFeedback,
+}: {
+  message: ChatMessage;
+  citationMap?: ReadonlyMap<number, number>;
+  onCitationClick: (globalOrder: number) => void;
+  onFeedback: (
+    rating: "HELPFUL" | "NOT_HELPFUL",
+  ) => void;
+}) {
+  if (message.role === "USER") {
+    return (
+      <UserBubble
+        content={message.content}
+        timestamp={message.created_at}
+      />
+    );
+  }
+
   return (
     <div className="flex gap-3">
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-token bg-accent/10 text-accent">
-        <Bot className="h-4 w-4" aria-hidden="true" />
+        <Bot
+          className="h-4 w-4"
+          aria-hidden="true"
+        />
       </div>
+
       <article className="min-w-0 flex-1 rounded-token border border-border bg-elevated p-3">
-        <p className="whitespace-pre-wrap text-sm leading-6 text-ink">{message.content}</p>
+        <CitationContent
+          content={message.content}
+          citationMap={citationMap}
+          onCitationClick={onCitationClick}
+        />
+
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
-          <span>{formatDateTime(message.created_at)}</span>
+          <span>
+            {formatDateTime(message.created_at)}
+          </span>
+
           <div className="flex gap-1">
-            <button className="rounded-token p-1 hover:bg-surface" type="button" onClick={() => onFeedback("HELPFUL")} aria-label="Mark answer helpful">
-              <ThumbsUp className="h-4 w-4" aria-hidden="true" />
+            <button
+              className="rounded-token p-1 hover:bg-surface"
+              type="button"
+              onClick={() =>
+                onFeedback("HELPFUL")
+              }
+              aria-label="Mark answer helpful"
+            >
+              <ThumbsUp
+                className="h-4 w-4"
+                aria-hidden="true"
+              />
             </button>
-            <button className="rounded-token p-1 hover:bg-surface" type="button" onClick={() => onFeedback("NOT_HELPFUL")} aria-label="Mark answer not helpful">
-              <ThumbsDown className="h-4 w-4" aria-hidden="true" />
+
+            <button
+              className="rounded-token p-1 hover:bg-surface"
+              type="button"
+              onClick={() =>
+                onFeedback("NOT_HELPFUL")
+              }
+              aria-label="Mark answer not helpful"
+            >
+              <ThumbsDown
+                className="h-4 w-4"
+                aria-hidden="true"
+              />
             </button>
           </div>
         </div>
       </article>
     </div>
+  );
+}
+
+function CitationContent({
+  content,
+  citationMap,
+  onCitationClick,
+}: {
+  content: string;
+  citationMap?: ReadonlyMap<number, number>;
+  onCitationClick: (globalOrder: number) => void;
+}) {
+  const parts: React.ReactNode[] = [];
+
+  const citationPattern = /\[(\d+)\]/g;
+
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while (
+    (match = citationPattern.exec(content)) !== null
+  ) {
+    if (match.index > lastIndex) {
+      parts.push(
+        content.slice(lastIndex, match.index),
+      );
+    }
+
+    const localOrder = Number(match[1]);
+    const globalOrder =
+      citationMap?.get(localOrder);
+
+    if (globalOrder !== undefined) {
+      parts.push(
+        <button
+          key={`${match.index}-${globalOrder}`}
+          type="button"
+          className="citation-inline"
+          onClick={() =>
+            onCitationClick(globalOrder)
+          }
+          aria-label={`Open citation ${globalOrder}`}
+          title={`Open citation ${globalOrder}`}
+        >
+          [{globalOrder}]
+        </button>,
+      );
+    } else {
+      parts.push(match[0]);
+    }
+
+    lastIndex = citationPattern.lastIndex;
+  }
+
+  if (lastIndex < content.length) {
+    parts.push(content.slice(lastIndex));
+  }
+
+  return (
+    <p className="whitespace-pre-wrap text-sm leading-6 text-ink">
+      {parts}
+    </p>
   );
 }
 
@@ -323,22 +992,44 @@ function AssistantWaiting({ status }: { status: string }) {
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-token bg-accent/10 text-accent">
         <Bot className="h-4 w-4" aria-hidden="true" />
       </div>
-      <div className="rounded-token border border-border bg-elevated px-3 py-2 text-sm text-muted">
-        <ShimmerText>{label}</ShimmerText>
+      <div className="rounded-token border border-accent/25 bg-accent/5 px-3 py-2 text-sm shadow-sm">
+        <ShimmerText className="font-medium tracking-[0.01em]">
+          {label}
+        </ShimmerText>
       </div>
     </div>
   );
 }
 
-function AssistantStreamBubble({ content, citations, completedMessageId, onFeedback }: { content: string; citations: Citation[]; completedMessageId: string | null; onFeedback: (rating: "HELPFUL" | "NOT_HELPFUL") => void }) {
-  return (
+function AssistantStreamBubble({
+  content,
+  citations,
+  citationMap,
+  onCitationClick,
+  completedMessageId,
+  onFeedback,
+}: {
+  content: string;
+  citations: Citation[];
+  citationMap: ReadonlyMap<number, number>;
+  onCitationClick: (globalOrder: number) => void;
+  completedMessageId: string | null;
+  onFeedback: (
+    rating: "HELPFUL" | "NOT_HELPFUL",
+  ) => void;
+}) {
+    return (
     <div className="flex gap-3">
       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-token bg-accent/10 text-accent">
         <Bot className="h-4 w-4" aria-hidden="true" />
       </div>
       <article className="min-w-0 flex-1 rounded-token border border-accent/25 bg-accent/5 p-3">
-        <p className="whitespace-pre-wrap text-sm leading-6 text-ink">{content}</p>
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
+      <CitationContent
+        content={content}
+        citationMap={citationMap}
+        onCitationClick={onCitationClick}
+      /> 
+       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
           {citations.length ? <span>{citations.length} validated citations</span> : <span>Completed</span>}
           {completedMessageId ? (
             <div className="flex gap-1">

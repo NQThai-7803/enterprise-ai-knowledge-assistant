@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.permissions import build_accessible_document_filter
 from app.models import Document, DocumentChunk, DocumentStatus, User
+from app.retrieval.authority import current_authority_order_expression
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,6 +79,7 @@ async def search_permitted_chunks(
         )
         .order_by(
             cosine_distance.asc(),
+            current_authority_order_expression().desc(),
             Document.id.asc(),
             DocumentChunk.chunk_index.asc(),
             DocumentChunk.id.asc(),

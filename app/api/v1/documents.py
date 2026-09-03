@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import Annotated, Literal
 from uuid import UUID
 
@@ -17,7 +18,7 @@ from app.api.dependencies import (
     require_manager_or_admin,
 )
 from app.db.session import get_db_session
-from app.models import DocumentAccessScope, DocumentStatus, User
+from app.models import DocumentAccessScope, DocumentLifecycleStatus, DocumentStatus, User
 from app.schemas.common import (
     DEFAULT_PAGE,
     DEFAULT_PAGE_SIZE,
@@ -68,6 +69,12 @@ async def upload_document(
     audit_context: Annotated[AuditContext, Depends(get_audit_context)],
     description: Annotated[str | None, Form()] = None,
     department_id: Annotated[UUID | None, Form()] = None,
+    document_code: Annotated[str | None, Form(max_length=128)] = None,
+    document_version: Annotated[str | None, Form(max_length=64)] = None,
+    effective_from: Annotated[date | None, Form()] = None,
+    effective_to: Annotated[date | None, Form()] = None,
+    lifecycle_status: Annotated[DocumentLifecycleStatus, Form()] = DocumentLifecycleStatus.ACTIVE,
+    supersedes_document_id: Annotated[UUID | None, Form()] = None,
 ) -> DataResponse[DocumentUploadResponse]:
     await enforce_upload_rate_limit(request, current_user)
     document = await DocumentService(
@@ -83,6 +90,12 @@ async def upload_document(
         department_id=department_id,
         current_user=current_user,
         audit_context=audit_context,
+        document_code=document_code,
+        document_version=document_version,
+        effective_from=effective_from,
+        effective_to=effective_to,
+        lifecycle_status=lifecycle_status,
+        supersedes_document_id=supersedes_document_id,
     )
     return DataResponse[DocumentUploadResponse](
         data=DocumentUploadResponse.from_document(document),

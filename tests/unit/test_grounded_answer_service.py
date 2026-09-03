@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from collections.abc import Coroutine
 from dataclasses import replace
 from datetime import UTC, datetime
@@ -11,6 +12,7 @@ from uuid import UUID
 import pytest
 
 from app.chat.models import GroundingStatus
+from app.citations.models import PromptSource, PromptSourceRegistry
 from app.core.config import Settings
 from app.core.exceptions import (
     ChatRetrievalFailedError,
@@ -20,14 +22,26 @@ from app.core.exceptions import (
 )
 from app.llm.errors import LLMError, LLMFailureCode
 from app.llm.models import LLMGenerationResult
-from app.models import AuditLog, ChatMessage, ChatMessageRole, ChatSession, User, UserRole
+from app.models import (
+    AuditLog,
+    ChatMessage,
+    ChatMessageRole,
+    ChatSession,
+    CitationSourceType,
+    User,
+    UserRole,
+)
 from app.repositories.chat_message_repository import ConversationMemoryMessageRow
 from app.retrieval.errors import RetrievalError, RetrievalFailureCode
 from app.retrieval.models import HybridRetrievalHit, HybridRetrievalResult
 from app.services.grounded_answer_service import (
     GroundedAnswerService,
+    _focused_retry_requirements,
     _person_name_sequences_near_terms,
+    _preserve_reranked_hit_order,
     _rank_hits_for_prompt,
+    _role_terms_for_prompt_question,
+    _short_explicit_topic_phrases,
 )
 from app.web_search.errors import WebSearchError, WebSearchFailureCode
 from app.web_search.models import WebSearchResult, WebSearchResults
@@ -332,8 +346,16 @@ class FakeCitationValidationService:
     async def validate_and_map(self, *, answer: str, source_registry, current_user: User):  # noqa: ANN001
         self.calls += 1
         self.answers.append(answer)
+        marker_map: dict[str, str] = {}
+
+        def replace_marker(match: re.Match[str]) -> str:
+            marker = match.group(0)
+            if marker not in marker_map:
+                marker_map[marker] = f"[{len(marker_map) + 1}]"
+            return marker_map[marker]
+
         return SimpleNamespace(
-            answer=answer.replace("[SOURCE_1]", "[1]"),
+            answer=re.sub(r"\[SOURCE_[1-9][0-9]*\]", replace_marker, answer),
             citations=self.citations,
         )
 
@@ -391,6 +413,7 @@ def make_service(
     citation_repository: FakeCitationRepository | None = None,
     settings_obj: Settings | None = None,
     web_search_service: FakeWebSearchService | None = None,
+    retrieval_reranker: Any | None = None,
 ) -> tuple[
     GroundedAnswerService,
     FakeSessionRepository,
@@ -427,6 +450,7 @@ def make_service(
         message_service=message_service,
         citation_validation_service=citation_validation or FakeCitationValidationService(),
         web_search_service=web_search_service,
+        retrieval_reranker=retrieval_reranker,
     )
     return (
         service,
@@ -487,7 +511,7 @@ def test_context_dependent_question_uses_resolved_retrieval_query() -> None:
             question="If working 5 years then what?",
         )
 
-        assert retrieval.queries == ["Leave policy If working 5 years then what?"]
+        assert retrieval.queries == ["Leave policy - If working 5 years then what?"]
         assert "12 annual leave days" not in retrieval.queries[0]
         assert retrieval.top_ks == [2]
         assert message_repo.memory_call_args[0]["session_id"] == chat_session().id
@@ -571,11 +595,30 @@ def test_policy_follow_up_uses_resolved_five_year_grounding_question() -> None:
         assert "5 nam" in query
         assert "12 ngay" not in query
         assert "bao nhieu" not in query
+        assert "thay đổi như thế nào" in query
         user_prompt = llm.messages[1].content
         assert query in user_prompt
         assert "12 ngay" not in user_prompt
 
     run_async(scenario())
+
+
+def test_generic_description_follow_up_preserves_short_explicit_topic_for_retrieval() -> None:
+    assert _short_explicit_topic_phrases("salary review được quy định như thế nào?") == (
+        "salary review",
+    )
+    assert _short_explicit_topic_phrases("How is salary review defined?") == ("salary review",)
+
+    exact = hit("Chu kỳ salary review gồm đánh giá hiệu suất hàng năm.")
+    generic = replace(
+        hit("Phạm vi chính sách được quy định theo pháp luật."),
+        chunk_id=UUID("00000000-0000-0000-0000-000000000102"),
+    )
+    ranked = _rank_hits_for_prompt(
+        (generic, exact),
+        question="salary review được quy định như thế nào?",
+    )
+    assert ranked[0].chunk_id == exact.chunk_id
 
 
 def test_empty_conversation_memory_uses_current_question_for_retrieval() -> None:
@@ -607,7 +650,7 @@ def test_llm_prompt_excludes_assistant_history_and_contains_retrieved_context() 
             question="Does it apply on Saturday?",
         )
 
-        assert retrieval.queries == ["Working policy - Does it apply on Saturday?"]
+        assert retrieval.queries == ["Does Working policy apply on Saturday?"]
         assert [message.role for message in llm.messages[:2]] == ["system", "user"]
         user_prompt = llm.messages[1].content
         assert "<conversation_history>\n</conversation_history>" in user_prompt
@@ -615,7 +658,7 @@ def test_llm_prompt_excludes_assistant_history_and_contains_retrieved_context() 
         assert "08:00-17:00 schedule." not in user_prompt
         assert "<retrieved_context>" in user_prompt
         assert "allowed context" in user_prompt
-        assert "Working policy - Does it apply on Saturday?" in user_prompt
+        assert "Does Working policy apply on Saturday?" in user_prompt
         assert "Working policy" not in llm.messages[0].content
 
     run_async(scenario())
@@ -689,6 +732,31 @@ def test_person_role_candidate_prefers_previous_record_name() -> None:
     assert _person_name_sequences_near_terms(text, ("CTO",)) == ("Bob Thu Tran",)
 
 
+def test_descriptive_person_role_question_extracts_subject_role_terms() -> None:
+    assert _role_terms_for_prompt_question(
+        "Người phụ trách công nghệ của Nova Digital tên gì?"
+    ) == ("cong nghe",)
+
+
+def test_prompt_reranking_prefers_descriptive_role_person_record() -> None:
+    topical = hit(
+        "Tên tài liệu Công nghệ Nova Digital. Người phê duyệt Nguyễn Anh Khoa - Tổng Giám đốc."
+    )
+    direct = replace(
+        hit("Lê Thu Hà - phụ trách kỹ thuật và nền tảng. Giám đốc Công nghệ (CTO)."),
+        chunk_id=UUID("00000000-0000-0000-0000-000000000119"),
+        document_id=UUID("00000000-0000-0000-0000-000000000219"),
+        chunk_index=9,
+    )
+
+    ranked = _rank_hits_for_prompt(
+        (topical, direct),
+        question="Người phụ trách công nghệ của Nova Digital tên gì?",
+    )
+
+    assert ranked[0].chunk_id == direct.chunk_id
+
+
 def test_person_role_extraction_ignores_committee_name_false_positive() -> None:
     text = "Hoi dong Kien truc Cong nghe\nCTO chu tri va phe duyet nguyen tac kien truc cong nghe."
 
@@ -719,6 +787,32 @@ def test_prompt_reranking_keeps_numeric_condition_hit_first() -> None:
     )
 
     assert ranked[0].chunk_index == 5
+
+
+def test_prompt_reranking_prefers_concrete_control_for_ascii_security_question() -> None:
+    generic_remote_hit = replace(
+        hit(
+            "Nhan vien hybrid duoc lam o nha toi da 02 ngay/tuan, tuy vi tri va "
+            "phe duyet cua quan ly."
+        ),
+        chunk_id=UUID("00000000-0000-0000-0000-000000000117"),
+        chunk_index=6,
+    )
+    concrete_security_hit = replace(
+        hit(
+            "Lam viec tu xa phai co ket noi an toan va khong de nguoi khong co "
+            "tham quyen tiep can man hinh, tai lieu hoac cuoc hop."
+        ),
+        chunk_id=UUID("00000000-0000-0000-0000-000000000118"),
+        chunk_index=7,
+    )
+
+    ranked = _rank_hits_for_prompt(
+        (generic_remote_hit, concrete_security_hit),
+        question="Nhan vien hybrid can tuan thu bao mat nao khi lam o nha?",
+    )
+
+    assert ranked[0].chunk_index == 7
 
 
 def test_prompt_reranking_prefers_distinct_product_name_over_generic_usage_terms() -> None:
@@ -905,13 +999,54 @@ def test_yes_no_answer_without_polarity_retries() -> None:
         )
 
         assert llm.calls == 2
-        assert result.assistant_message.content.startswith("Khong")
+        assert result.assistant_message.content.startswith("Kh")
         assert "Nguyen Anh Khoa" in result.assistant_message.content
 
     run_async(scenario())
 
 
-def test_open_person_negative_polarity_answer_retries() -> None:
+def test_false_premise_role_question_does_not_require_wrong_person_in_source() -> None:
+    async def scenario() -> None:
+        llm = SequentialFakeLLMProvider(
+            LLMGenerationResult(
+                content=(
+                    '{"answer":"Khong, CEO Nova Digital la Nguyen Anh Khoa.",'
+                    '"polarity":"NO","citations":["SOURCE_1"]}'
+                ),
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            ),
+        )
+        service, _, _, _, _, _, _ = make_service(
+            retrieval=FakeRetrievalService(
+                retrieval_result(
+                    hit(
+                        "Ban dieu hanh gia dinh Nguyen Anh Khoa - Tong Giam doc "
+                        "(CEO) chiu trach nhiem ket qua kinh doanh cua Nova Digital."
+                    )
+                )
+            ),
+            llm=llm,
+        )
+
+        result = await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question="CEO Nova Digital co phai la Le Thu Ha khong?",
+        )
+
+        assert llm.calls == 1
+        assert result.grounding_status == GroundingStatus.ANSWERED
+        assert result.assistant_message.content.startswith("Kh")
+        assert "Nguyen Anh Khoa" in result.assistant_message.content
+
+    run_async(scenario())
+
+
+def test_open_person_role_bound_source_uses_structured_answer_before_llm() -> None:
     async def scenario() -> None:
         llm = SequentialFakeLLMProvider(
             LLMGenerationResult(
@@ -944,9 +1079,10 @@ def test_open_person_negative_polarity_answer_retries() -> None:
             question="CEO Example Digital la ai?",
         )
 
-        assert llm.calls == 2
+        assert llm.calls == 0
         assert result.grounding_status == GroundingStatus.ANSWERED
-        assert result.assistant_message.content.startswith("CEO la Nguyen Anh Khoa")
+        assert result.assistant_message.content.startswith("CEO")
+        assert "Nguyen Anh Khoa" in result.assistant_message.content
 
     run_async(scenario())
 
@@ -983,7 +1119,7 @@ def test_absent_named_entity_role_question_skips_llm() -> None:
     run_async(scenario())
 
 
-def test_incomplete_person_answer_retries_without_auto_selecting_source() -> None:
+def test_role_bound_person_source_uses_structured_answer_before_llm() -> None:
     async def scenario() -> None:
         llm = SequentialFakeLLMProvider(
             LLMGenerationResult(
@@ -1020,7 +1156,7 @@ def test_incomplete_person_answer_retries_without_auto_selecting_source() -> Non
             question="CTO Nova Digital la ai?",
         )
 
-        assert resolved_llm.calls == 2
+        assert resolved_llm.calls == 0
         assert "Le Thu Ha" in result.assistant_message.content
         assert result.grounding_status == GroundingStatus.ANSWERED
 
@@ -1207,7 +1343,7 @@ def test_quantity_answer_missing_source_number_retries() -> None:
     run_async(scenario())
 
 
-def test_change_answer_missing_source_amount_retries() -> None:
+def test_change_answer_uses_complete_deterministic_source_rule() -> None:
     async def scenario() -> None:
         llm = SequentialFakeLLMProvider(
             LLMGenerationResult(
@@ -1246,7 +1382,7 @@ def test_change_answer_missing_source_amount_retries() -> None:
             question="How does annual leave change after 5 years?",
         )
 
-        assert resolved_llm.calls == 2
+        assert resolved_llm.calls == 0
         assert "1 day" in result.assistant_message.content
         assert result.grounding_status == GroundingStatus.ANSWERED
 
@@ -1291,6 +1427,221 @@ def test_context_calls_llm_once_and_answered_status() -> None:
         assert llm.calls == 1
         assert result.grounding_status == GroundingStatus.ANSWERED
         assert result.assistant_message.content == "Grounded answer [1]"
+
+    run_async(scenario())
+
+
+def test_compound_answer_repairs_only_failed_claim_and_preserves_valid_claim() -> None:
+    async def scenario() -> None:
+        second_hit = replace(
+            hit("Security timeout is 15 minutes."),
+            chunk_id=UUID("00000000-0000-0000-0000-000000000102"),
+            document_id=UUID("00000000-0000-0000-0000-000000000202"),
+            document_title="Security policy",
+        )
+        llm = SequentialFakeLLMProvider(
+            LLMGenerationResult(
+                content=(
+                    '{"claims":['
+                    '{"claim_id":"CLAIM_1","answer":"Remote limit is 2 days.",'
+                    '"citations":["SOURCE_1","SOURCE_2"]},'
+                    '{"claim_id":"CLAIM_2","answer":"Security timeout is 5 minutes.",'
+                    '"citations":["SOURCE_1","SOURCE_2"]}'
+                    "]}"
+                ),
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=10,
+                completion_tokens=10,
+                response_time_ms=10,
+            ),
+            LLMGenerationResult(
+                content=(
+                    '{"claims":[{"claim_id":"CLAIM_2",'
+                    '"answer":"Security timeout is 15 minutes.",'
+                    '"citations":["SOURCE_1"]}]}'
+                ),
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=5,
+                completion_tokens=5,
+                response_time_ms=5,
+            ),
+        )
+        citation_validation = FakeCitationValidationService()
+        service, _, _, resolved_retrieval, resolved_llm, _, _ = make_service(
+            retrieval=FakeRetrievalService(
+                (
+                    retrieval_result(hit("Remote limit is 2 days.")),
+                    retrieval_result(second_hit),
+                )
+            ),
+            llm=llm,
+            citation_validation=citation_validation,
+        )
+
+        result = await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question="What is the remote limit and how many minutes is security timeout?",
+        )
+
+        assert resolved_llm.calls == 2
+        assert resolved_retrieval.queries[0] == (
+            "What is the remote limit and how many minutes is security timeout?"
+        )
+        assert len(resolved_retrieval.queries) == 3
+        assert result.grounding_status == GroundingStatus.ANSWERED
+        assert "Remote limit is 2 days" in result.assistant_message.content
+        assert "Security timeout is 15 minutes" in result.assistant_message.content
+        assert "[SOURCE_1]" in citation_validation.answers[-1]
+        assert "[SOURCE_2]" in citation_validation.answers[-1]
+        repair_prompt = resolved_llm.message_history[1][1].content
+        assert "CLAIM_2" in repair_prompt
+        assert "CLAIM_1:" not in repair_prompt
+
+    run_async(scenario())
+
+
+def test_compound_answer_never_exposes_valid_claim_when_required_repair_fails() -> None:
+    async def scenario() -> None:
+        second_hit = replace(
+            hit("Security timeout is 15 minutes."),
+            chunk_id=UUID("00000000-0000-0000-0000-000000000102"),
+            document_id=UUID("00000000-0000-0000-0000-000000000202"),
+        )
+        llm = SequentialFakeLLMProvider(
+            LLMGenerationResult(
+                content=(
+                    '{"claims":[{"claim_id":"CLAIM_1",'
+                    '"answer":"Remote limit is 2 days.",'
+                    '"citations":["SOURCE_1"]}]}'
+                ),
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=10,
+                completion_tokens=10,
+                response_time_ms=10,
+            ),
+            LLMGenerationResult(
+                content="__NO_ANSWER__",
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=5,
+                completion_tokens=1,
+                response_time_ms=5,
+            ),
+        )
+        service, _, _, _, resolved_llm, _, _ = make_service(
+            retrieval=FakeRetrievalService(
+                (
+                    retrieval_result(hit("Remote limit is 2 days.")),
+                    retrieval_result(second_hit),
+                )
+            ),
+            llm=llm,
+        )
+
+        result = await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question="What is the remote limit and how many minutes is security timeout?",
+        )
+
+        assert resolved_llm.calls == 2
+        assert result.grounding_status == GroundingStatus.NO_ANSWER
+        assert "Remote limit is 2 days" not in result.assistant_message.content
+
+    run_async(scenario())
+
+
+def test_compound_deterministic_repair_recovers_security_and_allowance_claims() -> None:
+    async def scenario() -> None:
+        initial = LLMGenerationResult(
+            content=(
+                '{"claims":['
+                '{"claim_id":"CLAIM_1","answer":"Hybrid duoc 2 ngay/tuan.",'
+                '"citations":["SOURCE_3"]},'
+                '{"claim_id":"CLAIM_2","answer":"Hybrid duoc 500.000 d/thang.",'
+                '"citations":["SOURCE_3"]}'
+                "]}"
+            ),
+            model="fake",
+            finish_reason="stop",
+            prompt_tokens=1,
+            completion_tokens=1,
+            response_time_ms=1,
+        )
+        llm = SequentialFakeLLMProvider(
+            LLMGenerationResult(
+                content=(
+                    '[{"claim_id":"CLAIM_1","answer":"Khong lam viec voi du lieu mat.",'
+                    '"citations":["SOURCE_1"]},'
+                    '{"claim_id":"CLAIM_2","answer":"Duoc 500.000 d/thang.",'
+                    '"citations":["SOURCE_3"]}]'
+                ),
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            )
+        )
+        service, _, _, _, _, _, _ = make_service(llm=llm)
+
+        def prompt_source(index: int, title: str, text: str) -> PromptSource:
+            return PromptSource(
+                marker=f"[SOURCE_{index}]",
+                source_type=CitationSourceType.INTERNAL,
+                document_title=title,
+                text=text,
+                page_numbers=(index,),
+                start_page=index,
+                end_page=index,
+                hybrid_score=1.0,
+                chunk_id=UUID(f"00000000-0000-0000-0006-{index:012d}"),
+                document_id=UUID(f"00000000-0000-0000-0007-{index:012d}"),
+            )
+
+        registry = PromptSourceRegistry(
+            sources=(
+                prompt_source(
+                    1,
+                    "Chinh sach lam viec va cham cong",
+                    "Su dung thiet bi duoc phe duyet, VPN/MFA khi ap dung; "
+                    "khong lam viec voi du lieu mat tren thiet bi hoac mang khong an toan.",
+                ),
+                prompt_source(
+                    2,
+                    "Chinh sach tien luong phu cap va thuong",
+                    "Hybrid / Remote stipend 500.000 d/thang cho nhan vien duoc phe duyet "
+                    "che do hybrid/remote thuong xuyen.",
+                ),
+                prompt_source(
+                    3,
+                    "Chinh sach bao hiem va phuc loi",
+                    "Tu van tam ly bao mat 04 phien/nam. Ergonomic support 1.500.000 d/24 thang.",
+                ),
+            )
+        )
+        draft = await service._compound_draft_with_claim_repair(
+            initial,
+            information_needs=(
+                "Nhan vien hybrid can tuan thu bao mat nao khi lam o nha",
+                "Nhan vien hybrid duoc phu cap bao nhieu moi thang",
+            ),
+            source_registry=registry,
+            current_user=user(),
+            provider=llm,
+            grounding_question=(
+                "Nhan vien hybrid can tuan thu bao mat nao khi lam o nha va "
+                "duoc phu cap bao nhieu moi thang?"
+            ),
+        )
+
+        assert draft.grounding_status == GroundingStatus.ANSWERED
+        assert "VPN/MFA" in draft.content
+        assert "500.000" in draft.content
 
     run_async(scenario())
 
@@ -1872,5 +2223,601 @@ def test_answer_question_cancellation_reaches_provider_and_persists_nothing() ->
         assert slow_provider.cancelled is True
         assert message_service.calls == []
         assert citation_repository.calls == []
+
+    run_async(scenario())
+
+
+def test_preserve_reranked_hit_order_keeps_reranker_authoritative() -> None:
+    reranker_first = replace(
+        hit("Engineering Manager 42 - 70 trieu dong"),
+        chunk_id=UUID("00000000-0000-0000-0000-000000000121"),
+        chunk_index=10,
+        reranker_score=120.0,
+    )
+
+    prompt_first = replace(
+        hit("Generic salary and manager policy context"),
+        chunk_id=UUID("00000000-0000-0000-0000-000000000122"),
+        chunk_index=11,
+        reranker_score=None,
+    )
+
+    ranked = _preserve_reranked_hit_order(
+        (reranker_first,),
+        (prompt_first, reranker_first),
+    )
+
+    assert [item.chunk_id for item in ranked] == [
+        reranker_first.chunk_id,
+        prompt_first.chunk_id,
+    ]
+
+
+def test_yes_no_answer_that_restates_question_is_retried() -> None:
+    async def scenario() -> None:
+        llm = SequentialFakeLLMProvider(
+            LLMGenerationResult(
+                content=(
+                    '{"answer":"Nhan vien co duoc noi ve muc luong cua chinh minh",'
+                    '"citations":["SOURCE_1"]}'
+                ),
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            ),
+            LLMGenerationResult(
+                content=(
+                    '{"answer":"Co. Nhan vien duoc trao doi ve muc luong cua chinh minh.",'
+                    '"citations":["SOURCE_1"]}'
+                ),
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            ),
+        )
+
+        service, _, _, _, resolved_llm, _, _ = make_service(
+            retrieval=FakeRetrievalService(
+                retrieval_result(
+                    hit(
+                        "Nhan vien duoc quyen biet va trao doi "
+                        "thong tin ve muc luong cua chinh minh."
+                    )
+                )
+            ),
+            llm=llm,
+        )
+
+        result = await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question="Nhan vien co duoc noi ve muc luong cua chinh minh khong?",
+        )
+
+        assert resolved_llm.calls == 2
+        assert result.grounding_status == GroundingStatus.ANSWERED
+        assert result.assistant_message.content.startswith("Có.")
+
+    run_async(scenario())
+
+
+def test_salary_amount_range_is_not_retried_from_grade_label_as_unit() -> None:
+    async def scenario() -> None:
+        llm = SequentialFakeLLMProvider(
+            LLMGenerationResult(
+                content=(
+                    '{"answer":"Head / Director co dai Base Salary tham khao '
+                    '65 - 110 trieu dong.","citations":["SOURCE_1"]}'
+                ),
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            ),
+            LLMGenerationResult(
+                content="__NO_ANSWER__",
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            ),
+        )
+
+        source_text = (
+            "Grade Vi du chuc danh Dai Base Salary tham khao gross/thang\n"
+            "N4 Senior Engineer / Senior Specialist 28 - 48 trieu dong\n"
+            "N5 Tech Lead / Engineering Manager / Functional Manager "
+            "42 - 70 trieu dong\n"
+            "N6 Head / Director 65 - 110 trieu dong"
+        )
+
+        service, _, _, _, resolved_llm, _, _ = make_service(
+            retrieval=FakeRetrievalService(retrieval_result(hit(source_text))),
+            llm=llm,
+        )
+
+        result = await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question="Dai luong tham khao cua Head la bao nhieu?",
+        )
+
+        assert resolved_llm.calls == 1
+        assert result.grounding_status == GroundingStatus.ANSWERED
+        assert "65 - 110 trieu dong" in result.assistant_message.content
+
+    run_async(scenario())
+
+
+def test_salary_amount_range_with_grade_identifier_is_not_retried() -> None:
+    async def scenario() -> None:
+        llm = SequentialFakeLLMProvider(
+            LLMGenerationResult(
+                content=(
+                    '{"claims":['
+                    '{"claim_id":"CLAIM_1","answer":"Engineering Manager thuoc grade N5.",'
+                    '"citations":["SOURCE_1"]},'
+                    '{"claim_id":"CLAIM_2","answer":"Dai Base Salary tham khao la '
+                    '42 - 70 trieu dong.","citations":["SOURCE_1"]}'
+                    "]}"
+                ),
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            ),
+            LLMGenerationResult(
+                content="__NO_ANSWER__",
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            ),
+        )
+
+        source_text = (
+            "Grade Vi du chuc danh Dai Base Salary tham khao gross/thang\n"
+            "N4 Senior Engineer / Senior Specialist 28 - 48 trieu dong\n"
+            "N5 Tech Lead / Engineering Manager / Functional Manager "
+            "42 - 70 trieu dong\n"
+            "N6 Head / Director 65 - 110 trieu dong"
+        )
+
+        service, _, _, _, resolved_llm, _, _ = make_service(
+            retrieval=FakeRetrievalService(retrieval_result(hit(source_text))),
+            llm=llm,
+        )
+
+        result = await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question="Engineering Manager thuoc grade nao va dai luong bao nhieu?",
+        )
+
+        assert resolved_llm.calls == 1
+        assert result.grounding_status == GroundingStatus.ANSWERED
+        assert "N5" in result.assistant_message.content
+        assert "42 - 70 trieu dong" in result.assistant_message.content
+
+    run_async(scenario())
+
+
+def test_yes_no_polarity_field_adds_vietnamese_prefix() -> None:
+    async def scenario() -> None:
+        llm = SequentialFakeLLMProvider(
+            LLMGenerationResult(
+                content=(
+                    '{"answer":"Quyen cua nguoi lao dong doi voi '
+                    'thong tin luong cua chinh minh khong bi han che.",'
+                    '"polarity":"YES",'
+                    '"citations":["SOURCE_1"]}'
+                ),
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            ),
+        )
+
+        service, _, _, _, resolved_llm, _, _ = make_service(
+            retrieval=FakeRetrievalService(
+                retrieval_result(
+                    hit(
+                        "Quyen cua nguoi lao dong doi voi "
+                        "thong tin luong cua chinh minh "
+                        "khong bi han che."
+                    )
+                )
+            ),
+            llm=llm,
+        )
+
+        result = await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question=("Nhan vien co duoc noi ve muc luong cua chinh minh khong?"),
+        )
+
+        assert resolved_llm.calls == 1
+        assert result.grounding_status == (GroundingStatus.ANSWERED)
+        assert result.assistant_message.content.startswith("Có.")
+
+    run_async(scenario())
+
+
+def test_yes_no_question_restatement_is_retried() -> None:
+    async def scenario() -> None:
+        llm = SequentialFakeLLMProvider(
+            LLMGenerationResult(
+                content=(
+                    '{"answer":"Nhan vien co duoc noi ve '
+                    'muc luong cua chinh minh",'
+                    '"polarity":"YES",'
+                    '"citations":["SOURCE_1"]}'
+                ),
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            ),
+            LLMGenerationResult(
+                content=(
+                    '{"answer":"Quyen cua nguoi lao dong '
+                    "doi voi thong tin luong cua chinh minh "
+                    'khong bi han che.",'
+                    '"polarity":"YES",'
+                    '"citations":["SOURCE_1"]}'
+                ),
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            ),
+        )
+
+        service, _, _, _, resolved_llm, _, _ = make_service(
+            retrieval=FakeRetrievalService(
+                retrieval_result(
+                    hit(
+                        "Quyen cua nguoi lao dong doi voi "
+                        "thong tin luong cua chinh minh "
+                        "khong bi han che."
+                    )
+                )
+            ),
+            llm=llm,
+        )
+
+        result = await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question=("Nhan vien co duoc noi ve muc luong cua chinh minh khong?"),
+        )
+
+        assert resolved_llm.calls == 2
+        assert result.grounding_status == (GroundingStatus.ANSWERED)
+        assert result.assistant_message.content.startswith("Có.")
+
+    run_async(scenario())
+
+
+def test_focused_retry_requirements_returns_empty_string_when_no_requirement() -> None:
+    requirements = _focused_retry_requirements(
+        context=(
+            "<retrieved_context>\n"
+            "Employees may discuss their own salary information.\n"
+            "</retrieved_context>"
+        ),
+        grounding_question=("Nhan vien co duoc noi ve muc luong cua chinh minh khong?"),
+    )
+
+    assert requirements == ""
+
+
+def test_yes_no_positive_negation_is_canonicalized_without_retry() -> None:
+    async def scenario() -> None:
+        llm = SequentialFakeLLMProvider(
+            LLMGenerationResult(
+                content=(
+                    '{"answer":"Chinh sach khong cam nguoi lao dong '
+                    'trao doi thong tin luong cua chinh minh.",'
+                    '"citations":["SOURCE_1"]}'
+                ),
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            ),
+        )
+
+        source_text = (
+            "Nhan vien khong duoc truy cap, sao chep hoac "
+            "phat tan du lieu luong cua nguoi khac neu khong "
+            "co phe duyet. "
+            "Chinh sach khong cam nguoi lao dong su dung, "
+            "trao doi hoac cung cap thong tin luong cua "
+            "chinh minh khi thuc hien quyen hop phap."
+        )
+
+        service, _, _, _, resolved_llm, _, _ = make_service(
+            retrieval=FakeRetrievalService(retrieval_result(hit(source_text))),
+            llm=llm,
+        )
+
+        result = await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question=("Nhan vien co duoc noi ve muc luong cua chinh minh khong?"),
+        )
+
+        assert resolved_llm.calls == 1
+        assert result.grounding_status == (GroundingStatus.ANSWERED)
+        assert result.assistant_message.content.startswith("Có.")
+
+    run_async(scenario())
+
+
+def test_yes_no_negative_clause_is_canonicalized_without_retry() -> None:
+    async def scenario() -> None:
+        llm = SequentialFakeLLMProvider(
+            LLMGenerationResult(
+                content=(
+                    '{"answer":"Thong tin noi dung tu van '
+                    'khong duoc chuyen cho quan ly.",'
+                    '"citations":["SOURCE_1"]}'
+                ),
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            ),
+        )
+
+        service, _, _, _, resolved_llm, _, _ = make_service(
+            retrieval=FakeRetrievalService(
+                retrieval_result(
+                    hit(
+                        "Suc khoe tinh than - EAP. "
+                        "Thong tin noi dung tu van khong duoc "
+                        "chuyen cho quan ly; cong ty chi nhan "
+                        "du lieu tong hop khong dinh danh."
+                    )
+                )
+            ),
+            llm=llm,
+        )
+
+        result = await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question=("EAP co gui noi dung tu van cho quan ly khong?"),
+        )
+
+        assert resolved_llm.calls == 1
+        assert result.grounding_status == (GroundingStatus.ANSWERED)
+        assert result.assistant_message.content.startswith("Không.")
+
+    run_async(scenario())
+
+
+def test_yes_no_sample_question_alone_is_not_supporting_evidence() -> None:
+    async def scenario() -> None:
+        llm = FakeLLMProvider(
+            LLMGenerationResult(
+                content=(
+                    '{"answer":"Thong tin tu van khong duoc '
+                    'chuyen cho quan ly.",'
+                    '"polarity":"NO",'
+                    '"citations":["SOURCE_1"]}'
+                ),
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            )
+        )
+
+        service, _, _, _, _, _, _ = make_service(
+            retrieval=FakeRetrievalService(
+                retrieval_result(
+                    hit("B. Cau hoi mau\nEAP co gui noi dung tu van cho quan ly khong?")
+                )
+            ),
+            llm=llm,
+        )
+
+        result = await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question=("EAP co gui noi dung tu van cho quan ly khong?"),
+        )
+
+        assert result.grounding_status == (GroundingStatus.NO_ANSWER)
+
+    run_async(scenario())
+
+
+def test_yes_no_self_salary_uses_relevant_clause_across_pdf_line_wraps() -> None:
+    async def scenario() -> None:
+        llm = SequentialFakeLLMProvider(
+            LLMGenerationResult(
+                content=(
+                    '{"answer":"Nguoi lao dong duoc trao doi '
+                    'thong tin luong cua chinh minh.",'
+                    '"polarity":"YES",'
+                    '"citations":["SOURCE_1"]}'
+                ),
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            ),
+        )
+
+        source_text = (
+            "Luong la du lieu nhan su nhay cam nhung "
+            "khong cam nhan\n"
+            "vien noi ve luong cua chinh minh.\n"
+            "2. Chia se thong tin luong\n"
+            "• Nhan vien khong duoc truy cap, sao chep "
+            "hoac phat tan du lieu luong cua nguoi khac "
+            "neu khong co phe duyet.\n"
+            "• Chinh sach khong cam nguoi lao dong "
+            "su dung, trao doi hoac cung cap thong tin "
+            "luong cua chinh\n"
+            "minh khi thuc hien quyen hop phap."
+        )
+
+        service, _, _, _, resolved_llm, _, _ = make_service(
+            retrieval=FakeRetrievalService(retrieval_result(hit(source_text))),
+            llm=llm,
+        )
+
+        result = await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question=("Nhan vien co duoc noi ve muc luong cua chinh minh khong?"),
+        )
+
+        assert resolved_llm.calls == 1
+        assert result.grounding_status == GroundingStatus.ANSWERED
+        assert result.assistant_message.content.startswith("Có.")
+
+    run_async(scenario())
+
+
+def test_supported_yes_no_answer_uses_validated_evidence_polarity() -> None:
+    async def scenario() -> None:
+        llm = SequentialFakeLLMProvider(
+            LLMGenerationResult(
+                content=(
+                    '{"answer":"Noi dung tu van EAP '
+                    "duoc bao mat va khong chia se "
+                    'voi quan ly.",'
+                    '"citations":["SOURCE_1"]}'
+                ),
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            ),
+        )
+
+        source_text = (
+            "Suc khoe tinh than - EAP. "
+            "Thong tin noi dung tu van khong duoc "
+            "chuyen cho quan ly; cong ty chi nhan "
+            "du lieu tong hop khong dinh danh."
+        )
+
+        service, _, _, _, resolved_llm, _, _ = make_service(
+            retrieval=FakeRetrievalService(retrieval_result(hit(source_text))),
+            llm=llm,
+        )
+
+        result = await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question=("EAP co gui noi dung tu van cho quan ly khong?"),
+        )
+
+        assert resolved_llm.calls == 1
+        assert result.grounding_status == GroundingStatus.ANSWERED
+        assert result.assistant_message.content.startswith("Không.")
+
+    run_async(scenario())
+
+
+def test_yes_no_polarity_nonpolar_prefix_does_not_match_longer_word() -> None:
+    from app.services.claim_evidence_validation_service import (
+        infer_yes_no_polarity,
+    )
+
+    assert infer_yes_no_polarity("Noi dung khong chia se voi quan ly.") == "NO"
+
+    assert infer_yes_no_polarity("Khong chi bao mat ma con ma hoa du lieu.") is None
+
+
+class SampleQuestionFirstReranker:
+    async def rerank(self, *, query: str, hits, top_k: int):  # noqa: ANN001
+        sample_hits = tuple(item for item in hits if "Cau hoi mau" in item.text)
+        other_hits = tuple(item for item in hits if "Cau hoi mau" not in item.text)
+        return (*sample_hits, *other_hits)[:top_k]
+
+
+def test_prompt_source_order_uses_answer_quality_after_reranker_sample_hit() -> None:
+    async def scenario() -> None:
+        sample = replace(
+            hit("B. Cau hoi mau\nNhan vien co duoc noi ve muc luong cua chinh minh khong?"),
+            chunk_id=UUID("00000000-0000-0000-0000-000000000301"),
+            chunk_index=0,
+            hybrid_score=2.0,
+        )
+        direct = replace(
+            hit(
+                "Chia se thong tin luong\n"
+                "Chinh sach khong cam nguoi lao dong su dung, "
+                "trao doi hoac cung cap thong tin luong cua chinh minh "
+                "khi thuc hien quyen hop phap."
+            ),
+            chunk_id=UUID("00000000-0000-0000-0000-000000000302"),
+            chunk_index=1,
+            hybrid_score=0.5,
+        )
+        llm = FakeLLMProvider(
+            LLMGenerationResult(
+                content=(
+                    '{"answer":"Chinh sach khong cam nguoi lao dong '
+                    'trao doi thong tin luong cua chinh minh.",'
+                    '"polarity":"YES",'
+                    '"citations":["SOURCE_1"]}'
+                ),
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            )
+        )
+        service, _, _, _, resolved_llm, _, _ = make_service(
+            retrieval=FakeRetrievalService(retrieval_result(sample, direct)),
+            llm=llm,
+            settings_obj=settings(
+                chat_retrieval_top_k=4,
+                citation_max_sources_per_answer=4,
+                reranker_enabled=True,
+                reranker_provider="heuristic",
+                reranker_top_k=2,
+                reranker_candidate_k=4,
+            ),
+            retrieval_reranker=SampleQuestionFirstReranker(),
+        )
+
+        result = await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question="Nhan vien co duoc noi ve muc luong cua chinh minh khong?",
+        )
+
+        prompt = resolved_llm.messages[1].content
+        assert prompt.index("Chinh sach khong cam") < prompt.index("Cau hoi mau")
+        assert result.grounding_status == GroundingStatus.ANSWERED
+        assert result.assistant_message.content.startswith("Có.")
 
     run_async(scenario())

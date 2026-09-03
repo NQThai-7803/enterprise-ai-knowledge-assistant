@@ -84,6 +84,7 @@ class CitationRead(BaseModel):
     chunk_id: UUID | None
     page_number: int = Field(gt=0)
     excerpt: str
+    evidence_text: str | None = None
     relevance_score: float | None
     citation_order: int = Field(ge=1)
     source_type: CitationSourceType | None = None
@@ -96,6 +97,8 @@ class CitationRead(BaseModel):
             data.pop("source_type", None)
         if data.get("source_url") is None:
             data.pop("source_url", None)
+        if data.get("evidence_text") is None:
+            data.pop("evidence_text", None)
         return data
 
     @classmethod
@@ -109,6 +112,11 @@ class CitationRead(BaseModel):
             chunk_id=getattr(citation, "chunk_id", None),
             page_number=citation.page_number,
             excerpt=citation.excerpt,
+            evidence_text=getattr(
+                citation,
+                "evidence_text",
+                None,
+            ),
             relevance_score=citation.relevance_score,
             citation_order=citation.citation_order,
             source_type=source_type if source_type == CitationSourceType.WEB else None,

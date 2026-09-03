@@ -134,10 +134,14 @@ def get_grounded_answer_service(request: Request) -> GroundedAnswerService:
     settings = get_settings()
     llm_provider_manager = request.app.state.llm_provider_manager
     web_search_provider_manager = request.app.state.web_search_provider_manager
+    hybrid_retrieval_service = getattr(request.app.state, "hybrid_retrieval_service", None)
+    if hybrid_retrieval_service is None:
+        hybrid_retrieval_service = create_hybrid_retrieval_service(settings)
+        request.app.state.hybrid_retrieval_service = hybrid_retrieval_service
     return GroundedAnswerService(
         settings=settings,
         session_provider=async_session_factory,
-        hybrid_retrieval_service=create_hybrid_retrieval_service(settings),
+        hybrid_retrieval_service=hybrid_retrieval_service,
         retrieval_reranker=(
             create_retrieval_reranker(settings) if settings.reranker_enabled else None
         ),

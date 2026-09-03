@@ -83,6 +83,28 @@ def test_person_acronym_excerpt_formats_wrapped_role_records() -> None:
     assert "Bob Thu Tran - Chief Technology Officer (CTO)" in excerpt
 
 
+def test_descriptive_person_excerpt_keeps_matching_wrapped_role_record() -> None:
+    text = (
+        "Nguyen Anh Khoa - chiu trach nhiem ket qua kinh doanh va dieu hanh\n"
+        "Tong Giam doc (CEO)\n"
+        "chung\n"
+        "Le Thu Ha - phu trach ky thuat, kien truc, nen tang va nang luc cong\n"
+        "Giam doc Cong nghe (CTO)\n"
+        "nghe\n"
+        "Vo Ngoc Linh - phu trach trien khai va van hanh\n"
+        "Giam doc Van hanh (COO)\n"
+    )
+
+    excerpt = query_focused_excerpt(
+        text,
+        "Nguoi phu trach cong nghe cua Nova Digital ten gi?",
+    )
+
+    assert "Le Thu Ha" in excerpt
+    assert "Giam doc Cong nghe (CTO)" in excerpt
+    assert "Nguyen Anh Khoa" not in excerpt
+
+
 def test_multi_value_excerpt_reconstructs_wrapped_number_rows() -> None:
     text = (
         "Annual leave table\n"
@@ -98,6 +120,151 @@ def test_multi_value_excerpt_reconstructs_wrapped_number_rows() -> None:
     assert "- 12 days Work in normal conditions" in excerpt
     assert "- 14 days Protected workers or hazardous work under the legal list" in excerpt
     assert "- 16 days Especially hazardous work under the legal list" in excerpt
+
+
+def test_broad_duration_excerpt_preserves_condition_value_rows_without_every_cue() -> None:
+    text = (
+        "Muc nghi Doi tuong ap dung\n"
+        "12 ngay Cong viec trong dieu kien binh thuong\n"
+        "Nguoi chua thanh nien hoac cong viec nang nhoc, doc hai\n"
+        "14 ngay\n"
+        "16 ngay Cong viec dac biet nang nhoc, doc hai\n"
+        "Dang ky truoc 03 ngay; nghi 05 ngay lien tuc dang ky truoc 10 ngay.\n"
+    )
+
+    excerpt = query_focused_excerpt(
+        text,
+        "So ngay nghi hang nam theo nhom cong viec la bao nhieu?",
+    )
+
+    assert all(value in excerpt for value in ("12 ngay", "14 ngay", "16 ngay"))
+
+
+def test_broad_duration_excerpt_keeps_wrapped_condition_before_scored_value() -> None:
+    text = (
+        "binh thuong\n"
+        "Nguoi chua thanh nien, nguoi khuyet tat hoac cong viec nang nhoc, "
+        "doc hai, nguy\n"
+        "14 ngay\n"
+        "hiem theo danh muc phap luat\n"
+        "16 ngay Cong viec dac biet nang nhoc, doc hai, nguy hiem theo danh muc phap luat\n"
+        "Nguoi lao dong lam viec chua du 12 thang. Cu du 05 nam tang them 01 ngay. "
+        "Nghi nhieu lan hoac gop toi da 03 nam. Dang ky truoc 03 ngay; "
+        "nghi 05 ngay lien tuc dang ky truoc 10 ngay."
+    )
+
+    excerpt = query_focused_excerpt(
+        text,
+        "So ngay nghi hang nam theo nhom cong viec la bao nhieu?",
+    )
+
+    assert "14 ngay" in excerpt
+    assert "16 ngay" in excerpt
+    assert "Nguoi chua thanh nien" in excerpt
+
+
+def test_compound_excerpt_preserves_evidence_for_each_information_need() -> None:
+    text = (
+        "Thông tin payroll khác\n"
+        "Làm thêm ngày nghỉ hằng tuần: ít nhất 200%.\n"
+        "Phụ cấp on-call bù cho trạng thái sẵn sàng theo lịch.\n"
+        "Thời gian thực tế xử lý ticket/sự cố được ghi nhận riêng để đánh giá OT.\n"
+        + "Nội dung không liên quan. "
+        * 200
+    )
+
+    excerpt = query_focused_excerpt(
+        text,
+        "Nhân viên on-call xử lý sự cố vào Chủ nhật thì thời gian và mức OT thế nào?",
+        information_needs=(
+            "Nhân viên on-call xử lý sự cố vào Chủ nhật thì thời gian",
+            "Nhân viên on-call xử lý sự cố vào Chủ nhật mức OT thế nào",
+        ),
+    )
+
+    assert "thời gian thực tế xử lý ticket/sự cố" in excerpt.casefold()
+    assert "ít nhất 200%" in excerpt.casefold()
+
+
+def test_compound_excerpt_preserves_concrete_security_control_for_ascii_need() -> None:
+    text = (
+        "So ngay remote thong thuong Toi da 02 ngay/tuan.\n"
+        "Dang ky lich Truoc 16:00 cua ngay lam viec lien truoc.\n"
+        "Nhan vien hybrid duy tri kha nang lien lac khi lam o nha.\n"
+        "Nhan vien hybrid tham gia hop trong thoi gian lam viec.\n"
+        "Nhan vien onboarding can kem cap truc tiep.\n"
+        "Dieu kien remote tuy thuoc vi tri va phe duyet quan ly.\n"
+        "An toan thong tin\n"
+        "Su dung thiet bi duoc phe duyet, VPN/MFA khi ap dung; "
+        "khong de nguoi khong co tham quyen tiep can tai lieu.\n"
+    )
+
+    excerpt = query_focused_excerpt(
+        text,
+        "Nhan vien hybrid can tuan thu bao mat nao va duoc phu cap bao nhieu?",
+        information_needs=(
+            "Nhan vien hybrid can tuan thu bao mat nao",
+            "Nhan vien hybrid duoc phu cap bao nhieu",
+        ),
+    )
+
+    assert "thiet bi duoc phe duyet" in excerpt.casefold()
+    assert "vpn/mfa" in excerpt.casefold()
+    assert "khong co tham quyen" in excerpt.casefold()
+
+
+def test_compound_excerpt_preserves_named_eligibility_row_and_header() -> None:
+    text = (
+        "Quyền lợi Từ ngày nhận việc Sau thử việc Sau ngày nghỉ việc\n"
+        "Bảo hiểm bắt buộc Theo điều kiện pháp luật Có Tiếp tục\n"
+        "Có thể tạm dừng theo hợp đồng bảo hiểm\n"
+        "NovaCare Không Có Kết thúc theo ngày hiệu lực bảo hiểm\n"
+        + "Nội dung phúc lợi khác. "
+        * 100
+    )
+
+    excerpt = query_focused_excerpt(
+        text,
+        "NovaCare có từ ngày đầu không và nội trú tối đa bao nhiêu?",
+        information_needs=(
+            "NovaCare có từ ngày đầu không",
+            "NovaCare nội trú tối đa bao nhiêu",
+        ),
+    )
+
+    assert "quyền lợi từ ngày nhận việc sau thử việc" in excerpt.casefold()
+    assert "novacare không có" in excerpt.casefold()
+
+
+def test_night_work_excerpt_prefers_regular_night_rate_over_night_overtime() -> None:
+    text = (
+        "Lam them ngay nghi hang tuan It nhat 200%.\n"
+        "Duoc tra them it nhat 30% tien luong tinh theo don gia/tien\n"
+        "Lam viec ban dem luong gio cua ngay lam viec binh thuong.\n"
+        "Ngoai tien OT va khoan 30% ban dem, con tra them it nhat 20%\n"
+        "Lam them vao ban dem theo co so phap luat ap dung.\n"
+    )
+
+    excerpt = query_focused_excerpt(text, "Lam viec ban dem duoc cong them bao nhieu?")
+
+    assert "30%" in excerpt
+    assert "Lam viec ban dem" in excerpt
+    assert "20%" not in excerpt
+
+
+def test_pay_date_excerpt_rebinds_value_before_wrapped_field_label() -> None:
+    text = (
+        "Moc Quy dinh noi bo\n"
+        "Ky cong Tu ngay 01 den het ngay cuoi cung cua thang.\n"
+        "Han quan ly xac nhan dieu chinh Ngay lam viec thu 4 cua thang ke tiep.\n"
+        "Ngay 10 cua thang ke tiep; neu trung ngay nghi/le, Finance\n"
+        "Ngay tra luong thuc hien vao ngay lam viec lien truoc.\n"
+    )
+
+    excerpt = query_focused_excerpt(text, "Luong thuong ve ngay nao?")
+
+    assert excerpt.startswith("Answer-focused evidence:\nNgay tra luong")
+    assert "Ngay 10 cua thang ke tiep" in excerpt.splitlines()[1]
 
 
 def test_context_selects_highest_ranked_hits_first() -> None:

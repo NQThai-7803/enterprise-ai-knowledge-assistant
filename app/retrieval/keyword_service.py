@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 import logging
 from collections.abc import Callable
 from contextlib import AbstractAsyncContextManager
+from time import perf_counter
 from typing import Protocol
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -73,6 +75,7 @@ class KeywordRetrievalService:
 
         try:
             async with self.session_provider() as session:
+                fts_started = perf_counter()
                 rows = await self.repository.search_permitted_chunks_by_keyword(
                     session,
                     query=normalized_query,
@@ -80,6 +83,7 @@ class KeywordRetrievalService:
                     top_k=resolved_top_k,
                     min_keyword_rank=resolved_min_rank,
                 )
+                fts_ms = int((perf_counter() - fts_started) * 1000)
         except RetrievalError:
             raise
         except Exception as exc:
@@ -96,14 +100,18 @@ class KeywordRetrievalService:
             requested_top_k=resolved_top_k,
             applied_min_keyword_rank=resolved_min_rank,
         )
-        logger.info(
-            "Keyword retrieval completed.",
-            extra={
-                "user_id": str(current_user.id),
-                "hit_count": result.hit_count,
-                "requested_top_k": result.requested_top_k,
-                "applied_min_keyword_rank": result.applied_min_keyword_rank,
-            },
+        logger.warning(
+            "Keyword retrieval completed: %s",
+            json.dumps(
+                {
+                    "user_id": str(current_user.id),
+                    "hit_count": result.hit_count,
+                    "requested_top_k": result.requested_top_k,
+                    "applied_min_keyword_rank": result.applied_min_keyword_rank,
+                    "fts_ms": fts_ms,
+                },
+                ensure_ascii=False,
+            ),
         )
         return result
 

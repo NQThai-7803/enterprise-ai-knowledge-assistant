@@ -141,6 +141,10 @@ class ValidatedCitation:
     chunk_id: UUID | None = None
     source_url: str | None = None
     relevance_score: float | None = None
+    evidence_text: str | None = field(
+        default=None,
+        repr=False,
+    )
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "source_type", CitationSourceType(self.source_type))
@@ -179,6 +183,9 @@ class ValidatedCitation:
             raise ValueError(msg)
         if self.citation_order < 1:
             msg = "citation_order must be one-based."
+            raise ValueError(msg)
+        if self.evidence_text is not None and not self.evidence_text.strip():
+            msg = "evidence_text must not be blank when present."
             raise ValueError(msg)
 
 

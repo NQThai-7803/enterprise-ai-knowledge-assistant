@@ -1,6 +1,205 @@
 
 # Implementation Tasks
 
+## CURRENT COMPLETION SNAPSHOT -- 2026-08-21
+
+### TASK-034.1.2 -- Multi-Document Reliability & RAG Accuracy Hardening
+
+**Status:** Complete for the seven-case runtime UAT set after restoring the intended UAT leave-policy evidence through the real ingestion pipeline. TASK-035 remains not started.
+
+#### Non-negotiable runtime constraint
+
+The 12 / 14 / 16 annual-leave values were not hard-coded into runtime logic and no regression/UAT question was converted into a lookup rule. Runtime answers still flow through RBAC-filtered retrieval, normal ingestion/indexing, reranking/fallback reranking, grounded generation, citation validation, and citation persistence.
+
+#### Four RAG root causes fixed
+
+1. Retrieval/source quality allowed sample-question, appendix, and reference chunks to compete with direct answer-bearing policy clauses. The new evidence/source-quality path ranks clause/table evidence ahead of question-list or sample text.
+2. YES/NO validation was not subject/object aware enough. It could accept the wrong actor/object or reject supported answers when the leading polarity token was missing. Validation now anchors polarity to the asked subject/object.
+3. Relation entailment was missing for replacement/supplemental relationships such as NovaCare versus mandatory BHYT. Validation now recognizes source-supported relation cues instead of treating the answer as unsupported.
+4. Citation repair was too weak. It could leave redundant markers or map final citations to non-answer evidence. Citation selection now uses answer-bearing evidence, focused evidence text, source-quality scoring, and marker repair before public citation numbering.
+
+#### Answer-bearing evidence architecture completed
+
+- Added/used answer-bearing evidence scoring in `app/retrieval/evidence_quality.py`.
+- Added focused citation evidence extraction in `app/citations/evidence.py`.
+- Added evidence-aware citation pruning and marker repair in `app/citations/pruning.py`.
+- Extended citation mapping/persistence/API history with nullable `message_citations.evidence_text`.
+- Strengthened `app/services/claim_evidence_validation_service.py` for subject/object-aware YES/NO validation and relation entailment.
+- Preserved RBAC and permission revalidation; citations remain tied to authorized retrieved chunks.
+
+#### Annual-leave corpus issue and restoration
+
+Annual-leave UAT exposed a corpus issue, not a runtime-code issue. The active Nova-branded leave policy only contained the 12-day normal-work clause, while the authoritative 12 / 14 / 16-day distinction existed in a soft-deleted UAT-admin, organization-scope leave policy document.
+
+Restored existing document rather than reseeding:
+
+- Document ID: `43cb2c93-52bc-44f6-8e03-1b1f075e1d89`
+- Title: `Chính sách nghỉ của người lao động`
+- Filename: `Chinh_sach_nghi_cua_nguoi_lao_dong.pdf`
+- Storage key: `documents/2026/08/951776f4-88c3-4c98-8401-c8ce5edad268.pdf`
+- Checksum: `24178db420422e474326986672b6c15cc67373ee6adbe1489ba5e8addf95f4f4`
+- Uploaded by: `admin.uat@example.test`
+- Access scope: `ORGANIZATION`
+- Restore action: set `is_deleted=false`, reset status to `UPLOADED`, and enqueued normal processing task `274fe326-9d28-421c-9c11-253ec7b74bc2`.
+- Worker result: `READY`, `page_count=6`, `chunk_count=12`, `total_tokens=6458`, `embedding_dimensions=384`.
+- Active indexed verification: active ready corpus became `12` documents and `153` chunks; active authoritative 12 / 14 / 16 clause chunk count is `1`.
+- Active evidence chunk: `4b341201-f0df-4102-b9f2-5ad7091781a6`, page `3`, containing the table rows for `12 ngày`, `14 ngày`, and `16 ngày`.
+
+Provenance conclusion: the restored file is part of the local Nova Digital UAT corpus by uploader, scope, timing, and HR-policy purpose. Remaining corpus debt is that this authoritative 12 / 14 / 16 source is generic/template-branded, while the active Nova-branded leave policy is incomplete for those distinctions.
+
+#### Seven-case runtime UAT result
+
+All cases were run as new staff chat sessions against the real local runtime (`qwen2.5:7b-instruct-8k`). All seven passed.
+
+| Case | Result | Required evidence behavior |
+| --- | --- | --- |
+| Own salary | PASS | Answer `Có`; cites salary policy pages 10-11; claim validation `SUPPORTED`. |
+| EAP | PASS | Answer `Không`; cites benefits policy page 8; claim validation `SUPPORTED`. |
+| NovaCare vs BHYT | PASS | Answer `Không`; cites benefits policy page 4; claim validation `SUPPORTED`. |
+| Engineering Manager | PASS | Returns `N5`, `42 - 70 triệu đồng`; cites salary table page 4; claim validation `SUPPORTED`. |
+| Head / Director | PASS | Returns `N6`, `65 - 110 triệu đồng`; cites salary table page 4; claim validation `SUPPORTED`. |
+| Annual leave | PASS | Starts `Không`; distinguishes `12`, `14`, and `16` days; cites the restored active leave clause/table on page 3 and no sample-question/test-question section; claim validation `SUPPORTED`. |
+| CEO false premise | PASS | Starts `Không`; corrects CEO to `Nguyễn Anh Khoa`; cites organization source page 6; claim validation `SUPPORTED`. |
+
+Annual-leave answer observed:
+
+```text
+Không. 12 ngày Công việc trong điều kiện bình thường; 14 ngày Người chưa thành niên, người khuyết tật hoặc công việc nặng nhọc, độc hại, nguy hiểm theo danh mục pháp luật; 16 ngày Công việc đặc biệt nặng nhọc, độc hại, nguy hiểm theo danh mục pháp luật; 12 ngày làm việc/năm khi đủ [1] [2]
+```
+
+#### Verification
+
+```text
+python -m pytest tests\unit\test_grounded_answer_service.py -q
+75 passed in 1.33s
+
+python -m pytest tests\unit\test_grounded_answer_service.py tests\unit\test_rag_accuracy_components.py tests\unit\test_citation_mapping.py -q
+132 passed in 1.56s
+
+python -m pytest tests\unit\test_grounded_answer_service.py tests\unit\test_rag_accuracy_components.py tests\unit\test_citation_mapping.py tests\unit\test_citation_validation_service.py tests\unit\test_grounded_output.py -q
+157 passed in 1.71s
+
+python -m pytest tests\unit -q
+1061 passed in 8.22s
+
+python -m ruff check <21 touched Python files>
+All checks passed!
+
+python -m ruff format --check <21 touched Python files>
+21 files already formatted
+```
+
+#### Remaining technical debt
+
+- Replace the restored generic/template leave policy with a Nova-branded leave policy containing the same source-defined 12 / 14 / 16 distinctions through the normal upload pipeline when the canonical file is available.
+- The configured CrossEncoder reranker is unavailable in the current runtime and falls back to alignment reranking; hydrate/cache the intended reranker model or explicitly bless the fallback for local UAT.
+- Runtime UAT latency remains high, with observed case elapsed times from about 94s to 186s.
+- Annual-leave `evidence_text` is currently too narrow (`12 ngày`) even though the citation excerpt contains the full 12 / 14 / 16 table; multi-value/table evidence highlighting should capture the full supporting clause.
+- The active Nova-branded leave policy still contains sample-question/test-question chunks; source-quality scoring prevents them from factual citation use, but corpus curation should move test material out of production knowledge documents.
+- The seven-case runtime UAT runner is still manual; add an automated acceptance harness that records prompt, citations, claim-validation diagnostics, and latency.
+
+## CURRENT MANUAL WORK — 2026-08-19
+
+### TASK-034.1.2 — Multi-Document Reliability & RAG Accuracy Hardening
+
+**Status:** In Progress (manual work; Codex not used).
+
+This work is not TASK-035 and does not mark a Release Candidate.
+
+#### Runtime constraint
+
+The regression/UAT question set exists only to measure system behavior. It must never be converted into:
+
+- question-to-answer dictionaries;
+- special-case runtime branches;
+- prompt rules containing expected answers for individual UAT questions;
+- source-specific hard-coded answer templates.
+
+#### Completed in current manual work
+
+- Added exact evidence extraction from answer + backend source text.
+- Added optional `ValidatedCitation.evidence_text`.
+- Persisted nullable `message_citations.evidence_text`.
+- Added DB check constraint preventing blank non-null evidence text.
+- Added migration `cd124fa71c86_add_citation_evidence_text.py`.
+- Added repository read/write propagation.
+- Added `CitationRead.evidence_text` API propagation.
+- Verified DB persistence and GET session reload with a live citation containing `evidence_text = "180 người"`.
+- Added frontend exact-evidence rendering so only the evidence substring is emphasized instead of the whole excerpt.
+- Preserved compatibility for historical citations without evidence metadata.
+- Started Minimal Citation Selection with evidence-aware pruning.
+
+#### Current verification
+
+Exact evidence focused suite checkpoint:
+
+```text
+15 passed
+```
+
+Minimal Citation Selection is **IMPLEMENTED + UNIT VERIFIED; LIVE RUNTIME VERIFICATION PENDING**.
+
+Final focused citation-mapping verification:
+
+```text
+17 passed in 0.19s
+```
+
+The punctuation-whitespace regression after removing redundant markers is fixed:
+
+```text
+Before: Quy mô nhân sự là 180 người [1] .
+After:  Quy mô nhân sự là 180 người [1].
+```
+
+#### Current acceptance intent for citation pruning
+
+- Same `document_id` + same normalized `evidence_text`: keep one strongest citation.
+- Same document + different supporting evidence: preserve multiple citations when required.
+- Never deduplicate only by `document_id`.
+- Pruning occurs before public marker renumbering.
+- Frontend must not hide backend citation errors.
+
+#### RAG accuracy hardening scope after pruning
+
+1. Query understanding / bilingual alias support where useful.
+2. Retrieval recall for existing document facts.
+3. Reranking precision.
+4. Table/row discrimination for nearby values and conditions.
+5. Claim contradiction validation (`Có/Không`, allowed/prohibited, numeric conditions).
+6. Multi-document contamination prevention.
+7. Regression/UAT coverage with paraphrased questions, not runtime answer lookup.
+
+#### UI-04B status
+
+- B1 Exact Evidence Extraction: Completed.
+- B2 Persistence + API: Completed.
+- B3 React exact evidence highlighting: Implemented and manually visible; rerun frontend quality gates after citation-pruning work stabilizes.
+- B4 Document Viewer: Pending. Target behavior remains citation click -> correct document -> correct page -> locate `evidence_text` -> scroll/highlight without mutating source files.
+
+#### Next action
+
+Before final completion, run one live runtime check with a newly generated answer that previously produced duplicate citations:
+
+```text
+Quy mô nhân sự của Nova Digital là bao nhiêu?
+```
+
+Expected behavior: one public citation for the repeated `180 người` evidence, not two same-document/same-evidence citations.
+
+After the live runtime check passes, mark Minimal Citation Selection completed and start RAG Accuracy Hardening.
+
+First investigation target:
+
+```text
+Query Understanding
+-> Hybrid Retrieval recall
+-> Reranking precision
+```
+
+Inspect the real retrieval/reranking implementation before changing code. Do not add question-specific runtime answers.
+
+
 ## Summary
 
 TASK-001 -> TASK-034: Completed. TASK-035 is not started.
@@ -20,7 +219,7 @@ TASK-030 implementation completed: Yes. TASK-031 status: Completed. TASK-032 sta
 - Each task must include tests or a documented verification path.
 - After each task, update `PROJECT_STATUS.md` and `CHANGELOG.md`.
 
-## TASK-001 — Initialize backend project
+## TASK-001 â€” Initialize backend project
 
 **Status:** Completed.
 
@@ -36,7 +235,7 @@ TASK-030 implementation completed: Yes. TASK-031 status: Completed. TASK-032 sta
 
 ---
 
-## TASK-002 — Docker infrastructure
+## TASK-002 â€” Docker infrastructure
 
 **Status:** Completed.
 
@@ -48,7 +247,7 @@ TASK-030 implementation completed: Yes. TASK-031 status: Completed. TASK-032 sta
 
 ---
 
-## TASK-003 — Database foundation
+## TASK-003 â€” Database foundation
 
 **Status:** Completed.
 
@@ -61,7 +260,7 @@ TASK-030 implementation completed: Yes. TASK-031 status: Completed. TASK-032 sta
 
 ---
 
-## TASK-004 — User and department models
+## TASK-004 â€” User and department models
 
 **Status:** Completed.
 
@@ -75,7 +274,7 @@ TASK-030 implementation completed: Yes. TASK-031 status: Completed. TASK-032 sta
 
 ---
 
-## TASK-005 — Authentication
+## TASK-005 â€” Authentication
 
 **Status:** Completed.
 
@@ -90,7 +289,7 @@ TASK-030 implementation completed: Yes. TASK-031 status: Completed. TASK-032 sta
 
 ---
 
-## TASK-006 — RBAC dependencies and policies
+## TASK-006 â€” RBAC dependencies and policies
 
 **Status:** Completed.
 
@@ -102,7 +301,7 @@ TASK-030 implementation completed: Yes. TASK-031 status: Completed. TASK-032 sta
 
 ---
 
-## TASK-007 — User and department APIs
+## TASK-007 â€” User and department APIs
 
 **Status:** Completed.
 
@@ -115,7 +314,7 @@ TASK-030 implementation completed: Yes. TASK-031 status: Completed. TASK-032 sta
 
 ---
 
-## TASK-008 — Document data model
+## TASK-008 â€” Document data model
 
 **Status:** Completed.
 
@@ -129,7 +328,7 @@ TASK-030 implementation completed: Yes. TASK-031 status: Completed. TASK-032 sta
 
 ---
 
-## TASK-009 — Local file storage and upload
+## TASK-009 â€” Local file storage and upload
 
 **Status:** Completed.
 
@@ -144,7 +343,7 @@ TASK-030 implementation completed: Yes. TASK-031 status: Completed. TASK-032 sta
 
 ---
 
-## TASK-010 — Document listing and access control
+## TASK-010 â€” Document listing and access control
 
 **Status:** Completed.
 
@@ -156,7 +355,7 @@ TASK-030 implementation completed: Yes. TASK-031 status: Completed. TASK-032 sta
 
 ---
 
-## TASK-011 — Celery and Redis worker
+## TASK-011 â€” Celery and Redis worker
 
 **Status:** Completed.
 
@@ -171,7 +370,7 @@ TASK-030 implementation completed: Yes. TASK-031 status: Completed. TASK-032 sta
 
 ---
 
-## TASK-012 — PDF extraction
+## TASK-012 â€” PDF extraction
 
 **Status:** Completed.
 
@@ -185,7 +384,7 @@ TASK-030 implementation completed: Yes. TASK-031 status: Completed. TASK-032 sta
 
 ---
 
-## TASK-013 — Chunking
+## TASK-013 â€” Chunking
 
 **Status:** Completed.
 
@@ -198,7 +397,7 @@ TASK-030 implementation completed: Yes. TASK-031 status: Completed. TASK-032 sta
 
 ---
 
-## TASK-014 — pgvector and embeddings
+## TASK-014 â€” pgvector and embeddings
 
 **Status:** Completed.
 
@@ -211,7 +410,7 @@ TASK-030 implementation completed: Yes. TASK-031 status: Completed. TASK-032 sta
 
 ---
 
-## TASK-015 — Document processing pipeline
+## TASK-015 â€” Document processing pipeline
 
 **Status:** Completed.
 
@@ -223,7 +422,7 @@ TASK-030 implementation completed: Yes. TASK-031 status: Completed. TASK-032 sta
 
 ---
 
-## TASK-016 — Retrieval service
+## TASK-016 â€” Retrieval service
 
 **Status:** Completed.
 
@@ -236,7 +435,7 @@ TASK-030 implementation completed: Yes. TASK-031 status: Completed. TASK-032 sta
 
 ---
 
-## TASK-017 — Keyword and hybrid search
+## TASK-017 â€” Keyword and hybrid search
 
 **Status:** Completed.
 
@@ -248,7 +447,7 @@ TASK-030 implementation completed: Yes. TASK-031 status: Completed. TASK-032 sta
 
 ---
 
-## TASK-018 — Chat data model and APIs
+## TASK-018 â€” Chat data model and APIs
 
 **Status:** Completed.
 
@@ -261,7 +460,7 @@ TASK-030 implementation completed: Yes. TASK-031 status: Completed. TASK-032 sta
 
 ---
 
-## TASK-019 — LLM provider and grounded answer
+## TASK-019 â€” LLM provider and grounded answer
 
 **Status:** Completed.
 
@@ -277,7 +476,7 @@ TASK-030 implementation completed: Yes. TASK-031 status: Completed. TASK-032 sta
 
 ---
 
-## TASK-020 — Citation validation
+## TASK-020 â€” Citation validation
 
 **Status:** Completed.
 
@@ -292,7 +491,7 @@ TASK-030 implementation completed: Yes. TASK-031 status: Completed. TASK-032 sta
 
 ---
 
-## TASK-021 — Feedback
+## TASK-021 â€” Feedback
 
 **Status:** Completed.
 
@@ -303,7 +502,7 @@ TASK-030 implementation completed: Yes. TASK-031 status: Completed. TASK-032 sta
 
 ---
 
-## TASK-022 — Audit log expansion
+## TASK-022 â€” Audit log expansion
 
 **Status:** Completed.
 
@@ -315,7 +514,7 @@ TASK-030 implementation completed: Yes. TASK-031 status: Completed. TASK-032 sta
 
 ---
 
-## TASK-023 — Docker full backend stack
+## TASK-023 â€” Docker full backend stack
 
 **Status:** Completed.
 
@@ -327,7 +526,7 @@ TASK-030 implementation completed: Yes. TASK-031 status: Completed. TASK-032 sta
 
 ---
 
-## TASK-024 — CI pipeline
+## TASK-024 â€” CI pipeline
 
 **Status:** Completed.
 
@@ -349,7 +548,7 @@ TASK-030 implementation completed: Yes. TASK-031 status: Completed. TASK-032 sta
 
 ---
 
-## TASK-025 — MVP hardening
+## TASK-025 â€” MVP hardening
 
 **Status:** Completed.
 
@@ -395,7 +594,7 @@ Phase 2 extends the completed backend MVP with multi-provider LLM support, strea
 
 ---
 
-## TASK-026 — Multi-LLM Provider Support
+## TASK-026 â€” Multi-LLM Provider Support
 
 **Status:** Completed.
 
@@ -436,7 +635,7 @@ Extend the current LLM abstraction to support multiple safely configurable provi
 
 ---
 
-## TASK-027 — Streaming Chat with Server-Sent Events
+## TASK-027 â€” Streaming Chat with Server-Sent Events
 
 **Status:** Completed.
 
@@ -464,7 +663,7 @@ Add controlled streaming chat responses using Server-Sent Events while preservin
 
 ---
 
-## TASK-028 — Frontend UI Foundation & Test Console
+## TASK-028 â€” Frontend UI Foundation & Test Console
 
 **Status:** Completed.
 
@@ -807,7 +1006,7 @@ Run final acceptance, release-candidate verification, and release-readiness docu
 - TASK-035 must not be marked completed by selector UX changes, fake UAT LLM verification, or focused UAT regressions alone.
 
 ---
-## TASK-036 — Enterprise Release v2.0
+## TASK-036 â€” Enterprise Release v2.0
 
 **Status:** Pending.
 
@@ -856,3 +1055,111 @@ Verify the system as a real Enterprise RAG Assistant using a real/local LLM, new
 
 TASK-034.2 implementation started: No.
 TASK-035 implementation started: No.
+
+
+### RAG-H2.1 — Reranker Authority
+
+**Status:** Implemented + unit verified; runtime verification pending.
+
+#### Change
+
+Corrected the post-reranker merge order in `app/services/grounded_answer_service.py`.
+
+The previous implementation of `_preserve_reranked_hit_order()` iterated:
+
+```python
+for hit in (*ranked_hits, *reranked_hits):
+```
+
+which allowed the later prompt heuristic ranking to override the reranker's selected order.
+
+It now iterates:
+
+```python
+for hit in (*reranked_hits, *ranked_hits):
+```
+
+so the reranker/fallback reranker remains authoritative and prompt ranking only appends remaining candidates.
+
+A regression test was added to `tests/unit/test_grounded_answer_service.py` to enforce this contract.
+
+#### Verification
+
+```text
+tests/unit/test_grounded_answer_service.py
+61 passed in 2.46s
+
+tests/unit/test_rag_accuracy_components.py
+27 passed in 0.68s
+
+Focused combined retrieval/RAG suite
+147 passed in 2.38s
+```
+
+#### Runtime finding
+
+The configured SentenceTransformer cross-encoder is currently unavailable at runtime and the application logs:
+
+```text
+Retrieval reranker unavailable; falling back to alignment reranking.
+```
+
+Therefore current runtime ranking uses the existing `HeuristicRetrievalReranker` fallback.
+
+`RAG_DIAGNOSTICS_ENABLED` is not currently injected into the API container:
+
+```text
+Settings().rag_diagnostics_enabled = False
+printenv RAG_DIAGNOSTICS_ENABLED = <empty>
+```
+
+Do not claim RAG-H2 runtime acceptance until the container receives the diagnostics setting and the real chat flow is retested.
+
+
+### Runtime incident — LLM_GENERATION_FAILED (2026-08-19)
+
+**Status:** Resolved.
+
+Root cause was not Ollama. The provider stack and `/v1/chat/completions` endpoint were verified working with `qwen2.5:7b-instruct-8k`.
+
+The application failure was a Python `NameError` in `GroundedAnswerService._draft_from_generation()`: a partially applied H5.1 change attempted to call claim validation with `question=grounding_question`, but `grounding_question` was not in that method's scope and the current validator signature did not accept `question`.
+
+The invalid argument was removed to restore the previously supported validator contract.
+
+Verification:
+
+```text
+pytest tests/unit/test_grounded_answer_service.py -q
+61 passed in 1.34s
+
+focused combined RAG/retrieval suite
+147 passed in 2.41s
+
+container source verification:
+"question=grounding_question" in _draft_from_generation -> False
+```
+
+Live chat no longer returns `LLM_GENERATION_FAILED`. Accuracy work remains open: the `Head` salary query currently returns NO_ANSWER even though the source document contains the answer.
+
+Diagnostics setting is `True`, but the expected INFO-level RAG diagnostic messages are not visible in current Docker logs. Logging visibility must be investigated before changing retrieval logic.
+
+### RAG salary amount quality-gate fix — 2026-08-19
+
+**Status:** PASS (unit + runtime).
+
+Root cause: generic quantity completeness logic treated salary `AMOUNT` questions as generic quantity questions and could misread grade labels such as `N6 Head` as number/unit evidence. This caused already-supported salary answers to be retried repeatedly and converted to NO_ANSWER.
+
+Fix:
+- gate generic quantity completeness by analyzed answer type rather than raw `bao nhieu` / `how many` wording;
+- preserve DURATION/COUNT/NUMBER protections;
+- prefer exact question value units before normalized-family fallback.
+
+Verification:
+- `tests/unit/test_grounded_answer_service.py`: 63 passed.
+- focused combined RAG/retrieval suite: 149 passed.
+- runtime: `Head` -> `65 - 110 triệu đồng`.
+- runtime: `Engineering Manager` -> `42 - 70 triệu đồng/tháng`.
+
+Next:
+- YES/NO presentation/quality issue is confirmed separately. Retrieval and claim validation pass, but three supported drafts are rejected by `yes_no_missing_leading_polarity`.
+- Citation evidence UX refinement remains pending: highlight the minimal supporting evidence used to derive the answer, not merely text copied verbatim into the final answer.

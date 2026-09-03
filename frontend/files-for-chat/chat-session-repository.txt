@@ -1,0 +1,128 @@
+﻿from __future__ import annotations
+
+from dataclasses import dataclass
+from uuid import UUID
+
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models import ChatMessage, ChatMessageRole, ChatSession
+
+VISIBLE_MESSAGE_ROLES = (ChatMessageRole.USER, ChatMessageRole.ASSISTANT)
+
+
+@dataclass(frozen=True, slots=True)
+class ChatSessionListRow:
+    chat_session: ChatSession
+    visible_message_count: int
+
+
+async def create(
+    session: AsyncSession,
+    *,
+    user_id: UUID,
+    title: str | None,
+) -> ChatSession:
+    chat_session = ChatSession(
+        user_id=user_id,
+        title=title,
+        is_archived=False,
+    )
+    session.add(chat_session)
+    return chat_session
+
+
+async def list_owned(
+    session: AsyncSession,
+    *,
+    owner_user_id: UUID,
+    limit: int,
+    offset: int,
+    include_archived: bool = False,
+) -> tuple[ChatSessionListRow, ...]:
+    visible_message_count = _visible_message_count_subquery()
+    statement = (
+        select(ChatSession, visible_message_count.label("visible_message_count"))
+        .where(*_owned_session_conditions(owner_user_id, include_archived=include_archived))
+        .order_by(ChatSession.updated_at.desc(), ChatSession.id.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    rows = (await session.execute(statement)).all()
+    return tuple(
+        ChatSessionListRow(chat_session=chat_session, visible_message_count=int(message_count or 0))
+        for chat_session, message_count in rows
+    )
+
+
+async def count_owned(
+    session: AsyncSession,
+    *,
+    owner_user_id: UUID,
+    include_archived: bool = False,
+) -> int:
+    statement = (
+        select(func.count())
+        .select_from(ChatSession)
+        .where(*_owned_session_conditions(owner_user_id, include_archived=include_archived))
+    )
+    return await session.scalar(statement) or 0
+
+
+async def get_owned_by_id(
+    session: AsyncSession,
+    *,
+    session_id: UUID,
+    owner_user_id: UUID,
+) -> ChatSession | None:
+    statement = select(ChatSession).where(
+        ChatSession.id == session_id,
+        ChatSession.user_id == owner_user_id,
+    )
+    return await session.scalar(statement)
+
+
+async def get_owned_by_id_for_update(
+    session: AsyncSession,
+    *,
+    session_id: UUID,
+    owner_user_id: UUID,
+) -> ChatSession | None:
+    statement = (
+        select(ChatSession)
+        .where(
+            ChatSession.id == session_id,
+            ChatSession.user_id == owner_user_id,
+        )
+        .with_for_update()
+    )
+    return await session.scalar(statement)
+
+
+async def touch_updated_at(
+    chat_session: ChatSession,
+    *,
+    updated_at,
+) -> None:
+    chat_session.updated_at = updated_at
+
+
+def _visible_message_count_subquery():
+    return (
+        select(func.count())
+        .select_from(ChatMessage)
+        .where(
+            ChatMessage.session_id == ChatSession.id,
+            ChatMessage.role.in_(VISIBLE_MESSAGE_ROLES),
+        )
+        .correlate(ChatSession)
+        .scalar_subquery()
+    )
+
+
+def _owned_session_conditions(owner_user_id: UUID, *, include_archived: bool) -> list:
+    conditions = [ChatSession.user_id == owner_user_id]
+    if not include_archived:
+        conditions.append(ChatSession.is_archived.is_(False))
+    return conditions
+

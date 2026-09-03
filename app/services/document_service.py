@@ -43,6 +43,7 @@ from app.document_processing.document_types import (
 from app.models import (
     Document,
     DocumentAccessScope,
+    DocumentLifecycleStatus,
     DocumentPermissionLevel,
     DocumentStatus,
     User,
@@ -158,6 +159,12 @@ class DocumentService:
         department_id: UUID | None,
         current_user: User,
         audit_context: AuditContext | None = None,
+        document_code: str | None = None,
+        document_version: str | None = None,
+        effective_from=None,
+        effective_to=None,
+        lifecycle_status: DocumentLifecycleStatus = DocumentLifecycleStatus.ACTIVE,
+        supersedes_document_id: UUID | None = None,
     ) -> Document:
         storage = self._require_storage()
         upload_limits = self._require_upload_limits()
@@ -172,6 +179,13 @@ class DocumentService:
             current_user=current_user,
             access_scope=access_scope,
             department_id=department_id,
+        )
+        await self._validate_authority_metadata(
+            document_id=None,
+            supersedes_document_id=supersedes_document_id,
+            current_user=current_user,
+            effective_from=effective_from,
+            effective_to=effective_to,
         )
         storage_key = generate_document_storage_key(extension=file_type.primary_extension)
         processor = UploadFileProcessor(
@@ -189,6 +203,12 @@ class DocumentService:
             duplicate = await document_repository.get_active_duplicate_by_uploader_and_checksum(
                 self.session,
                 uploaded_by=current_user.id,
+                document_code=normalize_optional_metadata(document_code),
+                document_version=normalize_optional_metadata(document_version),
+                effective_from=effective_from,
+                effective_to=effective_to,
+                lifecycle_status=lifecycle_status,
+                supersedes_document_id=supersedes_document_id,
                 checksum_sha256=processor.checksum_sha256,
             )
             if duplicate is not None:
@@ -359,7 +379,19 @@ class DocumentService:
                 document=document,
                 current_user=current_user,
             )
-            changes_metadata = bool({"title", "description"} & payload.model_fields_set)
+            changes_metadata = bool(
+                {
+                    "title",
+                    "description",
+                    "document_code",
+                    "document_version",
+                    "effective_from",
+                    "effective_to",
+                    "lifecycle_status",
+                    "supersedes_document_id",
+                }
+                & payload.model_fields_set
+            )
             changes_scope = bool({"access_scope", "department_id"} & payload.model_fields_set)
             if changes_metadata and not can_edit_document(
                 current_user,
@@ -374,6 +406,19 @@ class DocumentService:
             ):
                 raise PermissionDeniedError()
             self._reject_null_update_fields(payload)
+            await self._validate_authority_metadata(
+                document_id=document.id,
+                supersedes_document_id=payload.supersedes_document_id
+                if "supersedes_document_id" in payload.model_fields_set
+                else document.supersedes_document_id,
+                current_user=current_user,
+                effective_from=payload.effective_from
+                if "effective_from" in payload.model_fields_set
+                else document.effective_from,
+                effective_to=payload.effective_to
+                if "effective_to" in payload.model_fields_set
+                else document.effective_to,
+            )
             final_scope, final_department_id = await self._validate_update_scope(
                 document=document,
                 payload=payload,
@@ -574,6 +619,33 @@ class DocumentService:
         if "title" in payload.model_fields_set and payload.title is None:
             raise BusinessValidationError("Document title must not be null.")
 
+    async def _validate_authority_metadata(
+        self,
+        *,
+        document_id: UUID | None,
+        supersedes_document_id: UUID | None,
+        current_user: User,
+        effective_from,
+        effective_to,
+    ) -> None:
+        if (
+            effective_from is not None
+            and effective_to is not None
+            and effective_to < effective_from
+        ):
+            raise BusinessValidationError("effective_to must not precede effective_from.")
+        if supersedes_document_id is None:
+            return
+        if document_id is not None and supersedes_document_id == document_id:
+            raise BusinessValidationError("A document cannot supersede itself.")
+        predecessor = await document_repository.get_accessible_by_id(
+            self.session,
+            document_id=supersedes_document_id,
+            current_user=current_user,
+        )
+        if predecessor is None:
+            raise ResourceNotFoundError()
+
     def _apply_document_update(
         self,
         document: Document,
@@ -586,6 +658,16 @@ class DocumentService:
             document.title = normalize_title(payload.title or "")
         if "description" in payload.model_fields_set:
             document.description = normalize_description(payload.description)
+        for field_name in (
+            "document_code",
+            "document_version",
+            "effective_from",
+            "effective_to",
+            "lifecycle_status",
+            "supersedes_document_id",
+        ):
+            if field_name in payload.model_fields_set:
+                setattr(document, field_name, getattr(payload, field_name))
         if {"access_scope", "department_id"} & payload.model_fields_set:
             document.access_scope = final_scope
             document.department_id = final_department_id
@@ -670,6 +752,13 @@ def normalize_search(search: str | None) -> str | None:
     if len(normalized) > MAX_SEARCH_LENGTH:
         raise BusinessValidationError("Search is too long.")
     return normalized
+
+
+def normalize_optional_metadata(value: str | None) -> str | None:
+    if value is None:
+        return None
+    normalized = value.strip()
+    return normalized or None
 
 
 def sanitize_original_filename(filename: str | None) -> str:

@@ -10,6 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.permissions import build_accessible_document_filter
 from app.models import Document, DocumentChunk, DocumentStatus, User
+from app.retrieval.authority import current_authority_order_expression, is_historical_query
+from app.retrieval.question_analysis import fold_text
 
 _TEXT_SEARCH_CONFIG = literal_column("'simple'::regconfig")
 _IDENTIFIER_PATTERN = re.compile(r"\b[A-Za-z0-9]+(?:[-/][A-Za-z0-9]+)+\b")
@@ -17,6 +19,33 @@ _FALLBACK_TOKEN_PATTERN = re.compile(r"[\wÀ-ỹ]+", re.UNICODE)
 _FALLBACK_MAX_TERMS = 12
 _FALLBACK_MAX_PHRASES = 8
 _TITLE_RANK_WEIGHT = 0.2
+_VIETNAMESE_DIACRITIC_SOURCE = "áàảãạăắằẳẵặâấầẩẫậéèẻẽẹêếềểễệíìỉĩịóòỏõọôốồổỗộơớờởỡợúùủũụưứừửữựýỳỷỹỵđ"
+_VIETNAMESE_DIACRITIC_TARGET = "a" * 17 + "e" * 11 + "i" * 5 + "o" * 17 + "u" * 11 + "y" * 5 + "d"
+_VIETNAMESE_ASCII_QUERY_CUES = frozenset(
+    {
+        "bao",
+        "cap",
+        "chinh",
+        "dieu",
+        "duoc",
+        "gio",
+        "han",
+        "khong",
+        "luong",
+        "muc",
+        "nam",
+        "ngay",
+        "nghi",
+        "nhan",
+        "phu",
+        "sach",
+        "thang",
+        "tham",
+        "trua",
+        "tuan",
+        "vien",
+    }
+)
 _VIETNAMESE_QUERY_STOPWORDS = frozenset(
     {
         "ai",
@@ -116,6 +145,25 @@ async def search_permitted_chunks_by_keyword(
     match_expression = text_vector.bool_op("@@")(text_query)
     keyword_rank = func.ts_rank_cd(text_vector, text_query)
 
+    folded_text_vector = None
+    folded_query_text = fold_text(query)
+    if _should_use_diacritic_insensitive_vector(query):
+        folded_text = func.translate(
+            func.lower(DocumentChunk.text),
+            _VIETNAMESE_DIACRITIC_SOURCE,
+            _VIETNAMESE_DIACRITIC_TARGET,
+        )
+        folded_text_vector = func.to_tsvector(_TEXT_SEARCH_CONFIG, folded_text)
+        folded_query = func.websearch_to_tsquery(_TEXT_SEARCH_CONFIG, folded_query_text)
+        match_expression = or_(
+            match_expression,
+            folded_text_vector.bool_op("@@")(folded_query),
+        )
+        keyword_rank = func.greatest(
+            keyword_rank,
+            func.ts_rank_cd(folded_text_vector, folded_query),
+        )
+
     for identifier_query_text in _identifier_query_texts(query):
         identifier_query = func.websearch_to_tsquery(_TEXT_SEARCH_CONFIG, identifier_query_text)
         match_expression = or_(match_expression, text_vector.bool_op("@@")(identifier_query))
@@ -128,6 +176,7 @@ async def search_permitted_chunks_by_keyword(
         min_keyword_rank=min_keyword_rank,
         match_expression=match_expression,
         keyword_rank=keyword_rank,
+        prefer_current_authority=not is_historical_query(query),
     )
     if len(primary_rows) >= top_k:
         return primary_rows
@@ -142,6 +191,27 @@ async def search_permitted_chunks_by_keyword(
     fallback_rank = func.ts_rank_cd(text_vector, fallback_query) + (
         func.ts_rank_cd(title_vector, fallback_query) * _TITLE_RANK_WEIGHT
     )
+    if folded_text_vector is not None:
+        folded_fallback_query_text = _fallback_tsquery_text(folded_query_text)
+        folded_fallback_query = func.to_tsquery(
+            _TEXT_SEARCH_CONFIG,
+            folded_fallback_query_text,
+        )
+        folded_title = func.translate(
+            func.lower(Document.title),
+            _VIETNAMESE_DIACRITIC_SOURCE,
+            _VIETNAMESE_DIACRITIC_TARGET,
+        )
+        folded_title_vector = func.to_tsvector(_TEXT_SEARCH_CONFIG, folded_title)
+        fallback_match_expression = or_(
+            fallback_match_expression,
+            folded_text_vector.bool_op("@@")(folded_fallback_query),
+        )
+        fallback_rank = func.greatest(
+            fallback_rank,
+            func.ts_rank_cd(folded_text_vector, folded_fallback_query)
+            + (func.ts_rank_cd(folded_title_vector, folded_fallback_query) * _TITLE_RANK_WEIGHT),
+        )
     fallback_rows = await _execute_keyword_search(
         session,
         current_user=current_user,
@@ -149,6 +219,7 @@ async def search_permitted_chunks_by_keyword(
         min_keyword_rank=min_keyword_rank,
         match_expression=fallback_match_expression,
         keyword_rank=fallback_rank,
+        prefer_current_authority=not is_historical_query(query),
     )
     return _merge_keyword_rows(primary_rows, fallback_rows, top_k=top_k)
 
@@ -161,6 +232,7 @@ async def _execute_keyword_search(
     min_keyword_rank: float,
     match_expression: ColumnElement[bool],
     keyword_rank: ColumnElement[float],
+    prefer_current_authority: bool,
 ) -> tuple[KeywordRetrievalRow, ...]:
     keyword_rank_label = keyword_rank.label("keyword_rank")
     statement = (
@@ -185,6 +257,11 @@ async def _execute_keyword_search(
         )
         .order_by(
             keyword_rank.desc(),
+            *(
+                ()
+                if not prefer_current_authority
+                else (current_authority_order_expression().desc(),)
+            ),
             Document.id.asc(),
             DocumentChunk.chunk_index.asc(),
             DocumentChunk.id.asc(),
@@ -228,6 +305,16 @@ def _fallback_tsquery_text(query: str) -> str:
     query_parts.extend(_phrase_query_parts(terms))
     query_parts.extend(terms)
     return " | ".join(dict.fromkeys(query_parts))
+
+
+def _should_use_diacritic_insensitive_vector(query: str) -> bool:
+    folded_query = fold_text(query)
+    if query.casefold() != folded_query:
+        return False
+    terms = {
+        term.strip("_") for term in _FALLBACK_TOKEN_PATTERN.findall(folded_query) if term.strip("_")
+    }
+    return bool(terms.intersection(_VIETNAMESE_ASCII_QUERY_CUES))
 
 
 def _meaningful_fallback_terms(query: str) -> tuple[str, ...]:

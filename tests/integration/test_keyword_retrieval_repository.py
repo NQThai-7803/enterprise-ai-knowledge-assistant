@@ -91,6 +91,42 @@ def test_keyword_search_finds_vietnamese_phrase(
     run_async(scenario())
 
 
+def test_keyword_search_finds_accented_policy_from_ascii_vietnamese_query(
+    async_session_factory_for_tests: async_sessionmaker[AsyncSession],
+) -> None:
+    async def scenario() -> None:
+        async with async_session_factory_for_tests() as session:
+            admin = await create_user(
+                session,
+                "keyword-ascii-vietnamese-admin",
+                role=UserRole.ADMIN,
+            )
+            document = await create_document(
+                session,
+                "keyword-ascii-vietnamese-doc",
+                uploader=admin,
+                title="Ch\u00ednh s\u00e1ch ti\u1ec1n l\u01b0\u01a1ng v\u00e0 ph\u1ee5 c\u1ea5p",
+            )
+            lunch_chunk = await create_chunk(
+                session,
+                "keyword-ascii-vietnamese-chunk",
+                document=document,
+                text="Ph\u1ee5 c\u1ea5p \u0103n tr\u01b0a l\u00e0 900.000 \u0111/th\u00e1ng.",
+            )
+
+            rows = await keyword_rows(
+                session,
+                user=admin,
+                query="moi thang phu cap an trua bao nhieu",
+                top_k=8,
+            )
+
+            assert rows
+            assert rows[0].chunk_id == lunch_chunk.id
+
+    run_async(scenario())
+
+
 def test_keyword_fallback_finds_vietnamese_leave_policy_question(
     async_session_factory_for_tests: async_sessionmaker[AsyncSession],
 ) -> None:

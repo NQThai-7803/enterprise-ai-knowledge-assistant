@@ -59,12 +59,101 @@ _VALUE_CUES = (
     "years",
 )
 
+_REPLACEMENT_RELATION_TERMS = frozenset(
+    {
+        "thay",
+        "the",
+        "replace",
+        "replaces",
+        "replacing",
+        "substitute",
+        "substitutes",
+    }
+)
+_PRIMARY_RELATION_CUES = (
+    "bat buoc",
+    "theo luat",
+    "mandatory",
+    "required",
+    "statutory",
+    "compulsory",
+)
+_SUPPLEMENTAL_RELATION_CUES = (
+    "bo sung",
+    "bo tro",
+    "them",
+    "tang cuong",
+    "additional",
+    "supplementary",
+    "supplemental",
+    "extra",
+    "optional",
+)
+_RELATION_ENTITY_STOP_TERMS = frozenset(
+    {
+        "co",
+        "duoc",
+        "khong",
+        "phai",
+        "dung",
+        "la",
+        "ve",
+        "cua",
+        "cho",
+        "hay",
+        "thi",
+        "thay",
+        "the",
+        "replace",
+        "replaces",
+        "replacing",
+        "substitute",
+        "substitutes",
+        "bat",
+        "buoc",
+        "theo",
+        "luat",
+        "mandatory",
+        "required",
+        "statutory",
+        "compulsory",
+        "bo",
+        "sung",
+        "tro",
+        "them",
+        "tang",
+        "cuong",
+        "additional",
+        "supplementary",
+        "supplemental",
+        "extra",
+        "optional",
+        "bao",
+        "hiem",
+        "suc",
+        "khoe",
+        "health",
+        "insurance",
+        "plan",
+        "program",
+        "che",
+        "do",
+        "loai",
+        "hinh",
+        "category",
+    }
+)
+
 
 @dataclass(frozen=True, slots=True)
 class StructuredRecord:
     section: str
     row_text: str
     field_pairs: tuple[tuple[str, str], ...] = ()
+    row_label: str = ""
+    row_value: str = ""
+    row_condition: str = ""
+    neighboring_header: str = ""
 
 
 def structured_retrieval_text(text: str) -> str:
@@ -93,11 +182,28 @@ def build_structured_records(text: str) -> tuple[StructuredRecord, ...]:
         folded_line = fold_text(line)
         key_value = _KEY_VALUE_RE.match(line)
         if key_value is not None:
+            if "|" in line:
+                label, value, condition = _record_parts(line)
+                records.append(
+                    StructuredRecord(
+                        section=current_section,
+                        row_text=line,
+                        row_label=label,
+                        row_value=value,
+                        row_condition=condition,
+                        neighboring_header=current_section,
+                    )
+                )
+                continue
+            label = key_value.group(1).strip()
+            value = key_value.group(2).strip()
             records.append(
                 StructuredRecord(
                     section=current_section,
                     row_text=line,
-                    field_pairs=((key_value.group(1).strip(), key_value.group(2).strip()),),
+                    field_pairs=((label, value),),
+                    row_label=label,
+                    row_value=value,
                 )
             )
             continue
@@ -109,19 +215,26 @@ def build_structured_records(text: str) -> tuple[StructuredRecord, ...]:
         previous_line = lines[index - 1] if index > 0 else ""
         next_line = lines[index + 1] if index + 1 < len(lines) else ""
         row_lines = [line]
-        if _line_has_value(line) and _line_looks_like_label(previous_line):
+        if "|" not in line and _line_has_value(line) and _line_looks_like_label(previous_line):
             row_lines.insert(0, previous_line)
         if (
-            not _line_has_value(line)
+            "|" not in line
+            and not _line_has_value(line)
             and _line_looks_like_label(line)
             and _line_has_value(next_line)
         ):
             row_lines.append(next_line)
         if len(row_lines) > 1 or _line_has_value(line) or _ACRONYM_RE.search(line):
+            row_text = " | ".join(part.strip() for part in row_lines if part.strip())
+            label, value, condition = _record_parts(row_text)
             records.append(
                 StructuredRecord(
                     section=current_section,
-                    row_text=" | ".join(part.strip() for part in row_lines if part.strip()),
+                    row_text=row_text,
+                    row_label=label,
+                    row_value=value,
+                    row_condition=condition,
+                    neighboring_header=current_section,
                 )
             )
             continue
@@ -130,6 +243,17 @@ def build_structured_records(text: str) -> tuple[StructuredRecord, ...]:
             current_section = line.strip()
 
     return tuple(records)
+
+
+def _record_parts(row_text: str) -> tuple[str, str, str]:
+    """Extract row label/value/condition without treating nearby numbers as values."""
+    parts = [part.strip() for part in row_text.split("|") if part.strip()]
+    if len(parts) < 2:
+        return row_text.strip(), "", ""
+    label = parts[0]
+    value = parts[1]
+    condition = " | ".join(parts[2:])
+    return label, value, condition
 
 
 def selected_structural_line_indexes(
@@ -143,6 +267,7 @@ def selected_structural_line_indexes(
     if not lines:
         return ()
     folded_lines = tuple(fold_text(line) for line in lines)
+    security_control_question = _asks_for_security_controls(question)
     terms = tuple(
         term
         for term in question_terms(question)
@@ -169,24 +294,55 @@ def selected_structural_line_indexes(
             folded_line,
             terms=terms,
             analysis=analysis,
+            security_control_question=security_control_question,
             previous_line=folded_lines[index - 1] if index > 0 else "",
             next_line=folded_lines[index + 1] if index + 1 < len(lines) else "",
         )
         if score > 0:
             scored.append((index, score))
-    if not scored:
+    relation_indexes = _replacement_relation_line_indexes(
+        folded_lines=folded_lines,
+        terms=terms,
+    )
+
+    if not scored and not relation_indexes:
         return ()
 
-    best_score = max(score for _, score in scored)
-    selected = sorted(
-        ((index, score) for index, score in scored if score >= max(1, best_score - 4)),
-        key=lambda row: (-row[1], row[0]),
-    )
+    selected_indexes: list[int] = []
+    for index in relation_indexes:
+        if index not in selected_indexes:
+            selected_indexes.append(index)
+
+    if scored:
+        best_score = max(score for _, score in scored)
+        selected = sorted(
+            ((index, score) for index, score in scored if score >= max(1, best_score - 4)),
+            key=lambda row: (-row[1], row[0]),
+        )
+        for index, _ in selected:
+            if index not in selected_indexes:
+                selected_indexes.append(index)
+
+    # Preserve every highest-scoring answer line before adding surrounding
+    # headers/conditions. Otherwise one row's neighbors can consume the whole
+    # excerpt and crowd out another directly relevant row.
     expanded: list[int] = []
-    for index, _ in selected[:max_indexes]:
+    for index in selected_indexes[:max_indexes]:
+        if index not in expanded:
+            expanded.append(index)
+        table_header = _nearest_table_header_index(lines, index)
+        if table_header is not None and table_header not in expanded:
+            expanded.append(table_header)
+    for index in selected_indexes:
         for neighbor in _structural_neighbors(index, lines, analysis):
             if 0 <= neighbor < len(lines) and neighbor not in expanded:
                 expanded.append(neighbor)
+    if _asks_regular_night_work(analysis=analysis, terms=terms):
+        expanded = [
+            index
+            for index in expanded
+            if not _is_mismatched_regular_night_percentage(index=index, folded_lines=folded_lines)
+        ]
     return tuple(expanded[:max_indexes])
 
 
@@ -241,12 +397,55 @@ def _line_question_score(
     *,
     terms: tuple[str, ...],
     analysis: QuestionAnalysis,
+    security_control_question: bool,
     previous_line: str,
     next_line: str,
 ) -> int:
     window = f"{previous_line} {folded_line} {next_line}"
     score = sum(2 for term in terms if term in folded_line)
     score += sum(1 for term in terms if term in window and term not in folded_line)
+    score += sum(
+        4 for left, right in zip(terms, terms[1:], strict=False) if f"{left} {right}" in folded_line
+    )
+    term_set = set(terms)
+    if security_control_question:
+        matched_controls = {
+            cue
+            for cue in (
+                "ket noi an toan",
+                "xac thuc nhieu lop",
+                "thiet bi duoc phe duyet",
+                "thiet bi duoc quan ly",
+                "khong de nguoi khong co tham quyen",
+                "multi factor",
+                "managed device",
+                "safe connection",
+                "unauthorized",
+                "vpn",
+                "mfa",
+            )
+            if cue in window
+        }
+        if matched_controls:
+            score += 40 + len(matched_controls) * 12
+    score += sum(8 for term in term_set if len(term) >= 7 and term in folded_line)
+    if {"thoi", "gian"}.issubset(term_set) and "thoi gian" in folded_line:
+        score += 12
+        if "ghi nhan" in folded_line:
+            score += 8
+    if analysis.asks_for_percentage and (
+        {"chu", "nhat"}.issubset(term_set) or "sunday" in term_set or "weekend" in term_set
+    ):
+        if "ngay nghi hang tuan" in folded_line:
+            score += 20
+        if any(cue in folded_line for cue in ("ngay le", "tet", "holiday")):
+            score -= 12
+    asks_regular_night_work = _asks_regular_night_work(analysis=analysis, terms=terms)
+    if asks_regular_night_work:
+        if "lam viec ban dem" in window or "night work" in window:
+            score += 24
+        if "lam them vao ban dem" in window or "night overtime" in window:
+            score -= 48
     if analysis.asks_for_person and any(term in folded_line for term in terms):
         score += 6
     if analysis.asks_for_explicit_value and has_value_expression(folded_line):
@@ -270,6 +469,107 @@ def _line_question_score(
     if has_explicit_not_specified(folded_line):
         score += 8
     return score
+
+
+def _asks_for_security_controls(question: str) -> bool:
+    folded = fold_text(question)
+    return (
+        "bao mat" in folded
+        and any(
+            cue in folded for cue in ("yeu cau", "bao dam", "can tuan thu", "tuan thu", "controls")
+        )
+    ) or (
+        "an toan" in folded
+        and any(cue in folded for cue in ("bao dam", "dam bao", "gi", "controls"))
+    )
+
+
+def _asks_regular_night_work(
+    *,
+    analysis: QuestionAnalysis,
+    terms: tuple[str, ...],
+) -> bool:
+    joined_terms = " ".join(terms)
+    return (
+        analysis.asks_for_percentage
+        and ("lam viec ban dem" in joined_terms or "night work" in joined_terms)
+        and "lam them" not in joined_terms
+        and "overtime" not in set(terms)
+    )
+
+
+def _is_mismatched_regular_night_percentage(
+    *,
+    index: int,
+    folded_lines: tuple[str, ...],
+) -> bool:
+    line = folded_lines[index]
+    if _PERCENT_RE.search(line) is None:
+        return False
+    next_line = folded_lines[index + 1] if index + 1 < len(folded_lines) else ""
+    if "lam viec ban dem" in line or "lam viec ban dem" in next_line:
+        return False
+    return any(
+        cue in f"{line} {next_line}"
+        for cue in (
+            "lam them",
+            "ngay nghi hang tuan",
+            "ngay le",
+            "night overtime",
+            "weekly rest",
+            "holiday",
+        )
+    )
+
+
+def _replacement_relation_line_indexes(
+    *,
+    folded_lines: tuple[str, ...],
+    terms: tuple[str, ...],
+) -> tuple[int, ...]:
+    if not _is_replacement_relation_question(terms):
+        return ()
+
+    entity_terms = tuple(
+        term for term in terms if term not in _RELATION_ENTITY_STOP_TERMS and len(term) >= 3
+    )
+    if len(entity_terms) < 2:
+        return ()
+
+    rows: list[tuple[int, str, frozenset[str]]] = []
+    for index, folded_line in enumerate(folded_lines):
+        matched_entities = frozenset(
+            term for term in entity_terms if _contains_folded_token(folded_line, term)
+        )
+        if not matched_entities:
+            continue
+        if any(cue in folded_line for cue in _PRIMARY_RELATION_CUES):
+            rows.append((index, "primary", matched_entities))
+        if any(cue in folded_line for cue in _SUPPLEMENTAL_RELATION_CUES):
+            rows.append((index, "supplemental", matched_entities))
+
+    primary_entities = set().union(*(entities for _, kind, entities in rows if kind == "primary"))
+    supplemental_entities = set().union(
+        *(entities for _, kind, entities in rows if kind == "supplemental")
+    )
+    if not primary_entities or not supplemental_entities:
+        return ()
+    if len(primary_entities.union(supplemental_entities)) < 2:
+        return ()
+
+    indexes = sorted({index for index, _, _ in rows})
+    return tuple(indexes)
+
+
+def _is_replacement_relation_question(terms: tuple[str, ...]) -> bool:
+    term_set = frozenset(terms)
+    return {"thay", "the"} <= term_set or bool(
+        term_set.intersection(_REPLACEMENT_RELATION_TERMS - {"thay", "the"})
+    )
+
+
+def _contains_folded_token(text: str, token: str) -> bool:
+    return re.search(rf"(?<!\w){re.escape(token)}(?!\w)", text) is not None
 
 
 def _structural_neighbors(
@@ -296,6 +596,28 @@ def _structural_neighbors(
 def _nearest_header_index(lines: tuple[str, ...], index: int) -> int | None:
     for candidate in range(index - 1, max(-1, index - 5), -1):
         if _looks_like_section_header(lines[candidate]):
+            return candidate
+    return None
+
+
+def _nearest_table_header_index(lines: tuple[str, ...], index: int) -> int | None:
+    cues = (
+        "quyen loi",
+        "tu ngay",
+        "sau thu viec",
+        "dieu kien",
+        "han muc",
+        "tinh huong",
+        "muc toi thieu",
+        "category",
+        "condition",
+        "eligibility",
+        "from first day",
+        "after probation",
+    )
+    for candidate in range(index - 1, max(-1, index - 11), -1):
+        folded = fold_text(lines[candidate])
+        if sum(cue in folded for cue in cues) >= 2:
             return candidate
     return None
 

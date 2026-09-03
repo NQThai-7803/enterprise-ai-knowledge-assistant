@@ -1,5 +1,118 @@
 # Project Status
 
+## CURRENT STATUS -- 2026-08-21
+
+> This block supersedes older 2026-08-19 RAG handoffs. TASK-034.1.2 runtime RAG acceptance is complete for the agreed seven-case set. TASK-035 is still not started.
+
+### Completed
+
+- Restored the intended UAT leave-policy evidence through the normal ingestion/indexing pipeline instead of changing runtime RAG logic or inserting direct chunk answers.
+- Verified active non-deleted indexed evidence for the 12 / 14 / 16 annual-leave distinctions before runtime UAT.
+- Completed answer-bearing source-quality, subject/object-aware YES/NO validation, relation entailment, and citation repair work.
+- Passed all seven runtime UAT cases in new chats against the local real LLM runtime.
+- Re-ran focused RAG suites, full unit tests, Ruff lint, and Ruff format check with actual counts.
+
+### Corpus action
+
+Restored document `43cb2c93-52bc-44f6-8e03-1b1f075e1d89`, `Chính sách nghỉ của người lao động`, checksum `24178db420422e474326986672b6c15cc67373ee6adbe1489ba5e8addf95f4f4`, storage key `documents/2026/08/951776f4-88c3-4c98-8401-c8ce5edad268.pdf`, uploaded by `admin.uat@example.test`, `ORGANIZATION` scope.
+
+The document was restored from soft delete by setting `is_deleted=false`, reset to `UPLOADED`, and processed by normal worker task `274fe326-9d28-421c-9c11-253ec7b74bc2`. Final ingestion result: `READY`, `page_count=6`, `chunk_count=12`, `total_tokens=6458`, embeddings `384` dimensions. Active corpus verification after processing: `12` active ready documents, `153` active chunks, and authoritative active leave clause chunk `4b341201-f0df-4102-b9f2-5ad7091781a6` on page `3`.
+
+Provenance is clear enough for UAT restoration because the file was UAT-admin uploaded, organization scoped, HR-policy themed, and contained the exact authoritative annual-leave table. Remaining corpus limitation: it is generic/template-branded; no Nova-branded PDF with the 12 / 14 / 16 table was found, and the active Nova-branded leave policy only had the 12-day normal-work clause.
+
+### Runtime UAT
+
+| Case | Result |
+| --- | --- |
+| Own salary | PASS -- `Có`; salary policy pages 10-11; `SUPPORTED`. |
+| EAP | PASS -- `Không`; benefits policy page 8; `SUPPORTED`. |
+| NovaCare vs BHYT | PASS -- `Không`; benefits policy page 4; `SUPPORTED`. |
+| Engineering Manager | PASS -- `N5`, `42 - 70 triệu đồng`; salary table page 4; `SUPPORTED`. |
+| Head / Director | PASS -- `N6`, `65 - 110 triệu đồng`; salary table page 4; `SUPPORTED`. |
+| Annual leave | PASS -- starts `Không`, distinguishes `12 / 14 / 16`, cites real active leave clause/table page 3, no sample-question citation, `SUPPORTED`. |
+| CEO false premise | PASS -- starts `Không`, identifies `Nguyễn Anh Khoa`; organization source page 6; `SUPPORTED`. |
+
+### Verification
+
+```text
+tests/unit/test_grounded_answer_service.py: 75 passed in 1.33s
+focused RAG/citation suite: 132 passed in 1.56s
+combined RAG/citation/validation/output suite: 157 passed in 1.71s
+tests/unit: 1061 passed in 8.22s
+ruff check on 21 touched Python files: All checks passed
+ruff format --check on 21 touched Python files: 21 files already formatted
+```
+
+### Remaining technical debt
+
+- Replace the restored generic/template leave policy with canonical Nova-branded content once available.
+- Hydrate/cache the configured CrossEncoder reranker or formally accept alignment fallback for local UAT.
+- Profile runtime UAT latency; observed wall-clock case times were about 94s-186s.
+- Improve table evidence highlighting so annual leave captures the full 12 / 14 / 16 support span, not only a narrow value.
+- Remove sample-question/test-question sections from production knowledge documents through corpus curation.
+- Convert the manual seven-case runtime UAT runner into an automated acceptance artifact.
+
+## CURRENT MANUAL STATUS — 2026-08-19
+
+> This block is the latest project handoff and should be read before older status snapshots below.
+
+### Current phase
+
+Manual RAG Accuracy Hardening + UI-04B Exact Evidence / citation quality.
+
+### Current task
+
+Minimal Citation Selection is **IMPLEMENTED + UNIT VERIFIED; LIVE RUNTIME VERIFICATION PENDING** after Exact Evidence persistence/API work was verified.
+
+Current checkpoint:
+
+- Exact evidence extraction: implemented and focused tests passed (`15 passed` at completion checkpoint).
+- `message_citations.evidence_text`: implemented and persisted.
+- API/session history exposes optional `evidence_text`.
+- Frontend exact-evidence rendering is visibly active in citation cards.
+- Original source PDF/DOCX files remain unchanged.
+- Minimal citation pruning: focused citation-mapping suite passed `17 passed in 0.19s`; one live new-message runtime check is still required before final completion.
+- Document Viewer navigation to exact document/page/evidence is still pending.
+- RAG answer-quality hardening is the next active work based on manual Vietnamese multi-document UAT.
+
+### Mandatory runtime principle
+
+Regression/UAT questions are not a runtime knowledge base. No hard-coded question-to-answer mappings are allowed. Answers must be generated from currently authorized retrieved document evidence.
+
+### Accuracy findings requiring general fixes
+
+Manual UAT showed recurring classes of errors:
+
+- retrieval misses even when the source contains direct answers;
+- wrong row selection in tables with neighboring percentages/conditions;
+- contradictions such as `Có` vs `Không`;
+- semantic intent confusion between related HR concepts;
+- role/workflow confusion;
+- redundant citations that support the same factual evidence.
+
+The remediation path is capability-level:
+
+```text
+Query Understanding
+-> Hybrid Retrieval
+-> Reranking
+-> Table/Row Discrimination
+-> Minimal Evidence Selection
+-> Claim/Evidence Validation
+-> Grounded Answer
+```
+
+### Documentation policy during manual work
+
+After each completed change, update:
+
+- `TASKS.md`
+- `PROJECT_STATUS.md`
+- `CHANGELOG.md`
+
+Also update the affected spec/design docs (`RAG_DESIGN.md`, `API_SPEC.md`, `DATABASE_DESIGN.md`, `TESTING_STRATEGY.md`, `FRONTEND_SPEC.md`) when their contracts/designs change.
+
+
 ## Current phase
 
 UAT UX + LLM configuration fix
@@ -242,3 +355,39 @@ Current remaining completion requirements:
 - Permission, failure, no-answer, and cross-document acceptance cases must remain green after the local streaming timeout fix.
 
 TASK-034.1 cannot be marked completed until real/local or explicitly configured external provider acceptance passes against the new unseen document set with manual claim verification.
+
+
+### RAG-H2.1 checkpoint — 2026-08-19
+
+- Post-reranker ordering bug fixed: reranked hits are now preserved before prompt-ranked supplemental hits.
+- Regression coverage added.
+- Focused verification passed: `61`, `27`, and combined `147` tests.
+- Runtime cross-encoder is currently unavailable and falls back to `HeuristicRetrievalReranker`.
+- `RAG_DIAGNOSTICS_ENABLED` is not present in the API container; `Settings().rag_diagnostics_enabled` remains `False`.
+- Runtime H2 acceptance is pending after diagnostics injection and real query verification.
+
+
+### Runtime recovery checkpoint — 2026-08-19
+
+- `LLM_GENERATION_FAILED` incident resolved.
+- Ollama/provider path verified healthy; 8K model alias runs with context 8192.
+- Actual backend root cause was `NameError` from a partially applied `question=grounding_question` claim-validation call inside `_draft_from_generation()`.
+- Restored current claim-validator call contract.
+- Tests passed: `61` focused grounded-answer tests and `147` combined RAG/retrieval tests.
+- Live `Head` salary query now fails as NO_ANSWER rather than generation failure; accuracy investigation continues.
+- `RAG_DIAGNOSTICS_ENABLED=True`, but INFO diagnostic events are not appearing in `docker compose logs`; logging visibility investigation is next.
+
+### RAG accuracy checkpoint — salary amount PASS
+
+Salary-band runtime probes are now passing:
+- Head / Director: 65 - 110 triệu đồng.
+- Engineering Manager / N5: 42 - 70 triệu đồng/tháng.
+
+Regression verification:
+- grounded-answer unit suite: 63 passed.
+- combined focused RAG/retrieval suite: 149 passed.
+
+Current open issue:
+`Nhân viên có được nói về mức lương của chính mình không?` still returns NO_ANSWER. Diagnostics show correct YES_NO retrieval and three `SUPPORTED` claim validations, followed each time by `reason=yes_no_missing_leading_polarity`. This is a presentation/quality-gate failure, not a retrieval miss.
+
+Citation UX decision pending implementation: evidence highlighting should represent the source passage(s) that materially support the answer/inference.

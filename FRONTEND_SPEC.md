@@ -1,27 +1,27 @@
-# Frontend Specification
+﻿# Frontend Specification
 
-## 1. Phạm vi
+## 1. Pháº¡m vi
 
-Frontend được thực hiện sau khi backend MVP ổn định. Công nghệ dự kiến:
+Frontend Ä‘Æ°á»£c thá»±c hiá»‡n sau khi backend MVP á»•n Ä‘á»‹nh. CÃ´ng nghá»‡ dá»± kiáº¿n:
 
 - React.
 - TypeScript.
 - Vite.
-- UI library sẽ được quyết định trước Task frontend đầu tiên.
+- UI library sáº½ Ä‘Æ°á»£c quyáº¿t Ä‘á»‹nh trÆ°á»›c Task frontend Ä‘áº§u tiÃªn.
 
 ## 2. Layout
 
 ### Auth layout
 
 - Login page.
-- Không hiển thị sidebar.
+- KhÃ´ng hiá»ƒn thá»‹ sidebar.
 
 ### Application layout
 
 - Sidebar theo role.
-- Top bar hiển thị user, department và logout.
+- Top bar hiá»ƒn thá»‹ user, department vÃ  logout.
 - Main content.
-- Responsive cho desktop và tablet; mobile là mức hỗ trợ phụ ở MVP.
+- Responsive cho desktop vÃ  tablet; mobile lÃ  má»©c há»— trá»£ phá»¥ á»Ÿ MVP.
 
 ## 3. Pages
 
@@ -30,22 +30,22 @@ Frontend được thực hiện sau khi backend MVP ổn định. Công nghệ d
 - Email.
 - Password.
 - Loading state.
-- Error message an toàn.
+- Error message an toÃ n.
 
 ### Dashboard
 
-MVP hiển thị:
+MVP hiá»ƒn thá»‹:
 
-- Số tài liệu READY.
-- Tài liệu PROCESSING/FAILED.
-- Số chat session của user.
-- Câu hỏi gần đây.
+- Sá»‘ tÃ i liá»‡u READY.
+- TÃ i liá»‡u PROCESSING/FAILED.
+- Sá»‘ chat session cá»§a user.
+- CÃ¢u há»i gáº§n Ä‘Ã¢y.
 
 ### Documents
 
-- Table hoặc card list.
+- Table hoáº·c card list.
 - Search.
-- Filter status và access scope.
+- Filter status vÃ  access scope.
 - Upload modal.
 - Processing status.
 - Action theo permission.
@@ -55,8 +55,8 @@ MVP hiển thị:
 - Metadata.
 - Processing status.
 - Download.
-- Reprocess cho người có quyền.
-- Không hiển thị storage path nội bộ.
+- Reprocess cho ngÆ°á»i cÃ³ quyá»n.
+- KhÃ´ng hiá»ƒn thá»‹ storage path ná»™i bá»™.
 
 ### Chat
 
@@ -67,7 +67,7 @@ Right drawer/panel: citations and document preview
 ```
 
 - New chat.
-- Loading/streaming state nếu backend hỗ trợ.
+- Loading/streaming state náº¿u backend há»— trá»£.
 - Citation chips.
 - Feedback buttons.
 - No-answer state.
@@ -84,8 +84,8 @@ Admin only:
 
 Admin only:
 
-- Filter action, user và date.
-- Không hiển thị secret hoặc raw token.
+- Filter action, user vÃ  date.
+- KhÃ´ng hiá»ƒn thá»‹ secret hoáº·c raw token.
 
 ## 4. Role-aware navigation
 
@@ -99,20 +99,58 @@ Admin only:
 | Feedback report | Yes | Department | No |
 | Audit logs | Yes | No | No |
 
-Frontend chỉ hỗ trợ UX; backend vẫn là nguồn kiểm soát quyền chính thức.
+Frontend chá»‰ há»— trá»£ UX; backend váº«n lÃ  nguá»“n kiá»ƒm soÃ¡t quyá»n chÃ­nh thá»©c.
 
 ## 5. API client
 
-- Base URL từ environment.
-- Gắn access token tự động.
+- Base URL tá»« environment.
+- Gáº¯n access token tá»± Ä‘á»™ng.
 - Refresh token theo flow backend.
-- Khi refresh thất bại, logout và chuyển về login.
-- Chuẩn hóa error handling.
+- Khi refresh tháº¥t báº¡i, logout vÃ  chuyá»ƒn vá» login.
+- Chuáº©n hÃ³a error handling.
 
 ## 6. Security
 
-- Không lưu password.
-- Không render raw HTML từ AI nếu chưa sanitize.
-- Không tin role do client tự sửa.
-- Không expose internal IDs không cần thiết trong URL công khai.
+- KhÃ´ng lÆ°u password.
+- KhÃ´ng render raw HTML tá»« AI náº¿u chÆ°a sanitize.
+- KhÃ´ng tin role do client tá»± sá»­a.
+- KhÃ´ng expose internal IDs khÃ´ng cáº§n thiáº¿t trong URL cÃ´ng khai.
 - Download qua authenticated endpoint.
+
+## 7. Exact Evidence Citation UX — 2026-08-19
+
+Citation objects may contain optional `evidence_text`.
+
+Frontend behavior:
+
+- keep the broader `excerpt` visible as context;
+- when `evidence_text` is present and can be matched inside the excerpt, emphasize only that exact evidence;
+- current visual treatment uses bold text + red underline + controlled animation;
+- if evidence is absent or cannot be safely matched, render the excerpt normally;
+- historical citations without evidence metadata must remain readable;
+- clicking an inline citation marker continues to focus/scroll the corresponding citation card;
+- conversation-global citation numbering remains a UI presentation detail.
+
+Do not mutate original PDF/DOCX files.
+
+### Pending Document Viewer behavior
+
+UI-04B.4 is not completed yet.
+
+Target:
+
+```text
+click citation
+-> document_id
+-> page_number
+-> open/locate document preview
+-> find evidence_text
+-> scroll evidence into view
+-> temporary visual highlight
+```
+
+This is presentation-only highlighting. The stored source document remains unchanged.
+
+### Citation quality boundary
+
+The frontend must not hide redundant/incorrect backend citations to simulate correctness. Minimal Citation Selection belongs in backend citation mapping/pruning before public marker numbering.

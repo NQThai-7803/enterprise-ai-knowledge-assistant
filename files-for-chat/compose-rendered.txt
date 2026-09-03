@@ -1,0 +1,436 @@
+﻿name: enterprise-ai-knowledge-assistant
+services:
+  api:
+    build:
+      context: C:\Users\_ASUS_\OneDrive\M├íy t├¡nh\Documents\Python\LTPYTHON\Enterprise AI Knowledge Assistant
+      dockerfile: Dockerfile
+      target: runtime
+    command:
+      - uvicorn
+      - app.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+    depends_on:
+      migration:
+        condition: service_completed_successfully
+        required: true
+      postgres:
+        condition: service_healthy
+        required: true
+      redis:
+        condition: service_healthy
+        required: true
+    environment:
+      ACCESS_TOKEN_EXPIRE_MINUTES: "15"
+      API_DOCS_ENABLED: "true"
+      API_V1_PREFIX: /api/v1
+      APP_DEBUG: "true"
+      APP_ENV: development
+      APP_NAME: Enterprise AI Knowledge Assistant
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      CELERY_WORKER_CONCURRENCY: "1"
+      CHUNK_OVERLAP_TOKENS: "100"
+      CHUNK_SIZE_TOKENS: "700"
+      CORS_ORIGINS: http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174
+      DATABASE_URL: postgresql+asyncpg://app_user:change-me-for-local-development@postgres:5432/enterprise_ai
+      DEBUG: "false"
+      DEV_ADMIN_EMAIL: admin@example.com
+      DEV_ADMIN_FULL_NAME: Development Admin
+      DEV_ADMIN_PASSWORD: ""
+      EMBEDDING_BATCH_SIZE: "16"
+      EMBEDDING_DEVICE: cpu
+      EMBEDDING_DIMENSIONS: "384"
+      EMBEDDING_LOCAL_FILES_ONLY: "false"
+      EMBEDDING_MODEL_CACHE_PATH: /app/data/models
+      EMBEDDING_MODEL_NAME: intfloat/multilingual-e5-small
+      EMBEDDING_MODEL_REVISION: ""
+      EMBEDDING_NORMALIZE: "true"
+      EMBEDDING_PASSAGE_PREFIX: 'passage: '
+      EMBEDDING_PROVIDER: sentence_transformers
+      EMBEDDING_QUERY_PREFIX: 'query: '
+      HF_HOME: /app/data/models/huggingface
+      JWT_ALGORITHM: HS256
+      JWT_AUDIENCE: enterprise-ai-api
+      JWT_ISSUER: enterprise-ai-knowledge-assistant
+      LLM_API_KEY: ""
+      LLM_ENABLED: "true"
+      LLM_MAX_OUTPUT_TOKENS: "512"
+      LLM_MODEL_NAME: ""
+      LLM_OLLAMA_BASE_URL: http://host.docker.internal:11434
+      LLM_OLLAMA_KEEP_ALIVE: 10m
+      LLM_OLLAMA_MODEL: qwen2.5:3b
+      LLM_OLLAMA_NUM_CTX: "4096"
+      LLM_OLLAMA_REASONING_EFFORT: none
+      LLM_PROVIDER: ollama
+      LLM_STREAM_HEARTBEAT_SECONDS: "15"
+      LLM_STREAM_MAX_DURATION_SECONDS: "300"
+      LLM_TEMPERATURE: "0"
+      LLM_TIMEOUT_SECONDS: "180"
+      LOCAL_STORAGE_PATH: /app/data/uploads
+      LOG_FORMAT: json
+      LOG_LEVEL: INFO
+      MAX_UPLOAD_SIZE_MB: "25"
+      MIN_RELEVANCE_SCORE: "0.50"
+      POSTGRES_DB: enterprise_ai
+      POSTGRES_PASSWORD: change-me-for-local-development
+      POSTGRES_PORT: "55432"
+      POSTGRES_USER: app_user
+      REDIS_PORT: "6379"
+      REDIS_URL: redis://redis:6379/0
+      REFRESH_TOKEN_EXPIRE_DAYS: "7"
+      RERANK_TOP_K: "5"
+      RETRIEVAL_TOP_K: "10"
+      SECRET_KEY: replace-with-a-long-random-secret-key
+      SENTENCE_TRANSFORMERS_HOME: /app/data/models/sentence-transformers
+      STORAGE_BACKEND: local
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=5).read()
+      timeout: 10s
+      interval: 15s
+      retries: 5
+      start_period: 20s
+    image: enterprise-ai-knowledge-assistant-backend:latest
+    logging:
+      driver: json-file
+      options:
+        max-file: "3"
+        max-size: 10m
+    networks:
+      backend: null
+    ports:
+      - mode: ingress
+        host_ip: 127.0.0.1
+        target: 8000
+        published: "8000"
+        protocol: tcp
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - type: volume
+        source: uploads_data
+        target: /app/data/uploads
+        volume: {}
+      - type: volume
+        source: model_cache
+        target: /app/data/models
+        volume: {}
+  migration:
+    build:
+      context: C:\Users\_ASUS_\OneDrive\M├íy t├¡nh\Documents\Python\LTPYTHON\Enterprise AI Knowledge Assistant
+      dockerfile: Dockerfile
+      target: runtime
+    command:
+      - alembic
+      - upgrade
+      - head
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: true
+    environment:
+      ACCESS_TOKEN_EXPIRE_MINUTES: "15"
+      API_DOCS_ENABLED: "true"
+      API_V1_PREFIX: /api/v1
+      APP_DEBUG: "true"
+      APP_ENV: development
+      APP_NAME: Enterprise AI Knowledge Assistant
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      CELERY_WORKER_CONCURRENCY: "1"
+      CHUNK_OVERLAP_TOKENS: "100"
+      CHUNK_SIZE_TOKENS: "700"
+      CORS_ORIGINS: http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174
+      DATABASE_URL: postgresql+asyncpg://app_user:change-me-for-local-development@postgres:5432/enterprise_ai
+      DEBUG: "false"
+      DEV_ADMIN_EMAIL: admin@example.com
+      DEV_ADMIN_FULL_NAME: Development Admin
+      DEV_ADMIN_PASSWORD: ""
+      EMBEDDING_BATCH_SIZE: "16"
+      EMBEDDING_DEVICE: cpu
+      EMBEDDING_DIMENSIONS: "384"
+      EMBEDDING_LOCAL_FILES_ONLY: "false"
+      EMBEDDING_MODEL_CACHE_PATH: /app/data/models
+      EMBEDDING_MODEL_NAME: intfloat/multilingual-e5-small
+      EMBEDDING_MODEL_REVISION: ""
+      EMBEDDING_NORMALIZE: "true"
+      EMBEDDING_PASSAGE_PREFIX: 'passage: '
+      EMBEDDING_PROVIDER: sentence_transformers
+      EMBEDDING_QUERY_PREFIX: 'query: '
+      HF_HOME: /app/data/models/huggingface
+      JWT_ALGORITHM: HS256
+      JWT_AUDIENCE: enterprise-ai-api
+      JWT_ISSUER: enterprise-ai-knowledge-assistant
+      LLM_API_KEY: ""
+      LLM_ENABLED: "true"
+      LLM_MAX_OUTPUT_TOKENS: "512"
+      LLM_MODEL_NAME: ""
+      LLM_OLLAMA_BASE_URL: http://host.docker.internal:11434
+      LLM_OLLAMA_KEEP_ALIVE: 10m
+      LLM_OLLAMA_MODEL: qwen2.5:3b
+      LLM_OLLAMA_NUM_CTX: "4096"
+      LLM_OLLAMA_REASONING_EFFORT: none
+      LLM_PROVIDER: ollama
+      LLM_STREAM_HEARTBEAT_SECONDS: "15"
+      LLM_STREAM_MAX_DURATION_SECONDS: "300"
+      LLM_TEMPERATURE: "0"
+      LLM_TIMEOUT_SECONDS: "180"
+      LOCAL_STORAGE_PATH: /app/data/uploads
+      LOG_FORMAT: json
+      LOG_LEVEL: INFO
+      MAX_UPLOAD_SIZE_MB: "25"
+      MIN_RELEVANCE_SCORE: "0.50"
+      POSTGRES_DB: enterprise_ai
+      POSTGRES_PASSWORD: change-me-for-local-development
+      POSTGRES_PORT: "55432"
+      POSTGRES_USER: app_user
+      REDIS_PORT: "6379"
+      REDIS_URL: redis://redis:6379/0
+      REFRESH_TOKEN_EXPIRE_DAYS: "7"
+      RERANK_TOP_K: "5"
+      RETRIEVAL_TOP_K: "10"
+      SECRET_KEY: replace-with-a-long-random-secret-key
+      SENTENCE_TRANSFORMERS_HOME: /app/data/models/sentence-transformers
+      STORAGE_BACKEND: local
+    image: enterprise-ai-knowledge-assistant-backend:latest
+    logging:
+      driver: json-file
+      options:
+        max-file: "3"
+        max-size: 10m
+    networks:
+      backend: null
+    restart: "no"
+    security_opt:
+      - no-new-privileges:true
+  postgres:
+    environment:
+      POSTGRES_DB: enterprise_ai
+      POSTGRES_PASSWORD: change-me-for-local-development
+      POSTGRES_USER: app_user
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"
+      timeout: 5s
+      interval: 10s
+      retries: 5
+      start_period: 10s
+    image: pgvector/pgvector:pg17
+    logging:
+      driver: json-file
+      options:
+        max-file: "3"
+        max-size: 10m
+    networks:
+      backend: null
+    ports:
+      - mode: ingress
+        host_ip: 127.0.0.1
+        target: 5432
+        published: "55432"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: volume
+        source: postgres_data
+        target: /var/lib/postgresql/data
+        volume: {}
+  redis:
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      timeout: 5s
+      interval: 10s
+      retries: 5
+      start_period: 5s
+    image: redis:7-alpine
+    logging:
+      driver: json-file
+      options:
+        max-file: "3"
+        max-size: 10m
+    networks:
+      backend: null
+    ports:
+      - mode: ingress
+        host_ip: 127.0.0.1
+        target: 6379
+        published: "6379"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: volume
+        source: redis_data
+        target: /data
+        volume: {}
+  worker:
+    build:
+      context: C:\Users\_ASUS_\OneDrive\M├íy t├¡nh\Documents\Python\LTPYTHON\Enterprise AI Knowledge Assistant
+      dockerfile: Dockerfile
+      target: runtime
+    command:
+      - celery
+      - -A
+      - app.workers.celery_app:celery_app
+      - worker
+      - --loglevel=INFO
+      - --queues=default,documents
+      - --concurrency=1
+      - --hostname=worker@%h
+    depends_on:
+      migration:
+        condition: service_completed_successfully
+        required: true
+      postgres:
+        condition: service_healthy
+        required: true
+      redis:
+        condition: service_healthy
+        required: true
+    environment:
+      ACCESS_TOKEN_EXPIRE_MINUTES: "15"
+      API_DOCS_ENABLED: "true"
+      API_V1_PREFIX: /api/v1
+      APP_DEBUG: "true"
+      APP_ENV: development
+      APP_NAME: Enterprise AI Knowledge Assistant
+      CELERY_BROKER_URL: redis://redis:6379/1
+      CELERY_RESULT_BACKEND: redis://redis:6379/2
+      CELERY_WORKER_CONCURRENCY: "1"
+      CHUNK_OVERLAP_TOKENS: "100"
+      CHUNK_SIZE_TOKENS: "700"
+      CORS_ORIGINS: http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174
+      DATABASE_URL: postgresql+asyncpg://app_user:change-me-for-local-development@postgres:5432/enterprise_ai
+      DEBUG: "false"
+      DEV_ADMIN_EMAIL: admin@example.com
+      DEV_ADMIN_FULL_NAME: Development Admin
+      DEV_ADMIN_PASSWORD: ""
+      EMBEDDING_BATCH_SIZE: "16"
+      EMBEDDING_DEVICE: cpu
+      EMBEDDING_DIMENSIONS: "384"
+      EMBEDDING_LOCAL_FILES_ONLY: "false"
+      EMBEDDING_MODEL_CACHE_PATH: /app/data/models
+      EMBEDDING_MODEL_NAME: intfloat/multilingual-e5-small
+      EMBEDDING_MODEL_REVISION: ""
+      EMBEDDING_NORMALIZE: "true"
+      EMBEDDING_PASSAGE_PREFIX: 'passage: '
+      EMBEDDING_PROVIDER: sentence_transformers
+      EMBEDDING_QUERY_PREFIX: 'query: '
+      HF_HOME: /app/data/models/huggingface
+      JWT_ALGORITHM: HS256
+      JWT_AUDIENCE: enterprise-ai-api
+      JWT_ISSUER: enterprise-ai-knowledge-assistant
+      LLM_API_KEY: ""
+      LLM_ENABLED: "true"
+      LLM_MAX_OUTPUT_TOKENS: "512"
+      LLM_MODEL_NAME: ""
+      LLM_OLLAMA_BASE_URL: http://host.docker.internal:11434
+      LLM_OLLAMA_KEEP_ALIVE: 10m
+      LLM_OLLAMA_MODEL: qwen2.5:3b
+      LLM_OLLAMA_NUM_CTX: "4096"
+      LLM_OLLAMA_REASONING_EFFORT: none
+      LLM_PROVIDER: ollama
+      LLM_STREAM_HEARTBEAT_SECONDS: "15"
+      LLM_STREAM_MAX_DURATION_SECONDS: "300"
+      LLM_TEMPERATURE: "0"
+      LLM_TIMEOUT_SECONDS: "180"
+      LOCAL_STORAGE_PATH: /app/data/uploads
+      LOG_FORMAT: json
+      LOG_LEVEL: INFO
+      MAX_UPLOAD_SIZE_MB: "25"
+      MIN_RELEVANCE_SCORE: "0.50"
+      POSTGRES_DB: enterprise_ai
+      POSTGRES_PASSWORD: change-me-for-local-development
+      POSTGRES_PORT: "55432"
+      POSTGRES_USER: app_user
+      REDIS_PORT: "6379"
+      REDIS_URL: redis://redis:6379/0
+      REFRESH_TOKEN_EXPIRE_DAYS: "7"
+      RERANK_TOP_K: "5"
+      RETRIEVAL_TOP_K: "10"
+      SECRET_KEY: replace-with-a-long-random-secret-key
+      SENTENCE_TRANSFORMERS_HOME: /app/data/models/sentence-transformers
+      STORAGE_BACKEND: local
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - celery -A app.workers.celery_app:celery_app inspect ping -d worker@$$(hostname) --timeout=10 | grep -q pong
+      timeout: 15s
+      interval: 30s
+      retries: 5
+      start_period: 30s
+    image: enterprise-ai-knowledge-assistant-backend:latest
+    logging:
+      driver: json-file
+      options:
+        max-file: "3"
+        max-size: 10m
+    networks:
+      backend: null
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - type: volume
+        source: uploads_data
+        target: /app/data/uploads
+        volume: {}
+      - type: volume
+        source: model_cache
+        target: /app/data/models
+        volume: {}
+networks:
+  backend:
+    name: enterprise-ai-knowledge-assistant_backend
+    driver: bridge
+volumes:
+  model_cache:
+    name: enterprise-ai-knowledge-assistant_model_cache
+  postgres_data:
+    name: enterprise-ai-knowledge-assistant_postgres_data
+  redis_data:
+    name: enterprise-ai-knowledge-assistant_redis_data
+  uploads_data:
+    name: enterprise-ai-knowledge-assistant_uploads_data
+x-app-build:
+  context: .
+  dockerfile: Dockerfile
+  target: runtime
+x-app-env-file:
+  - path: .env
+    required: false
+x-app-environment:
+  API_DOCS_ENABLED: "true"
+  APP_DEBUG: "true"
+  APP_ENV: development
+  CELERY_BROKER_URL: redis://redis:6379/1
+  CELERY_RESULT_BACKEND: redis://redis:6379/2
+  CELERY_WORKER_CONCURRENCY: "1"
+  DATABASE_URL: postgresql+asyncpg://app_user:change-me-for-local-development@postgres:5432/enterprise_ai
+  DEBUG: "false"
+  EMBEDDING_MODEL_CACHE_PATH: /app/data/models
+  HF_HOME: /app/data/models/huggingface
+  LLM_ENABLED: "true"
+  LOCAL_STORAGE_PATH: /app/data/uploads
+  REDIS_URL: redis://redis:6379/0
+  SENTENCE_TRANSFORMERS_HOME: /app/data/models/sentence-transformers
+x-app-image: enterprise-ai-knowledge-assistant-backend:latest
+x-default-logging:
+  driver: json-file
+  options:
+    max-file: "3"
+    max-size: 10m

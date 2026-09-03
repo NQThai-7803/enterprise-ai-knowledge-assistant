@@ -32,6 +32,14 @@ async def create(
     return chat_session
 
 
+async def delete(
+    session: AsyncSession,
+    *,
+    chat_session: ChatSession,
+) -> None:
+    await session.delete(chat_session)
+
+
 async def list_owned(
     session: AsyncSession,
     *,

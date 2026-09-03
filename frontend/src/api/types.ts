@@ -109,6 +109,9 @@ export interface Citation {
   chunk_id: string | null;
   page_number: number;
   excerpt: string;
+
+  evidence_text?: string | null;
+
   relevance_score: number | null;
   citation_order: number;
 }

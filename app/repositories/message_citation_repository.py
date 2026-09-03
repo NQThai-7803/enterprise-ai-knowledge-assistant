@@ -30,6 +30,10 @@ class MessageCitationRow:
     excerpt: str = field(repr=False)
     relevance_score: float | None
     citation_order: int
+    evidence_text: str | None = field(
+        default=None,
+        repr=False,
+    )
     source_url: str | None = None
 
 
@@ -61,6 +65,11 @@ async def create_many(
                 chunk_id=None if is_web else citation.chunk_id,
                 page_number=citation.page_number,
                 excerpt=citation.excerpt,
+                evidence_text=getattr(
+                    citation,
+                    "evidence_text",
+                    None,
+                ),
                 relevance_score=(
                     None if relevance_score is None else Decimal(str(relevance_score))
                 ),
@@ -92,6 +101,7 @@ async def list_by_message_ids(
             MessageCitation.chunk_id,
             MessageCitation.page_number,
             MessageCitation.excerpt,
+            MessageCitation.evidence_text,
             MessageCitation.relevance_score,
             MessageCitation.citation_order,
             MessageCitation.source_url,
@@ -141,5 +151,6 @@ def _row_from_result(row) -> MessageCitationRow:  # noqa: ANN001
         excerpt=row.excerpt,
         relevance_score=None if relevance is None else float(relevance),
         citation_order=row.citation_order,
+        evidence_text=row.evidence_text,
         source_url=row.source_url if source_type == CitationSourceType.WEB else None,
     )

@@ -171,6 +171,19 @@ def test_hybrid_calls_keyword_once() -> None:
     run_async(scenario())
 
 
+def test_diacritic_insensitive_variant_is_lexical_only() -> None:
+    async def scenario() -> None:
+        service, semantic, keyword = make_service()
+
+        await service.retrieve(query="Phụ cấp ăn trưa", current_user=make_user())
+
+        assert len(semantic.calls) == 1
+        assert len(keyword.calls) == 2
+        assert keyword.calls[0]["query"] != keyword.calls[1]["query"]
+
+    run_async(scenario())
+
+
 def test_hybrid_uses_larger_candidate_limit() -> None:
     async def scenario() -> None:
         service, semantic, keyword = make_service()

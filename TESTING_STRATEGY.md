@@ -13,18 +13,18 @@
 
 ### Integration tests
 
-- Repository với PostgreSQL test database.
-- Login và refresh flow.
+- Repository vá»›i PostgreSQL test database.
+- Login vÃ  refresh flow.
 - Document CRUD.
-- Permission-aware list và retrieval.
-- Celery task ở eager/test mode nếu phù hợp.
+- Permission-aware list vÃ  retrieval.
+- Celery task á»Ÿ eager/test mode náº¿u phÃ¹ há»£p.
 
 ### API tests
 
 - Status code.
 - Response schema.
 - Role restrictions.
-- Pagination và validation.
+- Pagination vÃ  validation.
 
 ### RAG evaluation tests
 
@@ -36,17 +36,17 @@
 
 ## 2. Critical security tests
 
-1. Staff không gọi được user management.
-2. Staff phòng A không xem document phòng B.
-3. Search không trả title của tài liệu trái quyền.
-4. Retrieval không trả chunk trái quyền.
-5. Citation không expose document trái quyền.
-6. User không xem chat session của người khác.
-7. Deleted hoặc archived document không được retrieve.
+1. Staff khÃ´ng gá»i Ä‘Æ°á»£c user management.
+2. Staff phÃ²ng A khÃ´ng xem document phÃ²ng B.
+3. Search khÃ´ng tráº£ title cá»§a tÃ i liá»‡u trÃ¡i quyá»n.
+4. Retrieval khÃ´ng tráº£ chunk trÃ¡i quyá»n.
+5. Citation khÃ´ng expose document trÃ¡i quyá»n.
+6. User khÃ´ng xem chat session cá»§a ngÆ°á»i khÃ¡c.
+7. Deleted hoáº·c archived document khÃ´ng Ä‘Æ°á»£c retrieve.
 
 ## 3. Fixtures
 
-Tạo fixtures:
+Táº¡o fixtures:
 
 - admin_user
 - manager_department_a
@@ -73,11 +73,11 @@ Mock external provider:
 - LLM API.
 - Object storage.
 
-Không mock permission query trong integration test quan trọng.
+KhÃ´ng mock permission query trong integration test quan trá»ng.
 
 ## 6. Coverage priority
 
-Ưu tiên coverage cao cho:
+Æ¯u tiÃªn coverage cao cho:
 
 - auth
 - RBAC
@@ -85,11 +85,11 @@ Không mock permission query trong integration test quan trọng.
 - retrieval
 - citation validation
 
-Coverage tổng chỉ là chỉ báo; không thay thế test case nghiệp vụ.
+Coverage tá»•ng chá»‰ lÃ  chá»‰ bÃ¡o; khÃ´ng thay tháº¿ test case nghiá»‡p vá»¥.
 
 ## 7. Manual acceptance test
 
-Mỗi task phải ghi cách test bằng Swagger hoặc command line nếu chưa có frontend.
+Má»—i task pháº£i ghi cÃ¡ch test báº±ng Swagger hoáº·c command line náº¿u chÆ°a cÃ³ frontend.
 
 
 ## 8. TASK-023 Docker stack verification
@@ -523,3 +523,230 @@ Acceptance rule: any unsupported material factual claim, wrong number/date/name,
 The real-LLM acceptance lane must warm up `qwen3:4b` before measuring chat latency. The streaming endpoint remains `buffer_after_validation`: it may emit heartbeats while waiting, but it must not emit `message.delta`, citations, or completion until the grounded answer has been validated and persisted.
 
 Timeout tests cover provider completion before deadline, heartbeat while waiting, single terminal event, cancellation on timeout, and no message/citation persistence after timeout. Deterministic UAT tests continue to use the fake provider and must not depend on real Ollama.
+
+## TASK-034.1.2 RAG Accuracy / Citation Regression Strategy
+
+### Hard rule: regression is not runtime knowledge
+
+Curated questions and expected criteria exist only under tests/UAT.
+
+Do not import them into application runtime code and do not implement question-specific answer branches to make tests pass.
+
+A valid fix must improve a general capability and should also work for paraphrases and unseen questions with the same evidence structure.
+
+### Exact evidence coverage
+
+Focused citation-mapping coverage verifies:
+
+- exact time/range evidence;
+- rate/unit preservation such as `8 giờ/ngày`;
+- named-entity supporting passages;
+- weak-match fallback to `None`;
+- backend mapping of `evidence_text`.
+
+Completion checkpoint for exact evidence:
+
+```text
+15 passed
+```
+
+Persistence UAT additionally verified:
+
+- PostgreSQL stores `message_citations.evidence_text`;
+- GET session reload returns the same evidence metadata;
+- historical rows without evidence remain compatible.
+
+### Minimal citation selection coverage
+
+Required behavior:
+
+1. Same internal document + same exact evidence => one strongest citation.
+2. Same document + different evidence => preserve multiple citations.
+3. Public markers are renumbered contiguously after pruning.
+4. Removed markers do not leave malformed whitespace/punctuation.
+5. Web citations must not be incorrectly grouped through internal `document_id` logic.
+6. Multi-claim answers retain enough evidence to support all material claims.
+
+Final focused suite checkpoint:
+
+```text
+17 passed in 0.19s
+```
+
+The formatting regression is fixed: pruned markers no longer leave `[1] .`; output normalizes to `[1].`.
+
+### Accuracy UAT categories
+
+The current Vietnamese multi-document UAT should include paraphrases across these general categories:
+
+- direct fact / named entity;
+- grade/title and salary table lookup;
+- neighboring table-row discrimination;
+- conditional/exception rules;
+- permission/prohibition contradiction;
+- workflow/approver role resolution;
+- sickness/leave intent separation;
+- no-answer;
+- multi-document synthesis;
+- redundant citation suppression;
+- distinct multi-evidence preservation.
+
+When a UAT case fails, record:
+
+- question;
+- expected evidence location/criterion;
+- retrieved sources;
+- final citations;
+- failure class (retrieval, reranking, table row, generation, claim validation, citation selection);
+- whether a paraphrased variant also fails.
+
+Do not store an expected runtime answer dictionary.
+
+
+Minimal Citation Selection is not considered fully accepted until a live new Chat message that previously produced duplicate same-evidence citations returns a single citation in both API payload and UI.
+
+
+## RAG-H2.1 Reranker Authority Tests
+
+Regression coverage must verify that post-processing cannot invert reranker order.
+
+Verified on 2026-08-19:
+
+```text
+pytest tests/unit/test_grounded_answer_service.py -q
+61 passed in 2.46s
+
+pytest tests/unit/test_rag_accuracy_components.py -q
+27 passed in 0.68s
+
+focused combined suite
+147 passed in 2.38s
+```
+
+Runtime acceptance additionally requires diagnostics to be enabled in the API container and representative live questions to be inspected through the real retrieval/reranking/context flow.
+
+
+## Runtime LLM failure regression checkpoint
+
+The 2026-08-19 `LLM_GENERATION_FAILED` incident was traced to an application `NameError`, not provider availability.
+
+Recovery verification:
+
+```text
+pytest tests/unit/test_grounded_answer_service.py -q
+61 passed in 1.34s
+
+focused combined RAG/retrieval suite
+147 passed in 2.41s
+```
+
+The provider was separately verified through the application's OpenAI-compatible Ollama path before declaring the runtime incident resolved.
+
+Accuracy acceptance is still pending. A NO_ANSWER result for a known-answer salary query must not be treated as provider failure.
+
+## Salary amount regression checkpoint
+
+Added/verified regression behavior for salary AMOUNT questions so grade labels are not treated as number/unit requirements.
+
+Results:
+- grounded-answer unit suite: 63 passed.
+- focused combined RAG/retrieval suite: 149 passed.
+- live Head salary: PASS.
+- live Engineering Manager salary: PASS.
+
+## YES/NO next acceptance
+
+For a supported YES/NO question:
+- retrieval/source selection must remain correct;
+- claim validation must remain supported;
+- answer must not be discarded solely because the model omitted the leading polarity token;
+- final UX should begin with an explicit `Có.` / `Không.` (or Yes/No for English) plus a short grounded explanation;
+- unrelated supported evidence must not determine polarity.
+
+## Citation evidence acceptance
+
+Evidence highlighting should underline the minimal source passage actually supporting the answer. A missing `evidence_text` must not be mistaken for a frontend CSS failure.
+
+## Runtime RAG Acceptance -- 2026-08-21
+
+The seven-case runtime acceptance set passed after restoring the intended UAT annual-leave source through normal ingestion. No runtime question-answer mappings, direct `document_chunks` inserts, or hard-coded annual-leave values were added.
+
+### Pre-UAT corpus verification
+
+Restored source:
+
+- Document ID: `43cb2c93-52bc-44f6-8e03-1b1f075e1d89`
+- Title: `Chính sách nghỉ của người lao động`
+- Checksum: `24178db420422e474326986672b6c15cc67373ee6adbe1489ba5e8addf95f4f4`
+- Storage key: `documents/2026/08/951776f4-88c3-4c98-8401-c8ce5edad268.pdf`
+- Worker task: `274fe326-9d28-421c-9c11-253ec7b74bc2`
+- Ingestion result: `READY`, `page_count=6`, `chunk_count=12`, `total_tokens=6458`, `embedding_dimensions=384`
+
+Active indexed evidence check before annual-leave UAT:
+
+```text
+active ready documents: 12
+active chunks: 153
+active 12/14/16 leave clause chunks: 1
+primary active clause chunk: 4b341201-f0df-4102-b9f2-5ad7091781a6, page 3
+```
+
+The active Nova-branded leave policy still only contains the 12-day normal-work clause. The restored UAT document provides the authoritative 12 / 14 / 16 distinctions, but it is generic/template-branded; this remains corpus debt.
+
+### Seven-case runtime UAT
+
+All cases were run as new staff chat sessions against the real local runtime using `qwen2.5:7b-instruct-8k`.
+
+| Case | Expected | Result |
+| --- | --- | --- |
+| Own salary | `Có`; employee may discuss own salary | PASS |
+| EAP | `Không`; EAP does not send counseling contents to manager | PASS |
+| NovaCare vs BHYT | `Không`; NovaCare does not replace mandatory BHYT | PASS |
+| Engineering Manager | `N5`, `42 - 70 triệu đồng` | PASS |
+| Head / Director | `N6`, `65 - 110 triệu đồng` | PASS |
+| Annual leave | starts `Không`, distinguishes `12 / 14 / 16`, real leave clause citation, no sample-question citation, `SUPPORTED` | PASS |
+| CEO false premise | starts `Không`, identifies `Nguyễn Anh Khoa` from source | PASS |
+
+Observed annual-leave answer:
+
+```text
+Không. 12 ngày Công việc trong điều kiện bình thường; 14 ngày Người chưa thành niên, người khuyết tật hoặc công việc nặng nhọc, độc hại, nguy hiểm theo danh mục pháp luật; 16 ngày Công việc đặc biệt nặng nhọc, độc hại, nguy hiểm theo danh mục pháp luật; 12 ngày làm việc/năm khi đủ [1] [2]
+```
+
+Annual-leave citations used the restored active leave table on page `3` plus the active Nova leave clause on page `3`. No sample-question/test-question section was cited as factual evidence. Final claim validation status was `SUPPORTED`.
+
+### Unit and static verification
+
+```text
+python -m pytest tests\unit\test_grounded_answer_service.py -q
+75 passed in 1.33s
+
+python -m pytest tests\unit\test_grounded_answer_service.py tests\unit\test_rag_accuracy_components.py tests\unit\test_citation_mapping.py -q
+132 passed in 1.56s
+
+python -m pytest tests\unit\test_grounded_answer_service.py tests\unit\test_rag_accuracy_components.py tests\unit\test_citation_mapping.py tests\unit\test_citation_validation_service.py tests\unit\test_grounded_output.py -q
+157 passed in 1.71s
+
+python -m pytest tests\unit -q
+1061 passed in 8.22s
+
+python -m ruff check <21 touched Python files>
+All checks passed!
+
+python -m ruff format --check <21 touched Python files>
+21 files already formatted
+```
+
+### Acceptance coverage added by this checkpoint
+
+- Answer-bearing evidence/source-quality selection prefers real policy clauses/tables over sample-question text.
+- YES/NO claim validation is subject/object aware.
+- Replacement/supplemental relation entailment is covered by NovaCare versus BHYT.
+- Citation source repair is covered by no sample-question citation in annual leave and by citation pruning/marker repair suites.
+
+### Remaining testing debt
+
+- Automate the seven-case runtime UAT so each run captures prompt, answer, citations, evidence text, claim-validation diagnostics, provider/model, and latency.
+- Add a regression that asserts multi-row/table `evidence_text` can cover the full annual-leave 12 / 14 / 16 support span.
+- Add an explicit runtime reranker availability check so fallback reranking is visible in acceptance reports.
+- Add corpus-quality checks that flag sample-question/test-question sections inside production factual documents.

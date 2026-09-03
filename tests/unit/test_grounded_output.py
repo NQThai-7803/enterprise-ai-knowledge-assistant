@@ -1,8 +1,13 @@
+# ruff: noqa: E501
 from __future__ import annotations
 
 import pytest
 
-from app.citations.grounded_output import parse_grounded_llm_output
+from app.citations.grounded_output import (
+    parse_grounded_llm_output,
+    parse_partial_structured_grounded_llm_output,
+    parse_structured_grounded_llm_output,
+)
 
 
 def test_parse_valid_answer_with_one_citation() -> None:
@@ -116,3 +121,48 @@ def test_parse_rejects_bracketed_or_malformed_identifiers() -> None:
 def test_exact_no_answer_is_handled_outside_parser() -> None:
     with pytest.raises(ValueError):
         parse_grounded_llm_output("__NO_ANSWER__")
+
+
+def test_parse_structured_output_covers_each_required_claim() -> None:
+    output = parse_structured_grounded_llm_output(
+        '{"claims":['
+        '{"claim_id":"CLAIM_1","answer":"Security requires MFA.","citations":["SOURCE_1"]},'
+        '{"claim_id":"CLAIM_2","answer":"The allowance is 500000 VND.","citations":["SOURCE_2"]}'
+        "]}",
+        expected_claim_ids=("CLAIM_1", "CLAIM_2"),
+        allowed_identifiers={"SOURCE_1", "SOURCE_2"},
+    )
+
+    assert tuple(claim.claim_id for claim in output.claims) == ("CLAIM_1", "CLAIM_2")
+    assert output.claims[0].citations == ("SOURCE_1",)
+    assert output.claims[1].citations == ("SOURCE_2",)
+
+
+@pytest.mark.parametrize(
+    "content",
+    [
+        '{"claims":[{"claim_id":"CLAIM_1","answer":"Only one.","citations":["SOURCE_1"]}]}',
+        '{"claims":[{"claim_id":"CLAIM_1","answer":"Wrong source.","citations":["SOURCE_9"]},{"claim_id":"CLAIM_2","answer":"Second.","citations":["SOURCE_2"]}]}',
+        '{"claims":[{"claim_id":"CLAIM_1","answer":"First.","citations":["SOURCE_1"]},{"claim_id":"CLAIM_1","answer":"Duplicate.","citations":["SOURCE_2"]}]}',
+    ],
+)
+def test_parse_structured_output_rejects_missing_duplicate_or_unknown_claims(content: str) -> None:
+    with pytest.raises(ValueError):
+        parse_structured_grounded_llm_output(
+            content,
+            expected_claim_ids=("CLAIM_1", "CLAIM_2"),
+            allowed_identifiers={"SOURCE_1", "SOURCE_2"},
+        )
+
+
+def test_partial_structured_output_preserves_only_individually_valid_claims() -> None:
+    output = parse_partial_structured_grounded_llm_output(
+        '{"claims":['
+        '{"claim_id":"CLAIM_1","answer":"Limit is 2 days.","citations":["SOURCE_1"]},'
+        '{"claim_id":"CLAIM_2","answer":"Wrong source.","citations":["SOURCE_9"]}'
+        "]}",
+        expected_claim_ids=("CLAIM_1", "CLAIM_2"),
+        allowed_identifiers={"SOURCE_1", "SOURCE_2"},
+    )
+
+    assert tuple(claim.claim_id for claim in output.claims) == ("CLAIM_1",)

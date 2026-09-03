@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from app.models import (
     Document,
     DocumentAccessScope,
+    DocumentLifecycleStatus,
     DocumentPermission,
     DocumentPermissionLevel,
     DocumentStatus,
@@ -19,6 +20,17 @@ class DocumentUploadMetadata(BaseModel):
 
     title: str = Field(max_length=255)
     description: str | None = None
+    document_code: str | None = Field(default=None, max_length=128)
+    document_version: str | None = Field(default=None, max_length=64)
+    effective_from: date | None = None
+    effective_to: date | None = None
+
+    @model_validator(mode="after")
+    def validate_effective_dates(self) -> DocumentUploadMetadata:
+        if self.effective_from and self.effective_to and self.effective_to < self.effective_from:
+            raise ValueError("effective_to must not precede effective_from.")
+        return self
+
     access_scope: DocumentAccessScope
     department_id: UUID | None = None
 
@@ -52,6 +64,18 @@ class DocumentSafeResponse(BaseModel):
     id: UUID
     title: str
     description: str | None
+    document_code: str | None
+    document_version: str | None
+    effective_from: date | None
+    effective_to: date | None
+    lifecycle_status: DocumentLifecycleStatus
+    supersedes_document_id: UUID | None
+
+    @field_validator("lifecycle_status", mode="before")
+    @classmethod
+    def default_missing_lifecycle_status(cls, value: object) -> object:
+        return value or DocumentLifecycleStatus.ACTIVE
+
     original_filename: str
     mime_type: str
     file_size: int
@@ -97,6 +121,12 @@ class DocumentUpdate(BaseModel):
 
     title: str | None = Field(default=None, max_length=255)
     description: str | None = None
+    document_code: str | None = Field(default=None, max_length=128)
+    document_version: str | None = Field(default=None, max_length=64)
+    effective_from: date | None = None
+    effective_to: date | None = None
+    lifecycle_status: DocumentLifecycleStatus | None = None
+    supersedes_document_id: UUID | None = None
     access_scope: DocumentAccessScope | None = None
     department_id: UUID | None = None
 
@@ -128,6 +158,16 @@ class DocumentUpdate(BaseModel):
         if not self.model_fields_set:
             msg = "At least one field must be provided."
             raise ValueError(msg)
+        return self
+
+    @model_validator(mode="after")
+    def validate_effective_dates(self) -> DocumentUpdate:
+        if self.effective_from and self.effective_to and self.effective_to < self.effective_from:
+            raise ValueError("effective_to must not precede effective_from.")
+        if self.supersedes_document_id is not None:
+            # A document may be linked to a predecessor, but never to itself;
+            # the service performs the request/document-level validation.
+            return self
         return self
 
 

@@ -1,0 +1,86 @@
+﻿# CODEX START HERE
+
+## Má»¥c Ä‘Ã­ch
+
+TÃ i liá»‡u nÃ y lÃ  Ä‘iá»ƒm báº¯t Ä‘áº§u báº¯t buá»™c cho má»i phiÃªn lÃ m viá»‡c vá»›i Codex trong dá»± Ã¡n **Enterprise AI Knowledge Assistant**.
+
+Codex pháº£i Ä‘á»c cÃ¡c tÃ i liá»‡u theo thá»© tá»± sau trÆ°á»›c khi sá»­a code:
+
+1. `CODEX_START_HERE.md`
+2. `README.md`
+3. `PROJECT_OVERVIEW.md`
+4. `PRODUCT_REQUIREMENTS.md`
+5. `ARCHITECTURE.md`
+6. `DATABASE_DESIGN.md`
+7. `API_SPEC.md`
+8. `SECURITY.md`
+9. `RAG_DESIGN.md`
+10. `CODING_STANDARDS.md`
+11. `TESTING_STRATEGY.md`
+12. `PROJECT_ROADMAP.md`
+13. `PROJECT_STATUS.md`
+14. `TASKS.md`
+
+## Quy táº¯c báº¯t buá»™c cho Codex
+
+- KhÃ´ng tá»± Ã½ thay Ä‘á»•i pháº¡m vi dá»± Ã¡n.
+- KhÃ´ng tá»± thÃªm thÆ° viá»‡n náº¿u chÆ°a giáº£i thÃ­ch lÃ½ do.
+- KhÃ´ng sá»­a nhiá»u module khÃ´ng liÃªn quan trong cÃ¹ng má»™t task.
+- KhÃ´ng xÃ³a code Ä‘ang hoáº¡t Ä‘á»™ng chá»‰ Ä‘á»ƒ viáº¿t láº¡i theo sá»Ÿ thÃ­ch.
+- KhÃ´ng lÆ°u secret, API key hoáº·c máº­t kháº©u vÃ o Git.
+- KhÃ´ng bá» qua migration khi thay Ä‘á»•i database.
+- KhÃ´ng cho AI truy xuáº¥t tÃ i liá»‡u mÃ  ngÆ°á»i dÃ¹ng khÃ´ng cÃ³ quyá»n xem.
+- KhÃ´ng táº¡o cÃ¢u tráº£ lá»i khÃ´ng cÃ³ nguá»“n náº¿u chá»©c nÄƒng yÃªu cáº§u citation.
+- KhÃ´ng giáº£ Ä‘á»‹nh file, model hoáº·c cáº¥u hÃ¬nh Ä‘Ã£ tá»“n táº¡i; pháº£i kiá»ƒm tra trÆ°á»›c.
+- Má»—i task pháº£i cÃ³ cÃ¡ch kiá»ƒm thá»­ rÃµ rÃ ng.
+- Sau má»—i task pháº£i cáº­p nháº­t `PROJECT_STATUS.md` vÃ  `CHANGELOG.md`.
+
+## Quy trÃ¬nh lÃ m má»™t task
+
+1. Äá»c task hiá»‡n táº¡i trong `TASKS.md`.
+2. Kiá»ƒm tra cÃ¡c file liÃªn quan Ä‘ang tá»“n táº¡i.
+3. TÃ³m táº¯t ngáº¯n nhá»¯ng gÃ¬ sáº½ thay Ä‘á»•i.
+4. Thá»±c hiá»‡n thay Ä‘á»•i nhá», cÃ³ kiá»ƒm soÃ¡t.
+5. Cháº¡y lint, test hoáº·c kiá»ƒm thá»­ thá»§ cÃ´ng phÃ¹ há»£p.
+6. Ghi láº¡i file Ä‘Ã£ thÃªm/sá»­a.
+7. Cáº­p nháº­t `PROJECT_STATUS.md`.
+8. Cáº­p nháº­t `CHANGELOG.md`.
+9. BÃ¡o rÃµ giá»›i háº¡n hoáº·c lá»—i cÃ²n tá»“n táº¡i.
+
+## Chuáº©n Ä‘áº§u ra sau má»—i task
+
+Codex pháº£i bÃ¡o cÃ¡o theo máº«u:
+
+```text
+TASK COMPLETED: <tÃªn task>
+
+Files created:
+- ...
+
+Files modified:
+- ...
+
+How to test:
+1. ...
+2. ...
+
+Known limitations:
+- ...
+
+Documentation updated:
+- PROJECT_STATUS.md
+- CHANGELOG.md
+```
+
+## Quy táº¯c há»i láº¡i
+
+Chá»‰ há»i ngÆ°á»i dÃ¹ng khi thiáº¿u má»™t trong cÃ¡c thÃ´ng tin sau vÃ  khÃ´ng thá»ƒ suy ra an toÃ n:
+
+- API key hoáº·c lá»±a chá»n nhÃ  cung cáº¥p LLM.
+- File máº«u cáº§n xá»­ lÃ½.
+- ChÃ­nh sÃ¡ch phÃ¢n quyá»n chÆ°a Ä‘Æ°á»£c Ä‘á»‹nh nghÄ©a.
+- ThÃ´ng tin triá»ƒn khai thá»±c táº¿ nhÆ° domain, server, cloud provider.
+- Quyáº¿t Ä‘á»‹nh cÃ³ áº£nh hÆ°á»Ÿng lá»›n tá»›i kiáº¿n trÃºc.
+
+Náº¿u khÃ´ng thiáº¿u cÃ¡c thÃ´ng tin trÃªn, Codex pháº£i tiáº¿p tá»¥c báº±ng phÆ°Æ¡ng Ã¡n máº·c Ä‘á»‹nh Ä‘Ã£ mÃ´ táº£ trong tÃ i liá»‡u.
+

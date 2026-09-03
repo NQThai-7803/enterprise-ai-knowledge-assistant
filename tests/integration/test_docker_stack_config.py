@@ -160,7 +160,7 @@ def test_default_compose_keeps_llm_local_safe() -> None:
     if environment["LLM_ENABLED"] == "true":
         assert environment["LLM_PROVIDER"] == "ollama"
         assert environment["LLM_OLLAMA_MODEL"] == "qwen2.5:3b"
-        assert environment["LLM_OLLAMA_NUM_CTX"] == "4096"
+        assert environment["LLM_OLLAMA_NUM_CTX"] == "8192"
         assert environment["LLM_OLLAMA_KEEP_ALIVE"] == "10m"
         assert environment["LLM_TEMPERATURE"] == "0"
         assert environment["LLM_MAX_OUTPUT_TOKENS"] == "512"

@@ -123,6 +123,7 @@ def select_context_for_prompt(
     web_results: Sequence[WebSearchResult] = (),
     conversation_history: str | None = None,
     question: str,
+    information_needs: Sequence[str] = (),
     system_prompt: str,
     token_counter: TokenCounter,
     max_tokens: int,
@@ -138,7 +139,11 @@ def select_context_for_prompt(
     )
     used_tokens = token_counter.count(base_text) + token_counter.count(render_source_context(()))
     for hit in hits:
-        source_text = query_focused_excerpt(hit.text, question)
+        source_text = query_focused_excerpt(
+            hit.text,
+            question,
+            information_needs=information_needs,
+        )
         candidate_text = render_hit_source_context_item(
             len(selected) + 1,
             hit,
@@ -195,13 +200,26 @@ def select_context_for_prompt(
     )
 
 
-def query_focused_excerpt(text: str, question: str) -> str:
+def query_focused_excerpt(
+    text: str,
+    question: str,
+    *,
+    information_needs: Sequence[str] = (),
+) -> str:
+    if len(information_needs) > 1:
+        claim_focused = _claim_focused_excerpt(text, information_needs)
+        if claim_focused:
+            return claim_focused
+
     normalized_text = _collapse_whitespace(text)
     analysis = analyze_question(question)
     folded_text = _fold_text(normalized_text)
     number_unit_count = len(tuple(_NUMBER_UNIT_PATTERN.finditer(folded_text)))
     quantity_focus = _is_quantity_question(question) and number_unit_count >= 3
-    multi_value_focus = _is_multi_value_question(question) and number_unit_count >= 2
+    multi_value_focus = number_unit_count >= 2 and (
+        _is_multi_value_question(question)
+        or _is_broad_multi_value_duration_question(question, analysis=analysis)
+    )
     change_focus = _is_change_question(question) and number_unit_count >= 2
     person_focus = _is_person_acronym_question(question) and _has_multiple_acronym_records(
         normalized_text
@@ -224,6 +242,10 @@ def query_focused_excerpt(text: str, question: str) -> str:
         person_excerpt = _person_acronym_excerpt(normalized_text, question)
         if person_excerpt:
             return person_excerpt
+    if analysis.asks_for_person:
+        person_role_excerpt = _person_role_excerpt(normalized_text, question)
+        if person_role_excerpt:
+            return person_role_excerpt
     if not multi_value_focus and (
         analysis.asks_for_explicit_value
         or analysis.asks_for_person
@@ -264,9 +286,11 @@ def query_focused_excerpt(text: str, question: str) -> str:
         return normalized_text[:_EXCERPT_MAX_CHARACTERS].strip()
 
     if multi_value_focus:
-        before_characters = 0
-        after_characters = 640
-        max_characters = 1000
+        # A value can be wrapped onto the line after its condition label in
+        # extracted tables. Preserve enough leading text for row/value binding.
+        before_characters = 240
+        after_characters = 900
+        max_characters = _EXCERPT_MAX_CHARACTERS
     elif quantity_focus:
         before_characters = 80
         after_characters = 180
@@ -310,6 +334,35 @@ def query_focused_excerpt(text: str, question: str) -> str:
     return excerpt
 
 
+def _claim_focused_excerpt(text: str, information_needs: Sequence[str]) -> str:
+    """Keep evidence for each backend-defined claim when packing compound context."""
+    lines = tuple(line.strip() for line in text.splitlines() if line.strip())
+    if not lines:
+        return ""
+
+    pieces: list[str] = []
+    per_need_budget = max(240, (_EXCERPT_MAX_CHARACTERS - 100) // len(information_needs))
+    for claim_index, need in enumerate(information_needs, start=1):
+        indexes = selected_structural_line_indexes(
+            text,
+            need,
+            analyze_question(need),
+            max_indexes=5,
+        )
+        selected_lines: list[str] = []
+        for index in sorted(indexes):
+            if 0 <= index < len(lines) and lines[index] not in selected_lines:
+                selected_lines.append(lines[index])
+        if selected_lines:
+            focused = "\n".join(selected_lines)[:per_need_budget].strip()
+            pieces.append(f"CLAIM_{claim_index} evidence:\n{focused}")
+
+    if not pieces:
+        return ""
+    excerpt = "Claim-focused evidence:\n" + "\n".join(pieces)
+    return excerpt[:_EXCERPT_MAX_CHARACTERS].strip()
+
+
 def _structured_query_excerpt(
     text: str,
     *,
@@ -320,7 +373,14 @@ def _structured_query_excerpt(
     if not indexes:
         return ""
     lines = tuple(line.strip() for line in text.splitlines() if line.strip())
-    selected = [lines[index] for index in indexes if 0 <= index < len(lines)]
+    selected_indexes = tuple(sorted(index for index in indexes if 0 <= index < len(lines)))
+    selected, used_indexes = _wrapped_value_label_rows(
+        lines,
+        selected_indexes=selected_indexes,
+        question=question,
+        analysis=analysis,
+    )
+    selected.extend(lines[index] for index in selected_indexes if index not in used_indexes)
     excerpt = "\n".join(dict.fromkeys(selected)).strip()
     if not excerpt:
         return ""
@@ -328,6 +388,36 @@ def _structured_query_excerpt(
     if len(excerpt) <= _EXCERPT_MAX_CHARACTERS:
         return excerpt
     return excerpt[:_EXCERPT_MAX_CHARACTERS].strip()
+
+
+def _wrapped_value_label_rows(
+    lines: tuple[str, ...],
+    *,
+    selected_indexes: tuple[int, ...],
+    question: str,
+    analysis: QuestionAnalysis,
+) -> tuple[list[str], set[int]]:
+    if analysis.answer_type != "DATE":
+        return [], set()
+    _, terms, _ = _query_needles(question)
+    focus_terms = tuple(term for term in terms if term not in {"ngay", "nao", "thuong"})
+    if not focus_terms:
+        return [], set()
+    selected_set = set(selected_indexes)
+    rows: list[str] = []
+    used: set[int] = set()
+    for index in selected_indexes:
+        if index + 1 not in selected_set:
+            continue
+        folded_value = _fold_text(lines[index])
+        folded_label = _fold_text(lines[index + 1])
+        if re.search(r"\bngay\s+\d{1,2}\b", folded_value) is None:
+            continue
+        if not any(term in folded_label for term in focus_terms):
+            continue
+        rows.append(f"{lines[index + 1]}: {lines[index]}")
+        used.update((index, index + 1))
+    return rows, used
 
 
 def _format_multi_value_excerpt(text: str) -> str:
@@ -403,7 +493,59 @@ def _is_quantity_question(question: str) -> bool:
 
 def _is_multi_value_question(question: str) -> bool:
     folded_question = _fold_text(question)
-    return any(cue in folded_question for cue in _MULTI_VALUE_QUESTION_CUES)
+    if any(cue in folded_question for cue in ("tat ca", "deu", "all", "every")):
+        return True
+    if "mọi" in question.casefold():
+        return True
+    return (
+        re.search(
+            r"\bmoi\s+(?!ngay\b|tuan\b|thang\b|nam\b|lan\b|ky\b|"
+            r"day\b|week\b|month\b|year\b)\w+",
+            folded_question,
+        )
+        is not None
+    )
+
+
+def _is_broad_multi_value_duration_question(
+    question: str,
+    *,
+    analysis: QuestionAnalysis,
+) -> bool:
+    """Keep condition/value rows for broad duration questions.
+
+    A question can request a duration table without using all/every wording.
+    Evidence drives this path (at least two number/unit pairs are required by
+    the caller); narrow deadline, minimum, maximum, and remote questions keep
+    the existing single-value structural focus.
+    """
+    if not analysis.asks_for_duration:
+        return False
+    folded_question = _fold_text(question)
+    return not any(
+        cue in folded_question
+        for cue in (
+            "bao lau",
+            "chua du",
+            "it nhat",
+            "khong qua",
+            "toi da",
+            "toi thieu",
+            "truoc bao",
+            "trong vong",
+            "ke tu",
+            "sau ",
+            "deadline",
+            "within",
+            "maximum",
+            "minimum",
+            "remote",
+            "hybrid",
+            "lam o nha",
+            "lam viec tu xa",
+            "work from home",
+        )
+    )
 
 
 def _is_person_acronym_question(question: str) -> bool:
@@ -441,6 +583,58 @@ def _person_acronym_excerpt(text: str, question: str) -> str:
                     selected_line_indexes.append(selected_index)
     parts = [lines[index].strip() for index in selected_line_indexes if lines[index].strip()]
     excerpt = _format_person_record_excerpt(parts)
+    return excerpt[:600].strip()
+
+
+def _person_role_excerpt(text: str, question: str) -> str:
+    """Preserve the named record for descriptive role/person questions."""
+    lines = tuple(line.strip() for line in text.splitlines() if line.strip())
+    if not lines:
+        return ""
+    folded_lines = tuple(_fold_text(line) for line in lines)
+    _, terms, _ = _query_needles(question)
+    focus_terms = tuple(
+        term
+        for term in terms
+        if term
+        not in {
+            "cua",
+            "digital",
+            "gi",
+            "nguoi",
+            "nova",
+            "phu",
+            "ten",
+            "trach",
+            "what",
+            "who",
+        }
+    )
+    if not focus_terms:
+        return ""
+
+    candidates: list[tuple[int, int]] = []
+    for index, line in enumerate(lines):
+        if " - " not in line:
+            continue
+        left_side = line.split(" - ", 1)[0].strip()
+        if len(left_side.split()) < 2 or any(character.isdigit() for character in left_side):
+            continue
+        window = " ".join(folded_lines[index : min(len(lines), index + 4)])
+        score = sum(2 for term in focus_terms if term in window)
+        score += sum(
+            5
+            for left, right in zip(focus_terms, focus_terms[1:], strict=False)
+            if f"{left} {right}" in window
+        )
+        if score > 0:
+            candidates.append((index, score))
+    if not candidates:
+        return ""
+
+    best_index, _ = max(candidates, key=lambda candidate: (candidate[1], -candidate[0]))
+    record_lines = lines[best_index : min(len(lines), best_index + 4)]
+    excerpt = _format_person_record_excerpt(record_lines)
     return excerpt[:600].strip()
 
 
@@ -489,6 +683,27 @@ def _multi_value_focus_positions(
         spans = tuple(span for span in spans if span[1] in question_units)
     if not spans:
         return ()
+    if "phep" in terms and "nam" in terms:
+        category_cues = (
+            "dieu kien",
+            "doi tuong",
+            "chua thanh nien",
+            "khuyet tat",
+            "nang nhoc",
+            "doc hai",
+            "nguy hiem",
+            "dac biet",
+        )
+        category_spans = tuple(
+            span
+            for span in spans
+            if any(
+                cue in text[max(0, span[2] - 180) : min(len(text), span[3] + 240)]
+                for cue in category_cues
+            )
+        )
+        if len(category_spans) >= 2:
+            return tuple(span[2] for span in category_spans)
     focused_terms = tuple(
         term for term in terms if term not in _QUANTITY_STOP_TERMS and term not in question_units
     )
@@ -530,7 +745,11 @@ def _multi_value_focus_positions(
     cluster_positions = tuple(
         start for index, (_, _, start, _) in enumerate(spans) if index in cluster_indexes
     )
-    return tuple(sorted(cluster_positions, key=lambda start: (abs(start - anchor_start), start)))
+    # Windows are rendered in source order. Returning source order also makes
+    # the caller's bounded first-three selection retain a condition row that
+    # precedes the highest-scoring value instead of dropping it behind later
+    # incidental durations.
+    return tuple(sorted(cluster_positions))
 
 
 def _quantity_focus_positions(

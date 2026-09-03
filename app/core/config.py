@@ -138,7 +138,7 @@ class Settings(BaseSettings):
         gt=0,
         validation_alias=AliasChoices("RERANKER_TOP_K", "RERANK_TOP_K"),
     )
-    reranker_candidate_k: int = Field(default=24, gt=0)
+    reranker_candidate_k: int = Field(default=50, gt=0)
     reranker_max_length: int = Field(default=512, gt=0)
     reranker_timeout_seconds: float = Field(default=10.0, gt=0.0, le=120.0)
     reranker_local_files_only: bool = True

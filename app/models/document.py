@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     BigInteger,
     Boolean,
     CheckConstraint,
+    Date,
     DateTime,
     Enum,
     ForeignKey,
@@ -22,7 +23,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
-from app.models.enums import DocumentAccessScope, DocumentStatus
+from app.models.enums import DocumentAccessScope, DocumentLifecycleStatus, DocumentStatus
 
 if TYPE_CHECKING:
     from app.models.department import Department
@@ -63,11 +64,45 @@ class Document(Base):
             "is_deleted",
         ),
         Index("ix_documents_created_at", "created_at"),
+        Index(
+            "ix_documents_authority",
+            "document_code",
+            "lifecycle_status",
+            "effective_from",
+            "effective_to",
+        ),
+        CheckConstraint(
+            "document_code IS NULL OR char_length(btrim(document_code)) > 0",
+            name="ck_documents_document_code_not_blank",
+        ),
+        CheckConstraint(
+            "document_version IS NULL OR char_length(btrim(document_version)) > 0",
+            name="ck_documents_document_version_not_blank",
+        ),
+        CheckConstraint(
+            "effective_to IS NULL OR effective_from IS NULL OR effective_to >= effective_from",
+            name="ck_documents_effective_dates_ordered",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    document_code: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    document_version: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    effective_from: Mapped[date | None] = mapped_column(Date, nullable=True)
+    effective_to: Mapped[date | None] = mapped_column(Date, nullable=True)
+    lifecycle_status: Mapped[DocumentLifecycleStatus] = mapped_column(
+        Enum(DocumentLifecycleStatus, name="document_lifecycle_status"),
+        nullable=False,
+        default=DocumentLifecycleStatus.ACTIVE,
+        server_default=DocumentLifecycleStatus.ACTIVE.value,
+    )
+    supersedes_document_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid,
+        ForeignKey("documents.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     original_filename: Mapped[str] = mapped_column(String(255), nullable=False)
     storage_key: Mapped[str] = mapped_column(String(512), nullable=False)
     mime_type: Mapped[str] = mapped_column(String(127), nullable=False)
@@ -115,6 +150,10 @@ class Document(Base):
     )
 
     department: Mapped[Department | None] = relationship()
+    supersedes_document: Mapped[Document | None] = relationship(
+        remote_side="Document.id",
+        foreign_keys=[supersedes_document_id],
+    )
     uploader: Mapped[User] = relationship(foreign_keys=[uploaded_by])
     permissions: Mapped[list[DocumentPermission]] = relationship(
         "DocumentPermission",

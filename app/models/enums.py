@@ -15,6 +15,14 @@ class DocumentStatus(StrEnum):
     ARCHIVED = "ARCHIVED"
 
 
+class DocumentLifecycleStatus(StrEnum):
+    """Authority lifecycle, separate from technical processing readiness."""
+
+    ACTIVE = "ACTIVE"
+    SUPERSEDED = "SUPERSEDED"
+    ARCHIVED = "ARCHIVED"
+
+
 class DocumentAccessScope(StrEnum):
     PRIVATE = "PRIVATE"
     DEPARTMENT = "DEPARTMENT"

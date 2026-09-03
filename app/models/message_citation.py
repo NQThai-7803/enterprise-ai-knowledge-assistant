@@ -36,6 +36,10 @@ class MessageCitation(Base):
             name="ck_message_citations_excerpt_not_blank",
         ),
         CheckConstraint(
+            "evidence_text IS NULL OR char_length(btrim(evidence_text)) > 0",
+            name="ck_message_citations_evidence_text_not_blank",
+        ),
+        CheckConstraint(
             "relevance_score IS NULL OR (relevance_score >= 0 AND relevance_score <= 1)",
             name="ck_message_citations_relevance_score_range",
         ),
@@ -89,6 +93,10 @@ class MessageCitation(Base):
     )
     page_number: Mapped[int] = mapped_column(Integer, nullable=False)
     excerpt: Mapped[str] = mapped_column(Text, nullable=False)
+    evidence_text: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+    )
     relevance_score: Mapped[Decimal | None] = mapped_column(Numeric(10, 6), nullable=True)
     citation_order: Mapped[int] = mapped_column(Integer, nullable=False)
     source_url: Mapped[str | None] = mapped_column(Text, nullable=True)

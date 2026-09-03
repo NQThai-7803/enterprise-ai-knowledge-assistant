@@ -1,0 +1,119 @@
+﻿# Frontend Specification
+
+## 1. Pháº¡m vi
+
+Frontend Ä‘Æ°á»£c thá»±c hiá»‡n sau khi backend MVP á»•n Ä‘á»‹nh. CÃ´ng nghá»‡ dá»± kiáº¿n:
+
+- React.
+- TypeScript.
+- Vite.
+- UI library sáº½ Ä‘Æ°á»£c quyáº¿t Ä‘á»‹nh trÆ°á»›c Task frontend Ä‘áº§u tiÃªn.
+
+## 2. Layout
+
+### Auth layout
+
+- Login page.
+- KhÃ´ng hiá»ƒn thá»‹ sidebar.
+
+### Application layout
+
+- Sidebar theo role.
+- Top bar hiá»ƒn thá»‹ user, department vÃ  logout.
+- Main content.
+- Responsive cho desktop vÃ  tablet; mobile lÃ  má»©c há»— trá»£ phá»¥ á»Ÿ MVP.
+
+## 3. Pages
+
+### Login
+
+- Email.
+- Password.
+- Loading state.
+- Error message an toÃ n.
+
+### Dashboard
+
+MVP hiá»ƒn thá»‹:
+
+- Sá»‘ tÃ i liá»‡u READY.
+- TÃ i liá»‡u PROCESSING/FAILED.
+- Sá»‘ chat session cá»§a user.
+- CÃ¢u há»i gáº§n Ä‘Ã¢y.
+
+### Documents
+
+- Table hoáº·c card list.
+- Search.
+- Filter status vÃ  access scope.
+- Upload modal.
+- Processing status.
+- Action theo permission.
+
+### Document detail
+
+- Metadata.
+- Processing status.
+- Download.
+- Reprocess cho ngÆ°á»i cÃ³ quyá»n.
+- KhÃ´ng hiá»ƒn thá»‹ storage path ná»™i bá»™.
+
+### Chat
+
+```text
+Left sidebar: chat sessions
+Center: conversation
+Right drawer/panel: citations and document preview
+```
+
+- New chat.
+- Loading/streaming state náº¿u backend há»— trá»£.
+- Citation chips.
+- Feedback buttons.
+- No-answer state.
+
+### User management
+
+Admin only:
+
+- List users.
+- Create/edit/deactivate.
+- Assign role and department.
+
+### Audit logs
+
+Admin only:
+
+- Filter action, user vÃ  date.
+- KhÃ´ng hiá»ƒn thá»‹ secret hoáº·c raw token.
+
+## 4. Role-aware navigation
+
+| Menu | Admin | Manager | Staff |
+|---|---:|---:|---:|
+| Dashboard | Yes | Yes | Yes |
+| Chat | Yes | Yes | Yes |
+| Documents | Yes | Yes | Yes |
+| Users | Yes | No | No |
+| Departments | Yes | No | No |
+| Feedback report | Yes | Department | No |
+| Audit logs | Yes | No | No |
+
+Frontend chá»‰ há»— trá»£ UX; backend váº«n lÃ  nguá»“n kiá»ƒm soÃ¡t quyá»n chÃ­nh thá»©c.
+
+## 5. API client
+
+- Base URL tá»« environment.
+- Gáº¯n access token tá»± Ä‘á»™ng.
+- Refresh token theo flow backend.
+- Khi refresh tháº¥t báº¡i, logout vÃ  chuyá»ƒn vá» login.
+- Chuáº©n hÃ³a error handling.
+
+## 6. Security
+
+- KhÃ´ng lÆ°u password.
+- KhÃ´ng render raw HTML tá»« AI náº¿u chÆ°a sanitize.
+- KhÃ´ng tin role do client tá»± sá»­a.
+- KhÃ´ng expose internal IDs khÃ´ng cáº§n thiáº¿t trong URL cÃ´ng khai.
+- Download qua authenticated endpoint.
+

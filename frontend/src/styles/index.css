@@ -1,4 +1,4 @@
-@tailwind base;
+﻿@tailwind base;
 @tailwind components;
 @tailwind utilities;
 
@@ -98,12 +98,19 @@ textarea {
 }
 
 .motion-shimmer {
-  background:
-    linear-gradient(110deg, transparent 25%, rgb(var(--color-accent) / 0.18) 45%, transparent 65%),
-    currentColor;
+  background: linear-gradient(
+    110deg,
+    rgb(var(--color-ink)) 0%,
+    rgb(var(--color-ink)) 28%,
+    rgb(var(--color-accent)) 45%,
+    rgb(var(--color-ink)) 62%,
+    rgb(var(--color-ink)) 100%
+  );
   background-size: 220% 100%;
   background-clip: text;
+  -webkit-background-clip: text;
   color: transparent;
+  -webkit-text-fill-color: transparent;
   animation: shimmer-text 3s ease-in-out infinite;
 }
 
@@ -152,8 +159,133 @@ textarea {
     transition-duration: 0.01ms !important;
   }
 
-  .motion-signal::before,
-  .motion-shimmer {
-    animation: none !important;
+    .motion-signal::before,
+    .motion-shimmer {
+      animation: none !important;
+    }
+
+    .citation-inline::after,
+    .citation-evidence,
+    .citation-card-highlight {
+      animation: none !important;
+    }
+}
+
+.citation-inline {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  margin-inline: 0.08rem;
+  padding-inline: 0.14rem;
+  border-radius: 4px;
+
+  color: rgb(var(--color-accent));
+  font-weight: 700;
+  line-height: 1.25;
+
+  cursor: pointer;
+
+  transition:
+    color 160ms ease,
+    background-color 160ms ease,
+    transform 160ms ease;
+}
+
+.citation-inline::after {
+  content: "";
+  position: absolute;
+  left: 0.1rem;
+  right: 0.1rem;
+  bottom: -2px;
+
+  height: 2px;
+  border-radius: 999px;
+
+  background: rgb(var(--color-danger));
+
+  transform-origin: left;
+
+  animation: citation-underline-in 420ms
+    cubic-bezier(.2, .8, .2, 1) both;
+}
+
+.citation-inline:hover {
+  color: rgb(var(--color-accent));
+  background: rgb(var(--color-accent) / 0.10);
+  transform: translateY(-1px);
+}
+
+.citation-inline:focus-visible {
+  outline: 2px solid rgb(var(--color-accent));
+  outline-offset: 3px;
+}
+
+
+/* Evidence text inside the Citation card */
+.citation-evidence {
+  color: rgb(var(--color-ink));
+  font-weight: 600;
+
+  text-decoration-line: underline;
+  text-decoration-color: rgb(var(--color-danger));
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+
+  animation: citation-evidence-in 520ms
+    cubic-bezier(.2, .8, .2, 1) both;
+}
+
+
+/* Flash the Citation card after clicking [1], [2], ... */
+.citation-card-highlight {
+  animation: citation-card-highlight 1.4s ease-out;
+}
+
+
+@keyframes citation-underline-in {
+  from {
+    transform: scaleX(0);
+    opacity: 0;
+  }
+
+  to {
+    transform: scaleX(1);
+    opacity: 1;
   }
 }
+
+
+@keyframes citation-evidence-in {
+  from {
+    text-decoration-color: transparent;
+    background-color: rgb(var(--color-danger) / 0);
+  }
+
+  45% {
+    background-color: rgb(var(--color-danger) / 0.08);
+  }
+
+  to {
+    text-decoration-color: rgb(var(--color-danger));
+    background-color: transparent;
+  }
+}
+
+
+@keyframes citation-card-highlight {
+  0% {
+    box-shadow:
+      0 0 0 0 rgb(var(--color-danger) / 0);
+  }
+
+  30% {
+    box-shadow:
+      0 0 0 4px rgb(var(--color-danger) / 0.18);
+  }
+
+  100% {
+    box-shadow:
+      0 0 0 10px rgb(var(--color-danger) / 0);
+  }
+}
+

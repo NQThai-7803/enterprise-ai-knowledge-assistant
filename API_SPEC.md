@@ -1,4 +1,4 @@
-# API Specification
+﻿# API Specification
 
 ## 1. Base conventions
 
@@ -662,6 +662,38 @@ TASK-026 multi-LLM behavior:
 - LLM disabled or misconfigured responses use the standard error envelope and safe LLM error codes from `API_ERROR_CODES.md`.
 - Provider timeout, rate limit, authentication, unavailable, rejected-request, and bad-response failures never include raw provider bodies, prompts, retrieved context, answers, citation excerpts, endpoint credentials, API keys, or request headers.
 
+
+## 8A. Exact Evidence Citation Metadata — 2026-08-19
+
+Chat request bodies are unchanged.
+
+Citation responses may now include optional `evidence_text`:
+
+```json
+{
+  "document_id": "uuid",
+  "document_title": "Giới thiệu và cơ cấu tổ chức Công ty Công nghệ Nova Digital",
+  "chunk_id": "uuid",
+  "page_number": 3,
+  "excerpt": "Answer-focused evidence: ... khoảng 180 người ...",
+  "evidence_text": "180 người",
+  "relevance_score": 0.89,
+  "citation_order": 1
+}
+```
+
+Rules:
+
+- `evidence_text` is backend-generated from the validated answer and backend-selected source text.
+- `evidence_text` is optional for backward compatibility; historical citations may omit it.
+- Blank evidence is not persisted.
+- `excerpt` remains the broader server-generated context snapshot.
+- `evidence_text` must never be supplied by the client or trusted from arbitrary LLM metadata.
+- Original PDF/DOCX content is not modified.
+- `GET /chat/sessions/{session_id}`, non-streaming message responses, and SSE citation payloads use the same safe citation metadata contract.
+- Frontend clients must fall back to the existing excerpt when `evidence_text` is absent.
+- Minimal Citation Selection may remove redundant backend markers before public `[1]`, `[2]` numbering; this optimization must preserve distinct evidence required by multi-claim answers.
+
 ## 9. Feedback
 
 ### PUT `/messages/{message_id}/feedback`
@@ -1071,3 +1103,4 @@ Security rules:
 - Release version: v1.0.0-rc1.
 - TASK-035 did not change API contracts, request bodies, response bodies, status codes, authentication requirements, streaming event names, or database schema.
 - Final acceptance verified Authentication, RBAC, Departments, Users, Documents, OCR, Embedding, Semantic Retrieval, Keyword Retrieval, Hybrid Retrieval, Conversation Memory, Grounded Answer, Citation, Streaming, Feedback, Audit, Web Search, Analytics, Monitoring, and Production Deployment endpoints against the existing contract.
+

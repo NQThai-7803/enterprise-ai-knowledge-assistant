@@ -6,6 +6,68 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### RAG Runtime Acceptance and Leave Corpus Restoration -- 2026-08-21
+
+#### Added
+
+- Added answer-bearing source-quality architecture across retrieval/citation selection so direct policy clauses and tables are preferred over sample-question, appendix, and reference chunks.
+- Added subject/object-aware YES/NO validation so polarity is anchored to the asked actor/object rather than accepted from unrelated supported evidence.
+- Added relation entailment support for replacement/supplemental relationships, including NovaCare versus mandatory BHYT.
+- Added stronger citation source repair with focused evidence text, redundant marker pruning, and source-quality-based citation selection.
+
+#### Fixed
+
+- Fixed the annual-leave UAT corpus gap by restoring the intended soft-deleted UAT leave-policy document instead of changing RAG/runtime logic.
+- Restored document `43cb2c93-52bc-44f6-8e03-1b1f075e1d89` (`Chính sách nghỉ của người lao động`, checksum `24178db420422e474326986672b6c15cc67373ee6adbe1489ba5e8addf95f4f4`) and reprocessed it through normal ingestion task `274fe326-9d28-421c-9c11-253ec7b74bc2`.
+- Confirmed the restored document became `READY` with `6` pages, `12` chunks, `6458` tokens, and `384`-dimension embeddings; active corpus verification found `12` ready documents, `153` active chunks, and active leave table chunk `4b341201-f0df-4102-b9f2-5ad7091781a6`.
+
+#### Verified
+
+- Annual-leave runtime UAT now starts with `Không`, distinguishes `12`, `14`, and `16` day categories, cites the real active leave clause/table, avoids sample-question/test-question citations, and records claim validation `SUPPORTED`.
+- Seven runtime UAT cases passed: own salary, EAP, NovaCare vs BHYT, Engineering Manager `N5 / 42 - 70 triệu`, Head / Director `N6 / 65 - 110 triệu`, annual leave, and CEO false premise `Nguyễn Anh Khoa`.
+- `python -m pytest tests\unit\test_grounded_answer_service.py -q`: `75 passed in 1.33s`.
+- Focused RAG/citation suite: `132 passed in 1.56s`.
+- Combined RAG/citation/validation/output suite: `157 passed in 1.71s`.
+- `python -m pytest tests\unit -q`: `1061 passed in 8.22s`.
+- Ruff check on 21 touched Python files: `All checks passed!`.
+- Ruff format check on 21 touched Python files: `21 files already formatted`.
+
+#### Known limitations
+
+- The restored authoritative annual-leave document is a generic/template policy in the UAT corpus, not a Nova-branded policy; replace it with canonical Nova-branded content when available.
+- The configured CrossEncoder reranker was unavailable and runtime used alignment fallback reranking.
+- Runtime UAT latency remains high.
+- Annual-leave exact evidence highlighting is too narrow for a multi-row table and should capture the full 12 / 14 / 16 support span.
+
+### Manual RAG / Citation Hardening — 2026-08-19
+
+#### Added
+
+- Added backend exact-evidence extraction that derives a focused supporting text/value from the answer and backend-selected source text without modifying original PDF/DOCX files.
+- Added optional `evidence_text` metadata to validated citations, persistence, API responses, and session-history reloads.
+- Added Alembic revision `cd124fa71c86_add_citation_evidence_text.py` for nullable `message_citations.evidence_text` and `ck_message_citations_evidence_text_not_blank`.
+- Added frontend exact-evidence rendering so the evidence substring can be emphasized independently from the broader citation excerpt.
+- Added evidence-aware Minimal Citation Selection/pruning work for redundant citations from the same internal document and same normalized evidence.
+
+#### Fixed
+
+- Repaired an initially empty `cd124fa71c86` migration by restoring the database revision marker to `20260803_0010` and re-running the corrected migration.
+- Confirmed historical citation rows remain valid with `evidence_text = NULL`.
+
+#### Verified
+
+- Exact-evidence citation-mapping focused suite reached `15 passed`.
+- Live PostgreSQL persistence and API/session reload verified `evidence_text = "180 người"` for a real local grounded answer.
+- Minimal Citation Selection focused unit verification passed with `17 passed in 0.19s`; live new-message runtime verification remains pending before final completion.
+- Verified punctuation cleanup after pruning so removed redundant markers no longer leave malformed output such as `[1] .`.
+- Verified focused mapping behavior preserves distinct evidence while allowing same-document/same-evidence redundancy removal.
+
+#### Design constraints
+
+- Regression/UAT questions are tests only and must never become runtime question-to-answer mappings.
+- Citation deduplication must not be based on `document_id` alone; different evidence supporting different claims must remain available.
+
+
 ### Fixed
 
 - Replaced document upload raw Department ID entry with a Department selector backed by `GET /api/v1/departments`, conditional scope validation, loading/empty/error/retry states, and safe validation copy.
@@ -338,3 +400,30 @@ Format follows a simplified Keep a Changelog style.
 - Docker Desktop, PostgreSQL, Redis, API, worker, and host Ollama `qwen3:4b` are reachable in the current local environment.
 - Live SSE verification for Nova Digital CEO, CTO, and NovaAssist completed twice each with no `STREAM_TIMEOUT`.
 - TASK-034.1 remains in progress until the full strict real-LLM matrix and manual claim report are complete.
+
+
+#### RAG-H2.1 — Reranker Authority
+
+- Fixed `_preserve_reranked_hit_order()` so reranker output remains authoritative over later prompt heuristic ranking.
+- Added regression coverage for reranker-order preservation.
+- Verified `61 passed`, `27 passed`, and `147 passed` across focused RAG/retrieval unit suites.
+- Recorded runtime limitation: cross-encoder model is unavailable and falls back to alignment reranking.
+- Recorded diagnostics limitation: API container currently has no `RAG_DIAGNOSTICS_ENABLED` environment variable.
+
+
+#### Fixed — LLM_GENERATION_FAILED runtime incident
+
+- Removed invalid `question=grounding_question` argument from `_draft_from_generation()` claim validation call.
+- Root cause was a `NameError` caused by an incomplete H5.1 change, not an Ollama failure.
+- Verified Ollama OpenAI-compatible `/v1/chat/completions` provider path independently.
+- Regression verification: `61 passed` and `147 passed` focused suites.
+- Live generation failure is resolved; RAG accuracy issue for salary lookup remains open.
+
+#### Fixed — salary amount false NO_ANSWER
+
+- Prevented generic quantity completeness checks from incorrectly handling `AMOUNT` salary questions.
+- Prevented grade labels such as `N6 Head` from behaving like answer number/unit requirements.
+- Preserved quantity regression behavior for genuine COUNT/DURATION/NUMBER questions.
+- Added salary-band regression coverage.
+- Verification: 63 grounded-answer tests passed; 149 focused combined tests passed.
+- Live UAT: Head 65-110 million and Engineering Manager 42-70 million/month both pass with citations.

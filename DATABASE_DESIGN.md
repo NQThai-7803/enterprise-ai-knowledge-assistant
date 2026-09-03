@@ -1,4 +1,4 @@
-# Database Design
+﻿# Database Design
 
 ## 1. Principles
 
@@ -471,3 +471,40 @@ Feedback rules:
 - Feedback does not store email, Department, role, answer snapshots, questions, citations, Document IDs, or arbitrary metadata JSON.
 - Hard-deleting an ASSISTANT message cascades its feedback.
 - User deletion is restricted when feedback exists; user deactivation does not delete historical feedback.
+
+## TASK-034.1.2 exact evidence citation metadata
+
+A manual citation-quality hardening follow-up adds exact evidence metadata to `message_citations`.
+
+### `message_citations.evidence_text`
+
+| Field | Notes |
+| --- | --- |
+| `evidence_text` | Nullable `text`; focused backend-generated evidence associated with the validated citation |
+
+Constraint:
+
+```text
+ck_message_citations_evidence_text_not_blank
+evidence_text IS NULL OR char_length(btrim(evidence_text)) > 0
+```
+
+Migration:
+
+```text
+cd124fa71c86_add_citation_evidence_text.py
+down_revision = 20260803_0010
+```
+
+Operational note:
+
+- The revision file was initially created with empty `upgrade()`/`downgrade()` bodies and was accidentally stamped as current.
+- The migration was corrected, the database was stamped back to `20260803_0010`, and the corrected migration was upgraded again.
+- Runtime verification confirmed the physical PostgreSQL column and successful persistence.
+
+Data rules:
+
+- Historical citation rows may remain `NULL`; no backfill is required.
+- `excerpt` remains the broader evidence/context snapshot.
+- `evidence_text` is additional presentation/validation metadata and does not alter `documents`, `document_chunks`, stored PDF files, or stored DOCX files.
+- Repository reads/writes preserve `evidence_text` across session reload.

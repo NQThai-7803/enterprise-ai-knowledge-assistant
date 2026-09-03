@@ -245,6 +245,11 @@ export const apiClient = {
     session(sessionId: string, query?: { message_page?: number; message_page_size?: number }) {
       return request<DataResponse<ChatSessionDetail>>(`/chat/sessions/${sessionId}`, { query });
     },
+    deleteSession(sessionId: string) {
+      return request<void>(`/chat/sessions/${sessionId}`, {
+        method: "DELETE",
+      });
+    },
     sendMessage(sessionId: string, payload: { content: string }) {
       return request<DataResponse<ChatAnswerResponse>>(`/chat/sessions/${sessionId}/messages`, {
         method: "POST",
