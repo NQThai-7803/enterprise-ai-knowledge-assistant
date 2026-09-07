@@ -1,4 +1,4 @@
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import json
 import logging
@@ -1591,8 +1591,7 @@ class GroundedAnswerService:
         if not codes:
             return hits
         conditions = tuple(
-            DocumentChunk.text.ilike(_like_contains_pattern(code), escape="\\")
-            for code in codes
+            DocumentChunk.text.ilike(_like_contains_pattern(code), escape="\\") for code in codes
         )
         existing_chunk_ids = {hit.chunk_id for hit in hits}
         supplements: list[HybridRetrievalHit] = []
