@@ -160,7 +160,7 @@ jobs:
         run: |
           set -euo pipefail
           coverage erase
-          env -u APP_ENV -u LLM_BASE_URL \
+          env -u APP_ENV -u LLM_BASE_URL -u SECRET_KEY \
           coverage run --parallel-mode -m pytest tests/unit \
           --junitxml=reports/pytest-unit.xml 2>&1 | tee logs/pytest-unit.log
           coverage run --parallel-mode -m pytest tests/api -m "not integration" \
