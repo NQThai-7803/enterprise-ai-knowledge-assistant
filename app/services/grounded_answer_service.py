@@ -104,6 +104,7 @@ logger = logging.getLogger(__name__)
 _PROMPT_QUERY_TERM_PATTERN = re.compile(r"\w+", re.UNICODE)
 _NAME_TOKEN_PATTERN = re.compile(r"\w+", re.UNICODE)
 _QUESTION_ACRONYM_PATTERN = re.compile(r"\b[A-Z][A-Z0-9&/+.-]{1,}\b")
+_EXPLICIT_DOCUMENT_CODE_PATTERN = re.compile(r"\b[A-Z]{2,}(?:-[A-Z0-9]{2,})+\b")
 _ROLE_DESCRIPTION_PATTERNS = (
     re.compile(
         r"(?:người\s+)?phụ\s+trách\s+(.+?)(?=\s+(?:của|tại|ở|tên|là|ai)\b|[?.,!]|$)",
@@ -177,6 +178,7 @@ _PROMPT_SECURITY_CONTROL_CUES = (
 _ROLE_PERSON_ASSOCIATION_MAX_CHARS = 320
 _ROLE_PERSON_SUPPLEMENT_LIMIT = 12
 _EXACT_TOPIC_SUPPLEMENT_LIMIT = 12
+_EXPLICIT_DOCUMENT_SUPPLEMENT_LIMIT = 80
 _MULTI_VALUE_DURATION_SUPPLEMENT_LIMIT = 80
 _PROMPT_VALUE_FOCUS_STOP_TERMS = frozenset(
     {
@@ -1534,8 +1536,13 @@ class GroundedAnswerService:
         question: str,
         current_user: User,
     ) -> tuple[HybridRetrievalHit, ...]:
-        candidate_hits = await self._supplement_exact_topic_retrieval_hits(
+        candidate_hits = await self._supplement_explicit_document_retrieval_hits(
             hits,
+            question=question,
+            current_user=current_user,
+        )
+        candidate_hits = await self._supplement_exact_topic_retrieval_hits(
+            candidate_hits,
             question=question,
             current_user=current_user,
         )
@@ -1571,6 +1578,45 @@ class GroundedAnswerService:
         if self.settings.reranker_enabled and self.retrieval_reranker is not None:
             return _merge_retrieval_hits(ranked_hits, reranked_hits)
         return ranked_hits
+
+    async def _supplement_explicit_document_retrieval_hits(
+        self,
+        hits: tuple[HybridRetrievalHit, ...],
+        *,
+        question: str,
+        current_user: User,
+    ) -> tuple[HybridRetrievalHit, ...]:
+        """Include answer chunks from a permission-visible explicitly coded document."""
+        codes = _explicit_document_codes(question)
+        if not codes:
+            return hits
+        conditions = tuple(
+            DocumentChunk.text.ilike(_like_contains_pattern(code), escape="\\")
+            for code in codes
+        )
+        existing_chunk_ids = {hit.chunk_id for hit in hits}
+        supplements: list[HybridRetrievalHit] = []
+        async with self.session_provider() as session:
+            execute = getattr(session, "execute", None)
+            if execute is None:
+                return hits
+            rows = await execute(
+                select(DocumentChunk, Document)
+                .join(Document, Document.id == DocumentChunk.document_id)
+                .where(
+                    Document.status == DocumentStatus.READY,
+                    build_accessible_document_filter(current_user),
+                    or_(*conditions),
+                )
+                .order_by(Document.created_at.desc(), DocumentChunk.chunk_index.asc())
+                .limit(_EXPLICIT_DOCUMENT_SUPPLEMENT_LIMIT)
+            )
+        for chunk, document in rows.all():
+            if chunk.id in existing_chunk_ids:
+                continue
+            supplements.append(_supplement_hit_from_chunk(chunk=chunk, document=document))
+            existing_chunk_ids.add(chunk.id)
+        return (*hits, *tuple(supplements)) if supplements else hits
 
     async def _supplement_exact_topic_retrieval_hits(
         self,
@@ -4053,6 +4099,23 @@ def _filter_to_named_document_title_hits(
     *,
     question: str,
 ) -> tuple[tuple[int, HybridRetrievalHit, float], ...]:
+    document_codes = _explicit_document_codes(question)
+    if document_codes:
+        code_hits = tuple(
+            (index, hit, score)
+            for index, hit, score in scored_hits
+            if all(
+                code.casefold() in f"{hit.document_title}\n{hit.text}".casefold()
+                for code in document_codes
+            )
+        )
+        if code_hits:
+            direct_code_hits = tuple(
+                (index, hit, score)
+                for index, hit, score in code_hits
+                if not _is_reference_or_question_list_hit(hit)
+            )
+            return direct_code_hits or code_hits
     title_terms = _named_document_title_terms(question)
     if not title_terms:
         return scored_hits
@@ -4135,6 +4198,10 @@ def _named_document_title_terms(question: str) -> tuple[str, ...]:
         if len(terms) >= 2:
             return terms[:6]
     return ()
+
+
+def _explicit_document_codes(question: str) -> tuple[str, ...]:
+    return tuple(dict.fromkeys(_EXPLICIT_DOCUMENT_CODE_PATTERN.findall(question)))
 
 
 def _filter_to_specific_term_hits(

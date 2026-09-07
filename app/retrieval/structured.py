@@ -374,6 +374,10 @@ def has_explicit_not_specified(text: str) -> bool:
             "not specify",
             "not fixed",
             "no fixed",
+            "ty le cu the duoc cap nhat theo",
+            "muc cu the duoc cap nhat theo",
+            "specific rate is updated under",
+            "specific rate is updated according to",
         )
     )
 

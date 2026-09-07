@@ -960,7 +960,7 @@ def _evidence_for_labels(
     for label in cited_source_labels:
         marker = f"[{label}]" if not label.startswith("[") else label
         source = source_registry.by_marker(marker)
-        if source is not None:
+        if source is not None and not is_non_answer_context(source.text):
             parts.append(source.text)
     return "\n\n".join(parts)
 

@@ -242,6 +242,16 @@ def _is_yes_no_question(folded: str) -> bool:
     stripped = folded.strip()
     return (
         stripped.startswith(("co ", "co phai ", "is ", "are ", "do ", "does ", "can "))
+        or any(
+            cue in stripped
+            for cue in (
+                "hay xac nhan",
+                "vui long xac nhan",
+                "please confirm",
+                "confirm whether",
+                "confirm that",
+            )
+        )
         or " dung khong" in stripped
         or " phai khong" in stripped
         or stripped.endswith(" khong")
@@ -277,6 +287,8 @@ def _asks_for_year(folded: str) -> bool:
 
 
 def _asks_for_percentage_like(folded: str) -> bool:
+    if "ty le" in folded or "percentage" in folded:
+        return True
     if re.search(r"\b(?:ot\s+bao nhieu|bao nhieu\s+ot)\b", folded):
         return True
     if any(

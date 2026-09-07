@@ -22,11 +22,7 @@ def information_need_queries(question: str) -> tuple[str, ...]:
     value = " ".join(question.split()).strip()
     if not value:
         return ()
-    clauses = tuple(
-        clause.strip(" ,;:?!")
-        for clause in _CONJUNCTION_PATTERN.split(value)
-        if clause.strip(" ,;:?!")
-    )
+    clauses = _compound_clauses(value)
     if len(clauses) < 2 or any(len(clause.split()) < 2 for clause in clauses):
         return ()
 
@@ -63,3 +59,27 @@ def information_need_queries(question: str) -> tuple[str, ...]:
         if query.casefold() != value.casefold():
             queries.append(query)
     return tuple(dict.fromkeys(queries))
+
+
+def _compound_clauses(value: str) -> tuple[str, ...]:
+    """Split requested facts without splitting a leading source/title qualifier."""
+    first_comma = value.find(",")
+    boundaries = tuple(
+        match
+        for match in _CONJUNCTION_PATTERN.finditer(value)
+        if first_comma < 0 or match.start() > first_comma
+    )
+    if not boundaries:
+        return (value.strip(" ,;:?!"),)
+
+    clauses: list[str] = []
+    start = 0
+    for boundary in boundaries:
+        clause = value[start : boundary.start()].strip(" ,;:?!")
+        if clause:
+            clauses.append(clause)
+        start = boundary.end()
+    final_clause = value[start:].strip(" ,;:?!")
+    if final_clause:
+        clauses.append(final_clause)
+    return tuple(clauses)
