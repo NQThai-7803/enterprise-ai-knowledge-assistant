@@ -5,10 +5,20 @@ from __future__ import annotations
 import json
 
 import httpx
+import pytest
 
 from scripts.release import task0353c2e_eval as evaluation
 
+requires_manifest = pytest.mark.skipif(
+    not evaluation.MANIFEST.exists(),
+    reason=(
+        f"{evaluation.MANIFEST.relative_to(evaluation.ROOT).as_posix()} is missing; artifacts/ "
+        "is git-ignored, so fresh clones lack the frozen synthetic manifest."
+    ),
+)
 
+
+@requires_manifest
 def test_manifest_is_frozen_and_split_before_evaluation() -> None:
     cases, digest = evaluation._load_manifest(evaluation.MANIFEST)
     assert len(cases) == 36
@@ -17,6 +27,7 @@ def test_manifest_is_frozen_and_split_before_evaluation() -> None:
     assert sum(case["split"] == "held_out" for case in cases) == 24
 
 
+@requires_manifest
 def test_restricted_synthetic_evidence_is_excluded_from_registry() -> None:
     cases, _ = evaluation._load_manifest(evaluation.MANIFEST)
     case = next(case for case in cases if case["id"] == "H22")
@@ -54,6 +65,7 @@ def test_development_threshold_ignores_held_out_scores() -> None:
     assert evaluation._select_dev_threshold(cases, rows) == threshold
 
 
+@requires_manifest
 def test_judge_transport_excludes_restricted_text(monkeypatch) -> None:
     cases, _ = evaluation._load_manifest(evaluation.MANIFEST)
     case = next(case for case in cases if case["id"] == "H22")
@@ -107,6 +119,7 @@ def test_judge_transport_excludes_restricted_text(monkeypatch) -> None:
     assert result[0]["decision"] == "REJECT"
 
 
+@requires_manifest
 def test_judge_timeout_becomes_uncertain(monkeypatch) -> None:
     cases, _ = evaluation._load_manifest(evaluation.MANIFEST)
 

@@ -3,8 +3,11 @@ from __future__ import annotations
 import asyncio
 import uuid
 from collections.abc import Callable
+from pathlib import Path
 
 import pytest
+from alembic.config import Config
+from alembic.script import ScriptDirectory
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -25,6 +28,15 @@ from app.models import (
 from app.services import admin_monitoring_service as monitoring
 
 pytestmark = pytest.mark.integration
+
+
+def _expected_migration_head() -> str:
+    repo_root = Path(__file__).resolve().parents[2]
+    config = Config(str(repo_root / "alembic.ini"))
+    config.set_main_option("script_location", str(repo_root / "app" / "db" / "migrations"))
+    heads = ScriptDirectory.from_config(config).get_heads()
+    assert len(heads) == 1, heads
+    return heads[0]
 
 
 ADMIN_ENDPOINTS = (
@@ -214,7 +226,7 @@ def test_admin_system_response_does_not_expose_secrets_or_content(
     assert data["providers"]["llm"]["provider"]
     assert data["workers"]["active_worker_count"] == 1
     assert data["queues"]["queues"][0]["kind"] == "document"
-    assert data["version"]["migration_head"] == "20260803_0010"
+    assert data["version"]["migration_head"] == _expected_migration_head()
 
 
 def test_admin_health_covers_required_subsystems(

@@ -2,7 +2,9 @@
 
 import json
 
-from scripts.release.task0353c2e_eval import _load_manifest
+import pytest
+
+from scripts.release.task0353c2e_eval import ROOT, _load_manifest
 from scripts.release.task0353c2f_eval import (
     MANIFEST,
     apply_decisions,
@@ -11,7 +13,16 @@ from scripts.release.task0353c2f_eval import (
     parse_extraction,
 )
 
+requires_manifest = pytest.mark.skipif(
+    not MANIFEST.exists(),
+    reason=(
+        f"{MANIFEST.relative_to(ROOT).as_posix()} is missing; artifacts/ is git-ignored, "
+        "so fresh clones lack the frozen synthetic manifest."
+    ),
+)
 
+
+@requires_manifest
 def test_independent_manifest_split_and_review_fields() -> None:
     cases, _ = _load_manifest(MANIFEST)
     assert len(cases) == 36

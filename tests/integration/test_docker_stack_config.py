@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -148,8 +150,42 @@ def _compose_uat_config() -> dict[str, object]:
     return json.loads(result.stdout)
 
 
-def test_default_compose_keeps_llm_local_safe() -> None:
-    services = _compose_config()["services"]
+def _compose_config_with_example_env(tmp_path: Path) -> dict[str, object]:
+    """Render compose.yaml against .env.example only, ignoring any personal .env."""
+
+    env_file = tmp_path / ".env"
+    shutil.copyfile(ROOT / ".env.example", env_file)
+    environment = {key: value for key, value in os.environ.items() if not key.startswith("LLM_")}
+    try:
+        result = subprocess.run(
+            [
+                "docker",
+                "compose",
+                "--project-directory",
+                str(tmp_path),
+                "-f",
+                str(ROOT / "compose.yaml"),
+                "--env-file",
+                str(env_file),
+                "config",
+                "--format",
+                "json",
+            ],
+            cwd=tmp_path,
+            env=environment,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+    except FileNotFoundError:
+        pytest.skip("Docker Compose is not installed.")
+    assert result.returncode == 0, result.stderr
+    return json.loads(result.stdout)
+
+
+def test_default_compose_keeps_llm_local_safe(tmp_path: Path) -> None:
+    services = _compose_config_with_example_env(tmp_path)["services"]
     environment = services["api"]["environment"]
 
     assert "uat-llm" not in services

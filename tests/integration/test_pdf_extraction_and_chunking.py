@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 from pathlib import Path
 
 import pymupdf
@@ -9,20 +10,16 @@ from app.document_processing.extractors.pymupdf_extractor import PyMuPDFTextExtr
 from app.document_processing.tokenization.tiktoken_counter import TiktokenTokenCounter
 from app.models import DocumentStatus
 
-TEST_FONT_PATH = Path("C:/Windows/Fonts/arial.ttf")
 
-
+# insert_htmlbox renders with MuPDF's bundled Unicode fonts (Charis SIL / Noto),
+# so Vietnamese text round-trips without depending on host OS fonts.
 def make_pdf(page_texts: list[str | None]) -> bytes:
     document = pymupdf.open()
     try:
         for text in page_texts:
             page = document.new_page()
             if text is not None:
-                if TEST_FONT_PATH.exists():
-                    page.insert_font(fontname="taskfont", fontfile=str(TEST_FONT_PATH))
-                    page.insert_text((72, 72), text, fontname="taskfont")
-                else:
-                    page.insert_text((72, 72), text)
+                page.insert_htmlbox(pymupdf.Rect(72, 60, 540, 780), html.escape(text))
         return document.tobytes()
     finally:
         document.close()

@@ -127,7 +127,13 @@ def make_settings(**overrides: object) -> Settings:
     return Settings(_env_file=None, **defaults)
 
 
-def hit(text: str = "authorized context") -> HybridRetrievalHit:
+# Context and answer agree, so the real claim validation keeps the ANSWERED path.
+GROUNDED_CONTEXT = "Nhân viên được nghỉ 12 ngày phép năm."
+GROUNDED_ANSWER_JSON = '{"answer":"Nhân viên được nghỉ 12 ngày phép năm.","citations":["SOURCE_1"]}'
+GROUNDED_ANSWER_DISPLAY = "Nhân viên được nghỉ 12 ngày phép năm. [1]"
+
+
+def hit(text: str = GROUNDED_CONTEXT) -> HybridRetrievalHit:
     return HybridRetrievalHit(
         chunk_id=uuid.UUID("00000000-0000-0000-0000-000000000101"),
         document_id=uuid.UUID("00000000-0000-0000-0000-000000000201"),
@@ -215,7 +221,7 @@ class FakeCitationRepository:
 
 
 def llm_answer(
-    content: str = '{"answer":"Grounded answer","citations":["SOURCE_1"]}',
+    content: str = GROUNDED_ANSWER_JSON,
 ) -> LLMGenerationResult:
     return LLMGenerationResult(
         content=content,
@@ -339,9 +345,12 @@ def test_non_streaming_chat_uses_current_session_conversation_memory_only(
     )
 
     assert response.status_code == 201
-    assert retrieval.queries == ["If working 5 years then what?"]
-    assert "Leave policy?" in llm.messages[1].content
-    assert "Employees get 12 annual leave days." in llm.messages[1].content
+    # Same-session history resolves the follow-up into the retrieval/grounding
+    # query; prior assistant answers never become prompt evidence.
+    assert retrieval.queries == ["Leave policy - If working 5 years then what?"]
+    assert retrieval.queries[0] in llm.messages[1].content
+    assert "Employees get 12 annual leave days." not in llm.messages[1].content
+    assert "Other session confidential topic" not in retrieval.queries[0]
     assert "Other session confidential topic" not in llm.messages[1].content
 
 
@@ -370,7 +379,7 @@ def test_answered_response_returns_citations(
 
     assert response.status_code == 201
     data = response.json()["data"]
-    assert data["assistant_message"]["content"] == "Grounded answer [1]"
+    assert data["assistant_message"]["content"] == GROUNDED_ANSWER_DISPLAY
     assert "[SOURCE_1]" not in data["assistant_message"]["content"]
     assert data["user_message"]["citations"] == []
     assert data["assistant_message"]["citations"] == [
