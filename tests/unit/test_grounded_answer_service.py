@@ -42,6 +42,9 @@ from app.services.grounded_answer_service import (
     _rank_hits_for_prompt,
     _role_terms_for_prompt_question,
     _short_explicit_topic_phrases,
+    _shortest_source_clause_for_groups,
+    _structured_claim_missing_bound_overtime_rate,
+    _structured_claim_missing_on_call_time_relation,
 )
 from app.web_search.errors import WebSearchError, WebSearchFailureCode
 from app.web_search.models import WebSearchResult, WebSearchResults
@@ -732,6 +735,47 @@ def test_person_role_candidate_prefers_previous_record_name() -> None:
     assert _person_name_sequences_near_terms(text, ("CTO",)) == ("Bob Thu Tran",)
 
 
+def test_person_role_candidate_does_not_cross_truncated_record_boundary() -> None:
+    truncated = (
+        "business results and operations\n"
+        "Chief Executive Officer (CEO)\n"
+        "overall\n\n"
+        "Bob Thu Tran - accountable for technology platforms\n"
+        "Chief Technology Officer (CTO)\n"
+    )
+    complete = (
+        "Alice Minh Nguyen - accountable for business results\n"
+        "Chief Executive Officer (CEO)\n"
+        "overall\n\n" + truncated.split("\n\n", 1)[1]
+    )
+
+    assert _person_name_sequences_near_terms(truncated, ("CEO",)) == ()
+    assert _person_name_sequences_near_terms(complete, ("CEO",)) == ("Alice Minh Nguyen",)
+    assert _person_name_sequences_near_terms(truncated, ("CTO",)) == ("Bob Thu Tran",)
+    assert _person_name_sequences_near_terms(complete, ("CFO",)) == ()
+    assert _person_name_sequences_near_terms(truncated.replace("\n\n", "\n"), ("CEO",)) == ()
+
+    for delimiter in ("|", ":"):
+        adjacent_record = (
+            "Chief Executive Officer (CEO)\n"
+            f"Bob Thu Tran {delimiter} Chief Technology Officer (CTO)"
+        )
+        assert _person_name_sequences_near_terms(adjacent_record, ("CEO",)) == ()
+        assert _person_name_sequences_near_terms(adjacent_record, ("CTO",)) == ("Bob Thu Tran",)
+
+    truncated_hit = hit(truncated)
+    complete_hit = replace(
+        hit(complete),
+        chunk_id=UUID("00000000-0000-0000-0000-000000000120"),
+        chunk_index=8,
+    )
+    ranked = _rank_hits_for_prompt(
+        (truncated_hit, complete_hit),
+        question="Who is the CEO?",
+    )
+    assert ranked[0].chunk_id == complete_hit.chunk_id
+
+
 def test_descriptive_person_role_question_extracts_subject_role_terms() -> None:
     assert _role_terms_for_prompt_question(
         "Người phụ trách công nghệ của Nova Digital tên gì?"
@@ -813,6 +857,51 @@ def test_prompt_reranking_prefers_concrete_control_for_ascii_security_question()
     )
 
     assert ranked[0].chunk_index == 7
+
+
+@pytest.mark.parametrize(
+    ("question", "direct_text"),
+    (
+        (
+            "Toi copy source code cong ty len GitHub ca nhan de lam o nha duoc khong?",
+            "Ma nguon phai luu trong kho ma nguon duoc Cong ty phe duyet; "
+            "khong dua len repository ca nhan.",
+        ),
+        (
+            "Co duoc gui file cong viec sang Gmail ca nhan khong?",
+            "Cam gui du lieu, file hoac tai lieu cong viec sang email ca nhan.",
+        ),
+        (
+            "Toi co the paste source code noi bo vao ChatGPT/public AI de hoi loi khong?",
+            "Khong nhap ma nguon doc quyen vao dich vu AI cong cong hoac public AI.",
+        ),
+        (
+            "AI tao ra ket qua roi thi co duoc dung thang lam bang chung test khong?",
+            "Ket qua AI phai duoc con nguoi kiem chung va khong duoc dung thang "
+            "lam bang chung test.",
+        ),
+        (
+            "Neu nghi tai khoan bi lo thi phai bao ai?",
+            "Bao ngay cho Service Desk va Security Operations khi nghi ngo lo "
+            "thong tin xac thuc hoac co dang nhap bat thuong.",
+        ),
+    ),
+)
+def test_prompt_reranking_prefers_direct_sensitive_policy_rule(
+    question: str,
+    direct_text: str,
+) -> None:
+    generic = hit("Cong ty quan ly nhan su, lich lam viec va phe duyet tren he thong HRM.")
+    direct = replace(
+        hit(direct_text),
+        chunk_id=UUID("00000000-0000-0000-0000-000000000120"),
+        document_id=UUID("00000000-0000-0000-0000-000000000220"),
+        chunk_index=8,
+    )
+
+    ranked = _rank_hits_for_prompt((generic, direct), question=question)
+
+    assert ranked[0].chunk_id == direct.chunk_id
 
 
 def test_prompt_reranking_prefers_distinct_product_name_over_generic_usage_terms() -> None:
@@ -958,7 +1047,7 @@ def test_false_premise_multi_rule_question_retries_and_corrects() -> None:
     run_async(scenario())
 
 
-def test_yes_no_answer_without_polarity_retries() -> None:
+def test_yes_no_role_answer_uses_grounded_structured_answer_before_llm() -> None:
     async def scenario() -> None:
         llm = SequentialFakeLLMProvider(
             LLMGenerationResult(
@@ -998,7 +1087,7 @@ def test_yes_no_answer_without_polarity_retries() -> None:
             question="CEO Nova Digital la Le Thu Ha dung khong?",
         )
 
-        assert llm.calls == 2
+        assert llm.calls == 0
         assert result.assistant_message.content.startswith("Kh")
         assert "Nguyen Anh Khoa" in result.assistant_message.content
 
@@ -1038,7 +1127,7 @@ def test_false_premise_role_question_does_not_require_wrong_person_in_source() -
             question="CEO Nova Digital co phai la Le Thu Ha khong?",
         )
 
-        assert llm.calls == 1
+        assert llm.calls == 0
         assert result.grounding_status == GroundingStatus.ANSWERED
         assert result.assistant_message.content.startswith("Kh")
         assert "Nguyen Anh Khoa" in result.assistant_message.content
@@ -1503,6 +1592,277 @@ def test_compound_answer_repairs_only_failed_claim_and_preserves_valid_claim() -
     run_async(scenario())
 
 
+def test_compound_overtime_claim_repairs_omitted_bound_day_type_rate() -> None:
+    async def scenario() -> None:
+        generic_ot_policy = " ".join(
+            (
+                "Thời gian tự nguyện làm thêm không có phê duyệt",
+                "có thể không được ghi nhận là OT.",
+            )
+        )
+
+        def prompt_source(index: int, text: str) -> PromptSource:
+            return PromptSource(
+                marker=f"[SOURCE_{index}]",
+                source_type=CitationSourceType.INTERNAL,
+                document_title="Work policy",
+                text=text,
+                page_numbers=(index,),
+                start_page=index,
+                end_page=index,
+                hybrid_score=1.0,
+                chunk_id=UUID(f"00000000-0000-0000-0006-{index:012d}"),
+                document_id=UUID(f"00000000-0000-0000-0007-{index:012d}"),
+            )
+
+        registry = PromptSourceRegistry(
+            sources=(
+                prompt_source(
+                    1,
+                    "On-call không tự động được coi là thời gian làm thêm; "
+                    "thời gian thực tế xử lý sự cố phải được ghi nhận.",
+                ),
+                prompt_source(
+                    2,
+                    generic_ot_policy,
+                ),
+                prompt_source(
+                    3,
+                    "Làm thêm ngày nghỉ hằng tuần: ít nhất 200%.\nLàm thêm ngày lễ: ít nhất 300%.",
+                ),
+            )
+        )
+        needs = (
+            "Thời gian on-call xử lý sự cố được ghi nhận thế nào",
+            "Tiền OT được xử lý thế nào vào Chủ nhật",
+        )
+        initial = LLMGenerationResult(
+            content=(
+                '{"claims":['
+                '{"claim_id":"CLAIM_1",'
+                '"answer":"On-call không tự động được coi là thời gian làm thêm; '
+                'thời gian thực tế xử lý sự cố phải được ghi nhận.",'
+                '"citations":["SOURCE_1"]},'
+                '{"claim_id":"CLAIM_2",'
+                '"answer":"Thời gian tự nguyện làm thêm không có phê duyệt có thể '
+                'không được ghi nhận là OT.","citations":["SOURCE_2"]}'
+                "]}"
+            ),
+            model="fake",
+            finish_reason="stop",
+            prompt_tokens=1,
+            completion_tokens=1,
+            response_time_ms=1,
+        )
+        llm = SequentialFakeLLMProvider(
+            LLMGenerationResult(
+                content="__NO_ANSWER__",
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            )
+        )
+        service, _, _, _, _, _, _ = make_service(llm=llm)
+        generic_validation = await service.claim_validation_service.validate(
+            question=needs[1],
+            answer=generic_ot_policy,
+            source_registry=registry,
+            cited_source_labels=("SOURCE_2",),
+            require_subject_attribute_alignment=True,
+        )
+        assert generic_validation.status.value == "SUPPORTED"
+        validated = await service._validated_structured_claims(
+            initial.content,
+            expected_claim_ids=("CLAIM_1", "CLAIM_2"),
+            information_needs=needs,
+            source_registry=registry,
+        )
+        assert tuple(validated) == ("CLAIM_1",)
+
+        draft = await service._compound_draft_with_claim_repair(
+            initial,
+            information_needs=needs,
+            source_registry=registry,
+            current_user=user(),
+            provider=llm,
+            grounding_question="Thời gian on-call và tiền OT Chủ nhật được xử lý thế nào?",
+        )
+        assert llm.calls == 1
+        assert draft.grounding_status == GroundingStatus.ANSWERED
+        assert "thời gian thực tế xử lý sự cố" in draft.content
+        assert "Ít nhất 200%" in draft.content
+        assert "[2]" in draft.content
+
+    run_async(scenario())
+
+
+def test_compound_overtime_rate_completeness_does_not_invent_conflict_precedence() -> None:
+    def registry(*texts: str) -> PromptSourceRegistry:
+        return PromptSourceRegistry(
+            sources=tuple(
+                PromptSource(
+                    marker=f"[SOURCE_{index}]",
+                    source_type=CitationSourceType.INTERNAL,
+                    document_title="Work policy",
+                    text=text,
+                    page_numbers=(index,),
+                    start_page=index,
+                    end_page=index,
+                    hybrid_score=1.0,
+                    chunk_id=UUID(f"00000000-0000-0000-0006-{index:012d}"),
+                    document_id=UUID(f"00000000-0000-0000-0007-{index:012d}"),
+                )
+                for index, text in enumerate(texts, start=1)
+            )
+        )
+
+    question = "How is overtime on Sunday calculated?"
+    answer = "Overtime is recorded separately."
+    assert not _structured_claim_missing_bound_overtime_rate(
+        question=question,
+        answer=answer,
+        source_registry=registry("Holiday overtime: at least 300%."),
+    )
+    assert not _structured_claim_missing_bound_overtime_rate(
+        question=question,
+        answer=answer,
+        source_registry=registry(
+            "Weekly rest overtime: at least 200%.",
+            "Weekly rest overtime: at least 250%.",
+        ),
+    )
+
+
+def test_compound_on_call_claim_repairs_missing_standby_work_distinction() -> None:
+    async def scenario() -> None:
+        def prompt_source(index: int, text: str) -> PromptSource:
+            return PromptSource(
+                marker=f"[SOURCE_{index}]",
+                source_type=CitationSourceType.INTERNAL,
+                document_title="Work policy",
+                text=text,
+                page_numbers=(index,),
+                start_page=index,
+                end_page=index,
+                hybrid_score=1.0,
+                chunk_id=UUID(f"00000000-0000-0000-0008-{index:012d}"),
+                document_id=UUID(f"00000000-0000-0000-0009-{index:012d}"),
+            )
+
+        registry = PromptSourceRegistry(
+            sources=(
+                prompt_source(
+                    1,
+                    "On-call không tự động được coi là thời gian làm thêm; "
+                    "thời gian thực tế xử lý sự cố phải được ghi nhận theo chính sách.",
+                ),
+                prompt_source(2, "Làm thêm ngày nghỉ hằng tuần: ít nhất 200%."),
+            )
+        )
+        needs = (
+            "Thời gian on-call xử lý sự cố được ghi nhận thế nào",
+            "Tiền OT được xử lý thế nào vào Chủ nhật",
+        )
+        generic_time_answer = "Thời gian thực tế xử lý sự cố phải được ghi nhận theo chính sách."
+        initial = LLMGenerationResult(
+            content=(
+                '{"claims":['
+                '{"claim_id":"CLAIM_1",'
+                '"answer":"Thời gian thực tế xử lý sự cố phải được ghi nhận theo chính sách.",'
+                '"citations":["SOURCE_1"]},'
+                '{"claim_id":"CLAIM_2","answer":"Ít nhất 200%.",'
+                '"citations":["SOURCE_2"]}'
+                "]}"
+            ),
+            model="fake",
+            finish_reason="stop",
+            prompt_tokens=1,
+            completion_tokens=1,
+            response_time_ms=1,
+        )
+        llm = SequentialFakeLLMProvider(
+            LLMGenerationResult(
+                content="__NO_ANSWER__",
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            )
+        )
+        service, _, _, _, _, _, _ = make_service(llm=llm)
+        generic_validation = await service.claim_validation_service.validate(
+            question=needs[0],
+            answer=generic_time_answer,
+            source_registry=registry,
+            cited_source_labels=("SOURCE_1",),
+            require_subject_attribute_alignment=True,
+        )
+        assert generic_validation.status.value == "SUPPORTED"
+        validated = await service._validated_structured_claims(
+            initial.content,
+            expected_claim_ids=("CLAIM_1", "CLAIM_2"),
+            information_needs=needs,
+            source_registry=registry,
+        )
+        assert tuple(validated) == ("CLAIM_2",)
+
+        draft = await service._compound_draft_with_claim_repair(
+            initial,
+            information_needs=needs,
+            source_registry=registry,
+            current_user=user(),
+            provider=llm,
+            grounding_question="Thời gian on-call khi xử lý sự cố và tiền OT được tính thế nào?",
+        )
+        assert llm.calls == 1
+        assert draft.grounding_status == GroundingStatus.ANSWERED
+        assert "On-call không tự động" in draft.content
+        assert "thời gian thực tế xử lý sự cố" in draft.content
+        assert "Ít nhất 200%" in draft.content
+
+    run_async(scenario())
+
+
+def test_policy_clause_repair_keeps_wrapped_connector_continuation() -> None:
+    clause = _shortest_source_clause_for_groups(
+        "On-call không tự động được coi là thời gian làm thêm; "
+        "thời gian thực tế xử lý sự cố phải được ghi nhận theo\n"
+        "quy định của công ty và pháp luật.",
+        required_groups=(("on-call",), ("khong tu dong",), ("thoi gian thuc te xu ly",)),
+    )
+    assert clause is not None
+    assert "theo quy định của công ty và pháp luật" in clause
+
+
+def test_on_call_time_completeness_requires_explicit_source_relation() -> None:
+    source = PromptSource(
+        marker="[SOURCE_1]",
+        source_type=CitationSourceType.INTERNAL,
+        document_title="Work policy",
+        text="On-call incident handling time is recorded separately for overtime assessment.",
+        page_numbers=(1,),
+        start_page=1,
+        end_page=1,
+        hybrid_score=1.0,
+        chunk_id=UUID("00000000-0000-0000-0008-000000000001"),
+        document_id=UUID("00000000-0000-0000-0009-000000000001"),
+    )
+    registry = PromptSourceRegistry(sources=(source,))
+    assert not _structured_claim_missing_on_call_time_relation(
+        question="How is on-call incident time recorded?",
+        answer="Incident handling time is recorded separately.",
+        source_registry=registry,
+    )
+    assert not _structured_claim_missing_on_call_time_relation(
+        question="How much overtime is paid on a weekly rest day?",
+        answer="At least 200%.",
+        source_registry=registry,
+    )
+
+
 def test_compound_answer_never_exposes_valid_claim_when_required_repair_fails() -> None:
     async def scenario() -> None:
         second_hit = replace(
@@ -1575,8 +1935,8 @@ def test_compound_deterministic_repair_recovers_security_and_allowance_claims() 
         llm = SequentialFakeLLMProvider(
             LLMGenerationResult(
                 content=(
-                    '[{"claim_id":"CLAIM_1","answer":"Khong lam viec voi du lieu mat.",'
-                    '"citations":["SOURCE_1"]},'
+                    '[{"claim_id":"CLAIM_1","answer":"Nhan vien hybrid cham cong tren HRM '
+                    'bang tai khoan ca nhan va MFA.","citations":["SOURCE_3"]},'
                     '{"claim_id":"CLAIM_2","answer":"Duoc 500.000 d/thang.",'
                     '"citations":["SOURCE_3"]}]'
                 ),
@@ -1619,8 +1979,8 @@ def test_compound_deterministic_repair_recovers_security_and_allowance_claims() 
                 ),
                 prompt_source(
                     3,
-                    "Chinh sach bao hiem va phuc loi",
-                    "Tu van tam ly bao mat 04 phien/nam. Ergonomic support 1.500.000 d/24 thang.",
+                    "Chinh sach cham cong",
+                    "Nhan vien hybrid cham cong tren HRM bang tai khoan ca nhan va MFA.",
                 ),
             )
         )
@@ -2415,8 +2775,8 @@ def test_yes_no_polarity_field_adds_vietnamese_prefix() -> None:
         llm = SequentialFakeLLMProvider(
             LLMGenerationResult(
                 content=(
-                    '{"answer":"Quyen cua nguoi lao dong doi voi '
-                    'thong tin luong cua chinh minh khong bi han che.",'
+                    '{"answer":"Chinh sach khong cam nguoi lao dong trao doi '
+                    'thong tin luong cua chinh minh.",'
                     '"polarity":"YES",'
                     '"citations":["SOURCE_1"]}'
                 ),
@@ -2432,9 +2792,8 @@ def test_yes_no_polarity_field_adds_vietnamese_prefix() -> None:
             retrieval=FakeRetrievalService(
                 retrieval_result(
                     hit(
-                        "Quyen cua nguoi lao dong doi voi "
-                        "thong tin luong cua chinh minh "
-                        "khong bi han che."
+                        "Chinh sach khong cam nguoi lao dong trao doi "
+                        "thong tin luong cua chinh minh."
                     )
                 )
             ),
@@ -2472,9 +2831,8 @@ def test_yes_no_question_restatement_is_retried() -> None:
             ),
             LLMGenerationResult(
                 content=(
-                    '{"answer":"Quyen cua nguoi lao dong '
-                    "doi voi thong tin luong cua chinh minh "
-                    'khong bi han che.",'
+                    '{"answer":"Chinh sach khong cam nguoi lao dong trao doi '
+                    'thong tin luong cua chinh minh.",'
                     '"polarity":"YES",'
                     '"citations":["SOURCE_1"]}'
                 ),
@@ -2490,9 +2848,8 @@ def test_yes_no_question_restatement_is_retried() -> None:
             retrieval=FakeRetrievalService(
                 retrieval_result(
                     hit(
-                        "Quyen cua nguoi lao dong doi voi "
-                        "thong tin luong cua chinh minh "
-                        "khong bi han che."
+                        "Chinh sach khong cam nguoi lao dong trao doi "
+                        "thong tin luong cua chinh minh."
                     )
                 )
             ),
@@ -2697,6 +3054,358 @@ def test_yes_no_self_salary_uses_relevant_clause_across_pdf_line_wraps() -> None
         assert resolved_llm.calls == 1
         assert result.grounding_status == GroundingStatus.ANSWERED
         assert result.assistant_message.content.startswith("Có.")
+
+    run_async(scenario())
+
+
+def test_scoped_policy_polarity_retry_receives_source_constrained_feedback() -> None:
+    async def scenario() -> None:
+        llm = SequentialFakeLLMProvider(
+            LLMGenerationResult(
+                content=(
+                    '{"answer":"No, employees are prohibited from discussing their own records.",'
+                    '"polarity":"NO","citations":["SOURCE_1"]}'
+                ),
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            ),
+            LLMGenerationResult(
+                content=(
+                    '{"answer":"The policy does not prohibit employees from '
+                    'discussing their own records.",'
+                    '"polarity":"YES","citations":["SOURCE_1"]}'
+                ),
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            ),
+        )
+        service, _, _, _, resolved_llm, _, _ = make_service(
+            retrieval=FakeRetrievalService(
+                retrieval_result(
+                    hit(
+                        "The policy prohibits employees from discussing another "
+                        "employee's records. "
+                        "The policy does not prohibit employees from discussing their own records."
+                    )
+                )
+            ),
+            llm=llm,
+        )
+
+        result = await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question="Can an employee discuss their own records?",
+        )
+
+        retry_prompt = resolved_llm.message_history[1][-1].content
+        assert resolved_llm.calls == 2
+        assert len(resolved_llm.message_history[1]) == 2
+        assert retry_prompt.startswith("RESOLVED QUESTION")
+        assert "effective_relation = NON_PROHIBITORY" in retry_prompt
+        assert "NON_PROHIBITORY means that the policy does not prohibit" in retry_prompt
+        assert "allowed_source = SOURCE_1" in retry_prompt
+        assert '"citations":["SOURCE_1"]' in retry_prompt
+        assert '"polarity"' not in retry_prompt
+        assert "FAILURE DIMENSION" not in retry_prompt
+        assert "CONTRADICTION STATUS" not in retry_prompt
+        assert "GOVERNING PREDICATE" not in retry_prompt
+        assert "NEGATED" not in retry_prompt
+        assert "VALIDATED POLARITY" not in retry_prompt
+        assert "PREVIOUS ATTEMPT STATUS" not in retry_prompt
+        assert "another employee's records" not in retry_prompt
+        assert "employees are prohibited from discussing their own records" not in retry_prompt
+        assert result.grounding_status == GroundingStatus.ANSWERED
+
+    run_async(scenario())
+
+
+def test_scoped_policy_repair_keeps_prohibitory_target_negative() -> None:
+    async def scenario() -> None:
+        llm = SequentialFakeLLMProvider(
+            LLMGenerationResult(
+                content=(
+                    '{"answer":"Yes. Employees may discuss their own records.",'
+                    '"polarity":"YES","citations":["SOURCE_1"]}'
+                ),
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            ),
+            LLMGenerationResult(
+                content=(
+                    '{"answer":"Employees are prohibited from discussing their own records.",'
+                    '"polarity":"NO","citations":["SOURCE_1"]}'
+                ),
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            ),
+        )
+        service, _, _, _, resolved_llm, _, _ = make_service(
+            retrieval=FakeRetrievalService(
+                retrieval_result(
+                    hit("The policy prohibits employees from discussing their own records.")
+                )
+            ),
+            llm=llm,
+        )
+
+        result = await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question="Can an employee discuss their own records?",
+        )
+
+        retry_prompt = resolved_llm.message_history[1][-1].content
+        assert "effective_relation = PROHIBITORY" in retry_prompt
+        assert "PROHIBITORY means that the policy prohibits" in retry_prompt
+        assert "VALIDATED POLARITY" not in retry_prompt
+        assert result.grounding_status == GroundingStatus.ANSWERED
+        assert result.assistant_message.content.startswith("No.")
+
+    run_async(scenario())
+
+
+def test_scoped_policy_repair_keeps_not_permitted_target_negative() -> None:
+    async def scenario() -> None:
+        llm = SequentialFakeLLMProvider(
+            LLMGenerationResult(
+                content=(
+                    '{"answer":"Yes. Employees may discuss their own records.",'
+                    '"polarity":"YES","citations":["SOURCE_1"]}'
+                ),
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            ),
+            LLMGenerationResult(
+                content=(
+                    '{"answer":"Employees are not permitted to discuss their own records.",'
+                    '"polarity":"NO","citations":["SOURCE_1"]}'
+                ),
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            ),
+        )
+        service, _, _, _, resolved_llm, _, _ = make_service(
+            retrieval=FakeRetrievalService(
+                retrieval_result(
+                    hit("The policy does not permit employees to discuss their own records.")
+                )
+            ),
+            llm=llm,
+        )
+
+        result = await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question="Can an employee discuss their own records?",
+        )
+
+        retry_prompt = resolved_llm.message_history[1][-1].content
+        assert "effective_relation = NOT_PERMITTED" in retry_prompt
+        assert "NOT_PERMITTED means that the policy does not permit" in retry_prompt
+        assert "VALIDATED POLARITY" not in retry_prompt
+        assert result.grounding_status == GroundingStatus.ANSWERED
+        assert result.assistant_message.content.startswith("No.")
+
+    run_async(scenario())
+
+
+def test_scoped_policy_repair_isolates_other_target_from_adjacent_own_permission() -> None:
+    async def scenario() -> None:
+        llm = SequentialFakeLLMProvider(
+            LLMGenerationResult(
+                content=(
+                    '{"answer":"Yes. Employees may discuss another employee records.",'
+                    '"polarity":"YES","citations":["SOURCE_1"]}'
+                ),
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            ),
+            LLMGenerationResult(
+                content=(
+                    '{"answer":"Employees are prohibited from discussing another '
+                    'employee records.",'
+                    '"polarity":"NO","citations":["SOURCE_1"]}'
+                ),
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            ),
+        )
+        service, _, _, _, resolved_llm, _, _ = make_service(
+            retrieval=FakeRetrievalService(
+                retrieval_result(
+                    hit(
+                        "The policy does not prohibit employees from discussing their own records. "
+                        "The policy prohibits employees from discussing another employee records."
+                    )
+                )
+            ),
+            llm=llm,
+        )
+
+        result = await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question="Can an employee discuss another employee records?",
+        )
+
+        retry_prompt = resolved_llm.message_history[1][-1].content
+        assert "scope = OTHER" in retry_prompt
+        assert "effective_relation = PROHIBITORY" in retry_prompt
+        assert "their own records" not in retry_prompt
+        assert result.grounding_status == GroundingStatus.ANSWERED
+
+    run_async(scenario())
+
+
+def test_wrong_scope_scoped_policy_repairs_fall_back_to_validated_source_clause() -> None:
+    async def scenario() -> None:
+        initial = LLMGenerationResult(
+            content=(
+                '{"answer":"No. Employees are prohibited from discussing their own records.",'
+                '"polarity":"NO","citations":["SOURCE_1"]}'
+            ),
+            model="fake",
+            finish_reason="stop",
+            prompt_tokens=1,
+            completion_tokens=1,
+            response_time_ms=1,
+        )
+        wrong_scope = LLMGenerationResult(
+            content=(
+                '{"answer":"No. Employees are prohibited from discussing another '
+                'employee records.",'
+                '"polarity":"NO","citations":["SOURCE_1"]}'
+            ),
+            model="fake",
+            finish_reason="stop",
+            prompt_tokens=1,
+            completion_tokens=1,
+            response_time_ms=1,
+        )
+        llm = SequentialFakeLLMProvider(initial, wrong_scope, wrong_scope)
+        service, _, _, _, resolved_llm, _, _ = make_service(
+            retrieval=FakeRetrievalService(
+                retrieval_result(
+                    hit("The policy does not prohibit employees from discussing their own records.")
+                )
+            ),
+            llm=llm,
+        )
+
+        result = await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question="Can an employee discuss their own records?",
+        )
+
+        assert resolved_llm.calls == 3
+        assert result.grounding_status == GroundingStatus.ANSWERED
+        assert "another employee" not in result.assistant_message.content
+
+    run_async(scenario())
+
+
+def test_unsupported_scoped_policy_target_preserves_no_answer() -> None:
+    async def scenario() -> None:
+        unsupported = LLMGenerationResult(
+            content=(
+                '{"answer":"Yes. Employees may discuss their own records.",'
+                '"polarity":"YES","citations":["SOURCE_1"]}'
+            ),
+            model="fake",
+            finish_reason="stop",
+            prompt_tokens=1,
+            completion_tokens=1,
+            response_time_ms=1,
+        )
+        llm = SequentialFakeLLMProvider(unsupported, unsupported, unsupported)
+        service, _, _, _, resolved_llm, _, _ = make_service(
+            retrieval=FakeRetrievalService(
+                retrieval_result(hit("The policy describes retention of employee records."))
+            ),
+            llm=llm,
+        )
+
+        result = await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question="Can an employee discuss their own records?",
+        )
+
+        assert resolved_llm.calls == 3
+        assert all(
+            "AUTHORITATIVE TARGET PROPOSITION" not in messages[-1].content
+            for messages in resolved_llm.message_history[1:]
+        )
+        assert result.grounding_status == GroundingStatus.NO_ANSWER
+
+    run_async(scenario())
+
+
+def test_repeated_scoped_policy_polarity_contradiction_uses_validated_source_clause() -> None:
+    async def scenario() -> None:
+        wrong = LLMGenerationResult(
+            content=(
+                '{"answer":"No, employees are prohibited from discussing their own records.",'
+                '"polarity":"NO","citations":["SOURCE_1"]}'
+            ),
+            model="fake",
+            finish_reason="stop",
+            prompt_tokens=1,
+            completion_tokens=1,
+            response_time_ms=1,
+        )
+        llm = SequentialFakeLLMProvider(wrong, wrong, wrong)
+        service, _, _, _, resolved_llm, _, _ = make_service(
+            retrieval=FakeRetrievalService(
+                retrieval_result(
+                    hit("The policy does not prohibit employees from discussing their own records.")
+                )
+            ),
+            llm=llm,
+        )
+
+        result = await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question="Can an employee discuss their own records?",
+        )
+
+        assert resolved_llm.calls == 3
+        assert result.grounding_status == GroundingStatus.ANSWERED
+        assert result.assistant_message.content.startswith("Yes.")
+        final_repair_prompt = resolved_llm.message_history[2][-1].content
+        assert "AUTHORITATIVE TARGET PROPOSITION" in final_repair_prompt
+        assert "FAILURE DIMENSION" not in final_repair_prompt
+        assert "PREVIOUS ATTEMPT STATUS" not in final_repair_prompt
+        assert (
+            "employees are prohibited from discussing their own records" not in final_repair_prompt
+        )
 
     run_async(scenario())
 

@@ -1,0 +1,19 @@
+# syntax=docker/dockerfile:1.7
+# Local-only candidate derivation from the accepted H5.2 API image.
+# The base image ID, not the mutable :latest tag, fixes installed bytes.
+FROM enterprise-ai-knowledge-assistant-backend@sha256:1f057785bd8cacb68aa8573e3aa12e29a23c37692e0ad045997770d4adf2648e
+
+ARG CANDIDATE_ROLE
+WORKDIR /app
+
+COPY --chown=app:app app ./app
+COPY --chown=app:app alembic.ini pyproject.toml README.md ./
+COPY --chown=app:app requirements.lock ./requirements.lock
+
+RUN python -m pip check \
+    && python -c "import pathlib, subprocess, sys; expected = sorted(pathlib.Path('/app/requirements.lock').read_text().splitlines()); actual = sorted(subprocess.check_output([sys.executable, '-m', 'pip', 'freeze'], text=True).splitlines()); assert expected == actual, 'Installed distributions differ from candidate lock'"
+
+LABEL org.opencontainers.image.title="Enterprise AI Knowledge Assistant isolated TASK-035.3A candidate" \
+      org.opencontainers.image.base.name="enterprise-ai-knowledge-assistant-backend@sha256:1f057785bd8cacb68aa8573e3aa12e29a23c37692e0ad045997770d4adf2648e" \
+      org.opencontainers.image.description="Local isolated qualification only; not an approved RC" \
+      org.enterprise-ai.candidate.role="${CANDIDATE_ROLE}"

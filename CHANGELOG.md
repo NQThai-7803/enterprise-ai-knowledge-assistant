@@ -6,6 +6,185 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### TASK-035.3A isolated candidate qualification -- 2026-10-13
+
+- Preserved the accepted H5.2 working-tree source as a filtered, checksummed
+  local snapshot and captured the accepted API's exact 92-package lock; no
+  dependency upgrade or active-stack replacement occurred.
+- Built uniquely tagged API and worker candidate images from one source and
+  package baseline, then qualified them in a separate Compose project with
+  focused tests and synthetic ingestion/RAG/permission smoke. Both candidate
+  roles have matching shared application hashes, packages, and Python runtime.
+- Recorded the observed results, reproducibility limits, protected-baseline
+  comparison, and unexecuted promotion plan in
+  `docs/release/TASK-035.3A-isolated-candidate-qualification-20261013.md`.
+  TASK-035 remains IN PROGRESS; active image skew and RC gates remain open.
+
+### RAG-H5.2 V2 final qualification -- 2026-10-13
+
+- Closed the documented supported payroll, benefits, remote-accident,
+  credential/source-code, leave-clause and multi-need failures with generic
+  source-derived retrieval, structured-evidence, context, validation and
+  yes/no-negation preservation changes; added synthetic regression controls.
+- Requalified one frozen V2 API image on Q001-Q100: 100/100 requests, 98/98
+  supported semantic/material answers, Q018/Q100 safe abstentions, 101/101
+  citation registry identities, and zero infrastructure failures. Final-image
+  six-case permission/safety smoke and nine-case repeat passed. The corrected
+  six-case smoke also passed on the previously independently restored corpus.
+- Recorded performance, runtime, backup/source checksums, restore-check Docker
+  stop anomaly and off-host/Celery limitations in
+  `artifacts/uat-corpus-v2/h5-2-qualification-20261013.md`. RAG-H5.2 is
+  COMPLETED for isolated V2; TASK-035 is ELIGIBLE / NOT STARTED. No release
+  candidate or off-host disaster-recovery claim is made.
+
+### RAG-H5.2 V2 qualification checkpoint -- 2026-10-12
+
+- Revalidated generic person/role record boundaries and the current CEO/CTO
+  runtime behavior after Redis recovery; targeted Q001/Q003/Q099 are grounded.
+- Added generic security-control polarity, leave notice-band/partial-year
+  binding, and paid-family-event record focus. Targeted Q042/Q043/Q045/Q047/
+  Q048/Q050 now return source-bound answers with material citations.
+- Ran the frozen broad V2 Q001-Q100 set: 100/100 transport complete, but
+  supported semantic/material failures remain. Current representative and
+  six-case safety smoke pass; no Exact-100 completion claim is made.
+- Recorded open Q055/Q080/Q084/Q088/Q089/Q091 and Q090 inconsistency, the
+  separate Q018 corpus-authority conflict, performance/repeatability evidence,
+  and reproducibility limitations in
+  `artifacts/uat-corpus-v2/h5-2-qualification-20261012.md`. RAG-H5.2 stays
+  IN PROGRESS; TASK-035 stays BLOCKED / NOT STARTED.
+
+### Isolated UAT Corpus v2 Redis recovery -- 2026-10-12
+
+- Completed the approved Redis-only cutover onto the dedicated recovered volume;
+  preserved original, snapshot, diagnostic and isolated-test Redis volumes.
+- Reverified Redis/API/worker/PostgreSQL health, unchanged monitored PostgreSQL
+  counts/identities/READY states/migration head, and unchanged backend source hash.
+- Recorded historical Celery accounting as UNKNOWN and the initial autosave
+  dirty-counter origin as unresolved; no task replay was observed. RAG-H5.2
+  remains in progress and TASK-035 remains blocked. See the local recovery
+  evidence report under `artifacts/uat-corpus-v2/redis-recovery-20261010/`.
+
+### RAG-H5.2 September corpus source recovery -- 2026-09-29
+
+#### Recovered
+
+- Located the six original Nova Digital policy PDFs in a synchronized OneDrive policy
+  directory and verified them against retained document-library and runtime evidence.
+- Extracted the checksum-matched generic leave source and two deterministic UAT source
+  PDFs from the stale August upload archive into a recovery-only artifact directory.
+- Added a 12-slot diagnostic provenance manifest with nine verified sources, one
+  probable generated fixture, one partial successful-run fixture, and one missing
+  document identity/source.
+
+#### Forensics
+
+- Confirmed Git history, deleted paths, branches, tags, reflog, and unreachable objects
+  contain no historical corpus files.
+- Targeted OneDrive, Documents, Desktop, Downloads, project-parent, and `E:` searches
+  found no additional September source or backup candidates.
+- Identified the surviving deterministic generator and permission evidence for
+  `UAT Live Upload 1786697622220`, but not its original binary/checksum.
+
+#### Safety
+
+- Did not reconstruct the database, create users, ingest documents, build embeddings,
+  alter current volumes, or run RAG gates against the empty runtime.
+- Isolated reconstruction remains blocked until the two unidentified READY documents
+  and complete permission metadata are recovered. RAG-H5.2 remains in progress and
+  TASK-035 remains blocked.
+
+### RAG-H5.2 runtime recovery forensic hard stop -- 2026-09-28
+
+#### Observed
+
+- The local Docker engine no longer contained the previously verified containers,
+  backend image, or populated project volumes. Starting the stack created fresh
+  volumes; the resulting database contains zero users, documents, and chunks.
+- The rebuilt API is healthy (`live=200`, `ready=200`), but the empty database is not
+  suitable for RAG release-gate execution.
+- Both Docker contexts target the same current engine; only one Compose project and
+  four freshly created named volumes are visible. Docker Desktop logs establish that
+  its missing data disk was formatted before those volumes were created, so no old
+  project prefix or alternate active backend can be reconnected safely.
+- Read-only inspection classified both 2026-08-09 PostgreSQL/upload backup pairs as
+  stale pre-September state. Repository artifacts retain partial document provenance,
+  but no complete authoritative September corpus or deterministic ingestion manifest
+  is available.
+
+#### Safety
+
+- Did not seed accounts, restore a database, reingest documents, or delete any volume.
+- Did not create UAT users, rebuild embeddings, overwrite persistent state, or attach
+  the August backups to the active runtime.
+- Did not run benefits, later semantic clusters, or Exact-100 against the empty corpus.
+- Preserved all prior closed-cluster status. RAG-H5.2 remains in progress and
+  TASK-035 remains blocked.
+- Further work requires explicit authorization for isolated reconstruction plus the
+  missing authoritative September source documents/manifests.
+
+### RAG-H5.2 remaining-gate analysis and cross-document closure -- 2026-09-28
+
+#### Added
+
+- Recorded the repository-authoritative remaining release-gate inventory: 23 open
+  cases across four application-defect clusters and one corpus-conflict cluster.
+- Added generic subclaim handling for paired and coordinated Vietnamese questions,
+  plus focused regression coverage for multi-part policy requests.
+
+#### Fixed
+
+- Normalized production-incident and first-person wording for retrieval without
+  changing the original answer-facing question.
+- Bound generic allowance/support requests and open-ended OT treatment questions to
+  their structured condition/rate evidence.
+- Preferred direct replacement, consent, on-call schedule, and actual-time clauses
+  when a leave-period incident question requires both rights and time treatment.
+- Trimmed packed claim-evidence boundaries so deterministic answers do not expose
+  neighboring claim labels or dangling truncated conditions.
+
+#### Verified
+
+- Q096/Q097/Q098 cross-document synthesis gate: `3/3 PASS` on production
+  `qwen2.5:3b`; citation registry/material support `100%`; hallucinations, permission
+  leakage, infra errors, and application timeouts `0`.
+- Focused subclaim tests: `13 passed`; final shared RAG gate: `8 passed`; Ruff check,
+  Ruff format check, source compilation, and imports passed.
+- API live/readiness `200/200`, restart count `0`, OOM killed `false`; no persistent
+  volume, corpus, or ingestion changes.
+- Compensation remains closed and was not rerun. RAG-H5.2 remains in progress,
+  Exact-100 remains deferred, and TASK-035 remains blocked/not started.
+
+### RAG-H5.2 Q059 and compensation closure -- 2026-09-24
+
+#### Added
+
+- Added artifact-only, atomic UTF-8 production-contract capture for selected source
+  registry, model-visible evidence, raw generations, parsed citations, validation,
+  repairs, and final draft without exposing prompts or source text in normal logs.
+- Added adversarial salary-band tests for generic minimum-wage prose, neighboring
+  bands, correct/wrong source binding, atomic wrapped rows, and unsupported roles.
+
+#### Fixed
+
+- Prioritized query-matched structured role/range evidence before the per-query prompt
+  cutoff so generic compensation prose cannot displace the answer-bearing row.
+- Moved narrowly gated salary-band extraction ahead of generic structured value
+  extraction and preserved compound currency units.
+- Preserved strict claim/citation validation, permission revalidation, and no-answer
+  behavior; no citation inference or production answer hardcoding was added.
+
+#### Verified
+
+- Focused tests: `20 passed, 276 deselected`; Ruff check, Ruff format check, and
+  compileall passed for all changed Python files.
+- Q059: `PASS`; salary band Q056-Q060: `5/5 PASS`; compensation gate: `12/12 PASS`.
+- Citation registry validity/material support: `100%`; hallucinations, permission
+  leakage, and application timeouts: `0`.
+- Final API health/readiness: `200/200`, restart count `0`, OOM killed `false`; running
+  source hash matched the workspace after a safe API-only rebuild/recreate.
+- RAG-H5.2 remains in progress; Exact-100 was not run; TASK-035 remains blocked/not
+  started.
+
 ### RAG Runtime Acceptance and Leave Corpus Restoration -- 2026-08-21
 
 #### Added

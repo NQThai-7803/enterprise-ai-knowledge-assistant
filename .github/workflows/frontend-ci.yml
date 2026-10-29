@@ -1,0 +1,122 @@
+name: Frontend CI
+
+on:
+  push:
+    branches:
+      - "**"
+  pull_request:
+    branches:
+      - "**"
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    name: Frontend source quality
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CI: "true"
+      VITE_API_BASE_URL: http://127.0.0.1:9
+      PLAYWRIGHT_BASE_URL: http://127.0.0.1:5174
+      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/frontend-playwright
+    defaults:
+      run:
+        shell: bash
+        working-directory: frontend
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "24.14.0"
+          package-manager-cache: false
+
+      - name: Record runtime and verify lock contract
+        id: runtime
+        run: |
+          set -euo pipefail
+          mkdir -p ci-artifacts ci-logs
+          node --version | tee ci-artifacts/node-version.txt
+          npm --version | tee ci-artifacts/npm-version.txt
+          test "$(node --version)" = "v24.14.0"
+          test "$(npm --version)" = "11.9.0"
+          node -e "const p=require('./package.json');const l=require('./package-lock.json');if(l.packages[''].devDependencies.vite!==p.devDependencies.vite)process.exit(1)"
+          sha256sum package.json package-lock.json > ci-artifacts/source-hashes.txt
+
+      - name: Install exact locked dependencies without lifecycle scripts
+        id: install
+        run: |
+          set -euo pipefail
+          npm ci --ignore-scripts --no-audit --no-fund 2>&1 | tee ci-logs/install.log
+          npm ls --depth=0 2>&1 | tee ci-logs/dependency-tree-summary.log
+
+      - name: TypeScript
+        id: typecheck
+        run: |
+          set -euo pipefail
+          npm run typecheck 2>&1 | tee ci-logs/typecheck.log
+
+      - name: ESLint
+        id: lint
+        run: |
+          set -euo pipefail
+          npm run lint 2>&1 | tee ci-logs/eslint.log
+
+      - name: Vitest
+        id: vitest
+        run: |
+          set -euo pipefail
+          npm run test 2>&1 | tee ci-logs/vitest.log
+
+      - name: Provision isolated Chromium runner dependencies
+        id: chromium
+        run: |
+          set -euo pipefail
+          ./node_modules/.bin/playwright install --with-deps chromium 2>&1 | tee ci-logs/chromium-install.log
+
+      - name: Mocked Chromium regression
+        id: playwright
+        run: |
+          set -euo pipefail
+          npm run test:e2e -- --config playwright.config.ts 2>&1 | tee ci-logs/playwright.log
+
+      - name: Production-style frontend build
+        id: build
+        run: |
+          set -euo pipefail
+          npm run build 2>&1 | tee ci-logs/build.log
+          find dist -type f -print0 | sort -z | xargs -0 sha256sum > ci-artifacts/build-output-sha256.txt
+
+      - name: Summarize quality outcomes without uploading raw logs
+        if: always()
+        run: |
+          set -euo pipefail
+          mkdir -p ci-artifacts
+          printf 'runtime=%s\ninstall=%s\ntypecheck=%s\nlint=%s\nvitest=%s\nchromium=%s\nplaywright=%s\nbuild=%s\n' \
+            '${{ steps.runtime.outcome }}' '${{ steps.install.outcome }}' \
+            '${{ steps.typecheck.outcome }}' '${{ steps.lint.outcome }}' \
+            '${{ steps.vitest.outcome }}' '${{ steps.chromium.outcome }}' \
+            '${{ steps.playwright.outcome }}' '${{ steps.build.outcome }}' \
+            > ci-artifacts/gate-outcomes.txt
+
+      - name: Preserve bounded frontend quality evidence
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: frontend-ci-quality-evidence
+          path: |
+            frontend/ci-artifacts/node-version.txt
+            frontend/ci-artifacts/npm-version.txt
+            frontend/ci-artifacts/source-hashes.txt
+            frontend/ci-artifacts/build-output-sha256.txt
+            frontend/ci-artifacts/gate-outcomes.txt
+          retention-days: 7
+          if-no-files-found: error
+          include-hidden-files: false
+          archive: true

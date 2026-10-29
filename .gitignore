@@ -30,7 +30,7 @@ dist/
 
 # Local data and logs
 .backups/
-data/
+/data/
 data/models/
 logs/
 *.log

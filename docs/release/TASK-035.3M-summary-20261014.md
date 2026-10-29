@@ -1,0 +1,26 @@
+# TASK-035.3M — dependency exposure triage summary
+
+Date: 2026-10-14 (Asia/Saigon). **COMPLETED as bounded read-only exposure/decision design; release security and RC qualification remain NO-GO.** The seven 035.3L frontend advisory matches were independently rechecked against linked official records and exact unchanged lock entries. Five dev-tool entries are version-affected. Four brace advisories share one transitive `brace-expansion@5.0.8`; nanoid and Vite have one each; the Vitest advisory matches two coupled entries. No production frontend runtime exposure was verified in the inspected build path, but no final-image security clearance is claimed. Local lint/build/test/development reachability was analyzed without exploit payloads.
+
+## Decision result
+
+| Family | Actual path and assessed condition | Recommended decision (owner approval pending) |
+| --- | --- | --- |
+| Brace expansion (4 advisories) | `eslint → minimatch → brace-expansion`; ESLint runs fixed config globs/CLI `.`, with no found attacker-controlled pattern. Toolchain present; future CI/input trust boundary not fully eliminated. | **REMEDIATE_BEFORE_CANDIDATE**, target >=5.0.12 via compatible lock re-resolution. |
+| Nanoid (1) | `postcss → nanoid/non-secure(6)` during CSS build, not the affected secure custom-generator size-0 call. | **VERIFIED_NOT_APPLICABLE in current assessed call path**; security-owner sign-off or optional >=3.3.18 hygiene refresh. |
+| Vite (1) | Current Windows local dev not affected by non-Windows prerequisite; Docker build/static runtime not dev server. Future Linux mock CI would use Vite host loopback; path-collision condition not completely disproved. | **REMEDIATE_BEFORE_CANDIDATE**, direct fixed floor >=8.1.6 with Linux mock/browser and build regression. |
+| Vitest/mocker (1 advisory, 2 entries) | Project uses `vitest run`/jsdom; no `@vitest/browser` or public mocker plugin registration in source/config. | **VERIFIED_NOT_APPLICABLE in current configuration**; owner sign-off or paired >=4.1.11 hygiene refresh. |
+
+The fixed-version proposal is **not a tested upgrade**. `minimatch`/PostCSS child semver ranges admit patched brace/nanoid; direct Vite/Vitest ranges admit patched same-major releases, but direct minimum floors should be raised if changed. Future isolated lock diff, compatibility tests, mocked Chromium, build/source-map/provenance checks and fresh advisories are required. No `npm install/update/audit fix` or lock mutation occurred.
+
+## Coverage limits and state protection
+
+- Backend advisory coverage **NOT VERIFIED**: existing 20-public-direct-pin `pip-audit 2.10.1` OSV attempt failed `api.osv.dev` DNS; 035.3L PyPI attempt also failed DNS. Host Python 3.11 does not qualify required >=3.12 candidate; transitive and active-image inventories remain unscanned. Targeted Pillow/PyMuPDF notes are not a full audit.
+- Image advisory coverage **NOT VERIFIED**: no installed safe scanner/SBOM; no image pulls, builds, scans against protected containers or service changes.
+- Current CI has backend gates but no frontend/advisory/image jobs, no observed current run and no proven required statuses. The separate [CI proposal](TASK-035.3M-ci-security-gate-proposal-20261014.md) is not implemented. The existing two red RAG safety contract modules remain mandatory and must not be excluded.
+- HEAD `04ebd73aae737414fb591fe2e8b2c286134cdcd8`, dirty `main`; unchanged lock SHA `1fdf9b6d438cedc1f4027a43195407bcc1f2363f4acac50862f3403c6aa195d5`, `pyproject.toml` SHA `989e79086047000b2b2864dcae747beca7e94f70fcb97e887abff39195065845`, CI YAML SHA `d2627b5d7042154757948a52736a7980b24e59f77d0e2322379b476ca9ee1264`, original Git index SHA `13d1b85ece51ae72af9102ed130486ee9f1b7407298942054d291bce0ffd65e3`. Node 24.14.0/npm 11.9.0, host Python 3.11.0. No original repository staging/commit.
+- Historical H5.2 isolated V2 supported-case result stays **98/98 PASS in its own scope**; frozen 035.3B candidate **FAILED**; 035.3H frontend result is local/mock only. Full-tree Ruff and eight-path staging whitespace remain FAIL; source versioning approval NOT GRANTED; RAG unsupported-answer safety B19/B21/R18 OPEN mandatory blocker; active API/worker R05 skew UNRESOLVED; TASK-035 IN PROGRESS; RC NO-GO; approved deferrals 0.
+
+**Exact next authorized action:** request security/release-owner review of the [decision sheet](TASK-035.3M-security-owner-decision-sheet-20261014.md), including scoped non-applicability acceptance versus hygiene upgrades, authorization for an isolated brace/Vite dependency change, and separate authorization/data policy for CI scanners and fresh full advisory queries. Until those decisions, `READY_FOR_DEPENDENCY_REMEDIATION: NO` and `READY_FOR_CI_IMPLEMENTATION: NO` as an execution authorization, though the technical plans are reviewable. Do not automatically start implementation.
+
+Companion reports: [exact seven-advisory matrix](TASK-035.3M-exact-advisory-applicability-matrix-20261014.md), [chain/runtime exposure](TASK-035.3M-dependency-chain-runtime-exposure-20261014.md), [fixed versions and upgrade impact](TASK-035.3M-fixed-version-upgrade-impact-20261014.md), [CI security-gate proposal](TASK-035.3M-ci-security-gate-proposal-20261014.md), and [owner decisions](TASK-035.3M-security-owner-decision-sheet-20261014.md).

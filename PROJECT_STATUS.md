@@ -1,5 +1,565 @@
 # Project Status
 
+## TASK-035.3M dependency exposure and remediation decision -- 2026-10-14
+
+**COMPLETED for read-only triage; dependency remediation and CI implementation NOT AUTHORIZED; RC NO-GO.** Six 035.3M reports identify seven version-matching frontend advisories across five dev-tool lock entries, trace actual ESLint/PostCSS/Vite/Vitest call paths, separate assessed production-static-bundle absence from build/development exposure, and propose package-specific fixes plus CI gates. Four brace advisories and Vite are recommended for pre-candidate remediation; nanoid/Vitest current paths have scoped not-applicable recommendations requiring security-owner acceptance. OSV and PyPI public-only backend audit attempts both failed DNS, so full backend and image advisory coverage remain **NOT VERIFIED**. No production code, manifest, lock, workflow, Docker/V2 resource, Git index or historical evidence was changed. Source versioning approval **NOT GRANTED**; current RAG B19/B21/R18 safety **OPEN/FAIL**, API/worker R05 skew **UNRESOLVED**, full-tree Ruff and eight-path staging whitespace FAIL, TASK-035 **IN PROGRESS**, RC **NO-GO**, approved deferrals **0**. Historical H5.2 V2 98/98 and failed 035.3B candidate remain distinct.
+
+## TASK-035.3L dependency security and CI qualification -- 2026-10-14
+
+**COMPLETED as bounded evidence and remediation proposal; RC NO-GO.** Seven current reports are in `docs/release/TASK-035.3L-*20261014.md`. Targeted official advisory review found five affected frontend dev-tool lock entries across seven distinct advisories, while the checked React Router RSC-CSRF issue does not affect locked 7.18.2. Their deployed exploitability is unproven. Fresh full frontend/backend and container scans are **NOT VERIFIED**; host Python 3.11 differs from required >=3.12, pip-audit public-pin query failed DNS, and no image scanner/SBOM was available. Local app-only Ruff/format/compile/narrow security scan and frontend type/lint/Vitest 40/40/mocked Chromium 15/15/isolated build passed in limited scope; no current CI run or live candidate qualification was shown. Full-tree Ruff and eight-path staging whitespace failures persist. RAG unsupported-answer safety B19/B21/R18 **OPEN/FAIL**, active API/worker skew R05 **UNRESOLVED**, source versioning approval **NOT GRANTED**, TASK-035 **IN PROGRESS**, RC **NO-GO**. Historical H5.2 V2 acceptance is not promoted to this source state. No production source, dependency/lock, CI, Docker image, active V2 or original Git index was modified.
+
+## TASK-035.3K source versioning approval gate -- 2026-10-14
+
+**COMPLETED for bounded review; READY_FOR_VERSIONING_APPROVAL NO, RC NO-GO.** At entry all 035.3J 666-path identities, 495-file source archive and key historical captures matched; the subsequent authorized `TASKS.md` and `PROJECT_STATUS.md` updates are the two expected documentation hash differences from the frozen manifest. Its self-path is not hashed within the list. All 103 review-required paths await owners; the locally present Gitlink still lacks a documented/reachable fetch path and verified license. In an independent 497-file simulation, exact staged membership and copy hashes passed, but `git diff --cached --check` failed with 15 findings in eight paths. Original `.git/index` SHA-256 remained unchanged. Selected Ruff and 49 focused units passed; full-tree Ruff remains failed. See `docs/release/TASK-035.3K-*20261014.*`. No owner approval, commit, tag, push, source/runtime change, off-host backup or independent reproducible build was established. H5.2 historical 98/98 and frozen 035.3B failure remain separate; RAG answer safety **OPEN/FAIL**, active API/worker skew **UNRESOLVED**, TASK-035 **IN PROGRESS**, RC **NO-GO**.
+
+## TASK-035.3J reviewed source selection/versioning readiness -- 2026-10-14
+
+**COMPLETED as a bounded decision package; source selection READY_FOR_REVIEW,
+versioning approval NOT READY, RC NO-GO.** The 035.3I 495-file archive and
+all selected original hashes remain intact. An exact per-path proposed Git
+staging manifest and five companion decisions classify production source,
+tests/tooling, docs, experiments, private evidence, generated output and
+owner-review paths. The locally available `vite-monorepo` Gitlink lacks a
+parent `.gitmodules` fetch mapping and nested origin, so fresh-clone
+recoverability is not established. Full original repository Ruff failures
+remain visible. No Git add/commit/tag/push, source edit, image/service or
+database action occurred. See `docs/release/TASK-035.3J-*20261014.*`.
+Historical H5.2 V2 98/98 remains scoped PASS; frozen 035.3B candidate remains
+FAILED; 035.3H frontend mock correction remains PASS in its scope. RAG
+unsupported-answer safety **OPEN/FAIL**, B19/B21/R18 open, active API/worker
+skew **UNRESOLVED**, approved deferrals **0**, TASK-035 **IN PROGRESS**, RC
+**NO-GO**.
+
+## TASK-035.3I source hygiene/reproducible baseline preparation -- 2026-10-14
+
+**COMPLETED for bounded local inventory/preservation; RC NO-GO.** Full
+working-tree classification and a unique 495-file reviewed source tar were
+created with per-file SHA-256 and independently verified extraction. Shared
+035.3A source paths show zero hash drift; the 035.3H frontend correction is
+included, but the frozen 035.3B candidate remains FAILED. Full repository
+Ruff check/format still FAIL on preserved scratch/research files; the
+filtered source copy passes both. Focused extracted units 49/49 and current
+frontend type/lint/Vitest 40/40/mocked Chromium 15/15/isolated build passed
+in their scopes; one broader unit attempt was interrupted without result.
+No production source, service, database, Git history or historical evidence was changed;
+one release-inventory script and the checkpoint documents were added.
+See the six `docs/release/TASK-035.3I-*20261014.md` reports. Source archive is
+local, not independent build or off-host DR proof. RAG answer safety
+**OPEN/FAIL**, B19/B21/R18 open, API/worker skew **UNRESOLVED**, deferrals
+**0**, TASK-035 **IN PROGRESS**, RC **NO-GO**.
+
+## TASK-035.3H confirmation-dialog keyboard remediation -- 2026-10-14
+
+**COMPLETED in local frontend scope; RC NO-GO.** Both 035.3G dialog failures
+were reproduced and corrected in the shared frontend component. Focused
+component tests passed 4/4; focused mocked Chromium accessibility passed
+6/6; full frontend typecheck and isolated build passed; lint passed with
+seven unchanged warnings; Vitest passed 40/40 and mocked Chromium passed
+15/15. The [035.3H report](docs/release/TASK-035.3H-confirmation-dialog-remediation-20261014.md)
+records root cause, source/test hashes, before/after focus behavior and
+remaining gaps. P14's dialog sub-check is closed; P14/R19 live/broader
+accessibility criteria are not fully accepted. No backend, active V2 runtime,
+failed candidate, dependency, origin or source-map configuration was changed.
+RAG unsupported-answer safety **OPEN/FAIL**, API/worker skew **UNRESOLVED**,
+approved deferrals **0**, TASK-035 **IN PROGRESS**, RC **NO-GO**.
+
+## TASK-035.3G frontend delivery/accessibility verification -- 2026-10-14
+
+**COMPLETED for its local static/mock scope with newly verified keyboard
+FAILURES; RC NO-GO.** Typecheck/build and 36/36 Vitest passed; lint had seven
+warnings. Mocked Chromium 11/13 passed; both failures concern confirmation
+dialog focus and Escape. The previously existing nine mocked tests passed.
+The build-time localhost fallback and referenced source-content map are
+verified local configuration/exposure risks, not proof of a production
+misconfiguration or public secret leak. Static frontend/backend contract
+comparison found no established live compatibility result. Source-hygiene
+Ruff failures remain; no file was discarded. See five
+`docs/release/TASK-035.3G-*20261014.md` reports and the 035.2 matrix
+addendum. Active V2 service identities remained unchanged and healthy; no
+live E2E or protected data operation ran. RAG answer safety remains
+**OPEN/FAIL**, API/worker skew **UNRESOLVED**, deferrals **0**, TASK-035 **IN
+PROGRESS**, RC **NO-GO**.
+
+## TASK-035.3F independent qualification -- 2026-10-14
+
+**COMPLETED in static/mock/host-unit scope; RC NO-GO.** Frontend typecheck,
+build, 36 Vitest units and nine mocked Chromium E2E tests passed; lint passed
+with seven warnings. Backend app-only Ruff/format, host Python 3.11 compile,
+`pip check`, limited security scan and 1423 non-red unit tests passed (three
+expected failures). Repo-wide Ruff/format are not green because pre-existing
+scratch/experimental files fail; red 035.3C.2 and 035.3E safety contracts
+were excluded from the non-red unit run and remain open. Compose config syntax
+passed; no image or service changed. Live frontend, current vulnerability
+data, production TLS, full security/observability and rollback remain gaps.
+Five evidence/plan documents are linked from `TASKS.md` and the 035.2 matrix
+addendum. Accepted H5.2 V2 scope is preserved; frozen 035.3B candidate still
+FAILED. Unsupported-answer safety and current B19/B21 RC materiality are
+OPEN, active API/worker skew UNRESOLVED, approved deferrals 0, TASK-035 IN
+PROGRESS, RC NO-GO.
+
+## TASK-035.3E context-admission investigation -- 2026-10-14
+
+**COMPLETED as bounded investigation; NO DEFENSIBLE CORRECTION IDENTIFIED.**
+The first observed unsafe progression in 035.3B was admission of two
+permission-visible but question-irrelevant sources into answer context.
+Synthetic A–O context tests completed 11 pass / 4 fail (all four intended
+irrelevant-hit exclusions failed); 0/8 material-answer positive controls were
+lost by the current permissive boundary. Two separate final-claim controls
+both returned unsafe `SUPPORTED`. A zero-reranker-score or lexical
+cutoff lacks defensible semantics and would risk multilingual false abstention.
+Contradictory/incomplete context can be useful for correction or abstention,
+so selection is not final-answer support. The independent final responsiveness
+defect remains OPEN. Report:
+`docs/release/TASK-035.3E-bounded-context-admission-investigation-20261014.md`.
+Accepted V2 and frozen failed candidate identities/evidence were checked
+read-only; no production source, service, database, model or corpus was changed.
+TASK-035 remains **IN PROGRESS**, RC **NO-GO**, candidate **FAIL/preserved**,
+source-level fix **NOT READY**, new candidate build **NOT READY**.
+
+## TASK-035.3D release safety decision -- 2026-10-14
+
+**COMPLETED as a bounded documentation/decision checkpoint; RC NO-GO.** The
+known 035.3B permission-aware unsupported-answer defect is an open mandatory
+safety blocker, despite historically valid H5.2 V2 and candidate broad 98/98
+supported-case results. Direct RBAC denial passed, but unrelated accessible
+evidence was admitted and its grounded yet nonresponsive answer returned
+ANSWERED instead of NO_ANSWER with zero citations. Context admission and final
+responsiveness show verified problems; exact generation/repair origin remains
+UNKNOWN. The 80-criterion matrix has a dated current-status addendum for
+B19/B21 and other affected rows; no unrelated historical PASS was erased.
+Both 2E and 2F selected **NO SAFE MECHANISM**. Current release strategy is
+explicit NO-GO; a bounded context-admission investigation is recommended only
+under separate authorization. Narrowed scope is **UNPROVEN**, not approved.
+See `docs/release/TASK-035.3D-release-safety-decision-20261014.md` and its
+linked affected-criteria, blocker, owner-decision and next-action documents.
+No production code, active V2 runtime, failed candidate, database, Redis,
+model, corpus or release policy changed. TASK-035 **IN PROGRESS**, approved
+deferrals **0**, RC sign-off **NOT GRANTED**.
+
+## TASK-035.3C.2F obligation analysis -- 2026-10-14
+
+**COMPLETED for bounded synthetic/offline research; NO SAFE MECHANISM
+SELECTED.** A new independent 12-development/24-final-test manifest was frozen
+before one-shot evaluation. Existing validation falsely accepted 11/14
+non-ACCEPT final cases and rejected 3/10 valid answers. Automatic
+question/evidence-only obligation extraction plus per-obligation E5 coverage
+reduced unsafe accepts to 2/14 but rejected all 10 valid answers; the
+intersection retained one unsafe accept and also rejected all 10. The
+extractor missed all three genuine development/final authority conflicts.
+The oracle-obligation cosine diagnostic also rejected all 10 final positives.
+No final-test tuning occurred. Synthetic authorization scoping is not a
+production RBAC or release-gate proof. Experimental artifacts and decision:
+`docs/release/TASK-035.3C.2F-feasibility-decision-20261014.md` and
+`artifacts/task-035-3c2f-20261014/`. Production source hashes and accepted
+V2 container identities stayed unchanged in read-only checks; broad V2 and
+database integrity were not rerun. TASK-035.3C.2 source correction remains
+**PARTIAL / BLOCKED**, TASK-035 **IN PROGRESS**, frozen candidate
+**FAIL/preserved**, and RC sign-off **NOT GRANTED**.
+
+## TASK-035.3C.2E isolated multilingual entailment evaluation -- 2026-10-14
+
+**COMPLETED for bounded synthetic/offline research; NO SAFE MECHANISM
+SELECTED.** A new 36-case English/Vietnamese/mixed manifest (12 development,
+24 held-out pilot) compared the existing claim validator, locally cached E5
+similarity, and a constrained localhost Qwen judge. The existing validator
+had 7/14 unsafe held-out acceptances and 5/10 false abstentions; E5 had 2/14
+and 10/10; the initial judge had 0 and 10/10, with 2/36 malformed outputs.
+A revised schema judge recovered development positives but falsely accepted
+an omitted condition, negation reversal, and unresolved authority conflict;
+its 12/12 repeated decisions repeated those errors. No new production source,
+model dependency, image or deployment changed. Active V2 remained healthy;
+the frozen failed candidate remains preserved and stopped. See
+`docs/release/TASK-035.3C.2E-evaluation-design-20261014.md` and
+`docs/release/TASK-035.3C.2E-decision-20261014.md`. TASK-035.3C.2 stays
+**PARTIAL / BLOCKED**, TASK-035 **IN PROGRESS**, and RC sign-off **NOT GRANTED**.
+
+## TASK-035.3C.2 multilingual responsiveness correction -- 2026-10-14
+
+**PARTIAL / BLOCKED at the authorized design gate; no production correction.**
+The synthetic A-O claim-validation contract completed 7 PASS / 8 FAIL: five
+grounded-but-nonresponsive or incomplete claims falsely pass, while three
+valid Vietnamese/mixed-language/conditional controls falsely abstain. Existing
+035.3C.1 tests remain 4 PASS / 3 expected failures. No evidence-backed
+generic deterministic or model-based decision rule yet preserves both sides;
+a lexical gate or relative reranker cutoff would be unsafe. The approved
+instruction to stop if no defensible correction is established was applied.
+Only test and documentation files changed. V2 and the frozen failed candidate
+retain their recorded container/image identities; neither was restarted or
+rebuilt. See
+`docs/release/TASK-035.3C.2-multilingual-responsiveness-design-stop-20261014.md`.
+TASK-035 is **IN PROGRESS**, candidate qualification **FAIL**, and RC sign-off
+**NOT GRANTED**.
+
+## TASK-035.3C.1 runtime rebaseline and root-cause verification -- 2026-10-14
+
+**COMPLETED for the authorized diagnostic scope; no production correction.**
+Read-only accepted V2 verification passed for the documented 9 READY documents,
+143 chunk identities/content hashes, 3 users, migration `20260822_0011`,
+grants, source PDFs and H5.2 artifact hashes after the host restart. The
+stopped 035.3B candidate, images and four volumes remain preserved; its
+database integrity is **NOT VERIFIED** without separately authorized startup.
+A host reboot is verified, but the precise exit-255 mechanism is unknown.
+Synthetic controls reproduced the generic answer-responsiveness gap and a
+Vietnamese false-abstention risk (4 passed, 3 expected failures); no code or
+image was changed. The older 035.3C status below is historical and its V2
+rebaseline uncertainty is superseded by this checkpoint. See
+`docs/release/TASK-035.3C.1-runtime-integrity-root-cause-20261014.md`.
+The failed candidate remains **FAIL**, TASK-035 **IN PROGRESS**, and RC sign-off
+**NOT GRANTED**.
+
+## TASK-035.3C permission-aware answer-relevance diagnostic -- 2026-10-14
+
+**PARTIAL / BLOCKED; no generic correction implemented.** The failed 035.3B
+capture and a synthetic probe establish that a verbatim cited clause can pass
+claim validation while not answering the user's question. Reranker score zero
+is not a calibrated irrelevance flag, and the complete generation/retrieval
+causal chain is not preserved. During read-only inspection, all four isolated
+035.3B containers were found exited with code 255; their images and volumes
+remain. The accepted V2 containers were up/healthy but had recently restarted.
+No services, databases, volumes or application source were modified in this
+checkpoint. Current candidate DB integrity and post-restart V2 data baseline
+are unverified, so remediation stopped under the integrity hard-stop rule.
+See `docs/release/TASK-035.3C-permission-answer-relevance-diagnostic-20261014.md`
+for boundary analysis and synthetic A-J regression design. The old candidate
+remains **FAIL**; TASK-035 is **IN PROGRESS** and RC sign-off is **NOT GRANTED**.
+
+## TASK-035.3B isolated candidate broad V2 requalification -- 2026-10-13
+
+TASK-035.3B's authorized restore, frozen broad run, source/citation review,
+safety/repeatability gates and post-run integrity assessment are **COMPLETED**.
+The isolated candidate restored 9 READY documents/143 chunks/3 users with
+verified grants and a successful second-database pre-run restore. Original
+Q001-Q100 completed with 98/98 supported semantic/material answers, 101/101
+persisted citation identities, and safe Q018/Q100 abstentions. The documented
+nine-case repeat was 9/9 and existing six-case safety smoke was 6/6. However,
+an independent STAFF private-policy question received an unrelated, cited
+organization-document answer instead of NO_ANSWER. Direct private-document and
+cross-user access were denied; no private-content leak was observed, but the
+unsupported-answer safety gate **FAILED**. Overall candidate qualification is
+**FAIL**, despite broad PASS. Active V2 and 035.3A synthetic resources stayed
+intact. See
+`docs/release/TASK-035.3B-isolated-candidate-qualification-20261013.md`.
+TASK-035 remains **IN PROGRESS**; active API/worker skew remains, next release
+verification is not ready, and RC sign-off is **NOT GRANTED**. No code change,
+image rebuild or candidate promotion is authorized by this result.
+
+## TASK-035.3A isolated candidate qualification -- 2026-10-13
+
+TASK-035.3A is **COMPLETED for its authorized isolated build/compatibility scope**.
+Two uniquely tagged candidate images share the same 217 application-file hashes,
+92 exact installed package versions, and Python 3.12.15 runtime. Focused checks
+passed (506 unit, 70 isolated-DB integration, static/security, Celery ping,
+synthetic READY ingestion, materially supported citation, private-document RBAC
+and safe NO_ANSWER). The accepted H5.2 V2 API/worker containers, images, Redis
+mapping, and 9 READY/143 chunks/3 users/migration baseline stayed intact. The
+active API/worker skew **still exists**; only the isolated candidate pair is
+aligned. Candidate reproducibility is partial, and broad V2 acceptance on the
+candidate has **NOT RUN**. See
+`docs/release/TASK-035.3A-isolated-candidate-qualification-20261013.md`.
+TASK-035 remains **IN PROGRESS**; TASK-035.3 overall and subsequent phases are
+not complete. RC sign-off is **NOT GRANTED** and no deployment is authorized.
+
+## TASK-035.2A RC candidate readiness planning -- 2026-10-13
+
+TASK-035.2A is **COMPLETED as a planning-only checkpoint**. Read-only source,
+corpus, evidence, image-identity and database checks found no material H5.2 V2
+baseline drift. The eight-file API/worker source difference and 22 installed
+package-version differences persist; no direct document-task source-path
+regression was demonstrated, but single-candidate identity remains an RC
+blocker. The conditional recommendation is to prepare one reviewed,
+dependency-frozen API/worker candidate in isolation under separate approval
+and then requalify it. See
+`docs/release/TASK-035.2A-rc-candidate-readiness-20261013.md`. TASK-035 is
+**IN PROGRESS**; TASK-035.3 has not started; RC sign-off is **NOT GRANTED**.
+
+## TASK-035.2 acceptance traceability and deferral review -- 2026-10-13
+
+TASK-035.2 is **COMPLETED as a read-only documentation checkpoint**. The
+80-criterion acceptance matrix has 9 scoped PASS, 1 FAIL (API/worker candidate
+identity skew), 17 NOT_RUN, 43 EVIDENCE_GAP, 7 CONFLICT, and 3
+DEFERRAL_PROPOSED. The seven reviewed deferral proposals remain
+`PENDING_REVIEW`; **zero are approved**. The original TASK-034.1 real-LLM
+report remains IN_PROGRESS with empty case results and is not automatically
+superseded by the passing H5.2 V2 qualification. Evidence:
+`docs/release/TASK-035.2-acceptance-traceability-matrix-20261013.md`,
+`docs/release/TASK-035.2-release-deferral-register-20261013.md`, and
+`docs/release/TASK-035.2-verification-coverage-summary-20261013.md`.
+TASK-035 remains **IN PROGRESS**; TASK-035.3 onward have not started. No current
+frontend, production/security, isolated integration, or DR gate was executed
+by this checkpoint. No RC sign-off is granted.
+
+## TASK-035.1 baseline protection and contract reconciliation -- 2026-10-13
+
+TASK-035 is **IN PROGRESS**, limited so far to the authorized 035.1 evidence
+checkpoint. The accepted H5.2 V2 API image matches all 216 current application
+Python files, while the older worker differs in eight RAG/chat/citation files
+and 22 installed package versions. No direct Celery task/pipeline source
+contract difference was found, but the version skew blocks an unqualified RC
+candidate identity. Current source, image, corpus, evidence and Redis recovery
+identities, along with unresolved release-authority decisions, are documented
+in `docs/release/TASK-035.1-baseline-manifest-20261013.md` and
+`docs/release/TASK-035.1-release-contract-reconciliation-20261013.md`.
+TASK-035.2 onward are not started. **No RC sign-off**, commit, tag, external
+backup, runtime rebuild, database write, or corpus change occurred.
+
+## RAG-H5.2 V2 final qualification -- 2026-10-13
+
+**RAG-H5.2 COMPLETED for isolated UAT Corpus v2; TASK-035 ELIGIBLE / NOT STARTED.**
+The frozen final API image `sha256:1f057785bd8cacb68aa8573e3aa12e29a23c37692e0ad045997770d4adf2648e`
+passed the broad Q001-Q100 run: 100/100 transport, 98/98 supported answers
+manually checked against material source evidence, 101/101 valid persisted
+citation identities, Q018 safe conflict abstention, Q100 safe unsupported
+abstention, and zero infrastructure errors. Final-image safety/permission smoke
+passed 6/6; high-risk repeatability passed 9/9. The previously independent
+restored corpus passed corrected current-image smoke 6/6 and retained 9 READY
+documents, 143 chunks, 3 users and migration `20260822_0011`. Active V2
+services remain healthy with zero restarts/OOM. The 13-file backup package and
+all nine source PDFs match SHA-256. Performance was measured (broad p95
+23.75 s) without a repository-defined p95 ceiling.
+
+This qualifies RAG-H5.2, **not** TASK-035 release-candidate sign-off. No
+verified off-host backup is claimed; historical Celery accounting remains
+UNKNOWN; Q018 policy precedence remains unresolved. The independent
+restore-check API had a Docker stop anomaly after its passing smoke but is now
+exited, and the active V2 stack was unaffected. Full evidence and limits:
+`artifacts/uat-corpus-v2/h5-2-qualification-20261013.md` and the superseding
+supported-failure ledger of the same date. Earlier checkpoints below are
+historical and are superseded for current RAG-H5.2 status.
+
+## RAG-H5.2 V2 qualification checkpoint -- 2026-10-12
+
+**RAG-H5.2 remains IN PROGRESS; TASK-035 remains BLOCKED / NOT STARTED.**
+Redis infrastructure recovery remains completed. The isolated V2 broad frozen
+Q001-Q100 run completed 100/100 requests with zero transport errors, but this is
+not a semantic pass. The applicability denominator remains 98 supported cases;
+Q018 is an unresolved authority conflict and Q100 is unsupported safe NO_ANSWER.
+Targeted generic RAG fixes closed Q042/Q043/Q045/Q047/Q048/Q050 and preserved
+the current CEO/CTO, Q096, Q097, representative, and six-case smoke gates.
+Supported Q055/Q080/Q084/Q088/Q089/Q091 remain confirmed failures; Q090 is
+cross-run inconsistent, and several truncated/partial answers need adjudication.
+The broad run predates the targeted fixes and has not been repeated on the final
+image, so its current 98-case pass rate is not certified. Citation registry
+identity is 95/95 in that broad capture, but material support has failures.
+See `artifacts/uat-corpus-v2/h5-2-qualification-20261012.md` for case-level
+evidence, performance, reproducibility limits, and the next checkpoint.
+
+## Isolated UAT Corpus v2 Redis recovery -- 2026-10-12
+
+**REDIS RECOVERY COMPLETED** after the approved Redis-only cutover and a further
+read-only post-cutover verification. The active V2 Redis service is healthy on
+`enterprise-ai-uat-v2_redis_recovered_cutover_20261010`; API live/ready are HTTP
+200, worker and PostgreSQL are healthy, and Redis has zero restarts/OOM. The
+monitored PostgreSQL baseline remains 9 READY documents, 143 chunks, 3 users,
+and Alembic `20260822_0011`; backend source hash is unchanged. No Celery task
+execution was observed, but historical Celery accounting is **UNKNOWN**. The
+initial Redis autosave dirty-counter origin is unresolved although the saves
+match configured thresholds and completed successfully.
+
+The evidence and limitations are recorded in
+`artifacts/uat-corpus-v2/redis-recovery-20261010/postreboot-cutover-integrity-20261011.md`.
+This isolated V2 recovery does not resolve the separate historical September
+corpus provenance gaps documented below. RAG-H5.2 remains **IN PROGRESS**;
+TASK-035 remains **BLOCKED / NOT STARTED**. Resume RAG release work separately;
+no broad benchmark was executed in this infrastructure finalization.
+
+## RAG-H5.2 September corpus source recovery -- 2026-09-29
+
+Authoritative-source forensics recovered and preserved nine verified source binaries
+without changing any runtime or persistent volume:
+
+- Six Nova Digital PDFs were found in the locally synchronized OneDrive folder
+  `Máy tính/Chính sách ct`. Their filenames, exact byte sizes, document IDs,
+  READY states, organization scope, page layout, and policy content agree with the
+  retained UAT document-library screenshot and September RAG artifacts. The
+  organization binary also matches the SHA-256 stored in the August database and the
+  September artifact facts (`2021`, approximately `180` staff), excluding the later
+  editable variant that contains different values.
+- The exact generic leave-policy binary was recovered from the August upload archive.
+  Its SHA-256 is
+  `24178db420422e474326986672b6c15cc67373ee6adbe1489ba5e8addf95f4f4`, matching the
+  September restoration ledger.
+- The exact deterministic UAT grounding and shared-policy PDFs were recovered from the
+  same archive. Their hashes match the stale database, while the seed path, screenshot,
+  and September artifacts establish their logical metadata and access behavior.
+
+The diagnostic manifest is
+`artifacts/rag-h5-2-september-corpus-recovery/manifest.json`; recovered binaries are
+copied under its `sources/` directory. Current classification is `9 VERIFIED_SOURCE`,
+`1 PROBABLE_SOURCE`, `1 PARTIAL_SOURCE`, and `1 MISSING`. The probable entry is the private
+`UAT Live Upload 1786697622220`: its ID, logical content, permission behavior, and
+deterministic generator survive, but its original generated PDF/checksum do not. The
+partial entry is retained successful-run binary `uat-live-1786698102732.pdf`; its
+title, content, READY contract, and access behavior are recoverable, but its historical
+database ID is not. One additional active READY record implied by the verified
+12-document aggregate remains wholly unidentified.
+
+Git history contains no tracked/deleted corpus files, and unreachable Git objects are
+source/test/documentation snapshots rather than policy binaries. Targeted host,
+OneDrive, Documents, Desktop, Downloads, and `E:` searches found no other September
+source or database backup. Manual OneDrive recycle-bin/version-history recovery is now
+required for the original `1786697622220` live-upload binary, the historical row for
+`1786698102732`, and the final unidentified record.
+
+Automatic isolated reconstruction is **NOT SAFE** because authoritative documents,
+complete document metadata, and the permission manifest remain incomplete. No users,
+documents, chunks, or embeddings were created; no H5.2 cluster or Exact-100 case was
+run. RAG-H5.2 remains **IN PROGRESS** and TASK-035 remains **BLOCKED / NOT STARTED**.
+
+## RAG-H5.2 runtime recovery forensic hard stop -- 2026-09-28
+
+RAG-H5.2 remains **IN PROGRESS** and TASK-035 remains **BLOCKED / NOT STARTED**.
+Compensation and cross-document synthesis retain their latest verified closed status.
+No semantic cluster or Exact-100 case was executed in this checkpoint.
+
+Read-only Docker and host forensics found no recoverable September runtime:
+
+- Both visible Docker contexts target the same current Docker Desktop engine. The only
+  Compose project is `enterprise-ai-knowledge-assistant`, and the only named volumes
+  are its four fresh volumes created at `2026-09-28T14:24:15Z` or one second later.
+- Docker Desktop logs show the former data disk could not be found by its disk ID and
+  then report `detected no file system. Formatting` at `2026-09-28T14:05:15.514Z`.
+  Older UI logs had shown 14 volumes before that restart. The current VHDX contains
+  only the four new volume directories, so this is storage reinitialization rather
+  than a CLI context or Compose-prefix mismatch.
+- Read-only database counts remain `users=0`, `documents=0`, and `chunks=0`. API
+  live/readiness are `200/200`, migration current/head is `20260822_0011`, restart
+  count is `0`, and OOM killed is `false`; infrastructure health does not establish
+  semantic-runtime readiness.
+- The only database/upload backups are two 2026-08-09 PostgreSQL 17 custom dumps and
+  their upload archives. They contain the expected tables, including users,
+  documents, chunks, citations, and vector extension, but predate the September
+  corpus. One upload archive contains only four synthetic UAT fixtures; the other
+  contains older July/August uploads with different storage IDs. They are classified
+  `STALE_PRE_SEPTEMBER_BACKUP`, not recovery candidates.
+- The repository and Codex attachment directories contain no authoritative PDF/DOCX
+  copies of the September policy corpus. Runtime artifacts preserve partial evidence
+  and seven cited document IDs/titles, but not all 12 source binaries or complete
+  document metadata. The documentation ZIP is documentation-only.
+
+Expected September provenance remains: three UAT roles/accounts, 12 active READY
+documents, 153 active chunks, 384-dimensional embeddings, and the recorded acceptance
+document IDs. The restored leave document provenance is still documented below, but
+its source PDF is not presently available. Exact recovery is therefore unavailable,
+and deterministic reconstruction is only partial from current repository artifacts.
+
+No seed, restore, document ingestion, user creation, embedding rebuild, volume
+deletion, or persistent-state overwrite was performed. Resuming requires explicit
+authorization plus authoritative copies/manifests for all September documents. The
+recommended procedure is to preserve the current empty volumes, create an isolated
+reconstruction project and new volumes, restore/recreate the three UAT accounts,
+ingest checksum-verified authoritative documents through the normal pipeline, verify
+12 READY documents / 153 chunks / 384-dimensional embeddings and representative IDs,
+then switch acceptance execution only after provenance is demonstrated.
+
+Hard stop: **no verified old state exists; reconstruction/reingestion and persistent
+writes require user authorization and missing authoritative corpus assets**. The
+active application queue remains benefits, person/organization, schedule/attendance
+excluding Q018, and annual-leave allocation. Q018 remains a separate corpus-authority
+conflict.
+
+## RAG-H5.2 remaining release-gate checkpoint -- 2026-09-28
+
+RAG-H5.2 remains **IN PROGRESS**. TASK-035 remains **BLOCKED / NOT STARTED**.
+Compensation hardening is closed (`12/12 PASS`) and was not reopened. Exact-100 was
+not rerun in this checkpoint.
+
+The current repository ledgers and the latest per-cluster artifacts supersede stale
+failures in the 2026-09-10 Exact-100 transport capture. Newer authoritative closure
+artifacts are:
+
+- `artifacts/rag-h5-2-compensation-gate-post-q059.json`
+- `artifacts/rag-h5-2-security-cluster-final-closure.json`
+- `artifacts/rag-h5-2-attendance-work-schedule-final-closure.json`
+- `artifacts/rag-h5-2-leave-condition-binding-final-closure.json`
+- `artifacts/rag-h5-2-cross-document-synthesis-final.json`
+- `artifacts/rag-h5-2-cross-document-final-closure.json`
+
+### Remaining inventory
+
+There are **23 unresolved cases**: **22 application defects**, **1 corpus conflict**,
+and no current infra, expected-no-answer, or insufficient-metadata blockers. The 36
+case records covered by newer compensation, security, targeted attendance,
+leave-condition, and cross-document closure gates are stale/superseded rather than
+open failures.
+
+| Cluster | Cases | Classification | Newer generic fix may cover | Runtime rerun |
+| --- | --- | --- | --- | --- |
+| Person/organization fact binding | Q006, Q008, Q010, Q011, Q012, Q015 | APPLICATION_DEFECT | Yes | Required |
+| Schedule/attendance value binding | Q016, Q017, Q020, Q021, Q022, Q024, Q032, Q038 | APPLICATION_DEFECT | Yes | Required |
+| Working-hours policy authority | Q018 | CORPUS_CONFLICT | No | Human authority required before adjudication |
+| Annual-leave allocation | Q039, Q040 | APPLICATION_DEFECT | Yes | Required |
+| Benefit value/condition binding | Q075, Q079, Q083, Q085, Q086, Q087 | APPLICATION_DEFECT | Yes | Required |
+
+Q018 is not classified as a retrieval defect. The indexed policies contain overlapping
+morning-start windows, and current metadata does not establish which document
+supersedes the other. No policy authority was invented.
+
+### Selected cluster result: cross-document synthesis
+
+Q096, Q097, and Q098 were selected because all three required multiple independently
+supported claims and exposed a shared interpretation/evidence-composition boundary.
+The first failure origin was query decomposition and retrieval intent formation, before
+generation or validation. Generic changes now decompose paired/coordinated clauses,
+normalize incident wording for retrieval, preserve the original user-facing question,
+bind allowance descriptors and OT day types to values, and select the direct
+leave-incident rights/time clauses.
+
+Production `qwen2.5:3b` results: Q096 `PASS`, Q097 `PASS`, Q098 `PASS`; all returned
+HTTP `201`, material registered citations, and no infra errors. The cluster is
+**CLOSED**. Focused tests passed (`13` subclaim tests and a final `8`-test shared RAG
+gate), Ruff check/format check passed, source compilation/import passed, and API
+live/readiness is `200/200` with restart count `0` and OOM killed `false`.
+
+No benchmark ID, expected answer, document ID, or source ordinal was added to
+production logic. Persistent volumes were not changed. Compensation was not rerun;
+focused shared-component safeguards for salary bands, conditional allowances, OT
+day-type/rate binding, review timeline, and locale decimal ranges remained green.
+
+Next checkpoint: run only the open benefit value/condition-binding cases
+Q075/Q079/Q083/Q085/Q086/Q087. Exact-100 remains deferred until known semantic
+clusters and safety gates are green.
+
+## RAG-H5.2 Q059 / compensation closure checkpoint -- 2026-09-24
+
+Q059 is closed. The current production failure originated before generation: the
+query-matched salary-table row survived retrieval and structured rescue but ranked
+third, while the production path retained only the top two hits for the prompt.
+Generic compensation principles and an unrelated benefit amount therefore displaced
+the answer-bearing row. Qwen cited the generic salary source, strict claim validation
+returned `CONTRADICTED`, and the safe user-visible result was `NO_ANSWER`.
+
+The generic fix prioritizes candidates that atomically bind the requested role to a
+salary range before the per-query prompt cutoff. It also runs the narrowly gated
+salary-band extractor before generic structured value extractors and preserves compound
+currency units such as `triệu đồng`. No role, grade, amount, case ID, or source ordinal
+is encoded in production logic. Citation inference and validator weakening were not
+introduced.
+
+Verification completed against production `qwen2.5:3b`, temperature `0`:
+
+- Focused salary/structured/citation tests: `20 passed, 276 deselected`.
+- Q059 post-fix: HTTP `201`, `ANSWERED`, authoritative salary-table chunk on page 4,
+  same-row role/range binding, material citation, claim validation `SUPPORTED`.
+- Salary-band gate Q056-Q060: `5/5 PASS`.
+- Compensation gate Q056, Q057, Q058, Q059, Q060, Q063, Q064, Q067, Q068,
+  Q071, Q072, Q073: `12/12 PASS`.
+- Citation registry validity and material support: `100%`; hallucinations,
+  permission leakage, and application timeouts: `0`.
+- Ruff check and Ruff format check passed for all currently changed Python files;
+  compileall passed.
+- API was rebuilt/recreated without touching persistent volumes. Final live/readiness
+  checks returned `200/200`, restart count `0`, OOM killed `false`, and the running
+  service file hash matched the workspace source.
+
+Artifacts: `artifacts/rag-h5-2-q059-production-contract-before-fix.json`,
+`artifacts/rag-h5-2-q059-post-fix.json`,
+`artifacts/rag-h5-2-salary-gate-post-q059.json`, and
+`artifacts/rag-h5-2-compensation-gate-post-q059.json`.
+
+RAG-H5.2 remains **IN PROGRESS** because broader release gates were not executed in
+this checkpoint. Exact-100 was intentionally not run. TASK-035 remains blocked/not
+started under the existing roadmap.
+
 ## CURRENT STATUS -- 2026-08-21
 
 > This block supersedes older 2026-08-19 RAG handoffs. TASK-034.1.2 runtime RAG acceptance is complete for the agreed seven-case set. TASK-035 is still not started.

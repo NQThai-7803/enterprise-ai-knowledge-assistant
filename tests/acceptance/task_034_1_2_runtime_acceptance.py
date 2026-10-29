@@ -506,7 +506,7 @@ def cases() -> list[CaseSpec]:
         "900",
         evidence=("ăn trưa", "900"),
         title=("tiền lương",),
-        any_required=(("tháng", "mỗi tháng"),),
+        any_required=(("tháng", "mỗi tháng", "month"),),
     )
     for index, question in enumerate(
         (

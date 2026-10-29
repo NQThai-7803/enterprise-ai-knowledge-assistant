@@ -1,0 +1,71 @@
+services:
+  uat-v2-accounts:
+    image: enterprise-ai-knowledge-assistant-backend:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    restart: "no"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      APP_ENV: development
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-app_user}:${POSTGRES_PASSWORD:-change-me-for-local-development}@postgres:5432/${POSTGRES_DB:-enterprise_ai}
+      UAT_SEED_ENABLED: "true"
+      UAT_SEED_ACCOUNTS_ONLY: "true"
+      UAT_ADMIN_PASSWORD: ${UAT_ADMIN_PASSWORD:-LocalUatAdmin!2026}
+      UAT_MANAGER_PASSWORD: ${UAT_MANAGER_PASSWORD:-LocalUatManager!2026}
+      UAT_STAFF_PASSWORD: ${UAT_STAFF_PASSWORD:-LocalUatStaff!2026}
+    command: ["python", "-m", "app.scripts.seed_uat_data"]
+    security_opt:
+      - no-new-privileges:true
+    depends_on:
+      migration:
+        condition: service_completed_successfully
+    networks:
+      - backend
+
+  postgres:
+    ports: !override
+      - "127.0.0.1:15432:5432"
+
+  redis:
+    ports: !override
+      - "127.0.0.1:16379:6379"
+
+  api:
+    ports: !override
+      - "127.0.0.1:18000:8000"
+    environment:
+      APP_ENV: development
+      APP_DEBUG: "false"
+      RAG_DIAGNOSTICS_ENABLED: "true"
+      CHUNK_TARGET_TOKENS: "500"
+      CHUNK_OVERLAP_TOKENS: "75"
+      EMBEDDING_MODEL_NAME: intfloat/multilingual-e5-small
+      EMBEDDING_DIMENSIONS: "384"
+      LLM_ENABLED: "true"
+      LLM_PROVIDER: ollama
+      LLM_OLLAMA_BASE_URL: http://host.docker.internal:11434
+      LLM_OLLAMA_MODEL: qwen2.5:3b
+      RATE_LIMIT_LOGIN_REQUESTS: "1000"
+      RATE_LIMIT_CHAT_REQUESTS: "1000"
+      RATE_LIMIT_UPLOAD_REQUESTS: "1000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      uat-v2-accounts:
+        condition: service_completed_successfully
+
+  worker:
+    environment:
+      APP_ENV: development
+      CHUNK_TARGET_TOKENS: "500"
+      CHUNK_OVERLAP_TOKENS: "75"
+      EMBEDDING_MODEL_NAME: intfloat/multilingual-e5-small
+      EMBEDDING_DIMENSIONS: "384"
+    depends_on:
+      uat-v2-accounts:
+        condition: service_completed_successfully
+

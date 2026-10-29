@@ -1,0 +1,11 @@
+# Approved Redis-only UAT Corpus v2 cutover. Append after the existing recovery overlay.
+# Preserve every prior Redis volume; this changes only the Redis /data mount.
+services:
+  redis:
+    volumes: !override
+      - redis_recovered_cutover_data:/data
+
+volumes:
+  redis_recovered_cutover_data:
+    external: true
+    name: enterprise-ai-uat-v2_redis_recovered_cutover_20261010

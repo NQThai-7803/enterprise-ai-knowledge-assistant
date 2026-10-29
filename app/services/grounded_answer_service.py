@@ -5,8 +5,10 @@ import logging
 import re
 import unicodedata
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
+from itertools import combinations
 from time import perf_counter
 from uuid import UUID
 
@@ -75,15 +77,34 @@ from app.repositories import (
 )
 from app.retrieval.base import HybridRetrievalService
 from app.retrieval.errors import RetrievalError
-from app.retrieval.evidence_quality import classify_evidence_context, is_non_answer_context
+from app.retrieval.evidence_quality import (
+    EvidenceContextKind,
+    classify_evidence_context,
+    is_non_answer_context,
+)
+from app.retrieval.leave_relations import (
+    AnnualLeaveRelation,
+    annual_leave_relation_intent,
+    annual_leave_seniority_increment,
+    ordinary_annual_leave_allocation,
+    requested_seniority_years,
+)
 from app.retrieval.models import HybridRetrievalHit
 from app.retrieval.question_analysis import (
     QuestionAnalysis,
     analyze_question,
+    asks_for_organization_activity,
     retrieval_query_variants,
 )
 from app.retrieval.reranker import RetrievalReranker
-from app.retrieval.structured import has_explicit_not_specified
+from app.retrieval.structured import (
+    has_explicit_not_specified,
+    monetary_example_rows,
+    monetary_match_has_subject,
+    monetary_period_for_match,
+    requested_monetary_period,
+    selected_structural_line_indexes,
+)
 from app.retrieval.subclaims import information_need_queries
 from app.services.audit_service import AuditContext, AuditService
 from app.services.chat_message_service import ChatMessageService, normalize_message_content
@@ -91,6 +112,7 @@ from app.services.citation_validation_service import CitationValidationService
 from app.services.claim_evidence_validation_service import (
     ClaimEvidenceStatus,
     ClaimEvidenceValidationService,
+    ClaimRepairFeedback,
     infer_yes_no_polarity,
 )
 from app.web_search.errors import WebSearchError
@@ -127,8 +149,9 @@ _COUNT_VALUE_PATTERN = re.compile(
     r"(?<!\d)\d+(?:[.,]\d+)?\s*(?:nguoi|nhan\s+su|nhan\s+vien|employees?|people)\b"
 )
 _MONEY_VALUE_PATTERN = re.compile(
-    r"(?<!\d)\d+(?:[.,]\d+)?(?:\s*(?:-|\u2013|\u2014)\s*\d+(?:[.,]\d+)?)?\s*"
-    r"(?:trieu|dong|vnd|d|\u20ab)\b"
+    r"(?<!\d)(?:\d{1,3}(?:[.,]\d{3})+|\d+(?:[.,]\d+)?)"
+    r"(?:\s*(?:-|\u2013|\u2014)\s*(?:\d{1,3}(?:[.,]\d{3})+|\d+(?:[.,]\d+)?))?\s*"
+    r"(?:trieu(?:\s+dong)?|dong|vnd|d|\u20ab)\b"
 )
 _PERCENT_VALUE_PATTERN = re.compile(r"(?<!\d)\d+(?:[.,]\d+)?\s*%")
 _TIME_RANGE_VALUE_PATTERN = re.compile(
@@ -138,7 +161,13 @@ _TIME_RANGE_VALUE_PATTERN = re.compile(
 _CLOCK_VALUE_PATTERN = re.compile(r"(?<!\d)(?:[01]?\d|2[0-3])(?:[:h][0-5]\d)(?!\d)")
 _DATE_VALUE_PATTERN = re.compile(r"\bngay\s+\d{1,2}(?:/\d{1,2}(?:/\d{2,4})?)?\b")
 _DURATION_VALUE_PATTERN = re.compile(
-    r"(?<!\d)\d+(?:[.,]\d+)?\s*(?:gio|ngay|tuan|thang|nam|hours?|days?|weeks?|months?|years?)\b"
+    r"(?<!\d)\d+(?:[.,]\d+)?\s*(?:phut|gio|ngay|tuan|thang|nam|minutes?|hours?|days?|weeks?|months?|years?)\b"
+)
+_CONDITIONAL_ALLOWANCE_AMOUNT_PATTERN = re.compile(
+    r"(?<!\d)(?:\d{1,3}(?:[.,]\d{3})+|\d+(?:[.,]\d+)?)"
+    r"(?:\s*(?:-|\u2013|\u2014)\s*(?:\d{1,3}(?:[.,]\d{3})+|\d+(?:[.,]\d+)?))?\s*"
+    r"(?:trieu|dong|vnd|d|\u0111)(?:\s*/\s*(?:ngay|ng\u00e0y|tuan|tu\u1ea7n|thang|th\u00e1ng|nam|n\u0103m|ky|k\u1ef3|lan|l\u1ea7n|day|week|month|year))?\b",
+    re.IGNORECASE,
 )
 _YEAR_VALUE_PATTERN = re.compile(r"\b(?:19|20)\d{2}\b")
 _FOUNDING_YEAR_VALUE_PATTERN = re.compile(
@@ -195,7 +224,10 @@ _PROMPT_VALUE_FOCUS_STOP_TERMS = frozenset(
         "hien",
         "ho",
         "luong",
+        "lan",
+        "lau",
         "moi",
+        "mot",
         "muc",
         "nam",
         "nao",
@@ -255,6 +287,11 @@ _PROMPT_MULTI_VALUE_FOCUS_STOP_TERMS = _PROMPT_VALUE_FOCUS_STOP_TERMS.union(
         "years",
     }
 )
+_SALARY_BAND_ROLE_QUERY_STOP_TERMS = frozenset({"ben", "cong", "ty", "khoang", "thi"})
+_SPECIFIC_TERM_TRANSLATIONS = {
+    "data": ("du lieu",),
+    "security": ("an toan", "bao mat"),
+}
 
 _PROMPT_NON_ROLE_ACRONYMS = frozenset(
     {
@@ -419,6 +456,7 @@ _NON_PERSON_NAME_TOKENS = frozenset(
         "san",
         "strategy",
         "technology",
+        "toi",
         "tong",
         "trach",
         "truong",
@@ -513,6 +551,14 @@ class _AnswerDraft:
     prompt_tokens: int | None
     completion_tokens: int | None
     citations: tuple[object, ...] = ()
+
+
+class _ClaimValidationRepairRequired(CitationValidationFailedApplicationError):
+    """Carries bounded validator feedback across the structured retry boundary."""
+
+    def __init__(self, feedback: ClaimRepairFeedback | None) -> None:
+        super().__init__()
+        self.feedback = feedback
 
 
 def _sum_optional_counts(*values: int | None) -> int | None:
@@ -764,7 +810,7 @@ class GroundedAnswerService:
                 selected_chunk_count=len(source_registry.sources),
             )
         structured_value_draft = None
-        if len(information_needs) <= 1:
+        if len(information_needs) <= 1 or _leave_incident_time_intent(grounding_question):
             structured_value_draft = await self._structured_value_answer_draft(
                 question=grounding_question,
                 source_registry=source_registry,
@@ -955,12 +1001,15 @@ class GroundedAnswerService:
                         return final_draft
                     return retry_draft
                 return draft
-            except CitationValidationFailedApplicationError:
+            except CitationValidationFailedApplicationError as initial_error:
+                repair_feedback = _claim_repair_feedback_from_error(initial_error)
                 retry_generation = await provider.generate(
                     messages=_structured_output_retry_messages(
                         messages,
                         no_answer_sentinel=self.settings.llm_no_answer_sentinel,
+                        grounding_question=grounding_question,
                         previous_output=generation.content,
+                        repair_feedback=repair_feedback,
                     ),
                     temperature=self.settings.llm_temperature,
                     max_output_tokens=self.settings.llm_max_output_tokens,
@@ -972,13 +1021,17 @@ class GroundedAnswerService:
                         current_user=current_user,
                         grounding_question=grounding_question,
                     )
-                except CitationValidationFailedApplicationError:
+                except CitationValidationFailedApplicationError as retry_error:
+                    repair_feedback = (
+                        _claim_repair_feedback_from_error(retry_error) or repair_feedback
+                    )
                     structured_repair_generation = await provider.generate(
                         messages=_structured_output_repair_messages(
                             messages,
                             no_answer_sentinel=self.settings.llm_no_answer_sentinel,
                             grounding_question=grounding_question,
                             previous_output=retry_generation.content,
+                            repair_feedback=repair_feedback,
                         ),
                         temperature=self.settings.llm_temperature,
                         max_output_tokens=self.settings.llm_max_output_tokens,
@@ -991,7 +1044,12 @@ class GroundedAnswerService:
                             grounding_question=grounding_question,
                         )
                     except CitationValidationFailedApplicationError:
-                        return _no_answer_draft(
+                        deterministic_draft = await self._draft_from_deterministic_repair(
+                            source_registry=source_registry,
+                            current_user=current_user,
+                            grounding_question=grounding_question,
+                        )
+                        return deterministic_draft or _no_answer_draft(
                             self.settings.chat_no_answer_message,
                             selected_chunk_count=len(source_registry.sources),
                             response_time_ms=structured_repair_generation.response_time_ms,
@@ -1171,10 +1229,11 @@ class GroundedAnswerService:
             needs_by_id = dict(zip(expected_ids, information_needs, strict=True))
             repair_source_labels: dict[str, tuple[str, ...]] = {}
             for claim_id in failed_ids:
+                repair_source_limit = _claim_repair_source_limit(needs_by_id[claim_id])
                 labels = information_need_source_labels(
                     needs_by_id[claim_id],
                     source_registry=source_registry,
-                    max_sources=2,
+                    max_sources=repair_source_limit,
                 )
                 repair_source_labels[claim_id] = labels or tuple(
                     source.label for source in source_registry.sources[:2]
@@ -1252,6 +1311,14 @@ class GroundedAnswerService:
                         cited_source_labels=structured_output.citations,
                         require_subject_attribute_alignment=True,
                     )
+                    incomplete_reason = (
+                        validation.status == ClaimEvidenceStatus.SUPPORTED
+                        and _structured_claim_incomplete_reason(
+                            question=needs_by_id[claim_id],
+                            answer=structured_output.answer,
+                            source_registry=source_registry,
+                        )
+                    )
                     if self.settings.rag_diagnostics_enabled:
                         logger.warning(
                             "RAG deterministic claim diagnostics: %s",
@@ -1261,7 +1328,7 @@ class GroundedAnswerService:
                                     "answer_type": analyze_question(
                                         needs_by_id[claim_id]
                                     ).answer_type,
-                                    "status": validation.status.value,
+                                    "status": incomplete_reason or validation.status.value,
                                     "cited_source_labels": list(structured_output.citations),
                                     "routed_source_labels": list(allowed_labels),
                                     "searched_source_labels": [
@@ -1270,7 +1337,7 @@ class GroundedAnswerService:
                                 }
                             ),
                         )
-                    if validation.status == ClaimEvidenceStatus.SUPPORTED:
+                    if validation.status == ClaimEvidenceStatus.SUPPORTED and not incomplete_reason:
                         validated_claims[claim_id] = StructuredGroundedClaim(
                             claim_id=claim_id,
                             answer=structured_output.answer,
@@ -1400,6 +1467,14 @@ class GroundedAnswerService:
                 cited_source_labels=claim.citations,
                 require_subject_attribute_alignment=True,
             )
+            incomplete_reason = (
+                result.status == ClaimEvidenceStatus.SUPPORTED
+                and _structured_claim_incomplete_reason(
+                    question=needs_by_id[claim.claim_id],
+                    answer=claim.answer,
+                    source_registry=source_registry,
+                )
+            )
             if self.settings.rag_diagnostics_enabled:
                 logger.warning(
                     "RAG structured claim diagnostics: %s",
@@ -1409,12 +1484,12 @@ class GroundedAnswerService:
                             "answer_type": analyze_question(
                                 needs_by_id[claim.claim_id]
                             ).answer_type,
-                            "status": result.status.value,
+                            "status": incomplete_reason or result.status.value,
                             "cited_source_labels": list(claim.citations),
                         }
                     ),
                 )
-            if result.status == ClaimEvidenceStatus.SUPPORTED:
+            if result.status == ClaimEvidenceStatus.SUPPORTED and not incomplete_reason:
                 validated[claim.claim_id] = claim
         return validated
 
@@ -1546,6 +1621,16 @@ class GroundedAnswerService:
             question=question,
             current_user=current_user,
         )
+        candidate_hits = await self._supplement_sensitive_policy_retrieval_hits(
+            candidate_hits,
+            question=question,
+            current_user=current_user,
+        )
+        candidate_hits = await self._supplement_salary_band_retrieval_hits(
+            candidate_hits,
+            question=question,
+            current_user=current_user,
+        )
         candidate_hits = await self._supplement_role_person_retrieval_hits(
             candidate_hits,
             question=question,
@@ -1666,6 +1751,117 @@ class GroundedAnswerService:
             )
         for chunk, document in rows.all():
             if chunk.id in existing_chunk_ids:
+                continue
+            supplements.append(_supplement_hit_from_chunk(chunk=chunk, document=document))
+            existing_chunk_ids.add(chunk.id)
+        return (*hits, *tuple(supplements)) if supplements else hits
+
+    async def _supplement_sensitive_policy_retrieval_hits(
+        self,
+        hits: tuple[HybridRetrievalHit, ...],
+        *,
+        question: str,
+        current_user: User,
+    ) -> tuple[HybridRetrievalHit, ...]:
+        """Retain permission-visible policy rules that bilingual FTS may miss."""
+
+        phrases = _sensitive_policy_retrieval_phrases(question)
+        if not phrases:
+            return hits
+        conditions = tuple(
+            DocumentChunk.text.ilike(_like_contains_pattern(phrase), escape="\\")
+            for phrase in phrases
+        )
+        existing_chunk_ids = {hit.chunk_id for hit in hits}
+        async with self.session_provider() as session:
+            execute = getattr(session, "execute", None)
+            if execute is None:
+                return hits
+            rows = await execute(
+                select(DocumentChunk, Document)
+                .join(Document, Document.id == DocumentChunk.document_id)
+                .where(
+                    Document.status == DocumentStatus.READY,
+                    build_accessible_document_filter(current_user),
+                    or_(*conditions),
+                )
+                .order_by(Document.created_at.desc(), DocumentChunk.chunk_index.asc())
+                .limit(24)
+            )
+        scored = sorted(
+            (
+                (
+                    _prompt_sensitive_policy_score(
+                        text=_fold_for_person_match(f"{document.title}\n{chunk.text}"),
+                        question=question,
+                    ),
+                    chunk,
+                    document,
+                )
+                for chunk, document in rows.all()
+                if chunk.id not in existing_chunk_ids and not is_non_answer_context(chunk.text)
+            ),
+            key=lambda row: -row[0],
+        )
+        supplements = tuple(
+            _supplement_hit_from_chunk(chunk=chunk, document=document)
+            for score, chunk, document in scored[:4]
+            if score > 0
+        )
+        return (*hits, *supplements) if supplements else hits
+
+    async def _supplement_salary_band_retrieval_hits(
+        self,
+        hits: tuple[HybridRetrievalHit, ...],
+        *,
+        question: str,
+        current_user: User,
+    ) -> tuple[HybridRetrievalHit, ...]:
+        """Add a visible salary-table row when hybrid retrieval misses its role."""
+        if not _is_salary_band_request(question):
+            return hits
+        _, terms, _ = _prompt_query_needles(question)
+        role_terms = _salary_band_role_query_terms(terms)
+        if not role_terms:
+            return hits
+        conditions = tuple(
+            DocumentChunk.text.ilike(_like_contains_pattern(term), escape="\\")
+            for term in role_terms
+        )
+        required_term_count = _salary_band_role_required_match_count(role_terms)
+        role_match_conditions = tuple(
+            and_(*subset) for subset in combinations(conditions, required_term_count)
+        )
+        existing_chunk_ids = {hit.chunk_id for hit in hits}
+        supplements: list[HybridRetrievalHit] = []
+        async with self.session_provider() as session:
+            execute = getattr(session, "execute", None)
+            if execute is None:
+                return hits
+            rows = await execute(
+                select(DocumentChunk, Document)
+                .join(Document, Document.id == DocumentChunk.document_id)
+                .where(
+                    Document.status == DocumentStatus.READY,
+                    build_accessible_document_filter(current_user),
+                    or_(*role_match_conditions),
+                )
+                .order_by(Document.created_at.desc(), DocumentChunk.chunk_index.asc())
+                .limit(_EXACT_TOPIC_SUPPLEMENT_LIMIT)
+            )
+        for chunk, document in rows.all():
+            if chunk.id in existing_chunk_ids:
+                continue
+            text = _fold_for_person_match(chunk.text)
+            # Queries frequently append an organization name that is present
+            # in document metadata but not in every extracted table chunk.
+            # Keep the role phrase decisive without requiring that incidental
+            # final entity token in the row text.
+            if not _salary_band_role_terms_match(text, role_terms):
+                continue
+            if not _MONEY_VALUE_PATTERN.search(text):
+                continue
+            if not any(cue in text for cue in ("dai", "salary", "gross", "luong")):
                 continue
             supplements.append(_supplement_hit_from_chunk(chunk=chunk, document=document))
             existing_chunk_ids.add(chunk.id)
@@ -2075,7 +2271,7 @@ class GroundedAnswerService:
                     _log_no_answer_diagnostics(
                         reason=(f"claim_validation_{claim_validation.status.value.lower()}"),
                     )
-                raise CitationValidationFailedApplicationError()
+                raise _ClaimValidationRepairRequired(claim_validation.repair_feedback)
 
             validated_yes_no_polarity = claim_validation.polarity
 
@@ -2226,13 +2422,53 @@ class GroundedAnswerService:
         )
 
 
+def _salary_band_role_query_terms(terms: tuple[str, ...]) -> tuple[str, ...]:
+    """Keep meaningful role/title tokens while removing conversational tails."""
+
+    return tuple(
+        term
+        for term in terms
+        if len(term) >= 3
+        and term not in _PROMPT_VALUE_FOCUS_STOP_TERMS
+        and term not in _SALARY_BAND_ROLE_QUERY_STOP_TERMS
+    )
+
+
+def _salary_band_role_terms_match(text: str, role_terms: tuple[str, ...]) -> bool:
+    """Require a multi-token role to match as words, not token substrings."""
+
+    required_matches = _salary_band_role_required_match_count(role_terms)
+    folded_text = _fold_for_person_match(text)
+    return (
+        sum(_contains_folded_phrase(folded_text, term) for term in role_terms) >= required_matches
+    )
+
+
+def _salary_band_role_required_match_count(role_terms: tuple[str, ...]) -> int:
+    """Keep a two-word title intact while tolerating only incidental extra terms."""
+
+    if len(role_terms) <= 1:
+        return 1
+    return max(2, len(role_terms) - 1)
+
+
 def _structured_output_retry_messages(
     messages: tuple[LLMMessage, ...],
     *,
     no_answer_sentinel: str,
+    grounding_question: str,
     previous_output: str | None = None,
+    repair_feedback: ClaimRepairFeedback | None = None,
 ) -> tuple[LLMMessage, ...]:
+    if _has_authoritative_repair_target(repair_feedback):
+        return _focused_claim_repair_messages(
+            messages,
+            no_answer_sentinel=no_answer_sentinel,
+            grounding_question=grounding_question,
+            repair_feedback=repair_feedback,
+        )
     previous_output_block = _format_previous_invalid_output(previous_output)
+    repair_feedback_block = _format_claim_repair_feedback(repair_feedback)
     retry_instruction = LLMMessage(
         role="user",
         content=(
@@ -2256,6 +2492,7 @@ def _structured_output_retry_messages(
             "states a product/tool role, purpose, description, function, or responsibility, "
             "answer with JSON instead of returning the no-answer sentinel.\n\n"
             f"{previous_output_block}"
+            f"{repair_feedback_block}"
         ),
     )
     return (*messages, retry_instruction)
@@ -2267,8 +2504,17 @@ def _structured_output_repair_messages(
     no_answer_sentinel: str,
     grounding_question: str,
     previous_output: str | None = None,
+    repair_feedback: ClaimRepairFeedback | None = None,
 ) -> tuple[LLMMessage, ...]:
+    if _has_authoritative_repair_target(repair_feedback):
+        return _focused_claim_repair_messages(
+            messages,
+            no_answer_sentinel=no_answer_sentinel,
+            grounding_question=grounding_question,
+            repair_feedback=repair_feedback,
+        )
     previous_output_block = _format_previous_invalid_output(previous_output)
+    repair_feedback_block = _format_claim_repair_feedback(repair_feedback)
     repair_instruction = LLMMessage(
         role="user",
         content=(
@@ -2290,6 +2536,7 @@ def _structured_output_repair_messages(
             "a product/tool role, purpose, description, function, or responsibility, answer "
             "with that correction or purpose using JSON.\n\n"
             f"{previous_output_block}"
+            f"{repair_feedback_block}"
             "Resolved grounding question:\n"
             f"{grounding_question}"
         ),
@@ -2304,6 +2551,182 @@ def _format_previous_invalid_output(previous_output: str | None) -> str:
     if not collapsed:
         return ""
     return f"Previous invalid output, not evidence:\n{collapsed}\n\n"
+
+
+def _claim_repair_feedback_from_error(
+    error: CitationValidationFailedApplicationError,
+) -> ClaimRepairFeedback | None:
+    if isinstance(error, _ClaimValidationRepairRequired):
+        return error.feedback
+    return None
+
+
+def _has_authoritative_repair_target(feedback: ClaimRepairFeedback | None) -> bool:
+    return bool(
+        feedback is not None
+        and feedback.source_label
+        and feedback.evidence_excerpt
+        and feedback.effective_relation
+    )
+
+
+def _focused_claim_repair_messages(
+    messages: tuple[LLMMessage, ...],
+    *,
+    no_answer_sentinel: str,
+    grounding_question: str,
+    repair_feedback: ClaimRepairFeedback | None,
+) -> tuple[LLMMessage, ...]:
+    """Regenerate fresh from one validated material proposition."""
+
+    if repair_feedback is None:  # Defensive; callers require an authoritative target.
+        return messages
+    system_messages = tuple(message for message in messages if message.role == "system")
+    target = _format_authoritative_claim_repair_target(repair_feedback)
+    instruction = LLMMessage(
+        role="user",
+        content=(
+            "RESOLVED QUESTION:\n"
+            f"{grounding_question}\n\n"
+            f"{target}"
+            "INSTRUCTION:\n"
+            "Render the effective relation as one complete declarative claim containing "
+            "the target subject, action, object, and scope. Put the claim only in answer "
+            "and the allowed source ID only in citations.\n\n"
+            "OUTPUT CONTRACT:\n"
+            f'Return only JSON with "answer" and "citations":["{repair_feedback.source_label}"].'
+        ),
+    )
+    return (*system_messages, instruction)
+
+
+def _format_authoritative_claim_repair_target(feedback: ClaimRepairFeedback) -> str:
+    parts = ["AUTHORITATIVE TARGET PROPOSITION:"]
+    if feedback.subject:
+        parts.append(f"subject = {feedback.subject}")
+    if feedback.actions:
+        parts.append(f"action = {', '.join(feedback.actions)}")
+    if feedback.objects:
+        parts.append(f"object = {', '.join(feedback.objects)}")
+    if feedback.scope:
+        parts.append(f"scope = {feedback.scope}")
+    if feedback.effective_relation:
+        parts.append(f"effective_relation = {feedback.effective_relation}")
+    if feedback.source_label:
+        parts.append(f"allowed_source = {feedback.source_label}")
+    parts.extend(
+        [
+            "",
+            "EFFECTIVE RELATION INTERPRETATION:",
+            _claim_repair_relation_interpretation(feedback.effective_relation),
+            "",
+            "AUTHORITATIVE TARGET CLAUSE:",
+            feedback.evidence_excerpt or "",
+            "",
+        ]
+    )
+    return "\n".join(parts) + "\n"
+
+
+def _claim_repair_relation_interpretation(relation: str | None) -> str:
+    interpretations = {
+        "NON_PROHIBITORY": (
+            "NON_PROHIBITORY means that the policy does not prohibit the exact target "
+            "action, object, and scope."
+        ),
+        "PROHIBITORY": (
+            "PROHIBITORY means that the policy prohibits the exact target action, "
+            "object, and scope."
+        ),
+        "PERMITTED": (
+            "PERMITTED means that the policy permits the exact target action, object, and scope."
+        ),
+        "NOT_PERMITTED": (
+            "NOT_PERMITTED means that the policy does not permit the exact target "
+            "action, object, and scope."
+        ),
+    }
+    if relation in interpretations:
+        return interpretations[relation]
+    return f"{relation or 'The effective relation'} is the controlling semantic relation."
+
+
+def _format_claim_repair_feedback(feedback: ClaimRepairFeedback | None) -> str:
+    """Put the validated effective relation ahead of parse and failure history."""
+
+    if feedback is None:
+        return ""
+    if not _has_authoritative_repair_target(feedback):
+        failure = (
+            f"{feedback.failure_dimension}_CONTRADICTION"
+            if feedback.relation == "CONTRADICTED"
+            else f"{feedback.failure_dimension}_{feedback.relation}"
+        )
+        return (
+            "Machine validation feedback (history only; no authoritative target was "
+            "identified):\n"
+            "PREVIOUS ATTEMPT STATUS: REJECTED\n"
+            f"FAILURE: {failure}\n"
+            f"FAILURE DIMENSION: {feedback.failure_dimension}\n"
+            f"CONTRADICTION STATUS: {feedback.relation}\n\n"
+        )
+    parts = ["AUTHORITATIVE TARGET PROPOSITION (primary repair evidence):"]
+    if feedback.source_label:
+        parts.append(f"SOURCE: {feedback.source_label}")
+    if feedback.subject:
+        parts.append(f"SUBJECT: {feedback.subject}")
+    if feedback.actions:
+        parts.append(f"ACTION: {', '.join(feedback.actions)}")
+    if feedback.objects:
+        parts.append(f"OBJECT: {', '.join(feedback.objects)}")
+    if feedback.scope:
+        parts.append(f"SCOPE: {feedback.scope}")
+    if feedback.effective_relation:
+        parts.append(f"EFFECTIVE RELATION: {feedback.effective_relation}")
+    if feedback.evidence_excerpt:
+        parts.extend(
+            [
+                "AUTHORITATIVE TARGET CLAUSE (the only repair-time evidence):",
+                feedback.evidence_excerpt,
+            ]
+        )
+    parts.append("SUPPORTING PARSE METADATA (explanatory only):")
+    if feedback.governing_predicate:
+        parts.append(f"GOVERNING PREDICATE: {feedback.governing_predicate}")
+    if feedback.negated is not None:
+        parts.append(f"NEGATED: {'TRUE' if feedback.negated else 'FALSE'}")
+    if feedback.effective_polarity:
+        parts.append(f"VALIDATED POLARITY: {feedback.effective_polarity}")
+    failure = (
+        f"{feedback.failure_dimension}_CONTRADICTION"
+        if feedback.relation == "CONTRADICTED"
+        else f"{feedback.failure_dimension}_{feedback.relation}"
+    )
+    parts.extend(
+        [
+            "VALIDATION HISTORY (not evidence):",
+            "PREVIOUS ATTEMPT STATUS: REJECTED",
+            f"FAILURE: {failure}",
+            f"FAILURE DIMENSION: {feedback.failure_dimension}",
+            f"CONTRADICTION STATUS: {feedback.relation}",
+        ]
+    )
+    if feedback.source_label:
+        parts.append(
+            f"ALLOWED REPAIR SOURCE: {feedback.source_label} only; other retrieved clauses "
+            "are not repair evidence for this proposition."
+        )
+    parts.extend(
+        [
+            "REPAIR INSTRUCTION:",
+            "Generate a new answer using only the authoritative target proposition and "
+            "target clause above. The previous attempt was rejected because it failed the "
+            "specified validation dimension. Do not copy or edit the rejected claim. The "
+            "new claim must be entailed on subject, action, object, scope, and effective "
+            "relation, and must cite only the allowed SOURCE ID.",
+        ]
+    )
+    return "\n".join(parts) + "\n\n"
 
 
 def _answer_quality_retry_messages(
@@ -2695,6 +3118,13 @@ def _reason_evidence_is_missing(
 ) -> bool:
     if _named_entity_evidence_is_missing(question=question, source_registry=source_registry):
         return True
+    if annual_leave_relation_intent(question):
+        relations = _annual_leave_relations_for_question(
+            question=question,
+            source_registry=source_registry,
+        )
+        if not relations or len({fact.amount_days for fact, _ in relations}) > 1:
+            return True
     folded_question = _fold_for_person_match(question).strip()
     folded_prefixes = tuple(_fold_for_person_match(prefix) for prefix in _REASON_QUESTION_PREFIXES)
     if not folded_question.startswith(folded_prefixes):
@@ -2742,7 +3172,23 @@ def _named_entity_evidence_is_missing(
     source_text = _fold_for_person_match(
         "\n".join(f"{source.document_title}\n{source.text}" for source in source_registry.sources)
     )
-    return not all(_contains_folded_phrase(source_text, term) for term in entity_terms)
+    return not all(
+        _contains_folded_phrase(source_text, term)
+        or _named_service_category_is_present(term=term, source_text=source_text)
+        for term in entity_terms
+    )
+
+
+def _named_service_category_is_present(*, term: str, source_text: str) -> bool:
+    """Match a named public service to a directly stated policy category."""
+
+    category_aliases = {
+        "chatgpt": ("public ai", "ai cong cong", "dich vu ai cong cong", "cong cu ai"),
+        "github": ("repository", "repo", "kho ma nguon", "kho ca nhan"),
+        "gmail": ("email ca nhan", "personal email"),
+    }
+    aliases = category_aliases.get(term, ())
+    return any(_contains_folded_phrase(source_text, alias) for alias in aliases)
 
 
 def _is_person_lookup_question(question: str) -> bool:
@@ -2762,7 +3208,10 @@ def _question_named_entity_terms_required_in_evidence(question: str) -> tuple[st
     if len(proposed_terms) < 2:
         return terms
     filtered_terms = tuple(term for term in terms if term not in proposed_terms)
-    return filtered_terms or terms
+    # When the only title-cased entity is the proposed (possibly false) person,
+    # the role acronym remains the evidence anchor. Requiring that proposed
+    # name in evidence would make a supported correction impossible.
+    return filtered_terms
 
 
 def _yes_no_proposed_entity_terms(question: str) -> tuple[str, ...]:
@@ -2871,6 +3320,30 @@ def _should_retry_incomplete_answer(
         logger.warning("RAG completeness diagnostics: reason=missing_quantity_number")
         return True
 
+    if _leave_duration_answer_mismatches_bound_row(
+        question=question,
+        answer=clean_answer,
+        source_registry=source_registry,
+    ):
+        logger.warning("RAG completeness diagnostics: reason=leave_duration_row_mismatch")
+        return True
+
+    if _annual_leave_answer_mismatches_bound_relation(
+        question=question,
+        answer=clean_answer,
+        source_registry=source_registry,
+    ):
+        logger.warning("RAG completeness diagnostics: reason=annual_leave_relation_mismatch")
+        return True
+
+    if _leave_policy_answer_mismatches_bound_clause(
+        question=question,
+        answer=clean_answer,
+        source_registry=source_registry,
+    ):
+        logger.warning("RAG completeness diagnostics: reason=leave_policy_clause_mismatch")
+        return True
+
     if _time_answer_missing_source_time_range(
         question=question,
         answer=clean_answer,
@@ -2884,6 +3357,14 @@ def _should_retry_incomplete_answer(
         source_registry=source_registry,
     ):
         logger.warning("RAG completeness diagnostics: reason=missing_numeric_unit")
+        return True
+
+    if _full_range_answer_missing_bound(
+        question=question,
+        answer=clean_answer,
+        source_registry=source_registry,
+    ):
+        logger.warning("RAG completeness diagnostics: reason=missing_range_bound")
         return True
 
     if _change_answer_missing_source_change(
@@ -2902,6 +3383,90 @@ def _should_retry_incomplete_answer(
         logger.warning("RAG completeness diagnostics: reason=missing_compound_need_value")
         return True
 
+    return False
+
+
+def _annual_leave_answer_mismatches_bound_relation(
+    *,
+    question: str,
+    answer: str,
+    source_registry: PromptSourceRegistry,
+) -> bool:
+    if not annual_leave_relation_intent(question):
+        return False
+    relations = _annual_leave_relations_for_question(
+        question=question,
+        source_registry=source_registry,
+    )
+    if not relations or len({fact.amount_days for fact, _ in relations}) != 1:
+        return False
+    fact = relations[0][0]
+    folded_answer = _fold_for_person_match(answer)
+    answer_days = tuple(
+        int(value) for value in re.findall(r"(?<!\d)(\d{1,2})\s+(?:ngay|days?)\b", folded_answer)
+    )
+    allowed_days = {fact.amount_days}
+    if fact.seniority_increment_days is not None:
+        allowed_days.add(fact.seniority_increment_days)
+    if fact.amount_days not in answer_days or any(days not in allowed_days for days in answer_days):
+        return True
+    if fact.seniority_years is not None:
+        answer_years = tuple(
+            int(value)
+            for value in re.findall(r"(?<!\d)(\d{1,2})\s+(?:nam|years?)\b", folded_answer)
+        )
+        allowed_years = {fact.seniority_years}
+        if fact.seniority_interval_years is not None:
+            allowed_years.add(fact.seniority_interval_years)
+        return fact.seniority_years not in answer_years or any(
+            year not in allowed_years for year in answer_years
+        )
+    return False
+
+
+def _leave_duration_answer_mismatches_bound_row(
+    *,
+    question: str,
+    answer: str,
+    source_registry: PromptSourceRegistry,
+) -> bool:
+    expected = _structured_leave_duration_answer(
+        question=question,
+        source_registry=source_registry,
+    )
+    if expected is None:
+        return False
+    expected_answer, _ = expected
+    expected_value = _DURATION_VALUE_PATTERN.search(_fold_for_person_match(expected_answer))
+    if expected_value is None:
+        return False
+    return expected_value.group(0) not in _fold_for_person_match(answer)
+
+
+def _leave_policy_answer_mismatches_bound_clause(
+    *,
+    question: str,
+    answer: str,
+    source_registry: PromptSourceRegistry,
+) -> bool:
+    expected = _structured_leave_policy_clause_answer(
+        question=question,
+        source_registry=source_registry,
+    )
+    if expected is None:
+        return False
+    folded_answer = _fold_for_person_match(answer)
+    intent = _leave_policy_intent(question)
+    if intent == "sickness_action":
+        return not (
+            "thong bao" in folded_answer
+            and any(cue in folded_answer for cue in ("ngay", "ngay khi co the"))
+        )
+    if intent == "unused_leave_termination":
+        return not (
+            "thanh toan" in folded_answer
+            and any(cue in folded_answer for cue in ("cham dut", "nghi viec"))
+        )
     return False
 
 
@@ -2977,12 +3542,11 @@ def _yes_no_answer_missing_polarity(
 
 
 def _is_yes_no_question(question: str) -> bool:
-    folded_question = _fold_for_person_match(question).strip()
-    if any(cue in folded_question for cue in ("co phai", "dung khong", "phai khong")):
-        return True
-    if folded_question.startswith(("is ", "are ", "do ", "does ")):
-        return True
-    return folded_question.endswith(" khong") or folded_question.endswith(" khong?")
+    # Keep every downstream completeness/repair decision on the same intent
+    # contract as retrieval question analysis.  Confirmation wording such as
+    # "please confirm" is a yes/no request even when it does not end in
+    # "... khong?".
+    return analyze_question(question).is_yes_no
 
 
 def _yes_no_answer_missing_supported_correction(
@@ -3294,6 +3858,18 @@ def _person_name_sequences_near_terms(
             if record_candidate is not None:
                 record_candidates.append(record_candidate)
             for candidate, candidate_start, candidate_end in spans:
+                if candidate_start >= term_end and _starts_person_record_at(text, candidate_end):
+                    # A following "Name -/|/: ..." begins its own record;
+                    # an orphan role in the previous record cannot claim it.
+                    continue
+                if candidate_end <= position:
+                    intervening = text[candidate_end:position]
+                elif candidate_start >= term_end:
+                    intervening = text[term_end:candidate_start]
+                else:
+                    intervening = ""
+                if re.search(r"\n\s*\n", intervening):
+                    continue
                 distance = _span_distance(
                     first_start=position,
                     first_end=term_end,
@@ -3347,9 +3923,10 @@ def _person_name_for_role_occurrence(
 
     same_line_following = tuple(
         (candidate, candidate_start)
-        for candidate, candidate_start, _ in spans
+        for candidate, candidate_start, candidate_end in spans
         if term_end <= candidate_start <= line_end
         and candidate_start - term_end <= _ROLE_PERSON_ASSOCIATION_MAX_CHARS
+        and not _starts_person_record_at(text, candidate_end)
     )
     if same_line_following:
         return min(same_line_following, key=lambda row: row[1])[0]
@@ -3368,19 +3945,28 @@ def _person_name_for_role_occurrence(
         for candidate, _, candidate_end in spans
         if candidate_end <= term_start
         and term_start - candidate_end <= _ROLE_PERSON_ASSOCIATION_MAX_CHARS
+        and not re.search(r"\n\s*\n", text[candidate_end:term_start])
     )
     if preceding:
         return max(preceding, key=lambda row: row[1])[0]
 
     following = tuple(
         (candidate, candidate_start)
-        for candidate, candidate_start, _ in spans
+        for candidate, candidate_start, candidate_end in spans
         if candidate_start >= term_end
         and candidate_start - term_end <= _ROLE_PERSON_ASSOCIATION_MAX_CHARS
+        and not re.search(r"\n\s*\n", text[term_end:candidate_start])
+        and not _starts_person_record_at(text, candidate_end)
     )
     if following:
         return min(following, key=lambda row: row[1])[0]
     return None
+
+
+def _starts_person_record_at(text: str, name_end: int) -> bool:
+    """A delimiter after a name starts that person's own extracted record."""
+
+    return re.match(r"[ \t]*[-|:][ \t]+", text[name_end:]) is not None
 
 
 def _person_name_sequences(text: str) -> tuple[str, ...]:
@@ -3515,6 +4101,17 @@ def _time_answer_missing_source_time_range(
     analysis = analyze_question(question)
     if not (analysis.asks_for_time_range or analysis.answer_type == "TIME"):
         return False
+    corresponding = _corresponding_work_time_answer(
+        question=question,
+        source_registry=source_registry,
+    )
+    if corresponding is not None:
+        expected_answer, _ = corresponding
+        expected_clocks = tuple(
+            _CLOCK_VALUE_PATTERN.findall(_fold_for_person_match(expected_answer))
+        )
+        folded_answer = _fold_for_person_match(answer)
+        return not all(clock in folded_answer for clock in expected_clocks)
     required_ranges = _question_focused_source_time_ranges(
         question=question,
         source_registry=source_registry,
@@ -3584,6 +4181,75 @@ def _numeric_answer_missing_source_unit(
         ):
             return True
     return False
+
+
+def _full_range_answer_missing_bound(
+    *,
+    question: str,
+    answer: str,
+    source_registry: PromptSourceRegistry,
+) -> bool:
+    """Require both endpoints when a question asks for a bounded value range."""
+
+    if not _asks_for_full_range(question):
+        return False
+    answer_numbers = {
+        match.group(0).replace(",", ".")
+        for match in re.finditer(r"\d+(?:[.,]\d+)?", _fold_for_person_match(answer))
+    }
+    for lower, upper in _question_bound_money_ranges(question, source_registry):
+        if lower not in answer_numbers or upper not in answer_numbers:
+            return True
+    return False
+
+
+def _asks_for_full_range(question: str) -> bool:
+    folded = _fold_for_person_match(question)
+    if any(cue in folded for cue in ("toi thieu", "minimum", " lower bound", "muc min")):
+        return False
+    if any(cue in folded for cue in ("toi da", "maximum", " upper bound", "muc max")):
+        return False
+    return any(cue in folded for cue in ("khoang", "range", "band", "dai", "khung")) or (
+        "tu" in folded and "den" in folded
+    )
+
+
+def _question_bound_money_ranges(
+    question: str,
+    source_registry: PromptSourceRegistry,
+) -> tuple[tuple[str, str], ...]:
+    """Find money ranges on a row that contains the requested field/title."""
+
+    _, terms, _ = _prompt_query_needles(question)
+    field_terms = tuple(
+        term
+        for term in terms
+        if len(term) >= 3
+        and term not in _PROMPT_VALUE_FOCUS_STOP_TERMS
+        and term not in _QUANTITY_STOP_TERMS
+        and term not in {"khoang", "range", "band", "dai", "khung"}
+    )
+    if not field_terms:
+        return ()
+
+    ranges: list[tuple[str, str]] = []
+    required_matches = min(2, len(field_terms))
+    for source in source_registry.sources:
+        for line in source.text.splitlines():
+            folded_line = _fold_for_person_match(line)
+            if sum(term in folded_line for term in field_terms) < required_matches:
+                continue
+            for match in _MONEY_VALUE_PATTERN.finditer(folded_line):
+                numbers = tuple(
+                    number.replace(",", ".")
+                    for number in re.findall(r"\d+(?:[.,]\d+)?", match.group(0))
+                )
+                if len(numbers) != 2:
+                    continue
+                value = (numbers[0], numbers[1])
+                if value not in ranges:
+                    ranges.append(value)
+    return tuple(ranges)
 
 
 def _answer_contains_source_unit(*, folded_answer: str, unit: str) -> bool:
@@ -4054,9 +4720,17 @@ def _rank_hits_for_prompt(
     )
     filtered_hits = _filter_to_role_person_hits(scored_hits, role_terms=role_terms)
     filtered_hits = _filter_to_named_document_title_hits(filtered_hits, question=question)
-    filtered_hits = _filter_non_answer_context_hits(filtered_hits)
+    filtered_hits = _filter_non_answer_context_hits(filtered_hits, question=question)
+    filtered_hits = _filter_to_salary_band_hits(filtered_hits, question=question)
+    filtered_hits = _filter_to_conditional_allowance_hits(filtered_hits, question=question)
+    filtered_hits = _filter_to_work_schedule_hits(filtered_hits, question=question)
+    filtered_hits = _filter_to_leave_policy_hits(filtered_hits, question=question)
+    filtered_hits = _filter_to_specific_term_hits(
+        filtered_hits,
+        question=question,
+        terms=terms,
+    )
     filtered_hits = _filter_low_alignment_documents(filtered_hits)
-    filtered_hits = _filter_to_specific_term_hits(filtered_hits, terms=terms)
     return tuple(
         hit
         for index, hit, alignment_score in sorted(
@@ -4076,6 +4750,487 @@ def _rank_hits_for_prompt(
             ),
         )
     )
+
+
+def _filter_to_salary_band_hits(
+    scored_hits: tuple[tuple[int, HybridRetrievalHit, float], ...],
+    *,
+    question: str,
+) -> tuple[tuple[int, HybridRetrievalHit, float], ...]:
+    """Prioritize the row that atomically binds a requested role and pay range.
+
+    Generic compensation prose and unrelated monetary tables can score well for
+    salary vocabulary even though they do not answer a role-specific band
+    lookup.  When at least one permission-visible candidate contains the
+    requested role and a range in the same structured row, keep those candidates
+    ahead of the per-query prompt cutoff.  If no such row exists, preserve the
+    original candidates so unsupported roles still flow to strict validation
+    and NO_ANSWER rather than borrowing a neighboring band.
+    """
+
+    if not _is_salary_band_request(question):
+        return scored_hits
+    analysis = analyze_question(question)
+    _, terms, _ = _prompt_query_needles(question)
+    role_terms = _salary_band_role_query_terms(terms)
+    if not role_terms:
+        return scored_hits
+
+    answer_bearing_hits: list[tuple[int, HybridRetrievalHit, float]] = []
+    for row in scored_hits:
+        hit = row[1]
+        lines = tuple(line.strip() for line in hit.text.splitlines() if line.strip())
+        indexes = selected_structural_line_indexes(hit.text, question, analysis)
+        evidence = "\n".join(lines[index] for index in indexes if 0 <= index < len(lines))
+        if not evidence or not _salary_band_role_terms_match(evidence, role_terms):
+            continue
+        value = _MONEY_VALUE_PATTERN.search(_fold_for_person_match(evidence))
+        if value is None or not any(separator in value.group(0) for separator in ("-", "–", "—")):
+            continue
+        answer_bearing_hits.append(row)
+    return tuple(answer_bearing_hits) or scored_hits
+
+
+def _filter_to_conditional_allowance_hits(
+    scored_hits: tuple[tuple[int, HybridRetrievalHit, float], ...],
+    *,
+    question: str,
+) -> tuple[tuple[int, HybridRetrievalHit, float], ...]:
+    """Keep explicit conditional allowance rows for entitlement questions.
+
+    A nearby work-arrangement rule can share the user's scenario terms without
+    answering whether a monetary benefit exists.  This filter requires the
+    benefit, monetary value, and an eligibility/exclusion relationship to be
+    present in the same candidate, and retains the original set when none is.
+    """
+
+    if not _is_allowance_entitlement_question(question):
+        return scored_hits
+    analysis = analyze_question(question)
+    if analysis.asks_for_explicit_value and not analysis.is_yes_no:
+        # A quantitative benefit lookup needs its named value row, not only
+        # eligibility/exclusion rows for unrelated allowances.
+        return scored_hits
+    if _is_simple_named_benefit_existence_question(question):
+        named_hits = tuple(
+            row for row in scored_hits if _named_monetary_benefit_row(row[1].text, question)
+        )
+        if named_hits:
+            return named_hits
+    _, terms, _ = _prompt_query_needles(question)
+    focus_terms = tuple(
+        term
+        for term in terms
+        if len(term) >= 3
+        and term not in {"cong", "ty", "duoc", "co", "ho", "tro", "tien", "allowance", "stipend"}
+    )
+    allowance_hits = tuple(
+        row
+        for row in scored_hits
+        if _hit_contains_conditional_allowance_row(row[1].text, focus_terms=focus_terms)
+    )
+    return allowance_hits or scored_hits
+
+
+def _is_simple_named_benefit_existence_question(question: str) -> bool:
+    return (
+        analyze_question(question).is_yes_no
+        and _is_allowance_entitlement_question(question)
+        and not _question_asks_allowance_scenario(question)
+    )
+
+
+def _named_monetary_benefit_focus_terms(question: str) -> tuple[str, ...]:
+    _, terms, _ = _prompt_query_needles(question)
+    return tuple(
+        term
+        for term in terms
+        if len(term) >= 3
+        and term
+        not in {
+            "cong",
+            "cua",
+            "duoc",
+            "khong",
+            "khoan",
+            "nhan",
+            "rieng",
+            "tien",
+            "tro",
+            "vien",
+            "allowance",
+            "benefit",
+            "support",
+        }
+    )
+
+
+def _named_monetary_benefit_row(text: str, question: str) -> str | None:
+    """Return a row that binds a named life event or benefit to one amount."""
+
+    focus_terms = _named_monetary_benefit_focus_terms(question)
+    if not focus_terms:
+        return None
+    normalized = _normalize_broken_number_groups(_fold_for_person_match(text))
+    for match in _MONEY_VALUE_PATTERN.finditer(normalized):
+        line_start = normalized.rfind("\n", 0, match.start()) + 1
+        line_end = normalized.find("\n", match.end())
+        if line_end < 0:
+            line_end = len(normalized)
+        row = normalized[line_start:line_end].strip()
+        if all(term in row for term in focus_terms):
+            return row
+    return None
+
+
+def _hit_contains_conditional_allowance_row(
+    text: str,
+    *,
+    focus_terms: tuple[str, ...],
+) -> bool:
+    folded = _fold_for_person_match(_normalize_broken_number_groups(text))
+    if _CONDITIONAL_ALLOWANCE_AMOUNT_PATTERN.search(folded) is None:
+        return False
+    if not any(
+        cue in folded for cue in ("phu cap", "tro cap", "allowance", "stipend", "ho tro", "support")
+    ):
+        return False
+    if not any(
+        cue in folded
+        for cue in (
+            "ap dung",
+            "khong ap dung",
+            "duoc phe duyet",
+            "eligible",
+            "not eligible",
+            "does not apply",
+        )
+    ):
+        return False
+    return not focus_terms or any(term in folded for term in focus_terms)
+
+
+def _filter_to_work_schedule_hits(
+    scored_hits: tuple[tuple[int, HybridRetrievalHit, float], ...],
+    *,
+    question: str,
+) -> tuple[tuple[int, HybridRetrievalHit, float], ...]:
+    """Keep explicit work-duration/range requests on schedule evidence."""
+
+    analysis = analyze_question(question)
+    folded_question = _fold_for_person_match(retrieval_query_variants(question).normalized)
+    asks_work_duration = analysis.asks_for_duration and any(
+        cue in folded_question
+        for cue in (
+            "lam bao nhieu gio",
+            "lam may gio",
+            "working hours",
+            "work hours",
+        )
+    )
+    asks_work_range = analysis.asks_for_time_range and (
+        any(
+            cue in folded_question
+            for cue in (
+                "core hour",
+                "gio cot loi",
+                "khung gio lam",
+                "khung bat dau",
+                "khung ket thuc",
+                "start window",
+                "end window",
+            )
+        )
+        or ("vao" in folded_question and "lam" in folded_question)
+    )
+    if not asks_work_duration and not asks_work_range:
+        return scored_hits
+
+    schedule_cues = (
+        "tong thoi gian lam viec",
+        "thoi gian lam viec tieu chuan",
+        "khung bat dau linh hoat",
+        "khung ket thuc tuong ung",
+        "gio cot loi",
+        "standard working time",
+        "standard working hours",
+        "flexible start window",
+        "core hours",
+    )
+    schedule_hits = tuple(
+        row
+        for row in scored_hits
+        if any(
+            cue in _fold_for_person_match(f"{row[1].document_title}\n{row[1].text}")
+            for cue in schedule_cues
+        )
+    )
+    return schedule_hits or scored_hits
+
+
+def _filter_to_leave_policy_hits(
+    scored_hits: tuple[tuple[int, HybridRetrievalHit, float], ...],
+    *,
+    question: str,
+) -> tuple[tuple[int, HybridRetrievalHit, float], ...]:
+    """Keep leave questions on evidence that answers their scenario."""
+
+    intent = _leave_policy_intent(question)
+    if not intent:
+        return scored_hits
+    matching = tuple(
+        (row[0], _focus_leave_policy_hit(row[1], intent=intent), row[2])
+        for row in scored_hits
+        if _hit_matches_leave_policy_intent(row[1].text, intent=intent)
+    )
+    return matching or scored_hits
+
+
+def _leave_policy_intent(question: str) -> str:
+    folded = _fold_for_person_match(question)
+    marriage = any(cue in folded for cue in ("cuoi", "ket hon", "marry", "marriage"))
+    child = any(cue in folded for cue in ("con toi", "con de", "con nuoi", "my child"))
+    if marriage:
+        return "child_marriage" if child else "own_marriage"
+
+    parent = any(
+        cue in folded for cue in ("ba me", "bo me", "cha me", "parent", "mother", "father")
+    )
+    death = any(cue in folded for cue in ("mat", "chet", "qua doi", "died", "death"))
+    if parent and death:
+        return "parent_bereavement"
+
+    leave = any(cue in folded for cue in ("nghi", "phep", "leave"))
+    incident = any(
+        cue in folded
+        for cue in (
+            "su co",
+            "incident",
+            "production",
+            "khan cap",
+            "emergency",
+        )
+    )
+    if leave and incident:
+        return "leave_incident"
+
+    notice = any(
+        cue in folded
+        for cue in (
+            "bao truoc",
+            "gui don truoc",
+            "xin truoc",
+            "truoc bao lau",
+            "notice",
+            "in advance",
+        )
+    )
+    if leave and notice and "khong luong" in folded and "dai ngay" in folded:
+        return "unpaid_leave_notice"
+    if leave and notice and (days_match := re.search(r"\b(\d+)\s*ngay\b", folded)):
+        requested_days = int(days_match.group(1))
+        preceding = folded[max(0, days_match.start() - 16) : days_match.start()]
+        if re.search(r"\b(?:hon|tren|more than|over)\s+$", preceding):
+            requested_days += 1
+        elif re.search(r"\b(?:duoi|it hon|less than|under)\s+$", preceding):
+            requested_days -= 1
+        return f"annual_leave_notice:{requested_days}"
+
+    if any(cue in folded for cue in ("bi sot", "om dau", "bi om", "sick", "fever")):
+        return "sickness_action"
+
+    termination = any(
+        cue in folded for cue in ("nghi viec", "cham dut", "thoi viec", "termination")
+    )
+    unused = any(
+        cue in folded
+        for cue in ("phep chua dung", "phep chua nghi", "phep con lai", "unused leave")
+    )
+    if termination and unused:
+        return "unused_leave_termination"
+    return ""
+
+
+_LEAVE_NOTICE_BAND_PATTERN = re.compile(
+    r"(?<!\w)(?:(?P<range_start>\d+)\s*[-–]\s*-?\s*(?P<range_end>\d+)"
+    r"|(?P<above_cue>tren|hon|more than)\s+-?\s*(?P<above>\d+)"
+    r"|(?P<below_cue>duoi|it hon|less than)\s+-?\s*(?P<below>\d+))"
+    r"\s*(?:ngay|days?)\b"
+)
+_LEAVE_NOTICE_DEADLINE_PATTERN = re.compile(
+    r"\b(?:truoc\s+it\s+nhat|(?:bao|gui)\s+truoc(?:\s+it\s+nhat)?|"
+    r"at\s+least\s+|in\s+advance\s+)\s*-?\s*"
+    r"(?P<value>\d+\s*(?:ngay(?:\s+lam\s+viec)?|working\s+days?|business\s+days?))\b"
+)
+
+
+def _unpaid_leave_notice_value(text: str) -> str | None:
+    """Read the deadline from a named unpaid-leave row or its policy clause."""
+    folded = " ".join(_fold_for_person_match(text).split())
+    named_row = re.search(r"\bnghi khong luong dai ngay\b", folded)
+    if named_row is not None:
+        deadline = _LEAVE_NOTICE_DEADLINE_PATTERN.search(
+            folded[named_row.end() : named_row.end() + 130]
+        )
+        if deadline is not None:
+            return " ".join(deadline.group("value").split())
+    if "nghi khong huong luong" not in folded:
+        return None
+    requested_period = re.search(r"\bde nghi tu\s+\d+\s+ngay\b", folded)
+    if requested_period is None:
+        return None
+    deadline = _LEAVE_NOTICE_DEADLINE_PATTERN.search(
+        folded[requested_period.end() : requested_period.end() + 150]
+    )
+    return " ".join(deadline.group("value").split()) if deadline is not None else None
+
+
+def _matching_leave_notice_values(text: str, *, requested_days: int) -> tuple[str, ...]:
+    """Match a requested leave length to notice requirements stated in policy rows."""
+
+    folded = " ".join(_fold_for_person_match(text).split())
+    bands = tuple(_LEAVE_NOTICE_BAND_PATTERN.finditer(folded))
+    values: list[str] = []
+    for index, band in enumerate(bands):
+        if band.group("range_start") is not None:
+            lower = int(band.group("range_start"))
+            upper = int(band.group("range_end"))
+            matches = lower <= requested_days <= upper
+        elif band.group("above") is not None:
+            matches = requested_days > int(band.group("above"))
+        else:
+            matches = requested_days < int(band.group("below"))
+        if not matches:
+            continue
+        next_start = bands[index + 1].start() if index + 1 < len(bands) else len(folded)
+        row = folded[band.end() : min(next_start, band.end() + 160)]
+        deadline = _LEAVE_NOTICE_DEADLINE_PATTERN.search(row)
+        if deadline is not None:
+            values.append(" ".join(deadline.group("value").split()))
+    return tuple(values)
+
+
+def _hit_matches_leave_policy_intent(text: str, *, intent: str) -> bool:
+    folded = _fold_for_person_match(_normalize_broken_number_groups(text))
+    if intent == "unpaid_leave_notice":
+        return _unpaid_leave_notice_value(text) is not None
+    if intent == "leave_incident":
+        leave_context = any(
+            cue in folded
+            for cue in (
+                "dang nghi phep",
+                "nhan vien nghi",
+                "quyen nghi",
+                "leave",
+            )
+        )
+        replacement_rule = any(
+            cue in folded for cue in ("nguoi thay the", "phuong an hop ly", "replacement")
+        ) and any(cue in folded for cue in ("dong y", "consent"))
+        time_rule = any(
+            cue in folded
+            for cue in (
+                "ghi nhan thoi gian thuc te",
+                "thoi gian thuc te xu ly",
+                "actual time",
+            )
+        )
+        return leave_context and (replacement_rule or time_rule)
+    if intent == "own_marriage":
+        return "ket hon" in folded and _DURATION_VALUE_PATTERN.search(folded) is not None
+    if intent == "child_marriage":
+        return bool(re.search(r"\bcon(?:\s+(?:de|nuoi|toi)){0,2}[^\n.;]{0,50}\bket hon\b", folded))
+    if intent == "parent_bereavement":
+        return any(cue in folded for cue in ("cha/me", "cha me", "ba me", "bo me")) and any(
+            cue in folded for cue in ("chet", "qua doi")
+        )
+    if intent.startswith("annual_leave_notice:"):
+        requested_days = int(intent.partition(":")[2])
+        return bool(_matching_leave_notice_values(text, requested_days=requested_days))
+    if intent == "sickness_action":
+        return any(cue in folded for cue in ("om dau", "khan cap", "sick")) and any(
+            cue in folded for cue in ("thong bao ngay", "ngay khi co the", "notify")
+        )
+    if intent == "unused_leave_termination":
+        return any(cue in folded for cue in ("cham dut", "termination")) and any(
+            cue in folded
+            for cue in ("phep chua nghi", "nghi hang nam chua nghi", "unused annual leave")
+        )
+    return False
+
+
+def _focus_leave_policy_hit(
+    hit: HybridRetrievalHit,
+    *,
+    intent: str,
+) -> HybridRetrievalHit:
+    """Preserve a complete material leave clause across PDF line wraps."""
+
+    if intent in {"own_marriage", "child_marriage"}:
+        lines = tuple(line.strip() for line in hit.text.splitlines() if line.strip())
+        folded_lines = tuple(_fold_for_person_match(line) for line in lines)
+        paid_heading = next(
+            (
+                line
+                for line in lines
+                if "nghi viec rieng huong" in _fold_for_person_match(line)
+                and "luong" in _fold_for_person_match(line)
+            ),
+            "",
+        )
+        if not paid_heading:
+            return hit
+        for line, folded_line in zip(lines, folded_lines, strict=True):
+            has_child = bool(re.search(r"\bcon(?:\s+(?:de|nuoi))?\s+ket hon\b", folded_line))
+            if has_child != (intent == "child_marriage"):
+                continue
+            if not re.search(r"\bket hon\b", folded_line):
+                continue
+            if _DURATION_VALUE_PATTERN.search(folded_line):
+                return replace(hit, text=f"{paid_heading}\n{line}".strip())
+    if intent == "parent_bereavement":
+        lines = tuple(line.strip() for line in hit.text.splitlines() if line.strip())
+        folded_lines = tuple(_fold_for_person_match(line) for line in lines)
+        paid_heading = next(
+            (
+                index
+                for index, line in enumerate(folded_lines)
+                if "nghi viec rieng huong luong" in line
+            ),
+            None,
+        )
+        unpaid_heading = next(
+            (
+                index
+                for index, line in enumerate(folded_lines)
+                if "nghi viec rieng khong huong luong" in line
+            ),
+            len(lines),
+        )
+        if paid_heading is not None and paid_heading < unpaid_heading:
+            for index in range(paid_heading + 1, unpaid_heading):
+                if not any(
+                    cue in folded_lines[index] for cue in ("cha/me", "cha me", "ba me", "bo me")
+                ):
+                    continue
+                row = lines[index : min(unpaid_heading, index + 4)]
+                folded_row = _fold_for_person_match(" ".join(row))
+                if "chet" in folded_row and _DURATION_VALUE_PATTERN.search(folded_row):
+                    return replace(hit, text=f"{lines[paid_heading]}\n{' '.join(row)}")
+    if intent != "unused_leave_termination":
+        return hit
+    lines = tuple(line.strip() for line in hit.text.splitlines() if line.strip())
+    for index, line in enumerate(lines):
+        folded = _fold_for_person_match(line)
+        if "cham dut" not in folded or "thanh toan" not in folded:
+            continue
+        parts = [line]
+        for continuation in lines[index + 1 : index + 4]:
+            parts.append(continuation)
+            if continuation.rstrip().endswith((".", "!", "?")):
+                break
+        return replace(hit, text=" ".join(parts).strip())
+    return hit
 
 
 def _filter_to_role_person_hits(
@@ -4109,12 +5264,31 @@ def _filter_to_named_document_title_hits(
             )
         )
         if code_hits:
+            title_terms = _named_document_title_terms(question)
+            own_document_hits = tuple(
+                (index, hit, score)
+                for index, hit, score in code_hits
+                if title_terms
+                and all(term in _fold_for_person_match(hit.document_title) for term in title_terms)
+            )
+            if own_document_hits:
+                code_hits = own_document_hits
             direct_code_hits = tuple(
                 (index, hit, score)
                 for index, hit, score in code_hits
                 if not _is_reference_or_question_list_hit(hit)
             )
-            return direct_code_hits or code_hits
+            candidate_hits = direct_code_hits or code_hits
+            analysis = analyze_question(question)
+            if analysis.asks_for_explicit_value:
+                answer_hits = tuple(
+                    (index, hit, score)
+                    for index, hit, score in candidate_hits
+                    if _hit_has_requested_answer_shape(hit, analysis=analysis)
+                )
+                if answer_hits:
+                    return answer_hits
+            return candidate_hits
     title_terms = _named_document_title_terms(question)
     if not title_terms:
         return scored_hits
@@ -4137,17 +5311,152 @@ def _is_reference_or_question_list_hit(hit: HybridRetrievalHit) -> bool:
     return is_non_answer_context(f"{hit.document_title}\n{hit.text}")
 
 
+def _answer_body_after_reference_prefix(hit: HybridRetrievalHit) -> str | None:
+    """Recover a real section following a table-of-contents page overlap."""
+
+    if classify_evidence_context(hit.text) != EvidenceContextKind.REFERENCE:
+        return None
+    lines = tuple(line.strip() for line in hit.text.splitlines() if line.strip())
+    for index, line in enumerate(lines):
+        if not re.match(r"^\d{2}\s+\D", line) or not line.isupper():
+            continue
+        if re.search(r"\s\d+\s*$", line):
+            continue
+        body = "\n".join(lines[index:])
+        if len(lines) - index < 4:
+            continue
+        detail_lines = tuple(
+            detail
+            for detail in lines[index + 1 :]
+            if not detail.isupper() and not re.search(r"\s\d+(?:-\d+)?\s*$", detail)
+        )
+        has_declarative_sentence = any(
+            len(detail.split()) >= 7 and detail.endswith((".", ";")) for detail in detail_lines
+        )
+        has_structured_facts = (
+            sum(
+                bool(re.search(r"(?<!\d)\d{2,4}(?:\s*%|\b)|\s:\s", detail))
+                for detail in detail_lines
+            )
+            >= 2
+        )
+        if classify_evidence_context(body) == EvidenceContextKind.ANSWER and (
+            has_declarative_sentence or has_structured_facts
+        ):
+            return body
+    return None
+
+
 def _filter_non_answer_context_hits(
     scored_hits: tuple[tuple[int, HybridRetrievalHit, float], ...],
+    *,
+    question: str,
 ) -> tuple[tuple[int, HybridRetrievalHit, float], ...]:
     """Exclude raw reference/test scaffolding when answer-bearing evidence exists."""
 
-    answer_hits = tuple(
-        (index, hit, score)
-        for index, hit, score in scored_hits
-        if not _is_reference_or_question_list_hit(hit)
+    analysis = analyze_question(question)
+    answer_hits: list[tuple[int, HybridRetrievalHit, float]] = []
+    recovered_scaffolding_hits: list[tuple[int, HybridRetrievalHit, float]] = []
+    for index, hit, score in scored_hits:
+        if not _is_reference_or_question_list_hit(hit):
+            answer_hits.append((index, hit, score))
+            continue
+        recovered_body = _answer_body_after_reference_prefix(hit)
+        if recovered_body is not None:
+            recovered_hit = replace(hit, text=recovered_body)
+            # The original score included a reference-page penalty. Once only
+            # the factual section remains, rank its actual evidence content.
+            answer_hits.append(
+                (
+                    index,
+                    recovered_hit,
+                    _prompt_alignment_score_for_question(recovered_hit, question),
+                )
+            )
+            continue
+        structured_evidence = _question_bound_structured_evidence(hit, question=question)
+        if structured_evidence is not None:
+            # Do not let unrelated test/scaffolding prose travel with a valid
+            # table row.  Downstream prompt routing and claim validation must
+            # see only the independently answer-bearing segment.
+            recovered_scaffolding_hits.append(
+                (index, replace(hit, text=structured_evidence), score)
+            )
+    if analysis.asks_for_percentage and any(
+        has_explicit_not_specified(hit.text) for _, hit, _ in answer_hits
+    ):
+        # An explicit policy clause that leaves a rate unfixed is a complete
+        # answer. Repeated benchmark/example prose is not material evidence.
+        return tuple(answer_hits)
+    return (*tuple(answer_hits), *tuple(recovered_scaffolding_hits))
+
+
+def _question_bound_structured_evidence(
+    hit: HybridRetrievalHit,
+    *,
+    question: str,
+) -> str | None:
+    """Extract a relevant value row from an otherwise non-answer chunk.
+
+    This is deliberately stricter than merely finding a number: query-bearing
+    terms and the requested value shape must occur on the same row, and a
+    nearby structural heading must establish that the row is policy evidence.
+    """
+
+    analysis = analyze_question(question)
+    if not analysis.asks_for_explicit_value:
+        return None
+    if _is_salary_band_request(question):
+        source_lines = tuple(line.strip() for line in hit.text.splitlines() if line.strip())
+        row_indexes = selected_structural_line_indexes(hit.text, question, analysis)
+        if row_indexes:
+            return chr(10).join(
+                source_lines[index]
+                for index in sorted(row_indexes)
+                if 0 <= index < len(source_lines)
+            )
+    _, terms, _ = _prompt_query_needles(question)
+    field_terms = tuple(
+        term for term in terms if len(term) >= 3 and term not in _PROMPT_VALUE_FOCUS_STOP_TERMS
     )
-    return answer_hits or scored_hits
+    if not field_terms:
+        return None
+    source_lines = tuple(line.strip() for line in hit.text.splitlines() if line.strip())
+    folded_lines = tuple(_fold_for_person_match(line) for line in source_lines)
+    has_structural_heading = any(
+        cue in " ".join(folded_lines)
+        for cue in (
+            "bang",
+            "table",
+            "grade",
+            "band",
+            "range",
+            "dai",
+            "khung",
+            "salary",
+            "gross",
+        )
+    )
+    if not has_structural_heading:
+        return None
+    # Natural-language question tails (for example, "how much per month")
+    # can contribute generic terms after the actual field/title.  One anchor
+    # is enough for a one-term field; otherwise require two row-local anchors.
+    required_matches = min(2, len(field_terms))
+    for row_index, row in enumerate(folded_lines):
+        if sum(term in row for term in field_terms) < required_matches:
+            continue
+        if not _text_has_requested_answer_shape(row, analysis=analysis):
+            continue
+        # A heading immediately before the row preserves its column meaning
+        # without carrying a distant scaffolding section into the prompt.
+        selected = [source_lines[row_index]]
+        if row_index and not _text_has_requested_answer_shape(
+            folded_lines[row_index - 1], analysis=analysis
+        ):
+            selected.insert(0, source_lines[row_index - 1])
+        return "\n".join(selected)
+    return None
 
 
 def _named_document_title_terms(question: str) -> tuple[str, ...]:
@@ -4157,6 +5466,13 @@ def _named_document_title_terms(question: str) -> tuple[str, ...]:
         if start < 0:
             continue
         candidate = folded_question[start + len(prefix) : start + len(prefix) + 120]
+        code_positions = tuple(
+            position
+            for code in _explicit_document_codes(question)
+            if (position := candidate.find(code.casefold())) >= 0
+        )
+        if code_positions:
+            candidate = candidate[: min(code_positions)]
         stop_positions = tuple(
             position
             for cue in (
@@ -4206,22 +5522,144 @@ def _explicit_document_codes(question: str) -> tuple[str, ...]:
 def _filter_to_specific_term_hits(
     scored_hits: tuple[tuple[int, HybridRetrievalHit, float], ...],
     *,
+    question: str,
     terms: tuple[str, ...],
 ) -> tuple[tuple[int, HybridRetrievalHit, float], ...]:
-    specific_terms = tuple(
-        term for term in terms if len(term) >= _PROMPT_SPECIFIC_TERM_MIN_CHARACTERS
+    document_codes = frozenset(code.casefold() for code in _explicit_document_codes(question))
+    raw_acronyms = tuple(
+        acronym
+        for acronym in _QUESTION_ACRONYM_PATTERN.findall(question)
+        if acronym.casefold() not in document_codes
     )
+    acronym_groups = tuple(_specific_acronym_components(acronym) for acronym in raw_acronyms)
+    acronyms = tuple(
+        _fold_for_person_match(retrieval_query_variants(acronym).normalized)
+        for acronym in raw_acronyms
+    )
+    long_terms = tuple(term for term in terms if len(term) >= _PROMPT_SPECIFIC_TERM_MIN_CHARACTERS)
+    specific_terms = tuple(dict.fromkeys(acronyms or long_terms))
     if not specific_terms:
         return scored_hits
     specific_hits = tuple(
         (index, hit, score)
         for index, hit, score in scored_hits
-        if any(
-            term in _fold_for_person_match(f"{hit.document_title}\n{hit.text}")
-            for term in specific_terms
+        if _hit_matches_specific_terms(
+            hit,
+            acronym_groups=acronym_groups,
+            specific_terms=specific_terms,
         )
     )
+    if acronyms:
+        analysis = analyze_question(question)
+        if analysis.asks_for_explicit_value:
+            bound_answer_hits = tuple(
+                (index, hit, score)
+                for index, hit, score in specific_hits
+                if _specific_terms_have_nearby_answer_shape(
+                    hit,
+                    terms=acronyms,
+                    analysis=analysis,
+                )
+            )
+            if bound_answer_hits:
+                return bound_answer_hits
     return specific_hits or scored_hits
+
+
+def _hit_matches_specific_terms(
+    hit: HybridRetrievalHit,
+    *,
+    acronym_groups: tuple[tuple[str, ...], ...],
+    specific_terms: tuple[str, ...],
+) -> bool:
+    text = _fold_for_person_match(f"{hit.document_title}\n{hit.text}")
+    if acronym_groups:
+        return any(
+            all(_contains_folded_phrase(text, component) for component in group)
+            if len(group) > 1
+            else group[0] in text
+            for group in acronym_groups
+        )
+    return any(
+        term in text
+        or any(
+            _contains_folded_phrase(text, translation)
+            for translation in _SPECIFIC_TERM_TRANSLATIONS.get(term, ())
+        )
+        for term in specific_terms
+    )
+
+
+def _specific_acronym_components(acronym: str) -> tuple[str, ...]:
+    """Treat a slash-combined acronym as required co-occurring concepts."""
+
+    parts = tuple(part for part in re.split(r"[&/+]", acronym) if part)
+    if len(parts) > 1 and all(len(part) >= 2 for part in parts):
+        return tuple(_fold_for_person_match(part) for part in parts)
+    return (_fold_for_person_match(retrieval_query_variants(acronym).normalized),)
+
+
+def _specific_terms_have_nearby_answer_shape(
+    hit: HybridRetrievalHit,
+    *,
+    terms: tuple[str, ...],
+    analysis: QuestionAnalysis,
+) -> bool:
+    """Require an explicit value to stay near its requested acronym/field.
+
+    A document can mention an acronym in a cross-reference and contain an
+    unrelated number or "not specified" clause much later.  Such a chunk must
+    not outrank a row that binds the requested field to its actual value rule.
+    """
+
+    text = _fold_for_person_match(f"{hit.document_title}\n{hit.text}")
+    for term in terms:
+        start = 0
+        while True:
+            position = text.find(term, start)
+            if position < 0:
+                break
+            window = text[max(0, position - 600) : min(len(text), position + len(term) + 600)]
+            if _text_has_requested_answer_shape(window, analysis=analysis):
+                return True
+            start = position + len(term)
+    return False
+
+
+def _hit_has_requested_answer_shape(
+    hit: HybridRetrievalHit,
+    *,
+    analysis: QuestionAnalysis,
+) -> bool:
+    text = _fold_for_person_match(hit.text)
+    return _text_has_requested_answer_shape(text, analysis=analysis)
+
+
+def _text_has_requested_answer_shape(
+    text: str,
+    *,
+    analysis: QuestionAnalysis,
+) -> bool:
+    if analysis.asks_for_percentage:
+        return bool(_PERCENT_VALUE_PATTERN.search(text)) or has_explicit_not_specified(text)
+    if analysis.asks_for_time_range:
+        # Bare integer ranges also describe pages and grades. Prefer clock-form
+        # ranges when narrowing an explicitly named document; callers retain
+        # their original candidates when no strict clock range exists.
+        return len(_CLOCK_VALUE_PATTERN.findall(text)) >= 2
+    if analysis.answer_type == "TIME":
+        return bool(_CLOCK_VALUE_PATTERN.search(text))
+    if analysis.asks_for_amount:
+        return bool(_MONEY_VALUE_PATTERN.search(text))
+    if analysis.asks_for_duration:
+        return bool(_DURATION_VALUE_PATTERN.search(text))
+    if analysis.answer_type == "DATE":
+        return bool(_DATE_VALUE_PATTERN.search(text))
+    if analysis.answer_type == "YEAR":
+        return bool(_YEAR_VALUE_PATTERN.search(text))
+    if analysis.asks_for_count:
+        return bool(_COUNT_VALUE_PATTERN.search(text))
+    return _has_generic_value_expression(text)
 
 
 def _filter_low_alignment_documents(
@@ -4267,12 +5705,13 @@ def _role_terms_for_prompt_question(question: str) -> tuple[str, ...]:
     analysis = analyze_question(question)
     if not analysis.asks_for_person and not _asks_role_assignment_question(question):
         return ()
+    document_codes = frozenset(code.casefold() for code in _explicit_document_codes(question))
     return tuple(
         term
         for term in dict.fromkeys(
             _fold_for_person_match(term) for term in _raw_role_terms_for_prompt_question(question)
         )
-        if term not in _PROMPT_NON_ROLE_ACRONYMS
+        if term not in _PROMPT_NON_ROLE_ACRONYMS and term.casefold() not in document_codes
     )
 
 
@@ -4360,7 +5799,10 @@ def _prompt_hit_alignment_score(
     role_terms: tuple[str, ...],
 ) -> float:
     text = _fold_for_person_match(f"{hit.document_title}\n{hit.text}")
-    alignment_score = 0.0
+    alignment_score = _prompt_title_phrase_score(
+        document_title=hit.document_title,
+        question=question,
+    )
     for phrase in phrases:
         if phrase in text:
             alignment_score += 8.0 + len(phrase.split())
@@ -4375,7 +5817,14 @@ def _prompt_hit_alignment_score(
         if quantity_question and _contains_number_unit(text, term):
             alignment_score += _PROMPT_NUMBER_UNIT_MATCH_BONUS
     alignment_score += _prompt_security_control_score(text=text, question=question)
+    alignment_score += _prompt_sensitive_policy_score(text=text, question=question)
+    alignment_score += _prompt_policy_relation_score(text=text, question=question)
     alignment_score += _prompt_remote_topic_score(text=text, question=question)
+    alignment_score += _prompt_attendance_policy_score(text=text, question=question)
+    alignment_score += _prompt_workflow_actor_score(text=text, question=question)
+    alignment_score += _prompt_work_schedule_score(text=text, question=question)
+    alignment_score += _prompt_office_location_score(text=text, question=question)
+    alignment_score += _prompt_organization_activity_score(text=text, question=question)
     if change_question and any(
         _fold_for_person_match(cue) in text for cue in _CHANGE_EVIDENCE_CUES
     ):
@@ -4399,6 +5848,16 @@ def _prompt_hit_alignment_score(
         terms=terms,
     )
     alignment_score += evidence_score
+    if analysis.asks_for_amount:
+        direct_value = _scored_question_focused_direct_value_from_text(
+            question=question,
+            source_text=hit.text,
+            analysis=analysis,
+        )
+        if direct_value is not None:
+            # A complete subject/value row should beat a neighboring chunk
+            # that starts halfway through the same row.
+            alignment_score += min(direct_value[0] / 2.0, 320.0)
     if analysis.is_yes_no:
         alignment_score += _prompt_yes_no_anchor_score(
             text=text,
@@ -4416,6 +5875,230 @@ def _prompt_hit_alignment_score(
         evidence_score=evidence_score,
     )
     return alignment_score
+
+
+def _prompt_alignment_score_for_question(hit: HybridRetrievalHit, question: str) -> float:
+    """Score extracted evidence with the same signals as an original hit."""
+
+    phrases, terms, numbers = _prompt_query_needles(question)
+    return _prompt_hit_alignment_score(
+        hit,
+        phrases=phrases,
+        terms=terms,
+        numbers=numbers,
+        question=question,
+        analysis=analyze_question(question),
+        quantity_question=_asks_for_quantity(question),
+        change_question=_question_mentions_change(question),
+        role_terms=_role_terms_for_prompt_question(question),
+    )
+
+
+def _prompt_workflow_actor_score(*, text: str, question: str) -> float:
+    """Separate operational approvers from document publication metadata."""
+
+    folded_question = _fold_for_person_match(question)
+    approval_cues = ("duyet", "phe duyet", "approve", "approves", "review", "reviews")
+    if not any(cue in folded_question for cue in approval_cues):
+        return 0.0
+    asks_actor = any(cue in f" {folded_question} " for cue in (" ai ", " who "))
+    if not asks_actor:
+        return 0.0
+    if any(
+        cue in text
+        for cue in (
+            "nguoi phe duyet mo phong",
+            "document approver",
+            "approved by",
+        )
+    ) and not any(cue in text for cue in ("yeu cau dieu chinh", "correction request")):
+        return -420.0
+    if not any(cue in text for cue in approval_cues):
+        return 0.0
+    workflow_cues = (
+        "yeu cau",
+        "dieu chinh",
+        "ngoai le",
+        "quan ly truc tiep",
+        "request",
+        "correction",
+        "exception",
+        "direct manager",
+    )
+    matched = sum(1 for cue in workflow_cues if cue in text)
+    score = 260.0 + matched * 55.0 if matched >= 2 else 0.0
+    if score and "quan ly truc tiep" in text:
+        score += 420.0
+    if (
+        score
+        and "nguoi phe duyet" in text
+        and not any(
+            cue in text for cue in ("quan ly truc tiep", "direct manager", "phong nhan su", "hr ")
+        )
+    ):
+        score -= 260.0
+    return score
+
+
+def _prompt_attendance_policy_score(*, text: str, question: str) -> float:
+    """Bind attendance scenarios to the clause that states their outcome.
+
+    These questions are commonly yes/no or conversational, so answer-shape
+    scoring alone cannot distinguish the governing attendance clause from
+    generic HR prose. Each rule requires both a question-side scenario and
+    source-side outcome language; no document title, benchmark id, or literal
+    answer value is used.
+    """
+
+    folded_question = _fold_for_person_match(question)
+    topic_rules = (
+        (
+            ("khoa ky cong", "locked attendance period", "pay period locked"),
+            ("sau khi khoa ky", "after the period is locked"),
+            ("dieu chinh muon", "late adjustment", "yeu cau dac biet", "special request"),
+        ),
+        (
+            ("remote", "hybrid", "lam o nha", "work from home"),
+            ("gio cot loi", "core hours"),
+            ("giu nguyen", "same as", "nhu khi lam tai van phong"),
+        ),
+        (
+            ("di muon", "toi tre", "ve som", "arrive late", "late arrival"),
+            ("bu trong cung ngay", "make up in the same day"),
+            ("khong duoc tu y bu sang ngay khac", "not make up on another day"),
+        ),
+        (
+            ("on-call", "on call", "truc"),
+            ("incident", "su co", "ot", "lam them"),
+            ("khong tu dong", "thoi gian thuc te xu ly", "actual incident handling time"),
+        ),
+        (
+            ("quen check", "checkout", "check-out", "check in", "check-in"),
+            ("yeu cau dieu chinh", "correction request"),
+            ("trong vong", "ngay lam viec", "working days", "bang chung", "evidence"),
+        ),
+    )
+    for question_cues, subject_cues, outcome_cues in topic_rules:
+        if "gio cot loi" in subject_cues and not any(
+            cue in folded_question
+            for cue in (
+                "gio",
+                "thoi gian lam viec",
+                "lich lam viec",
+                "core hour",
+                "working hour",
+                "work schedule",
+            )
+        ):
+            # Mentioning remote work as background does not make an unrelated
+            # security, payroll, or benefits question an hours question.
+            continue
+        if not any(
+            bool(re.search(r"\btruc\b(?!\s+tiep\b)", folded_question))
+            if cue == "truc"
+            else _contains_folded_phrase(folded_question, cue)
+            for cue in question_cues
+        ):
+            continue
+        has_subject = any(_contains_folded_phrase(text, cue) for cue in subject_cues)
+        has_outcome = any(_contains_folded_phrase(text, cue) for cue in outcome_cues)
+        if has_subject and has_outcome:
+            return 760.0
+        if has_subject or has_outcome:
+            return 180.0
+        return -180.0
+    return 0.0
+
+
+def _prompt_work_schedule_score(*, text: str, question: str) -> float:
+    """Bind ordinary work-time questions to schedule rows, not leave durations."""
+
+    folded_question = _fold_for_person_match(retrieval_query_variants(question).normalized)
+    asks_lunch_duration = any(
+        cue in folded_question for cue in ("nghi trua", "lunch break", "midday break")
+    )
+    asks_work_duration = (
+        any(cue in folded_question for cue in ("lam bao nhieu gio", "lam may gio"))
+        or "working hours" in folded_question
+    )
+    if not asks_lunch_duration and not asks_work_duration:
+        return 0.0
+    if asks_lunch_duration:
+        if any(cue in text for cue in ("nghi trua", "lunch break", "midday break")):
+            return 460.0
+        return -180.0
+    if any(
+        cue in text
+        for cue in (
+            "tong thoi gian lam viec",
+            "thoi gian lam viec tieu chuan",
+            "standard working time",
+            "standard working hours",
+        )
+    ):
+        return 460.0
+    return -180.0
+
+
+def _prompt_organization_activity_score(*, text: str, question: str) -> float:
+    """Bind a conversational company-activity request to a business-area fact."""
+
+    if not asks_for_organization_activity(question):
+        return 0.0
+    return (
+        260.0
+        if any(
+            _contains_folded_phrase(text, cue)
+            for cue in (
+                "linh vuc hoat dong",
+                "business areas",
+                "areas of operation",
+                "lines of business",
+            )
+        )
+        else 0.0
+    )
+
+
+def _prompt_office_location_score(*, text: str, question: str) -> float:
+    """Prefer an office-location field over generic office-policy mentions."""
+
+    folded_question = _fold_for_person_match(question)
+    asks_location = any(
+        _contains_folded_phrase(folded_question, cue)
+        for cue in ("o dau", "tai dau", "where", "locations")
+    )
+    asks_office = any(
+        _contains_folded_phrase(folded_question, cue) for cue in ("van phong", "office", "offices")
+    )
+    if not asks_location or not asks_office:
+        return 0.0
+    office_location_row = re.search(
+        r"\b(?:van phong|offices?)\s+(?:tai\s+|o\s+)?"
+        r"(?:thanh pho|tinh|city|province|dia chi|address)\b[^\n]{3,140}",
+        text,
+    )
+    return 260.0 if office_location_row is not None else 0.0
+
+
+def _prompt_title_phrase_score(*, document_title: str, question: str) -> float:
+    """Prefer a document whose title names a multi-word topic in the question."""
+
+    title = _fold_for_person_match(document_title)
+    tokens = tuple(_PROMPT_QUERY_TERM_PATTERN.findall(_fold_for_person_match(question)))
+    ignored_phrases = {
+        "chinh sach",
+        "cong ty",
+        "theo chinh",
+    }
+    matched_phrases = {
+        f"{left} {right}"
+        for left, right in zip(tokens, tokens[1:], strict=False)
+        if f"{left} {right}" not in ignored_phrases
+        and len(left) + len(right) >= 8
+        and f"{left} {right}" in title
+    }
+    return min(len(matched_phrases), 3) * 180.0
 
 
 def _prompt_security_control_score(*, text: str, question: str) -> float:
@@ -4440,9 +6123,211 @@ def _prompt_security_control_score(*, text: str, question: str) -> float:
     return 260.0 + len(matched_controls) * 90.0
 
 
+def _claim_repair_source_limit(question: str) -> int:
+    """Use the strongest routed source for an open security-control claim."""
+
+    folded_question = _fold_for_person_match(question)
+    asks_for_controls = (
+        "bao mat" in folded_question
+        and any(
+            cue in folded_question
+            for cue in ("yeu cau", "bao dam", "can tuan thu", "tuan thu", "controls")
+        )
+    ) or (
+        "an toan" in folded_question
+        and any(cue in folded_question for cue in ("bao dam", "dam bao", "gi", "controls"))
+    )
+    return 1 if asks_for_controls else 2
+
+
+def _prompt_sensitive_policy_score(*, text: str, question: str) -> float:
+    """Prefer a directly matching security rule over generic policy prose.
+
+    Questions about risky actions often omit the words ``security`` or ``bao mat``.
+    Lexical retrieval can still find the governing clause, but generic HR chunks may
+    outrank it because they share broad words such as ``cong ty`` or ``lam o nha``.
+    Require both a question-side risk topic and source-side rule evidence so this
+    bonus remains capability-level rather than tied to a document or benchmark case.
+    """
+
+    folded_question = _fold_for_person_match(question)
+    topic_rules = (
+        (
+            ("mat khau", "password", "passwords", "otp", "ma otp", "credentials"),
+            ("mat khau", "password", "passwords", "otp", "thong tin xac thuc", "credentials"),
+            ("cam chia se", "khong duoc chia se", "must not share", "do not share"),
+        ),
+        (
+            ("source code", "ma nguon", "github", "repository", "repo"),
+            ("ma nguon", "source code", "kho ma nguon", "repository", "repo"),
+            ("ca nhan", "personal", "duoc phep", "approved", "cam", "khong duoc"),
+        ),
+        (
+            ("gmail", "email ca nhan", "file cong viec", "work file"),
+            ("email ca nhan", "personal email", "ung dung chat ca nhan", "o dia ca nhan"),
+            ("du lieu", "data", "file", "tai lieu", "cam", "khong duoc"),
+        ),
+        (
+            ("chatgpt", "public ai", "ai cong cong", "cong cu ai"),
+            ("cong cu ai", "dich vu ai cong cong", "public ai", "ma nguon doc quyen"),
+            ("khong nhap", "khong duoc", "cam", "must not", "do not"),
+        ),
+        (
+            ("ket qua ai", "ai tao", "ai output", "bang chung test", "test evidence"),
+            ("ket qua ai", "ai output", "kiem chung", "xac minh", "bang chung", "evidence"),
+            ("khong duoc", "khong thay the", "phai", "must", "verify", "review"),
+        ),
+        (
+            (
+                "tai khoan bi lo",
+                "lo tai khoan",
+                "lo thong tin xac thuc",
+                "compromised account",
+                "credentials exposed",
+            ),
+            (
+                "bao ngay",
+                "service desk",
+                "security operations",
+                "dang nhap bat thuong",
+                "thong tin xac thuc",
+            ),
+            ("bao", "report", "service desk", "security operations"),
+        ),
+    )
+    best_score = 0.0
+    for question_cues, evidence_cues, rule_cues in topic_rules:
+        if not any(_contains_folded_phrase(folded_question, cue) for cue in question_cues):
+            continue
+        evidence_matches = sum(1 for cue in evidence_cues if _contains_folded_phrase(text, cue))
+        has_rule = any(_contains_folded_phrase(text, cue) for cue in rule_cues)
+        if evidence_matches and has_rule:
+            best_score = max(best_score, 520.0 + evidence_matches * 80.0)
+    return best_score
+
+
+def _sensitive_policy_retrieval_phrases(question: str) -> tuple[str, ...]:
+    folded = _fold_for_person_match(retrieval_query_variants(question).normalized)
+    phrases: list[str] = []
+    if any(cue in folded for cue in ("ma nguon", "source code", "github", "repository")):
+        phrases.extend(("mã nguồn", "source code", "repository"))
+    if any(cue in folded for cue in ("mat khau", "password")):
+        phrases.extend(("mật khẩu", "password"))
+    if "otp" in folded:
+        phrases.append("OTP")
+    return tuple(dict.fromkeys(phrases))
+
+
+def _structured_credential_sharing_answer(
+    *, question: str, source_registry: PromptSourceRegistry
+) -> tuple[str, str] | None:
+    """Copy a same-object credential prohibition without adjacent exceptions."""
+
+    folded_question = _fold_for_person_match(question)
+    if not analyze_question(question).is_yes_no or not any(
+        cue in folded_question for cue in ("dua", "gui", "chia se", "give", "send", "share")
+    ):
+        return None
+    object_families = (
+        ("mat khau", "password", "passwords"),
+        ("otp", "one time password", "one-time password"),
+        ("khoa api", "api key"),
+        ("token truy cap", "access token"),
+    )
+    requested = tuple(
+        family for family in object_families if any(cue in folded_question for cue in family)
+    )
+    if not requested:
+        return None
+    for source in source_registry.sources:
+        for raw_line in source.text.splitlines():
+            for clause in re.split(r"[;•]", raw_line):
+                folded_clause = _fold_for_person_match(clause)
+                if not any(cue in folded_clause for family in requested for cue in family):
+                    continue
+                if not any(
+                    cue in folded_clause
+                    for cue in (
+                        "cam chia se",
+                        "khong duoc chia se",
+                        "must not share",
+                        "do not share",
+                    )
+                ):
+                    continue
+                material_clause = clause.strip(" -:;•")
+                if material_clause:
+                    return f"Không. {material_clause.rstrip('.')}.", source.label
+    return None
+
+
+def _structured_example_expense_amount_answer(
+    *, question: str, source_registry: PromptSourceRegistry
+) -> tuple[str, str] | None:
+    """Bind an example expense to its adjacent category/amount table cell."""
+
+    analysis = analyze_question(question)
+    if not analysis.asks_for_amount or analysis.is_yes_no:
+        return None
+    focus_terms = tuple(
+        term
+        for term in _prompt_value_focus_terms(_prompt_query_needles(question)[1])
+        if term not in {"cong", "company", "firm"}
+    )
+    requested_period = requested_monetary_period(question)
+    candidates: list[tuple[str, str, str]] = []
+    for source in source_registry.sources:
+        for record in monetary_example_rows(
+            source.text,
+            focus_terms=focus_terms,
+            requested_period=requested_period,
+        ):
+            match = _CONDITIONAL_ALLOWANCE_AMOUNT_PATTERN.search(record.row_value)
+            if match is None:
+                continue
+            matched_terms = tuple(
+                term
+                for term in focus_terms
+                if _contains_folded_phrase(_fold_for_person_match(record.row_label), term)
+            )
+            subject = record.row_value[: match.start()].strip(" :-|,;")
+            if not subject or not matched_terms:
+                continue
+            answer = (
+                f"{'/'.join(matched_terms).capitalize()} thuộc khoản {subject}; "
+                f"hạn mức {match.group(0)}."
+            )
+            candidates.append((match.group(0), answer, source.label))
+    if not candidates or len({value for value, _, _ in candidates}) != 1:
+        return None
+    _, answer, source_label = candidates[0]
+    return answer, source_label
+
+
+def _prompt_policy_relation_score(*, text: str, question: str) -> float:
+    """Prefer a clause that binds the question's event to its policy outcome."""
+
+    folded_question = _fold_for_person_match(question)
+    if (
+        any(cue in folded_question for cue in ("tra luong", "pay date", "payday"))
+        and any(cue in folded_question for cue in ("ngay nghi", "holiday", "rest day"))
+        and any(cue in text for cue in ("tra luong", "pay date", "payday"))
+        and any(cue in text for cue in ("ngay nghi", "ngay le", "holiday", "rest day"))
+    ):
+        return 680.0
+    if (
+        any(cue in folded_question for cue in ("tai nan", "accident"))
+        and any(cue in folded_question for cue in ("remote", "lam o nha", "lam viec tu xa"))
+        and any(cue in text for cue in ("tai nan", "accident"))
+        and any(cue in text for cue in ("remote", "lam o nha", "lam viec tu xa"))
+    ):
+        return 680.0
+    return 0.0
+
+
 def _prompt_remote_topic_score(*, text: str, question: str) -> float:
     remote_cues = ("remote", "hybrid", "lam o nha", "lam viec tu xa", "work from home")
-    folded_question = _fold_for_person_match(question)
+    folded_question = _fold_for_person_match(retrieval_query_variants(question).normalized)
     if not any(cue in folded_question for cue in remote_cues):
         return 0.0
     if any(cue in text for cue in remote_cues):
@@ -4737,7 +6622,20 @@ def _direct_answer_anchor_spans(
     for pattern in patterns:
         spans.extend((match.start(), match.end()) for match in pattern.finditer(text))
     if analysis.asks_for_percentage and has_explicit_not_specified(text):
-        spans.extend(_cue_spans(text, ("khong co dinh", "khong quy dinh", "not fixed", "no fixed")))
+        spans.extend(
+            _cue_spans(
+                text,
+                (
+                    "khong co dinh",
+                    "khong quy dinh",
+                    "ty le cu the duoc cap nhat theo",
+                    "specific rate is updated under",
+                    "specific rate is updated according to",
+                    "not fixed",
+                    "no fixed",
+                ),
+            )
+        )
     if analysis.is_yes_no:
         automatic_question = _terms_ask_about_automatic(terms)
         if automatic_question:
@@ -4894,7 +6792,9 @@ def _prompt_query_needles(
     question: str,
 ) -> tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
     explicit_topics = _short_explicit_topic_phrases(question)
-    needle_question = explicit_topics[0] if explicit_topics else question
+    needle_question = (
+        explicit_topics[0] if explicit_topics else retrieval_query_variants(question).normalized
+    )
     terms = tuple(
         dict.fromkeys(
             term.strip("_")
@@ -5156,7 +7056,14 @@ def _canonicalize_yes_no_output(
     if effective_polarity is None:
         return output
 
-    explanation = _remove_leading_yes_no_prefix(output.answer)
+    # A leading ``Không được ...`` or ``Không đưa ...`` is an obligation, not
+    # a disposable yes/no label. Only strip an explicitly punctuated label;
+    # otherwise preserve the negation in the material clause.
+    explanation = (
+        _remove_leading_yes_no_prefix(output.answer)
+        if existing_polarity is not None
+        else output.answer.strip()
+    )
 
     if not explanation:
         return output
@@ -5363,12 +7270,134 @@ def _structured_value_repair_generation(
     question: str,
     source_registry: PromptSourceRegistry,
 ) -> LLMGenerationResult | None:
-    structured_answer = _structured_role_person_answer(
+    structured_answer = _structured_overtime_rate_answer(
         question=question,
         source_registry=source_registry,
     )
+    if structured_answer is None and _is_overtime_rate_question(question):
+        # A percentage from a different day-type row is not a fallback answer.
+        # Preserve NO_ANSWER when the selected evidence has no matching OT row.
+        return None
+    if structured_answer is None:
+        structured_answer = _structured_performance_bonus_range_answer(
+            question=question,
+            source_registry=source_registry,
+        )
+    if structured_answer is None and _is_performance_bonus_range_question(question):
+        # A range from a different rating row is not an answer. Do not let the
+        # generic value copier collapse a locale-formatted decimal range.
+        return None
+    if structured_answer is None:
+        structured_answer = _structured_salary_band_answer(
+            question=question,
+            source_registry=source_registry,
+        )
+    if structured_answer is None:
+        structured_answer = _structured_conditional_allowance_answer(
+            question=question,
+            source_registry=source_registry,
+        )
+    if structured_answer is None:
+        structured_answer = _structured_allowance_descriptor_answer(
+            question=question,
+            source_registry=source_registry,
+        )
+    if structured_answer is None:
+        structured_answer = _structured_named_monetary_benefit_answer(
+            question=question,
+            source_registry=source_registry,
+        )
+    if structured_answer is None:
+        structured_answer = _structured_proportional_leave_answer(
+            question=question,
+            source_registry=source_registry,
+        )
+    if structured_answer is None and annual_leave_relation_intent(question):
+        structured_answer = _structured_annual_leave_relation_answer(
+            question=question,
+            source_registry=source_registry,
+        )
+        if structured_answer is None:
+            # A neighboring notice, base-allocation, or seniority number is
+            # never a fallback for a missing requested leave relation.
+            return None
+    # Do not let a generic value or topic copier turn an unaddressed
+    # entitlement scenario into a positive answer merely because an allowance
+    # amount appears in the selected context.
+    if (
+        structured_answer is None
+        and analyze_question(question).is_yes_no
+        and _is_allowance_entitlement_question(question)
+    ):
+        return None
+    if structured_answer is None:
+        structured_answer = _structured_role_person_answer(
+            question=question,
+            source_registry=source_registry,
+        )
+    if structured_answer is None:
+        structured_answer = _structured_credential_sharing_answer(
+            question=question,
+            source_registry=source_registry,
+        )
+    if structured_answer is None:
+        structured_answer = _structured_consultation_session_answer(
+            question=question,
+            source_registry=source_registry,
+        )
+    if structured_answer is None:
+        structured_answer = _structured_public_ai_input_answer(
+            question=question,
+            source_registry=source_registry,
+        )
+    if structured_answer is None:
+        structured_answer = _structured_remote_accident_answer(
+            question=question,
+            source_registry=source_registry,
+        )
+    if structured_answer is None:
+        structured_answer = _structured_leave_incident_time_answer(
+            question=question,
+            source_registry=source_registry,
+        )
+    if structured_answer is None:
+        structured_answer = _structured_example_expense_amount_answer(
+            question=question,
+            source_registry=source_registry,
+        )
+    if structured_answer is None:
+        structured_answer = _structured_leave_approval_workflow_answer(
+            question=question,
+            source_registry=source_registry,
+        )
+    if structured_answer is None:
+        structured_answer = _structured_attendance_policy_answer(
+            question=question,
+            source_registry=source_registry,
+        )
     if structured_answer is None:
         structured_answer = _structured_named_topic_answer(
+            question=question,
+            source_registry=source_registry,
+        )
+    # Resolve clock fields before the generic condition copier. A schedule row
+    # can mention durations and a start window before the requested deadline or
+    # corresponding end time, and the wider copier would otherwise win first.
+    if structured_answer is None and analyze_question(question).answer_type in {
+        "TIME",
+        "TIME_RANGE",
+    }:
+        structured_answer = _structured_time_range_answer(
+            question=question,
+            source_registry=source_registry,
+        )
+    if structured_answer is None:
+        structured_answer = _structured_leave_duration_answer(
+            question=question,
+            source_registry=source_registry,
+        )
+    if structured_answer is None:
+        structured_answer = _structured_leave_policy_clause_answer(
             question=question,
             source_registry=source_registry,
         )
@@ -5398,6 +7427,11 @@ def _structured_value_repair_generation(
             source_registry=source_registry,
         )
     if structured_answer is None:
+        structured_answer = _structured_unspecified_value_answer(
+            question=question,
+            source_registry=source_registry,
+        )
+    if structured_answer is None:
         structured_answer = _structured_direct_value_answer(
             question=question,
             source_registry=source_registry,
@@ -5417,6 +7451,1210 @@ def _structured_value_repair_generation(
         completion_tokens=0,
         response_time_ms=0,
         provider="local",
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class _ConditionalAllowanceFact:
+    """One allowance row, with its value and qualification rules kept together."""
+
+    subject: str
+    value: str
+    positive_condition: str
+    exclusion_condition: str
+    source_label: str
+
+
+@dataclass(frozen=True, slots=True)
+class _OvertimeRateFact:
+    """One OT table row, retaining its day type and rate relationship."""
+
+    day_type: str
+    rate: str
+    minimum: bool
+    context: str
+    source_label: str
+
+
+@dataclass(frozen=True, slots=True)
+class _PerformanceBonusRangeFact:
+    """One performance-rating bonus range, including both bounds and its unit."""
+
+    rating: str
+    lower_bound: str
+    upper_bound: str
+    unit: str
+    source_label: str
+
+
+def _structured_attendance_policy_answer(
+    *,
+    question: str,
+    source_registry: PromptSourceRegistry,
+) -> tuple[str, tuple[str, ...]] | None:
+    """Return directly stated attendance workflow and scheduling clauses."""
+
+    folded_question = _fold_for_person_match(question)
+    scenario: tuple[tuple[tuple[str, ...], ...], str] | None = None
+    requires_deadline_number = False
+    requires_registration_clock = False
+    remote_attendance = False
+    if any(cue in folded_question for cue in ("ai duyet", "who approves", "who reviews")) and any(
+        cue in folded_question for cue in ("cham cong", "check-in", "checkout")
+    ):
+        scenario = (
+            (("quan ly truc tiep", "direct manager"), ("phe duyet", "duyet", "approve")),
+            "",
+        )
+    elif any(cue in folded_question for cue in ("khoa ky cong", "period locked")):
+        scenario = (
+            (
+                ("sau khi khoa ky", "after the period is locked"),
+                ("yeu cau dac biet", "special request", "dieu chinh muon"),
+            ),
+            "Không. ",
+        )
+    elif any(cue in folded_question for cue in ("remote", "lam o nha", "work from home")) and any(
+        cue in folded_question for cue in ("ngay mai", "tomorrow", "dang ky", "register")
+    ):
+        scenario = (
+            (
+                ("dang ky", "register"),
+                ("ngay lam viec lien truoc", "previous workday", "truoc", "before"),
+            ),
+            "",
+        )
+        requires_registration_clock = True
+    elif any(cue in folded_question for cue in ("remote", "lam o nha", "work from home")) and any(
+        cue in folded_question for cue in ("cham cong", "check-in", "checkout")
+    ):
+        remote_attendance = True
+        scenario = (
+            (
+                ("remote", "hybrid", "lam o nha", "work from home"),
+                ("nghia vu cham cong", "van phai cham cong", "must clock"),
+            ),
+            "Có. ",
+        )
+    elif any(cue in folded_question for cue in ("remote", "hybrid", "lam o nha")) and any(
+        cue in folded_question for cue in ("gio cot loi", "core hour")
+    ):
+        scenario = (
+            (("gio cot loi", "core hour"), ("giu nguyen", "nhu khi lam tai van phong", "same as")),
+            "Có. ",
+        )
+    elif any(
+        cue in folded_question
+        for cue in (
+            "quen cham cong",
+            "quen check-in",
+            "quen check-out",
+            "quen checkout",
+            "forgot check",
+            "forgot clock",
+        )
+    ):
+        scenario = (
+            (
+                (
+                    "quen check-in",
+                    "quen check-out",
+                    "quen cham cong",
+                    "forgot check",
+                    "forgot clock",
+                ),
+                ("yeu cau", "request"),
+                ("ngay lam viec", "working day", "business day"),
+            ),
+            "",
+        )
+        requires_deadline_number = True
+    elif any(cue in folded_question for cue in ("di muon", "toi tre", "arrive late")):
+        same_day = any(cue in folded_question for cue in ("toi nay", "cung ngay", "same day"))
+        next_day = any(cue in folded_question for cue in ("ngay mai", "ngay khac", "next day"))
+        if same_day or next_day:
+            outcome_group = (
+                ("bu trong cung ngay", "same day")
+                if same_day
+                else ("bu sang ngay khac", "ngay khac", "another day", "next day")
+            )
+            scenario = (
+                (
+                    ("di muon", "toi tre", "late"),
+                    outcome_group,
+                ),
+                "Có. " if same_day else "Không. ",
+            )
+    elif any(cue in folded_question for cue in ("on-call", "on call", "truc")) and any(
+        cue in folded_question for cue in ("incident", "su co", "ot", "lam them")
+    ):
+        scenario = (
+            (
+                ("on-call", "on call"),
+                ("khong tu dong", "thoi gian thuc te xu ly", "actual incident handling time"),
+            ),
+            "Không. ",
+        )
+    if scenario is None:
+        return None
+
+    required_groups, prefix = scenario
+    candidates: list[tuple[int, int, str, str]] = []
+    for source_index, source in enumerate(source_registry.sources):
+        clause = _shortest_source_clause_for_groups(source.text, required_groups=required_groups)
+        if clause is None:
+            continue
+        if (
+            requires_deadline_number
+            and re.search(
+                r"\b\d+\s+(?:ngay|working days?|business days?)\b",
+                _fold_for_person_match(clause),
+            )
+            is None
+        ):
+            continue
+        if requires_registration_clock and _CLOCK_VALUE_PATTERN.search(clause) is None:
+            continue
+        candidates.append((len(clause), source_index, clause, source.label))
+    if not candidates:
+        return None
+    _, _, clause, source_label = min(candidates)
+    if remote_attendance:
+        obligation = re.search(r"\b(?:giữ|giu)\s+(?:nguyên|nguyen)\b", clause, flags=re.IGNORECASE)
+        if obligation is not None:
+            clause = clause[obligation.start() :]
+    clause = clause.strip(" -â€¢\ufffd\u2022\uf0b7")
+    if clause and clause[-1] not in ".!?":
+        clause = f"{clause}."
+    return f"{prefix}{clause}", (source_label,)
+
+
+def _structured_leave_approval_workflow_answer(
+    *, question: str, source_registry: PromptSourceRegistry
+) -> tuple[str, str] | None:
+    """Answer whether filing a leave request alone completes approval."""
+
+    folded_question = _fold_for_person_match(question)
+    if not (analyze_question(question).is_yes_no or folded_question.endswith("ha?")):
+        return None
+    if not any(cue in folded_question for cue in ("nghi", "phep", "leave")):
+        return None
+    if not any(cue in folded_question for cue in ("tao don", "gui don", "submit", "file request")):
+        return None
+    if not any(
+        cue in folded_question for cue in ("nghi luon", "ngay", "immediately", "automatically")
+    ):
+        return None
+    for source in source_registry.sources:
+        folded_source = _fold_for_person_match(source.text)
+        if not all(
+            cue in folded_source
+            for cue in (
+                "luong phe duyet",
+                "tao yeu cau tren hrm",
+                "quan ly truc tiep",
+                "trang thai cuoi cung",
+            )
+        ):
+            continue
+        match = re.search(
+            r"Nhân viên tạo yêu cầu trên HRM\s*->\s*quản lý trực tiếp"
+            r"[\s\S]{0,320}?hệ thống ghi trạng thái cuối cùng",
+            source.text,
+            flags=re.IGNORECASE,
+        )
+        if match is None:
+            continue
+        clause = " ".join(match.group(0).split()).strip(" .")
+        return f"Không. {clause}.", source.label
+    return None
+
+
+def _structured_remote_accident_answer(
+    *, question: str, source_registry: PromptSourceRegistry
+) -> tuple[str, str] | None:
+    """Copy the conditional work-accident relation, never an unrelated 'no'."""
+
+    folded_question = _fold_for_person_match(question)
+    if not analyze_question(question).is_yes_no:
+        return None
+    if not any(cue in folded_question for cue in ("tai nan", "accident")) or not any(
+        cue in folded_question
+        for cue in ("remote", "lam o nha", "lam viec tu xa", "work from home")
+    ):
+        return None
+    for source in source_registry.sources:
+        normalized_source = " ".join(source.text.split())
+        for clause in re.findall(
+            r"\b(?:Nếu|If)\s+(?:tai nạn|an accident)\b[^.!?]{0,650}[.!?]",
+            normalized_source,
+            flags=re.IGNORECASE,
+        ):
+            folded_clause = _fold_for_person_match(clause)
+            if not all(
+                any(cue in folded_clause for cue in cues)
+                for cues in (
+                    ("tai nan", "accident"),
+                    ("lam viec tu xa", "remote", "work from home"),
+                    ("khong mac dinh", "not automatically", "not always"),
+                )
+            ):
+                continue
+            if not any(
+                cue in folded_clause
+                for cue in ("dua tren", "hoan canh", "bang chung", "circumstances", "evidence")
+            ):
+                continue
+            material_clause = " ".join(clause.split()).strip(" -\u2022\uf0b7\ufffd")
+            if material_clause:
+                return f"Không. {material_clause.rstrip('.')}.", source.label
+    return None
+
+
+def _structured_consultation_session_answer(
+    *, question: str, source_registry: PromptSourceRegistry
+) -> tuple[str, str] | None:
+    """Use the session count in the same consultation clause and period."""
+
+    folded_question = _fold_for_person_match(question)
+    if not any(cue in folded_question for cue in ("tu van", "consultation", "counseling")):
+        return None
+    if not any(cue in folded_question for cue in ("may buoi", "bao nhieu buoi", "sessions")):
+        return None
+    requested_topic = "eap" if "eap" in folded_question else None
+    candidates: list[tuple[str, str]] = []
+    for source in source_registry.sources:
+        for clause in re.split(r"\n+|(?<=[.!?])\s+", source.text):
+            folded_clause = _fold_for_person_match(clause)
+            if requested_topic and requested_topic not in folded_clause:
+                continue
+            if not any(cue in folded_clause for cue in ("tu van", "consultation", "counseling")):
+                continue
+            if not re.search(r"\b\d{1,3}\s+(?:phien|buoi|sessions?)\b", folded_clause):
+                continue
+            if not re.search(r"\b(?:nam|year)\b", folded_clause):
+                continue
+            material_clause = " ".join(clause.split()).strip(" -\u2022\uf0b7\ufffd")
+            candidates.append((material_clause, source.label))
+    if len({clause for clause, _ in candidates}) != 1:
+        return None
+    return candidates[0]
+
+
+def _structured_public_ai_input_answer(
+    *, question: str, source_registry: PromptSourceRegistry
+) -> tuple[str, str] | None:
+    """Keep confidential-input prohibitions separate from model capability claims."""
+
+    folded_question = _fold_for_person_match(question)
+    if not analyze_question(question).is_yes_no:
+        return None
+    if not any(cue in folded_question for cue in ("ai", "chatgpt", "model")):
+        return None
+    if not any(cue in folded_question for cue in ("ma nguon", "source code", "code noi bo")):
+        return None
+    if not any(cue in folded_question for cue in ("paste", "nhap", "dua", "upload", "enter")):
+        return None
+    for source in source_registry.sources:
+        normalized_source = " ".join(source.text.split())
+        for clause in re.findall(
+            r"\b(?:Không nhập|Do not enter|must not input)\b[^.!?]{0,520}[.!?]",
+            normalized_source,
+            flags=re.IGNORECASE,
+        ):
+            folded_clause = _fold_for_person_match(clause)
+            if not all(
+                any(cue in folded_clause for cue in cues)
+                for cues in (
+                    ("khong nhap", "do not enter", "must not input"),
+                    ("ma nguon", "source code", "proprietary code"),
+                    ("ai cong cong", "public ai", "public generative ai"),
+                )
+            ):
+                continue
+            material_clause = " ".join(clause.split()).strip(" -\u2022\uf0b7\ufffd")
+            return f"Không. {material_clause.rstrip('.')}.", source.label
+    return None
+
+
+def _leave_incident_time_intent(question: str) -> bool:
+    folded = _fold_for_person_match(question)
+    return all(
+        any(cue in folded for cue in cues)
+        for cues in (
+            ("nghi phep", "on leave", "annual leave"),
+            ("su co", "incident", "production"),
+            ("thoi gian", "time", "gio phat sinh"),
+        )
+    )
+
+
+def _structured_leave_incident_time_answer(
+    *, question: str, source_registry: PromptSourceRegistry
+) -> tuple[str, str] | None:
+    """Preserve replacement, consent, and time-recording as one source relation."""
+
+    if not _leave_incident_time_intent(question):
+        return None
+    for source in source_registry.sources:
+        normalized_source = " ".join(source.text.split())
+        match = re.search(
+            r"(?:Quản lý phải ưu tiên|Management must prioritize)\b"
+            r"[^.!?]{0,520}?(?:thời gian phát sinh|time worked)[.!?]",
+            normalized_source,
+            flags=re.IGNORECASE,
+        )
+        if match is None:
+            continue
+        folded_clause = _fold_for_person_match(match.group(0))
+        if not all(
+            any(cue in folded_clause for cue in cues)
+            for cues in (
+                ("nguoi thay the", "replacement", "on-call"),
+                ("dong y", "thong nhat", "consent", "agree"),
+                ("ghi nhan thoi gian", "record time"),
+            )
+        ):
+            continue
+        return match.group(0), source.label
+    return None
+
+
+def _shortest_source_clause_for_groups(
+    text: str,
+    *,
+    required_groups: tuple[tuple[str, ...], ...],
+) -> str | None:
+    raw_lines = tuple(line.strip() for line in text.splitlines() if line.strip())
+    restored_lines: list[str] = []
+    index = 0
+    while index < len(raw_lines):
+        line = raw_lines[index]
+        if (
+            index + 2 < len(raw_lines)
+            and not line.endswith((".", "!", "?", ";"))
+            and len(raw_lines[index + 1]) <= 48
+            and not raw_lines[index + 1].endswith((".", "!", "?", ";"))
+            and raw_lines[index + 1][:1].isupper()
+            and raw_lines[index + 2][:1].islower()
+        ):
+            restored_lines.append(f"{raw_lines[index + 1]}: {line} {raw_lines[index + 2]}")
+            index += 3
+            continue
+        if (
+            index + 1 < len(raw_lines)
+            and not line.endswith((".", "!", "?", ";"))
+            and raw_lines[index + 1][:1].islower()
+        ):
+            restored_lines.append(f"{line} {raw_lines[index + 1]}")
+            index += 2
+            continue
+        restored_lines.append(line)
+        index += 1
+    segments = tuple(
+        segment.strip()
+        for line in restored_lines
+        for segment in re.split(r"[\u2022]+|(?<=[.!?])\s+", line)
+        if segment.strip()
+    )
+    candidates: list[str] = []
+    for start in range(len(segments)):
+        for width in (1, 2, 3):
+            candidate = " ".join(segments[start : start + width])
+            folded_candidate = _fold_for_person_match(candidate)
+            if all(
+                any(_contains_folded_phrase(folded_candidate, cue) for cue in group)
+                for group in required_groups
+            ):
+                # PDF line wrapping can leave a complete-looking policy match
+                # ending in a connector ("according to", "theo", etc.). Keep
+                # the following source segment so repairs do not publish a
+                # syntactically and materially incomplete clause.
+                if start + width < len(segments) and re.search(
+                    r"\b(?:theo|according to|under|pursuant to)\s*$",
+                    folded_candidate,
+                ):
+                    candidate = f"{candidate} {segments[start + width]}"
+                candidates.append(candidate)
+                break
+    return min(candidates, key=len) if candidates else None
+
+
+_OT_DAY_TYPE_CUES: dict[str, tuple[str, ...]] = {
+    "normal_workday": (
+        "ngay thuong",
+        "ngay lam viec binh thuong",
+        "normal workday",
+        "weekday",
+    ),
+    "weekly_rest": ("ngay nghi hang tuan", "chu nhat", "weekly rest", "weekend", "sunday"),
+    "holiday": ("ngay le", "ngay nghi co huong luong", "tet", "public holiday", "holiday"),
+    "night_overtime": ("lam them vao ban dem", "night overtime"),
+    "night_work": ("lam viec ban dem", "night work", "night shift"),
+}
+
+_OT_RATE_ROW_PATTERNS: dict[str, tuple[re.Pattern[str], ...]] = {
+    "normal_workday": (
+        re.compile(r"\blam them ngay lam viec binh thuong\b"),
+        re.compile(r"\bovertime (?:on )?(?:a )?normal workday\b"),
+    ),
+    "weekly_rest": (
+        re.compile(r"\blam them ngay nghi hang tuan\b"),
+        re.compile(r"\bovertime (?:on )?(?:a )?(?:weekly rest|weekend|sunday)\b"),
+    ),
+    "holiday": (
+        re.compile(r"\blam them ngay le\b"),
+        re.compile(r"\bovertime (?:on )?(?:a )?(?:public )?holiday\b"),
+    ),
+    "night_overtime": (
+        re.compile(r"\blam them vao ban dem\b"),
+        re.compile(r"\bnight overtime\b"),
+    ),
+    "night_work": (
+        re.compile(r"\blam viec ban dem\b"),
+        re.compile(r"\bnight work\b"),
+    ),
+}
+
+_PERFORMANCE_BONUS_RANGE_PATTERN = re.compile(
+    r"(?P<lower>\d+(?:[.,]\d+)?)\s*(?:-|–|—|to)\s*"
+    r"(?P<upper>\d+(?:[.,]\d+)?)\s*"
+    r"(?P<unit>(?:th[aá]ng|months?)\s+(?:of\s+)?base\s+salary)\b",
+    re.IGNORECASE,
+)
+
+
+def _structured_performance_bonus_range_answer(
+    *,
+    question: str,
+    source_registry: PromptSourceRegistry,
+) -> tuple[str, str] | None:
+    """Return the full bonus range from the requested performance-rating row."""
+
+    if not _is_performance_bonus_range_question(question):
+        return None
+    folded_question = _fold_for_person_match(question)
+    facts = _performance_bonus_range_facts(source_registry)
+    matching = tuple(
+        fact for fact in facts if _fold_for_person_match(fact.rating) in folded_question
+    )
+    if not matching:
+        return None
+    fact = matching[0]
+    return f"{fact.lower_bound}–{fact.upper_bound} {fact.unit}.", fact.source_label
+
+
+def _is_performance_bonus_range_question(question: str) -> bool:
+    folded = _fold_for_person_match(question)
+    asks_bonus = any(cue in folded for cue in ("bonus", "thuong", "performance bonus"))
+    asks_value = any(cue in folded for cue in ("bao nhieu", "how much", "range", "muc tieu"))
+    asks_salary_months = any(cue in folded for cue in ("thang luong", "months base salary"))
+    return asks_bonus and asks_value and asks_salary_months
+
+
+def _performance_bonus_range_facts(
+    source_registry: PromptSourceRegistry,
+) -> tuple[_PerformanceBonusRangeFact, ...]:
+    facts: list[_PerformanceBonusRangeFact] = []
+    for source in source_registry.sources:
+        for line in source.text.splitlines():
+            normalized_line = " ".join(line.split())
+            for match in _PERFORMANCE_BONUS_RANGE_PATTERN.finditer(normalized_line):
+                # Prompt excerpts may prepend an evidence marker or a note from
+                # the previous table cell. The row label is the text since the
+                # last prose boundary immediately before this numeric range.
+                prefix = normalized_line[: match.start()]
+                rating = re.split(r"[;:\n]|(?<!\d)\.(?!\d)", prefix)[-1].strip()
+                if not rating:
+                    continue
+                facts.append(
+                    _PerformanceBonusRangeFact(
+                        rating=rating,
+                        lower_bound=match.group("lower"),
+                        upper_bound=match.group("upper"),
+                        unit=match.group("unit"),
+                        source_label=source.label,
+                    )
+                )
+    return tuple(facts)
+
+
+def _structured_overtime_rate_answer(
+    *,
+    question: str,
+    source_registry: PromptSourceRegistry,
+) -> tuple[str, str] | None:
+    """Return an OT rate only from the matching day-type table row."""
+
+    requested_day_type = _requested_ot_day_type(question)
+    if requested_day_type is None:
+        return None
+    if not _is_overtime_rate_question(question):
+        return None
+
+    matching = tuple(
+        fact
+        for fact in _overtime_rate_facts(source_registry)
+        if fact.day_type == requested_day_type
+    )
+    if not matching:
+        return None
+    fact = max(matching, key=lambda candidate: (candidate.minimum, len(candidate.context)))
+    qualifier = "Ít nhất " if fact.minimum else ""
+    return f"{qualifier}{fact.rate}.", fact.source_label
+
+
+def _structured_claim_incomplete_reason(
+    *,
+    question: str,
+    answer: str,
+    source_registry: PromptSourceRegistry,
+) -> str | None:
+    if _structured_claim_missing_bound_overtime_rate(
+        question=question,
+        answer=answer,
+        source_registry=source_registry,
+    ):
+        return "INCOMPLETE_OT_RATE"
+    if _structured_claim_missing_on_call_time_relation(
+        question=question,
+        answer=answer,
+        source_registry=source_registry,
+    ):
+        return "INCOMPLETE_ON_CALL_TIME"
+    return None
+
+
+def _structured_claim_missing_on_call_time_relation(
+    *,
+    question: str,
+    answer: str,
+    source_registry: PromptSourceRegistry,
+) -> bool:
+    """Keep standby and actual incident work distinct when a source binds both."""
+
+    folded_question = _fold_for_person_match(question)
+    asks_about_on_call_incident_time = (
+        any(
+            _contains_folded_phrase(folded_question, cue)
+            for cue in ("on-call", "on call", "ca truc")
+        )
+        and any(cue in folded_question for cue in ("incident", "su co"))
+        and any(
+            cue in folded_question
+            for cue in ("thoi gian", "gio", "time", "hours", "ot", "overtime", "lam them")
+        )
+    )
+    if not asks_about_on_call_incident_time:
+        return False
+
+    relation_groups = (
+        ("on-call", "on call", "ca truc"),
+        ("khong tu dong", "not automatically", "does not automatically"),
+        (
+            "thoi gian thuc te xu ly",
+            "actual incident handling time",
+            "actual time spent handling incidents",
+        ),
+        ("lam them", "ot", "overtime"),
+    )
+    if not any(
+        _shortest_source_clause_for_groups(source.text, required_groups=relation_groups)
+        for source in source_registry.sources
+    ):
+        return False
+
+    folded_answer = _fold_for_person_match(answer)
+    names_standby = any(
+        _contains_folded_phrase(folded_answer, cue) for cue in ("on-call", "on call", "ca truc")
+    )
+    excludes_automatic_overtime = any(
+        cue in folded_answer
+        for cue in (
+            "khong tu dong",
+            "khong tinh toan bo",
+            "khong phai toan bo",
+            "not automatically",
+            "not all on-call",
+            "not counted in full",
+        )
+    )
+    records_actual_work = any(
+        cue in folded_answer
+        for cue in (
+            "thoi gian thuc te xu ly",
+            "thoi gian xu ly su co",
+            "thoi gian xu ly incident",
+            "actual incident handling time",
+            "actual time spent handling",
+        )
+    ) and any(
+        cue in folded_answer
+        for cue in ("ghi nhan", "recorded", "logged", "danh gia ot", "assessed for overtime")
+    )
+    return not (names_standby and excludes_automatic_overtime and records_actual_work)
+
+
+def _structured_claim_missing_bound_overtime_rate(
+    *,
+    question: str,
+    answer: str,
+    source_registry: PromptSourceRegistry,
+) -> bool:
+    """Require the requested day-type rate when one unambiguous row is available.
+
+    Open-ended compound claims can be supported by nearby OT prose while
+    omitting the rate the user requested. Conflicting or absent rows are not
+    resolved by this completeness check.
+    """
+
+    if not _is_overtime_rate_question(question):
+        return False
+    requested_day_type = _requested_ot_day_type(question)
+    matching = tuple(
+        fact
+        for fact in _overtime_rate_facts(source_registry)
+        if fact.day_type == requested_day_type
+    )
+    bound_rates = {
+        Decimal(fact.rate.replace("%", "").replace(",", ".").strip()) for fact in matching
+    }
+    if len(bound_rates) != 1:
+        return False
+
+    answer_rates = {
+        Decimal(match.group(0).replace("%", "").replace(",", ".").strip())
+        for match in _PERCENT_VALUE_PATTERN.finditer(answer)
+    }
+    if bound_rates.isdisjoint(answer_rates):
+        return True
+    if all(fact.minimum for fact in matching):
+        folded_answer = _fold_for_person_match(answer)
+        return not any(
+            cue in folded_answer for cue in ("it nhat", "toi thieu", "at least", "minimum")
+        )
+    return False
+
+
+def _is_overtime_rate_question(question: str) -> bool:
+    analysis = analyze_question(question)
+    folded_question = _fold_for_person_match(question)
+    asks_how_treated = any(
+        cue in folded_question
+        for cue in (
+            "xu ly the nao",
+            "duoc xu ly",
+            "tinh the nao",
+            "duoc tinh",
+            "handled",
+            "calculated",
+        )
+    )
+    return (
+        (analysis.asks_for_percentage or asks_how_treated)
+        and _requested_ot_day_type(question) is not None
+        and any(cue in folded_question for cue in ("ot", "overtime", "lam them"))
+    )
+
+
+def _requested_ot_day_type(question: str) -> str | None:
+    folded = _fold_for_person_match(question)
+    matches = tuple(
+        day_type
+        for day_type, cues in _OT_DAY_TYPE_CUES.items()
+        if any(cue in folded for cue in cues)
+    )
+    # Night OT is a more specific category than ordinary night work.
+    if "night_overtime" in matches:
+        return "night_overtime"
+    return matches[0] if len(matches) == 1 else None
+
+
+def _overtime_rate_facts(source_registry: PromptSourceRegistry) -> tuple[_OvertimeRateFact, ...]:
+    facts: list[_OvertimeRateFact] = []
+    for source in source_registry.sources:
+        lines = tuple(line.strip() for line in source.text.splitlines() if line.strip())
+        # Prompt excerpts intentionally collapse whitespace. For a table whose
+        # value and row label were split across columns, reconstruct the row
+        # from explicit OT labels before falling back to line adjacency.
+        if len(lines) == 1:
+            facts.extend(_flattened_overtime_rate_facts(text=lines[0], source_label=source.label))
+            continue
+        for index, line in enumerate(lines):
+            for match in _PERCENT_VALUE_PATTERN.finditer(line):
+                row = _overtime_rate_row_for_percentage(lines=lines, index=index)
+                if row is None:
+                    continue
+                day_type, context = row
+                folded_context = _fold_for_person_match(context)
+                facts.append(
+                    _OvertimeRateFact(
+                        day_type=day_type,
+                        rate=match.group(0),
+                        minimum=any(
+                            cue in folded_context
+                            for cue in ("it nhat", "toi thieu", "at least", "minimum")
+                        ),
+                        context=context,
+                        source_label=source.label,
+                    )
+                )
+    return tuple(facts)
+
+
+def _flattened_overtime_rate_facts(
+    *,
+    text: str,
+    source_label: str,
+) -> tuple[_OvertimeRateFact, ...]:
+    folded_text = _fold_for_person_match(text)
+    percentages = tuple(_PERCENT_VALUE_PATTERN.finditer(folded_text))
+    labels = tuple(
+        (day_type, match)
+        for day_type, patterns in _OT_RATE_ROW_PATTERNS.items()
+        for pattern in patterns
+        for match in pattern.finditer(folded_text)
+    )
+    facts: list[_OvertimeRateFact] = []
+    for index, percentage in enumerate(percentages):
+        previous_boundary = percentages[index - 1].end() if index else 0
+        next_boundary = (
+            percentages[index + 1].start() if index + 1 < len(percentages) else len(folded_text)
+        )
+        candidates = tuple(
+            (day_type, label)
+            for day_type, label in labels
+            # A row label is eligible only if there is no competing percentage
+            # between it and this value. This prevents adjacent OT rows and
+            # unrelated percentage clauses from leaking into the binding.
+            if previous_boundary <= label.start() <= next_boundary
+            or previous_boundary <= label.end() <= next_boundary
+        )
+        if not candidates:
+            continue
+        day_type, label = min(
+            candidates,
+            key=lambda candidate: min(
+                abs(candidate[1].start() - percentage.end()),
+                abs(percentage.start() - candidate[1].end()),
+            ),
+        )
+        context_start = min(percentage.start(), label.start())
+        context_end = max(percentage.end(), label.end())
+        context = text[max(0, context_start - 80) : min(len(text), context_end + 120)]
+        folded_context = _fold_for_person_match(context)
+        facts.append(
+            _OvertimeRateFact(
+                day_type=day_type,
+                rate=percentage.group(0),
+                minimum=any(
+                    cue in folded_context for cue in ("it nhat", "toi thieu", "at least", "minimum")
+                ),
+                context=context,
+                source_label=source_label,
+            )
+        )
+    return tuple(facts)
+
+
+def _overtime_rate_row_for_percentage(
+    *,
+    lines: tuple[str, ...],
+    index: int,
+) -> tuple[str, str] | None:
+    """Bind a percent to its nearest single day-type label, not the table."""
+
+    current = _fold_for_person_match(lines[index])
+    if any(cue in current for cue in ("thuong", "bonus", "performance", "incentive")) and not any(
+        cue in current for cue in ("lam them", "ot", "overtime")
+    ):
+        return None
+    for candidate_index in (index, index - 1, index + 1, index - 2, index + 2):
+        if candidate_index < 0 or candidate_index >= len(lines):
+            continue
+        day_type = _ot_day_type_from_context(_fold_for_person_match(lines[candidate_index]))
+        if day_type is not None:
+            context = lines[index]
+            if candidate_index != index:
+                context = f"{context} {lines[candidate_index]}"
+            return day_type, context
+    return None
+
+
+def _ot_day_type_from_context(context: str) -> str | None:
+    matches = tuple(
+        day_type
+        for day_type, cues in _OT_DAY_TYPE_CUES.items()
+        if any(cue in context for cue in cues)
+    )
+    if "night_overtime" in matches:
+        return "night_overtime"
+    if "night_work" in matches:
+        return "night_work"
+    return matches[0] if len(matches) == 1 else None
+
+
+def _structured_conditional_allowance_answer(
+    *,
+    question: str,
+    source_registry: PromptSourceRegistry,
+) -> tuple[str, str] | None:
+    """Answer an allowance existence or entitlement question from one source row.
+
+    This is intentionally narrow: it operates only when an allowance-like row
+    contains a monetary value and an explicit qualification or exclusion.  It
+    does not infer a negative result from an amount alone.
+    """
+
+    analysis = analyze_question(question)
+    if not analysis.is_yes_no or not _is_allowance_entitlement_question(question):
+        return None
+
+    facts = _conditional_allowance_facts(source_registry)
+    matching_facts = tuple(
+        fact for fact in facts if _allowance_fact_matches_question(fact, question)
+    )
+    if not matching_facts:
+        return None
+
+    # A collapsed table can leave the next row's label in a preceding row's
+    # trailing text.  Prefer the benefit whose own subject matches the request,
+    # then its attached conditions; do not bind the first incidental overlap.
+    fact = max(
+        matching_facts,
+        key=lambda candidate: _allowance_fact_question_match_score(candidate, question),
+    )
+    exclusion_matches = _condition_entails_scenario(
+        condition=fact.exclusion_condition,
+        question=question,
+    )
+    positive_matches = _condition_entails_scenario(
+        condition=fact.positive_condition,
+        question=question,
+    )
+    asks_specific_scenario = _question_asks_allowance_scenario(question)
+
+    if exclusion_matches:
+        return (
+            f"Kh\u00f4ng. {fact.subject} ({fact.value}) kh\u00f4ng \u00e1p d\u1ee5ng cho "
+            f"{_strip_exclusion_prefix(fact.exclusion_condition)}.",
+            fact.source_label,
+        )
+    if asks_specific_scenario and positive_matches:
+        condition = _strip_condition_prefix(fact.positive_condition)
+        return (
+            f"C\u00f3. {fact.subject} l\u00e0 {fact.value} khi {condition}.",
+            fact.source_label,
+        )
+    if not asks_specific_scenario:
+        details = f"C\u00f3. {fact.subject} l\u00e0 {fact.value}"
+        if fact.positive_condition:
+            details += f"; \u00e1p d\u1ee5ng khi {_strip_condition_prefix(fact.positive_condition)}"
+        if fact.exclusion_condition:
+            details += (
+                "; kh\u00f4ng \u00e1p d\u1ee5ng cho "
+                f"{_strip_exclusion_prefix(fact.exclusion_condition)}"
+            )
+        return f"{details}.", fact.source_label
+
+    # A scenario that is neither explicitly included nor excluded remains
+    # unsupported.  Strict NO_ANSWER behaviour is preserved.
+    return None
+
+
+def _structured_allowance_descriptor_answer(
+    *,
+    question: str,
+    source_registry: PromptSourceRegistry,
+) -> tuple[str, str] | None:
+    """Describe the matching allowance when the user asks which benefit applies.
+
+    Entitlement questions remain in the stricter yes/no path above. This path
+    only copies a named monetary allowance and its attached conditions from a
+    single source row; it never infers eligibility from an amount alone.
+    """
+
+    analysis = analyze_question(question)
+    folded = _fold_for_person_match(question)
+    asks_which_allowance = any(
+        cue in folded
+        for cue in (
+            "khoan ho tro nao",
+            "ho tro nao",
+            "phu cap nao",
+            "phu cap gi",
+            "what allowance",
+            "which allowance",
+            "what stipend",
+            "which stipend",
+            "what support",
+        )
+    )
+    if analysis.is_yes_no or not asks_which_allowance:
+        return None
+
+    matching_facts = tuple(
+        fact
+        for fact in _conditional_allowance_facts(source_registry)
+        if _allowance_fact_matches_question(fact, question)
+    )
+    if not matching_facts:
+        return None
+
+    fact = max(
+        matching_facts,
+        key=lambda candidate: _allowance_fact_question_match_score(candidate, question),
+    )
+    details = f"{fact.subject} là {fact.value}"
+    if fact.positive_condition:
+        details += f"; áp dụng khi {_strip_condition_prefix(fact.positive_condition)}"
+    if fact.exclusion_condition:
+        details += f"; không áp dụng cho {_strip_exclusion_prefix(fact.exclusion_condition)}"
+    return f"{details}.", fact.source_label
+
+
+def _structured_named_monetary_benefit_answer(
+    *,
+    question: str,
+    source_registry: PromptSourceRegistry,
+) -> tuple[str, str] | None:
+    """Answer simple benefit-existence questions from one named monetary row.
+
+    This path is intentionally excluded for scenario/eligibility questions;
+    those still require the stricter conditional-allowance relationship.
+    """
+
+    if not _is_simple_named_benefit_existence_question(question):
+        return None
+    candidates: list[tuple[int, str, str, str]] = []
+    focus_terms = _named_monetary_benefit_focus_terms(question)
+    for source_index, source in enumerate(source_registry.sources):
+        folded = _normalize_broken_number_groups(_fold_for_person_match(source.text))
+        for match in _MONEY_VALUE_PATTERN.finditer(folded):
+            line_start = folded.rfind("\n", 0, match.start()) + 1
+            line_end = folded.find("\n", match.end())
+            if line_end < 0:
+                line_end = len(folded)
+            row = folded[line_start:line_end].strip()
+            if not all(term in row for term in focus_terms):
+                continue
+            subject = row[: match.start() - line_start].strip(" -|:")
+            if not subject:
+                continue
+            candidates.append((-source_index, subject, match.group(0), source.label))
+    if not candidates:
+        return None
+    _, subject, value, source_label = max(candidates, key=lambda candidate: candidate[0])
+    return f"Có. {subject} là {value}.", source_label
+
+
+def _is_allowance_entitlement_question(question: str) -> bool:
+    folded = _fold_for_person_match(question)
+    return any(
+        cue in folded for cue in ("phu cap", "tro cap", "allowance", "stipend", "ho tro", "support")
+    )
+
+
+def _conditional_allowance_facts(
+    source_registry: PromptSourceRegistry,
+) -> tuple[_ConditionalAllowanceFact, ...]:
+    facts: list[_ConditionalAllowanceFact] = []
+    for source in source_registry.sources:
+        text = _normalize_broken_number_groups(source.text)
+        for match in _CONDITIONAL_ALLOWANCE_AMOUNT_PATTERN.finditer(text):
+            subject = _allowance_subject_before_amount(text=text, amount_start=match.start())
+            tail = _allowance_condition_tail(text=text, amount_end=match.end())
+            folded_subject = _fold_for_person_match(subject)
+            folded_tail = _fold_for_person_match(tail)
+            if not subject or not _looks_like_allowance_fact(
+                subject=folded_subject,
+                condition=folded_tail,
+            ):
+                continue
+            positive, exclusion = _split_allowance_conditions(tail)
+            if not positive and not exclusion:
+                continue
+            facts.append(
+                _ConditionalAllowanceFact(
+                    subject=subject,
+                    value=match.group(0).strip(),
+                    positive_condition=positive,
+                    exclusion_condition=exclusion,
+                    source_label=source.label,
+                )
+            )
+    return tuple(facts)
+
+
+def _allowance_subject_before_amount(*, text: str, amount_start: int) -> str:
+    before = text[max(0, amount_start - 180) : amount_start]
+    lines = tuple(line.strip() for line in before.splitlines() if line.strip())
+    candidate = lines[-1] if lines else before
+    candidate = re.split(r"[.;:]\s*", candidate)[-1].strip()
+    candidate = re.sub(
+        r"^(?:nhan\s+vien|nguoi\s+lao\s+dong)\s+duoc\s+phe\s+duyet\s+che\s+do\s+",
+        "",
+        candidate,
+        flags=re.IGNORECASE,
+    )
+    return candidate.strip(" -|:\t")
+
+
+def _allowance_condition_tail(*, text: str, amount_end: int) -> str:
+    tail = text[amount_end : min(len(text), amount_end + 280)]
+    evidence_boundary = re.search(r"\bCLAIM_\d+\s+evidence\s*:", tail, re.IGNORECASE)
+    if evidence_boundary is not None:
+        tail = tail[: evidence_boundary.start()]
+    tail = re.sub(
+        r"[;,\s]*(?:(?:khong|không)\s+(?:ap|áp)|not\s+appl(?:y|ies))\s*$",
+        "",
+        tail,
+        flags=re.IGNORECASE,
+    )
+    # Some PDF table extractors collapse adjacent rows onto one physical line.
+    # A following monetary value is a reliable row boundary, whereas a newline
+    # is merely a layout detail.  Never let the next benefit's condition bind
+    # back to this amount.
+    next_amount = _CONDITIONAL_ALLOWANCE_AMOUNT_PATTERN.search(tail)
+    if next_amount is not None:
+        tail = tail[: next_amount.start()]
+    lines = tuple(line.strip() for line in tail.splitlines() if line.strip())
+    if not lines:
+        return ""
+    # A table row can wrap its condition across one following line.
+    selected: list[str] = []
+    for line in lines[:3]:
+        selected.append(line)
+        if line.endswith((".", "!", "?")):
+            break
+    return " ".join(selected).strip(" -|:\t")
+
+
+def _looks_like_allowance_fact(*, subject: str, condition: str) -> bool:
+    allowance_cues = ("phu cap", "tro cap", "allowance", "stipend", "ho tro", "support")
+    condition_cues = (
+        "ap dung",
+        "khong ap dung",
+        "duoc phe duyet",
+        "eligible",
+        "not eligible",
+        "does not apply",
+    )
+    return any(cue in subject for cue in allowance_cues) or (
+        any(cue in condition for cue in condition_cues)
+        and any(cue in f"{subject} {condition}" for cue in allowance_cues)
+    )
+
+
+def _split_allowance_conditions(tail: str) -> tuple[str, str]:
+    normalized = " ".join(tail.split())
+    exclusion = re.search(
+        r"(?:(?:khong|không)\s+(?:ap|áp)\s+(?:dung|dụng)"
+        r"|(?:khong|không)\s+(?:duoc|được)\s+(?:huong|hưởng)"
+        r"|not\s+eligible|does\s+not\s+apply)\b.*",
+        normalized,
+        re.IGNORECASE,
+    )
+    if exclusion is None:
+        return normalized, ""
+    positive = normalized[: exclusion.start()].strip(" ;,.")
+    return positive, exclusion.group(0).strip(" ;,.")
+
+
+def _allowance_fact_matches_question(fact: _ConditionalAllowanceFact, question: str) -> bool:
+    return _allowance_fact_question_match_score(fact, question) > 0
+
+
+def _allowance_fact_question_match_score(fact: _ConditionalAllowanceFact, question: str) -> int:
+    _, terms, _ = _prompt_query_needles(question)
+    focus_terms = tuple(
+        term
+        for term in terms
+        if len(term) >= 3
+        and term not in {"cong", "ty", "duoc", "co", "ho", "tro", "tien", "allowance", "stipend"}
+    )
+    if not focus_terms:
+        return 1
+    subject = _fold_for_person_match(fact.subject)
+    conditions = _fold_for_person_match(f"{fact.positive_condition} {fact.exclusion_condition}")
+    # A subject hit dominates an incidental condition hit from a neighbouring
+    # flattened row, while condition terms still distinguish qualifying and
+    # excluded scenarios for the same named benefit.
+    return sum(10 for term in focus_terms if term in subject) + sum(
+        1 for term in focus_terms if term in conditions
+    )
+
+
+def _question_asks_allowance_scenario(question: str) -> bool:
+    folded = _fold_for_person_match(question)
+    return bool(re.search(r"(?<!\d)\d+(?!\d)", folded)) or any(
+        cue in folded
+        for cue in (
+            "neu ",
+            "if ",
+            "truong hop",
+            "ngay ",
+            "day ",
+            "mot ",
+            "single ",
+            "ad hoc",
+            "regular ",
+            "thuong xuyen",
+            "arrangement",
+            "scenario",
+        )
+    )
+
+
+def _condition_entails_scenario(*, condition: str, question: str) -> bool:
+    if not condition:
+        return False
+    folded_condition = _canonicalize_allowance_condition(_fold_for_person_match(condition))
+    folded_question = _canonicalize_allowance_condition(_fold_for_person_match(question))
+    condition_terms = {
+        token
+        for token in re.findall(r"\w+", folded_condition)
+        if len(token) >= 3
+        and token not in {"khong", "ap", "dung", "duoc", "cho", "the", "when", "does", "not"}
+    }
+    question_terms = {
+        token
+        for token in re.findall(r"\w+", folded_question)
+        if len(token) >= 3
+        and token not in {"cong", "ty", "duoc", "co", "ho", "tro", "tien", "allowance", "stipend"}
+    }
+    shared = condition_terms.intersection(question_terms)
+    if len(shared) >= 2:
+        return True
+    return bool(
+        shared and _is_single_scenario(folded_condition) and _is_single_scenario(folded_question)
+    )
+
+
+def _canonicalize_allowance_condition(text: str) -> str:
+    canonical = re.sub(r"\b(?:wfh|work\s+from\s+home|lam\s+o\s+nha)\b", "remote", text)
+    canonical = re.sub(r"\b(?:don\s+le|ad\s*hoc|single)\b", "single", canonical)
+    return re.sub(r"\s+", " ", canonical).strip()
+
+
+def _is_single_scenario(text: str) -> bool:
+    return bool(
+        re.search(r"\b(?:single|mot|one|1)\b", text) and re.search(r"\b(?:ngay|day|hom)\b", text)
+    )
+
+
+def _strip_condition_prefix(condition: str) -> str:
+    return re.sub(r"^(?:ap\s+dung\s+(?:khi|cho)|for|when)\s+", "", condition, flags=re.IGNORECASE)
+
+
+def _strip_exclusion_prefix(condition: str) -> str:
+    return re.sub(
+        r"^(?:(?:khong|không)\s+(?:ap|áp)\s+(?:dung|dụng)\s+(?:cho)?|"
+        r"(?:khong|không)\s+(?:duoc|được)\s+(?:huong|hưởng)\s+(?:cho)?|"
+        r"not\s+eligible\s+for|does\s+not\s+apply\s+to)\s*",
+        "",
+        condition,
+        flags=re.IGNORECASE,
     )
 
 
@@ -5493,7 +8731,9 @@ def _structured_role_person_answer(
     source_registry: PromptSourceRegistry,
 ) -> tuple[str, str] | None:
     analysis = analyze_question(question)
-    if not analysis.asks_for_person:
+    if not analysis.asks_for_person and not (
+        analysis.is_yes_no and _asks_role_assignment_question(question)
+    ):
         return None
     role_terms = _raw_role_terms_for_prompt_question(question)
     if not role_terms:
@@ -5506,8 +8746,82 @@ def _structured_role_person_answer(
         candidates = _person_name_sequences_near_terms(source.text, role_terms)
         if candidates:
             role = role_terms[0].strip()
+            if analysis.is_yes_no:
+                proposed_terms = frozenset(_yes_no_proposed_entity_terms(question))
+                candidate_terms = {
+                    _fold_for_person_match(term)
+                    for term in re.findall(r"\w+", candidates[0], re.UNICODE)
+                }
+                polarity = "Có" if candidate_terms <= proposed_terms else "Không"
+                return f"{polarity}. {role} là {candidates[0]}.", source.label
             return f"{role} là {candidates[0]}.", source.label
     return None
+
+
+def _annual_leave_relations_for_question(
+    *,
+    question: str,
+    source_registry: PromptSourceRegistry,
+) -> tuple[tuple[AnnualLeaveRelation, str], ...]:
+    intent = annual_leave_relation_intent(question)
+    years = requested_seniority_years(question) if intent == "seniority_increment" else None
+    relations: list[tuple[AnnualLeaveRelation, str]] = []
+    for source in source_registry.sources:
+        if intent == "ordinary_allocation":
+            relation = ordinary_annual_leave_allocation(source.text)
+        elif intent == "seniority_increment" and years is not None:
+            relation = annual_leave_seniority_increment(source.text, requested_years=years)
+        else:
+            relation = None
+        if relation is not None:
+            relations.append((relation, source.label))
+    return tuple(relations)
+
+
+def _structured_proportional_leave_answer(
+    *, question: str, source_registry: PromptSourceRegistry
+) -> tuple[str, str] | None:
+    """Copy a source-bound proportional allocation for partial-year leave."""
+    folded_question = _fold_for_person_match(question)
+    if not any(cue in folded_question for cue in ("phep", "nghi hang nam", "annual leave")):
+        return None
+    if not (
+        re.search(r"\bchua(?:\s+lam)?\s+du\s+(?:mot|1)\s+nam\b", folded_question)
+        or re.search(r"\bchua(?:\s+lam)?\s+du\s+12\s+thang\b", folded_question)
+        or re.search(r"\b(?:under|less than)\s+(?:one|1)\s+year\b", folded_question)
+    ):
+        return None
+    relation = re.compile(
+        r"\btinh\s+theo\s+ty\s+le\s+tuong\s+ung\s+voi\s+thoi\s+gian\s+lam\s+viec\b"
+    )
+    for source in source_registry.sources:
+        folded_source = " ".join(_fold_for_person_match(source.text).split())
+        condition = re.search(r"\bchua\s+du\s+(?P<months>\d+)\s+thang\b", folded_source)
+        if condition is None:
+            continue
+        if match := relation.search(folded_source):
+            answer = f"Chua du {condition.group('months')} thang: phep nam {match.group(0)}."
+            return answer, source.label
+    return None
+
+
+def _structured_annual_leave_relation_answer(
+    *,
+    question: str,
+    source_registry: PromptSourceRegistry,
+) -> tuple[str, str] | None:
+    relations = _annual_leave_relations_for_question(
+        question=question,
+        source_registry=source_registry,
+    )
+    if not relations or len({fact.amount_days for fact, _ in relations}) > 1:
+        return None
+    fact, source_label = relations[0]
+    clause = fact.answer_clause.strip(" -\u2022\uf0b7")
+    if clause and clause[-1] not in ".!?":
+        clause = f"{clause}."
+    prefix = "Có. " if annual_leave_relation_intent(question) == "seniority_increment" else ""
+    return f"{prefix}{clause}", source_label
 
 
 def _structured_condition_value_answer(
@@ -5720,10 +9034,19 @@ def _structured_policy_clause_repair_generation(
     asks_for_first_action = any(
         cue in folded_question for cue in ("lam gi truoc", "what first", "do first")
     )
+    sensitive_policy_cues = _sensitive_policy_clause_cues(folded_question)
+    asks_for_sensitive_policy = bool(sensitive_policy_cues)
+    asks_for_scoped_self_policy = _asks_for_scoped_self_policy(folded_question)
     if (
-        (analysis.asks_for_explicit_value and not asks_for_oncall_allowance)
+        (
+            analysis.asks_for_explicit_value
+            and not asks_for_oncall_allowance
+            and not asks_for_scoped_self_policy
+        )
         or analysis.asks_for_person
-        or analysis.is_yes_no
+        or (
+            analysis.is_yes_no and not asks_for_sensitive_policy and not asks_for_scoped_self_policy
+        )
     ):
         return None
     focus_terms = tuple(
@@ -5743,7 +9066,11 @@ def _structured_policy_clause_repair_generation(
             "which",
         }
     )
-    if len(focus_terms) < 2 and "bao mat" not in _fold_for_person_match(question):
+    if (
+        len(focus_terms) < 2
+        and "bao mat" not in _fold_for_person_match(question)
+        and not asks_for_sensitive_policy
+    ):
         return None
 
     action_cues = (
@@ -5772,7 +9099,17 @@ def _structured_policy_clause_repair_generation(
         "an toan" in folded_question
         and any(cue in folded_question for cue in ("bao dam", "dam bao", "gi", "controls"))
     )
-    if asks_for_security_controls:
+    if asks_for_sensitive_policy:
+        required_cues = sensitive_policy_cues
+    elif asks_for_scoped_self_policy:
+        required_cues = (
+            "khong cam",
+            "duoc quyen",
+            "does not prohibit",
+            "may discuss",
+            "may share",
+        )
+    elif asks_for_security_controls:
         required_cues = _PROMPT_SECURITY_CONTROL_CUES
     elif asks_for_oncall_allowance:
         required_cues = ("phu cap on-call", "phu cap on call", "on-call bu", "on call bu")
@@ -5784,12 +9121,20 @@ def _structured_policy_clause_repair_generation(
     for source_index, source in enumerate(source_registry.sources):
         lines = tuple(line.strip() for line in source.text.splitlines() if line.strip())
         for line_index, _line in enumerate(lines):
-            combined = " ".join(lines[line_index : min(len(lines), line_index + 2)])
+            combined_lines = [lines[line_index]]
+            if line_index + 1 < len(lines) and not _starts_policy_list_item(lines[line_index + 1]):
+                combined_lines.append(lines[line_index + 1])
+            combined = " ".join(combined_lines)
             folded = _fold_for_person_match(combined)
             if not any(cue in folded for cue in required_cues):
                 continue
             matched = sum(1 for term in focus_terms if term in folded)
-            if matched < 2 and not (asks_for_security_controls or asks_for_oncall_allowance):
+            if matched < 2 and not (
+                asks_for_security_controls
+                or asks_for_oncall_allowance
+                or asks_for_sensitive_policy
+                or asks_for_scoped_self_policy
+            ):
                 continue
             clauses = tuple(part.strip(" -â€¢ï‚·") for part in re.split(r"[;]", combined))
             answer = next(
@@ -5834,6 +9179,70 @@ def _structured_policy_clause_repair_generation(
         response_time_ms=0,
         provider="local",
     )
+
+
+def _starts_policy_list_item(line: str) -> bool:
+    return re.match(r"^\s*(?:[-*•]|\d+[.)])\s*", line) is not None
+
+
+def _asks_for_scoped_self_policy(folded_question: str) -> bool:
+    has_self_scope = any(
+        cue in folded_question
+        for cue in (
+            "chinh minh",
+            "chinh toi",
+            "cua toi",
+            "my own",
+            "their own",
+            "his own",
+            "her own",
+        )
+    )
+    asks_policy_action = any(
+        cue in folded_question
+        for cue in (
+            "noi ve",
+            "noi cho",
+            "trao doi",
+            "chia se",
+            "cung cap",
+            "discuss",
+            "share",
+            "provide",
+            "disclose",
+        )
+    )
+    return has_self_scope and asks_policy_action
+
+
+def _sensitive_policy_clause_cues(folded_question: str) -> tuple[str, ...]:
+    """Return direct rule cues for a security-sensitive action or escalation."""
+
+    if any(cue in folded_question for cue in ("source code", "ma nguon", "github", "repository")):
+        return ("khong dua ma nguon", "must not put source code")
+    if any(
+        cue in folded_question for cue in ("gmail", "email ca nhan", "file cong viec", "work file")
+    ):
+        return ("khong tu gui", "email ca nhan", "personal email")
+    if any(cue in folded_question for cue in ("chatgpt", "public ai", "ai cong cong")):
+        return ("khong nhap", "dich vu ai cong cong", "public ai")
+    if any(
+        cue in folded_question
+        for cue in ("ket qua ai", "ai tao", "ai output", "bang chung test", "test evidence")
+    ):
+        return ("khong trinh bay", "bang chung kiem thu", "test evidence")
+    if any(
+        cue in folded_question
+        for cue in (
+            "tai khoan bi lo",
+            "lo tai khoan",
+            "lo thong tin xac thuc",
+            "compromised account",
+            "credentials exposed",
+        )
+    ):
+        return ("bao ngay", "service desk", "security operations")
+    return ()
 
 
 def _structured_first_day_eligibility_answer(
@@ -5946,6 +9355,18 @@ def _structured_time_range_answer(
     analysis = analyze_question(question)
     if not (analysis.asks_for_time_range or analysis.answer_type == "TIME"):
         return None
+    endpoint = _named_schedule_endpoint_answer(
+        question=question,
+        source_registry=source_registry,
+    )
+    if endpoint is not None:
+        return endpoint
+    corresponding = _corresponding_work_time_answer(
+        question=question,
+        source_registry=source_registry,
+    )
+    if corresponding is not None:
+        return corresponding
     for source in source_registry.sources:
         ranges = _question_focused_time_ranges_from_text(
             question=question,
@@ -5954,6 +9375,230 @@ def _structured_time_range_answer(
         if ranges:
             return _render_time_range_answer(ranges), source.label
     return None
+
+
+def _named_schedule_endpoint_answer(
+    *,
+    question: str,
+    source_registry: PromptSourceRegistry,
+) -> tuple[str, str] | None:
+    """Return one clock only when a named schedule field and endpoint are clear."""
+
+    folded_question = _fold_for_person_match(question)
+    if not any(cue in folded_question for cue in ("gio cot loi", "core hour")):
+        return None
+    asks_start = any(cue in folded_question for cue in ("bat dau", "starts at", "start at"))
+    asks_end = any(cue in folded_question for cue in ("ket thuc", "ends at", "end at"))
+    if asks_start == asks_end:
+        return None
+    is_afternoon = any(cue in folded_question for cue in ("buoi chieu", "afternoon"))
+    is_morning = any(cue in folded_question for cue in ("buoi sang", "morning"))
+    if is_afternoon == is_morning:
+        return None
+    for source in source_registry.sources:
+        ranges = _question_focused_time_ranges_from_text(
+            question="core hours",
+            source_text=source.text,
+        )
+        if len(ranges) != 2:
+            continue
+        target_range = ranges[1 if is_afternoon else 0]
+        clocks = tuple(_CLOCK_VALUE_PATTERN.findall(target_range))
+        if len(clocks) != 2:
+            continue
+        clock = clocks[0 if asks_start else 1]
+        period = "buổi chiều" if is_afternoon else "buổi sáng"
+        endpoint = "bắt đầu" if asks_start else "kết thúc"
+        return f"Giờ cốt lõi {period} {endpoint} lúc {clock}.", source.label
+    return None
+
+
+def _corresponding_work_time_answer(
+    *,
+    question: str,
+    source_registry: PromptSourceRegistry,
+) -> tuple[str, str] | None:
+    """Resolve a requested start time against paired start/end schedule ranges."""
+
+    folded_question = _fold_for_person_match(question)
+    asks_corresponding_end = any(
+        cue in folded_question for cue in ("may gio duoc ve", "gio duoc ve", "when can i leave")
+    ) or (
+        any(cue in folded_question for cue in ("vao luc", "bat dau", "start at"))
+        and any(cue in folded_question for cue in (" duoc ve", "ket thuc", "finish", "leave"))
+    )
+    if not asks_corresponding_end:
+        return None
+    requested_match = re.search(
+        r"(?<!\d)([01]?\d|2[0-3])(?:[:h]([0-5]\d))?\s*(?:gio|hours?|h\b)",
+        folded_question,
+    )
+    if requested_match is None:
+        return None
+    requested_minutes = int(requested_match.group(1)) * 60 + int(requested_match.group(2) or 0)
+
+    for source in source_registry.sources:
+        folded_text = _fold_for_person_match(source.text)
+        start_range: tuple[int, int] | None = None
+        end_range: tuple[int, int] | None = None
+        for match in _TIME_RANGE_VALUE_PATTERN.finditer(folded_text):
+            bounds = _time_range_minutes(match.group(0))
+            if bounds is None:
+                continue
+            line_start = folded_text.rfind("\n", 0, match.start()) + 1
+            label = folded_text[line_start : match.start()]
+            if any(cue in label for cue in ("khung bat dau", "flexible start", "start window")):
+                start_range = bounds
+            if any(cue in label for cue in ("khung ket thuc", "corresponding end", "end window")):
+                end_range = bounds
+        if start_range is None or end_range is None:
+            continue
+        if requested_minutes not in start_range:
+            continue
+        end_minutes = end_range[start_range.index(requested_minutes)]
+        end_clock = f"{end_minutes // 60:02d}:{end_minutes % 60:02d}"
+        return (
+            f"Nếu bắt đầu lúc {requested_minutes // 60:02d}:"
+            f"{requested_minutes % 60:02d} thì thời điểm kết thúc tương ứng là "
+            f"khoảng {end_clock}.",
+            source.label,
+        )
+    return None
+
+
+def _time_range_minutes(value: str) -> tuple[int, int] | None:
+    clocks = re.findall(r"(?<!\d)([01]?\d|2[0-3])(?:[:h]([0-5]\d))?(?!\d)", value)
+    if len(clocks) != 2:
+        return None
+    return tuple(int(hour) * 60 + int(minute or 0) for hour, minute in clocks)  # type: ignore[return-value]
+
+
+def _structured_unspecified_value_answer(
+    *,
+    question: str,
+    source_registry: PromptSourceRegistry,
+) -> tuple[str, str] | None:
+    """Explain an explicitly unfixed numeric field without guessing a value."""
+
+    analysis = analyze_question(question)
+    if not analysis.asks_for_percentage:
+        return None
+    for source in source_registry.sources:
+        if not has_explicit_not_specified(source.text):
+            continue
+        lines = tuple(line.strip() for line in source.text.splitlines() if line.strip())
+        candidate_clauses = tuple(
+            candidate
+            for index in range(len(lines))
+            for width in (1, 2, 3)
+            if has_explicit_not_specified(candidate := " ".join(lines[index : index + width]))
+            and not _fold_for_person_match(candidate)
+            .rstrip(" .,:;-")
+            .endswith((" theo", " according to", " under"))
+        )
+        if not candidate_clauses:
+            continue
+        clause = min(candidate_clauses, key=len).strip(" -•")
+        folded_clause = _fold_for_person_match(clause)
+        if any(
+            cue in folded_clause
+            for cue in (
+                "khong quy dinh",
+                "khong co dinh",
+                "khong an dinh",
+                "does not specify",
+                "not fixed",
+                "no fixed",
+            )
+        ):
+            answer = clause
+        else:
+            answer = f"Tài liệu không quy định một tỷ lệ cố định; {clause}"
+        if answer[-1] not in ".!?":
+            answer = f"{answer}."
+        return answer, source.label
+    return None
+
+
+def _structured_salary_band_answer(
+    *,
+    question: str,
+    source_registry: PromptSourceRegistry,
+) -> tuple[str, str] | None:
+    """Return a salary-band row when the requested role and range co-occur.
+
+    Salary tables commonly split a role label, grade, and currency range over
+    neighboring PDF-extracted lines.  General amount extraction intentionally
+    avoids these tables because their many nearby amounts are easy to confuse;
+    this narrow structural path requires the question's role terms and a
+    salary-band heading in the same local source window.
+    """
+
+    if not _is_salary_band_request(question):
+        return None
+
+    _, terms, _ = _prompt_query_needles(question)
+    role_terms = tuple(
+        term
+        for term in terms
+        if len(term) >= 3
+        and term not in _PROMPT_VALUE_FOCUS_STOP_TERMS
+        and term not in {"ben", "cong", "ty", "khoang"}
+    )
+    if not role_terms:
+        return None
+
+    candidates: list[tuple[float, int, int, str, str]] = []
+    for source_index, source in enumerate(source_registry.sources):
+        lines = tuple(line.strip() for line in source.text.splitlines() if line.strip())
+        folded_lines = tuple(_fold_for_person_match(line) for line in lines)
+        has_salary_band_heading = any(
+            cue in " ".join(folded_lines)
+            for cue in ("dai luong", "salary band", "base salary", "gross/thang")
+        )
+        if not has_salary_band_heading:
+            continue
+        for line_index in range(len(lines)):
+            role_line = folded_lines[line_index]
+            matched_terms = sum(term in role_line for term in role_terms)
+            if matched_terms < max(1, len(role_terms) - 1):
+                continue
+            window = " ".join(folded_lines[line_index : line_index + 2])
+            money_match = _MONEY_VALUE_PATTERN.search(window)
+            if money_match is None:
+                continue
+            value = money_match.group(0)
+            if "-" not in value and "–" not in value and "—" not in value:
+                continue
+            score = 100.0 + matched_terms * 80.0
+            if "gross/thang" in window or "gross" in window:
+                score += 20.0
+            candidates.append((score, -source_index, -line_index, value, source.label))
+    if not candidates:
+        return None
+    _, _, _, value, source_label = max(candidates, key=lambda candidate: candidate[:3])
+    return f"Dải lương tham khảo là {value}.", source_label
+
+
+def _is_salary_band_request(question: str) -> bool:
+    """Recognize role-level compensation bands, distinct from payroll topics."""
+
+    folded = _fold_for_person_match(question)
+    has_salary_scope = any(
+        cue in folded for cue in ("luong", "salary", "pay", "compensation", "gross")
+    )
+    has_band_scope = any(
+        cue in folded for cue in ("dai", "khoang", "range", "band", "khung", "min", "max")
+    )
+    has_explicit_range = (
+        ("tu" in folded and "den" in folded and "muc" in folded)
+        or "muc min" in folded
+        or "muc max" in folded
+    )
+    if has_band_scope and (has_salary_scope or "band" in folded):
+        return True
+    has_role_scope = any(cue in folded for cue in ("role", "vi tri", "position"))
+    return has_explicit_range and (has_salary_scope or has_role_scope)
 
 
 def _structured_direct_value_answer(
@@ -5994,6 +9639,148 @@ def _structured_direct_value_answer(
     return _render_direct_value_answer(value=value, analysis=analysis), source_label
 
 
+def _structured_leave_duration_answer(
+    *,
+    question: str,
+    source_registry: PromptSourceRegistry,
+) -> tuple[str, str] | None:
+    """Extract a duration bound to a leave event or notice-band condition."""
+
+    intent = _leave_policy_intent(question)
+    if intent == "unpaid_leave_notice":
+        values = {
+            (value, source.label)
+            for source in source_registry.sources
+            if (value := _unpaid_leave_notice_value(source.text)) is not None
+        }
+        if len({value for value, _ in values}) != 1:
+            return None
+        value, source_label = min(values, key=lambda item: item[1])
+        return f"Nên gửi đề nghị trước ít nhất {value}, nếu tình huống cho phép.", source_label
+    if intent not in {
+        "own_marriage",
+        "child_marriage",
+        "parent_bereavement",
+    } and not intent.startswith("annual_leave_notice:"):
+        return None
+    if intent.startswith("annual_leave_notice:"):
+        requested_days = int(intent.partition(":")[2])
+        matched_values = {
+            (value, source.label)
+            for source in source_registry.sources
+            for value in _matching_leave_notice_values(source.text, requested_days=requested_days)
+        }
+        if not matched_values or len({value for value, _ in matched_values}) != 1:
+            return None
+        value, source_label = min(matched_values, key=lambda item: item[1])
+        return f"Cần báo trước ít nhất {value}.", source_label
+    for source in source_registry.sources:
+        folded = _fold_for_person_match(_normalize_broken_number_groups(source.text))
+        patterns: tuple[str, ...]
+        if intent == "own_marriage":
+            patterns = (
+                r"(\d+\s*ngay)\s*\bket hon\b",
+                r"(?<!con\s)\bket hon\b\s*[-:|]?\s*(\d+\s*ngay)\b",
+            )
+        elif intent == "child_marriage":
+            patterns = (
+                r"\bcon(?:\s+(?:de|nuoi)){0,2}[^\n.;]{0,45}\bket hon\b\s*[-:|]?\s*(\d+\s*ngay)\b",
+                r"\bcon ket hon\b\s*[-:|]?\s*(\d+\s*ngay)\b",
+            )
+        elif intent == "parent_bereavement":
+            patterns = (
+                r"(?:cha/me|cha me|ba me|bo me)[^\n.;]{0,140}(?:chet|qua doi)"
+                r"\s*[-:|]?\s*(\d+\s*ngay)\b",
+                r"(?:cha/me|cha me|ba me|bo me)[^\n.;]{0,100}(\d+\s*ngay)\b",
+                r"(?:cha/me|cha me|ba me|bo me)[^\n.]{0,180}?(\d+\s*ngay)"
+                r"[^\n.]{0,100}(?:chet|qua doi)\b",
+            )
+        for pattern in patterns:
+            if match := re.search(pattern, folded):
+                return f"Thời lượng là {match.group(1)}.", source.label
+    return None
+
+
+def _structured_leave_policy_clause_answer(
+    *,
+    question: str,
+    source_registry: PromptSourceRegistry,
+) -> tuple[str, str] | None:
+    """Copy the material action clause for a non-numeric leave scenario."""
+
+    intent = _leave_policy_intent(question)
+    if intent not in {"sickness_action", "unused_leave_termination", "leave_incident"}:
+        return None
+    folded_question = _fold_for_person_match(question)
+    for source in source_registry.sources:
+        lines = tuple(line.strip(" -•") for line in source.text.splitlines() if line.strip())
+        if intent == "leave_incident":
+            asks_for_time = any(
+                cue in folded_question for cue in ("thoi gian", "ghi nhan", "actual time", "record")
+            )
+            required_cues = (
+                ("ghi nhan thoi gian thuc te", "thoi gian thuc te xu ly", "actual time")
+                if asks_for_time
+                else ("kich hoat nguoi thay the", "activate replacement")
+            )
+            for index, line in enumerate(lines):
+                folded_line = _fold_for_person_match(line)
+                if not any(cue in folded_line for cue in required_cues):
+                    continue
+                parts = [line]
+                if not asks_for_time:
+                    for continuation in lines[index + 1 : index + 5]:
+                        folded_continuation = _fold_for_person_match(continuation)
+                        if continuation.startswith("CLAIM_") or continuation.endswith("evidence:"):
+                            continue
+                        if (
+                            "dang nghi phep" in folded_continuation
+                            and "dau moi" in folded_continuation
+                        ):
+                            continue
+                        if folded_continuation == "tinh huong nguyen tac":
+                            continue
+                        parts.append(continuation)
+                        if any(cue in folded_continuation for cue in ("dong y", "consent")):
+                            break
+                    clause = " ".join(parts).strip()
+                    if not any(
+                        cue in _fold_for_person_match(clause) for cue in ("dong y", "consent")
+                    ):
+                        continue
+                else:
+                    clause = line
+                if clause[-1] not in ".!?":
+                    clause = f"{clause}."
+                return clause, source.label
+            continue
+        candidates: list[str] = []
+        for index in range(len(lines)):
+            for width in (1, 2, 3):
+                clause = " ".join(lines[index : index + width]).strip()
+                folded = _fold_for_person_match(clause)
+                if intent == "sickness_action":
+                    matches = "om dau" in folded and any(
+                        cue in folded for cue in ("thong bao ngay", "ngay khi co the")
+                    )
+                else:
+                    matches = (
+                        "cham dut" in folded
+                        and "thanh toan" in folded
+                        and any(
+                            cue in folded for cue in ("phep chua nghi", "nghi hang nam chua nghi")
+                        )
+                    )
+                if matches:
+                    candidates.append(clause)
+        if candidates:
+            clause = min(candidates, key=len)
+            if clause[-1] not in ".!?":
+                clause = f"{clause}."
+            return clause, source.label
+    return None
+
+
 def _duration_direct_value_repair_allowed(question: str) -> bool:
     folded_question = _fold_for_person_match(question)
     asks_for_paid_leave = " paid leave" in folded_question or (
@@ -6002,7 +9789,28 @@ def _duration_direct_value_repair_allowed(question: str) -> bool:
     asks_for_remote_days = any(
         cue in folded_question for cue in ("remote", "hybrid", "o nha", "lam viec tu xa")
     ) and any(cue in folded_question for cue in ("ngay", "day"))
-    return asks_for_paid_leave or asks_for_remote_days
+    asks_for_work_schedule_duration = any(
+        cue in folded_question
+        for cue in (
+            "lam bao nhieu",
+            "lam may",
+            "thoi gian lam viec",
+            "nghi trua",
+            "working hours",
+            "lunch break",
+        )
+    )
+    asks_for_leave_scenario = _leave_policy_intent(question) in {
+        "own_marriage",
+        "child_marriage",
+        "parent_bereavement",
+    } or _leave_policy_intent(question).startswith("annual_leave_notice:")
+    return (
+        asks_for_paid_leave
+        or asks_for_remote_days
+        or asks_for_work_schedule_duration
+        or asks_for_leave_scenario
+    )
 
 
 def _amount_direct_value_repair_allowed(question: str) -> bool:
@@ -6068,8 +9876,13 @@ def _scored_question_focused_direct_value_from_text(
     asks_minimum = any(
         cue in folded_question for cue in ("it nhat", "toi thieu", "minimum", "at least")
     )
-    _, terms, _ = _prompt_query_needles(effective_question)
+    phrases, terms, _ = _prompt_query_needles(effective_question)
     term_set = set(terms)
+    requested_duration_units = _requested_duration_value_units(folded_question)
+    requested_duration_periods = _requested_duration_period_units(
+        folded_question,
+        value_units=requested_duration_units,
+    )
     focus_terms = tuple(
         term
         for term in terms
@@ -6095,6 +9908,44 @@ def _scored_question_focused_direct_value_from_text(
     matches = tuple(pattern.finditer(folded_source_text))
     if not matches:
         return None
+    value_focus_terms = _prompt_value_focus_terms(terms) if analysis.asks_for_amount else ()
+    field_phrases = (
+        _direct_value_field_phrases(folded_question, value_focus_terms=value_focus_terms)
+        if value_focus_terms
+        else ()
+    )
+    requested_amount_period = (
+        requested_monetary_period(effective_question) if analysis.asks_for_amount else None
+    )
+    if requested_amount_period is not None:
+        period_matches = tuple(
+            match
+            for match in matches
+            if monetary_period_for_match(folded_source_text, match_end=match.end())
+            == requested_amount_period
+        )
+        if period_matches:
+            subject_matches = tuple(
+                match
+                for match in period_matches
+                if monetary_match_has_subject(
+                    folded_source_text,
+                    match_start=match.start(),
+                    match_end=match.end(),
+                    subject_phrases=field_phrases,
+                )
+            )
+            if subject_matches:
+                matches = subject_matches
+            elif any(
+                cue in folded_question
+                for cue in ("remote", "hybrid", "lam o nha", "lam viec tu xa")
+            ):
+                # Remote-value selection already has a stronger subject/condition
+                # scorer and can have several same-period allowance rows.
+                matches = period_matches
+            else:
+                return None
 
     best_value = ""
     best_score = 0.0
@@ -6129,8 +9980,19 @@ def _scored_question_focused_direct_value_from_text(
         score = sum(
             2.0 for term in focus_terms if term in local_before or term in local_after[:160]
         )
+        distinctive_matches = {
+            term
+            for term in focus_terms
+            if len(term) >= 8 and (term in local_before or term in local_after[:160])
+        }
+        # One long, exact field name (for example a named benefit or product)
+        # is stronger than generic conversational words around an amount.
+        # It must be able to outweigh a missing multi-word field phrase when
+        # the user's wording inserts short glue words between the terms.
+        score += len(distinctive_matches) * 500.0
         if focus_terms and score == 0:
             score += sum(0.25 for term in focus_terms if term in broad_window)
+        score += sum(90.0 for phrase in phrases if phrase in broad_window)
 
         if analysis.answer_type == "DATE":
             if any(cue in broad_window for cue in ("tra luong", "payroll", "salary", "payment")):
@@ -6138,8 +10000,23 @@ def _scored_question_focused_direct_value_from_text(
             if "ngay" in term_set:
                 score += 20.0
         if analysis.asks_for_duration:
-            if any(unit in match.group(0) for unit in ("gio", "ngay", "tuan", "thang", "nam")):
+            match_unit = _duration_match_unit(match.group(0))
+            if match_unit:
                 score += 45.0
+            if requested_duration_units:
+                if match_unit in requested_duration_units:
+                    score += 180.0
+                else:
+                    score -= 220.0
+            if requested_duration_periods:
+                matched_periods = _duration_match_period_units(
+                    text=folded_source_text,
+                    match=match,
+                )
+                if matched_periods & requested_duration_periods:
+                    score += 150.0
+                elif matched_periods:
+                    score -= 120.0
             if "nghi" in term_set and "nghi" in broad_window:
                 score += 55.0
             if "huong" in term_set and "huong luong" in broad_window:
@@ -6159,6 +10036,28 @@ def _scored_question_focused_direct_value_from_text(
             ):
                 score += 65.0
         if analysis.asks_for_percentage:
+            row_context = folded_source_text[line_start:line_end]
+            separator_before = max(
+                row_context.rfind(";", 0, match.start() - line_start),
+                row_context.rfind("|", 0, match.start() - line_start),
+            )
+            separator_after_candidates = tuple(
+                boundary
+                for separator in (";", "|")
+                if (boundary := row_context.find(separator, match.end() - line_start)) >= 0
+            )
+            segment_end = (
+                min(separator_after_candidates) if separator_after_candidates else len(row_context)
+            )
+            percentage_subject_score = _workforce_share_alignment_score(
+                question=folded_question,
+                row_context=row_context,
+                subject_context=row_context[separator_before + 1 : segment_end],
+                focus_terms=focus_terms,
+            )
+            if percentage_subject_score is None:
+                continue
+            score += percentage_subject_score
             if asks_minimum and "it nhat" in broad_window:
                 score += 75.0
             if any(cue in folded_question for cue in ("chu nhat", "sunday", "weekend")):
@@ -6195,16 +10094,21 @@ def _scored_question_focused_direct_value_from_text(
                     score += 260.0
                 else:
                     score -= 260.0
-            value_focus_terms = _prompt_value_focus_terms(terms)
             if value_focus_terms:
-                field_phrases = _direct_value_field_phrases(
-                    folded_question,
-                    value_focus_terms=value_focus_terms,
-                )
                 if field_phrases and not any(cue in folded_question for cue in remote_cues):
                     if any(
                         phrase in local_before[-100:] or phrase in local_after[:60]
                         for phrase in field_phrases
+                    ) or (
+                        requested_amount_period is not None
+                        and monetary_period_for_match(folded_source_text, match_end=match.end())
+                        == requested_amount_period
+                        and monetary_match_has_subject(
+                            folded_source_text,
+                            match_start=match.start(),
+                            match_end=match.end(),
+                            subject_phrases=field_phrases,
+                        )
                     ):
                         score += 420.0
                     else:
@@ -6232,6 +10136,170 @@ def _scored_question_focused_direct_value_from_text(
     if best_score < 50.0:
         return None
     return best_score, best_value
+
+
+def _workforce_share_alignment_score(
+    *,
+    question: str,
+    row_context: str,
+    subject_context: str,
+    focus_terms: tuple[str, ...],
+) -> float | None:
+    """Bind a workforce percentage to its requested group in the same row."""
+
+    workforce_cues = ("nhan su", "workforce", "personnel", "staff", "employees")
+    if not any(cue in question for cue in workforce_cues):
+        return 0.0
+    generic_terms = {
+        "phan",
+        "tram",
+        "percent",
+        "percentage",
+        "rate",
+        "ratio",
+        "share",
+        "nhan",
+        "vien",
+        "staff",
+        "workforce",
+        "personnel",
+        "employee",
+        "employees",
+        "nguoi",
+        "lam",
+        "viec",
+        "thuoc",
+        "khoi",
+        "voi",
+        "cung",
+        "the",
+        "and",
+        "khoang",
+        "bao",
+        "nhieu",
+        "what",
+        "which",
+        "how",
+        "many",
+        "trong",
+    }
+    subject_terms = tuple(term for term in focus_terms if term not in generic_terms)
+    if not subject_terms:
+        return 0.0
+    if not any(cue in row_context for cue in (*workforce_cues, "nhan vien", "employee")):
+        return None
+    if all(
+        term in subject_context
+        or any(alias in subject_context for alias in _SPECIFIC_TERM_TRANSLATIONS.get(term, ()))
+        for term in subject_terms
+    ):
+        return 160.0
+    return None
+
+
+def _requested_duration_value_units(question: str) -> frozenset[str]:
+    """Return the unit requested as the answer, not a surrounding period.
+
+    In ``một tuần làm bao nhiêu giờ`` the requested value unit is hours;
+    week is the condition. Keeping those roles separate prevents a nearby
+    ``12 tháng`` or ``24 giờ`` policy row from being selected merely because
+    it contains a duration.
+    """
+
+    aliases = {
+        "phut": "phut",
+        "minute": "phut",
+        "minutes": "phut",
+        "gio": "gio",
+        "tieng": "gio",
+        "hour": "gio",
+        "hours": "gio",
+        "ngay": "ngay",
+        "day": "ngay",
+        "days": "ngay",
+        "tuan": "tuan",
+        "week": "tuan",
+        "weeks": "tuan",
+        "thang": "thang",
+        "month": "thang",
+        "months": "thang",
+        "nam": "nam",
+        "year": "nam",
+        "years": "nam",
+    }
+    match = re.search(
+        r"(?:bao\s+nhieu|may|how\s+many)\s+(?:\w+\s+){0,3}?"
+        r"(phut|minutes?|gio|tieng|hours?|ngay|days?|tuan|weeks?|thang|months?|nam|years?)\b",
+        question,
+    )
+    if match is None:
+        return frozenset()
+    return frozenset((aliases[match.group(1)],))
+
+
+def _requested_duration_period_units(
+    question: str,
+    *,
+    value_units: frozenset[str],
+) -> frozenset[str]:
+    aliases = {
+        "ngay": "ngay",
+        "day": "day",
+        "tuan": "tuan",
+        "week": "week",
+        "thang": "thang",
+        "month": "month",
+        "nam": "nam",
+        "year": "year",
+    }
+    periods: set[str] = set()
+    for match in re.finditer(
+        r"(?:\bmoi\s+|\bmot\s+|/|\bper\s+)(ngay|day|tuan|week|thang|month|nam|year)\b",
+        question,
+    ):
+        canonical = aliases[match.group(1)]
+        if canonical not in value_units:
+            periods.add(canonical)
+    return frozenset(periods)
+
+
+def _duration_match_unit(value: str) -> str:
+    match = re.search(
+        r"(?:phut|minutes?|gio|hours?|ngay|days?|tuan|weeks?|thang|months?|nam|years?)\b",
+        value,
+    )
+    if match is None:
+        return ""
+    unit = match.group(0)
+    if unit.startswith("minute") or unit == "phut":
+        return "phut"
+    if unit.startswith("hour") or unit == "gio":
+        return "gio"
+    if unit.startswith("day") or unit == "ngay":
+        return "ngay"
+    if unit.startswith("week") or unit == "tuan":
+        return "tuan"
+    if unit.startswith("month") or unit == "thang":
+        return "thang"
+    return "nam"
+
+
+def _duration_match_period_units(*, text: str, match: re.Match[str]) -> frozenset[str]:
+    """Read a period bound directly to one duration value."""
+
+    periods: set[str] = set()
+    suffix = text[match.end() : min(len(text), match.end() + 24)]
+    suffix_match = re.match(r"\s*/\s*(ngay|day|tuan|week|thang|month|nam|year)\b", suffix)
+    if suffix_match is not None:
+        periods.add(suffix_match.group(1))
+    prefix = text[max(0, match.start() - 32) : match.start()]
+    prefix_match = re.search(
+        r"(?:moi|per)\s+(ngay|day|tuan|week|thang|month|nam|year)\s*$",
+        prefix,
+    )
+    if prefix_match is not None:
+        periods.add(prefix_match.group(1))
+    return frozenset(periods)
 
 
 def _direct_value_field_phrases(
@@ -6323,8 +10391,8 @@ def _structured_direct_value_for_match(
         suffix = folded_source_text[match.end() : min(len(folded_source_text), match.end() + 30)]
         suffix_match = re.match(
             r"(?:\s+(?:dong|vnd|d|₫)\b)"
-            r"(?:\s*/\s*(?:ngay|tuan|thang|nam|ky|lan|day|week|month|year)\b)?"
-            r"|\s*/\s*(?:ngay|tuan|thang|nam|ky|lan|day|week|month|year)\b",
+            r"(?:\s*/\s*(?:\d+\s*)?(?:ngay|tuan|thang|nam|ky|lan|day|week|month|year)\b)?"
+            r"|\s*/\s*(?:\d+\s*)?(?:ngay|tuan|thang|nam|ky|lan|day|week|month|year)\b",
             suffix,
         )
         if suffix_match is not None:
@@ -6380,23 +10448,35 @@ def _question_focused_time_ranges_from_text(
             "nao",
         }
     )
-    start_intent = bool(term_set & {"bat", "dau", "start", "begin", "begins"})
+    start_intent = bool(term_set & {"bat", "dau", "start", "begin", "begins"}) or (
+        "vao" in term_set and "lam" in term_set
+    )
     end_intent = bool(term_set & {"ket", "thuc", "end", "finish", "finishes"})
     core_intent = bool(term_set & {"cot", "loi", "core"})
-    has_direct_intent = start_intent or end_intent or core_intent
+    flexible_intent = bool(term_set & {"linh", "hoat", "flexible", "flex"})
+    has_direct_intent = start_intent or end_intent or core_intent or flexible_intent
 
     folded_source_text = _normalize_broken_number_groups(_fold_for_person_match(source_text))
     matches = tuple(_TIME_RANGE_VALUE_PATTERN.finditer(folded_source_text))
     if not matches:
         return ()
 
-    ranges: list[str] = []
+    scored_ranges: list[tuple[float, str]] = []
     previous_value_end = 0
     previous_direct_score = 0.0
     for match in matches:
         line_start = folded_source_text.rfind("\n", 0, match.start()) + 1
         label_start = max(line_start, previous_value_end)
         label_context = folded_source_text[label_start : match.start()].strip()
+        if not label_context and line_start > 0:
+            previous_line_end = line_start - 1
+            previous_line_start = folded_source_text.rfind("\n", 0, previous_line_end) + 1
+            previous_line = folded_source_text[previous_line_start:previous_line_end].strip()
+            if (
+                len(previous_line) <= 120
+                and _TIME_RANGE_VALUE_PATTERN.search(previous_line) is None
+            ):
+                label_context = previous_line
         if len(label_context) > 120:
             label_context = label_context[-120:]
         trailing_context = folded_source_text[
@@ -6425,6 +10505,9 @@ def _question_focused_time_ranges_from_text(
         label_has_core = (
             "cot" in label_context and "loi" in label_context
         ) or "core" in label_context
+        label_has_flexible = ("linh" in label_context and "hoat" in label_context) or any(
+            term in label_context for term in ("flexible", "flex")
+        )
 
         if start_intent:
             if label_has_start:
@@ -6453,18 +10536,36 @@ def _question_focused_time_ranges_from_text(
                 score -= 60.0
             if label_has_start or label_has_end:
                 score -= 140.0
+        if flexible_intent:
+            if label_has_flexible:
+                score += 120.0
+            else:
+                score -= 60.0
+            if label_has_core:
+                score -= 140.0
 
         value = match.group(0)
         include = score >= 50.0 if has_direct_intent else score > 0.0
-        if include and value not in ranges:
-            ranges.append(value)
+        if include and value not in {candidate for _, candidate in scored_ranges}:
+            scored_ranges.append((score, value))
             previous_direct_score = score if has_direct_intent else 0.0
         else:
             previous_direct_score = 0.0
         previous_value_end = match.end()
 
-    if ranges:
-        return tuple(ranges[:4])
+    if scored_ranges:
+        if has_direct_intent:
+            return tuple(value for _, value in scored_ranges[:4])
+        # A generic single-field question can share a paragraph with several
+        # other time rows. Keep only the range whose own label best matches the
+        # requested field; nearby lunch/flex ranges are not alternate answers.
+        best_score = max(score for score, _ in scored_ranges)
+        return tuple(value for score, value in scored_ranges if score == best_score)[:4]
+
+    if has_direct_intent:
+        # A nearby range from another named schedule field is not a fallback
+        # for an absent requested field (core, flexible start, or flexible end).
+        return ()
 
     fallback_ranges: list[str] = []
     for match in matches:

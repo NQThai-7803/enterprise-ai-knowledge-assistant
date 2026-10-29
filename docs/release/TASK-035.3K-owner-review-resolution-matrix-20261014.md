@@ -1,0 +1,14 @@
+# TASK-035.3K — owner-review resolution matrix
+
+Date: 2026-10-14. Decision analysis only; **no owner disposition was approved**. The complete exact-path appendix is [`TASK-035.3K-owner-review-path-appendix-20261014.json`](TASK-035.3K-owner-review-path-appendix-20261014.json), SHA-256 `727a9c7a40000e2969a2ebb1f314b7560c14d5606262fb402f0ef8ea17f0b3f1`. It records each path's current purpose, dependencies, known provenance, build/test and historical necessity, sensitivity, current size, bounded high-signal scan result, recommendation, supporting evidence, hash/Gitlink identity, and required owner decision. All **103/103** remain `REVIEW_REQUIRED`. The text-path scan found zero high-signal marker matches; zip, PNG and Gitlink contents were not scanned. Manual privacy/rights review remains mandatory.
+
+| Decision issue | Paths | Recommendation, not approval | Owner decision |
+| --- | ---: | --- | --- |
+| Historical release reports | 33 | Preserve controlled originals; review each for personal data, internal identifiers, source excerpts and publication rights before a sanitized Git version. | Release/privacy |
+| Legacy copied references | 50 | Preserve tracked history; decide whether engineering Git or a controlled historical archive is appropriate after provenance/privacy review. No active build import was found in 035.3J. | Engineering/privacy/content owner |
+| UAT operational overlays/scripts | 8 | Retain for isolated-corpus recovery; review runtime paths, credentials and operational effects before any source publication. | Engineering/operations/privacy |
+| Design/tool provenance | 7 | Retain current tracked state; establish source/license rights and actual frontend dependency before deciding Git inclusion or separate archive. | Frontend/design/legal as applicable |
+| Gitlink | 1 | Leave untouched pending option A/B/C decision in the Gitlink report. | Engineering/source owner |
+| Legacy archive, 7B model config, instruction and diff fragment | 4 | Preserve; evaluate each individually. The zip requires contents/privacy review, the 7B file is not the accepted 3B runtime, and the oddly named file is a diff fragment rather than a package manifest. | Engineering/privacy/licensing as applicable |
+
+These are 103 path-level recommendations, not 103 approvals. Tracked legacy files remain in current history even when excluded from a proposed new staging list. The 56 *proposed* release-documentation paths are a separate set and still require exact-diff/manual privacy clearance; proposed inclusion is not publication authorization. The 035.3J manifest itself is recorded only in its `self_path` metadata, with no self-hash entry among the 666 inventoried paths. That bounded manifest gap, plus these new 035.3K outputs, requires a future owner-approved refreshed manifest before versioning.

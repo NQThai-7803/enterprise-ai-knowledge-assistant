@@ -8,9 +8,20 @@ from app.chat.models import SelectedContext, SelectedContextItem
 from app.citations.models import PromptSource
 from app.document_processing.tokenization.base import TokenCounter
 from app.models import CitationSourceType
+from app.retrieval.leave_relations import (
+    annual_leave_relation_intent,
+    annual_leave_seniority_increment,
+    ordinary_annual_leave_allocation,
+    requested_seniority_years,
+)
 from app.retrieval.models import HybridRetrievalHit
-from app.retrieval.question_analysis import QuestionAnalysis, analyze_question
-from app.retrieval.structured import selected_structural_line_indexes
+from app.retrieval.question_analysis import (
+    QuestionAnalysis,
+    analyze_question,
+    asks_for_organization_activity,
+    retrieval_query_variants,
+)
+from app.retrieval.structured import has_explicit_not_specified, selected_structural_line_indexes
 from app.web_search.models import WebSearchResult
 
 CONTEXT_START = "<retrieved_context>"
@@ -19,6 +30,13 @@ CONTEXT_END = "</retrieved_context>"
 _QUERY_TERM_PATTERN = re.compile(r"\w+", re.UNICODE)
 _ACRONYM_PATTERN = re.compile(r"\b[A-Z][A-Z0-9&/+.-]{1,}\b")
 _NUMBER_UNIT_PATTERN = re.compile(r"(?<!\d)(\d+)\s*(?:\([^)]{1,80}\)\s*)?([^\W\d_]+)", re.UNICODE)
+_PERCENTAGE_PATTERN = re.compile(r"(?<!\d)\d+(?:[.,]\d+)?\s*%")
+_TIMELINE_VALUE_PATTERN = re.compile(
+    r"\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|"
+    r"jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?|"
+    r"thang\s*\d{1,2}|quy\s*\d|\d{1,2}\s*/\s*\d{1,2})\b",
+    re.IGNORECASE,
+)
 _EXCERPT_MAX_CHARACTERS = 1400
 _EXCERPT_BEFORE_CHARACTERS = 350
 _EXCERPT_AFTER_CHARACTERS = 900
@@ -211,8 +229,19 @@ def query_focused_excerpt(
         if claim_focused:
             return claim_focused
 
-    normalized_text = _collapse_whitespace(text)
     analysis = analyze_question(question)
+    profile_field = _organization_profile_field_excerpt(text, question, analysis)
+    if profile_field:
+        return profile_field
+    attendance_relation = _attendance_relation_excerpt(text, question)
+    if attendance_relation:
+        return attendance_relation
+    annual_leave_relation = _annual_leave_relation_excerpt(text, question)
+    if annual_leave_relation:
+        return annual_leave_relation
+
+    normalized_text = _collapse_whitespace(text)
+    focus_question = retrieval_query_variants(question).normalized
     folded_text = _fold_text(normalized_text)
     number_unit_count = len(tuple(_NUMBER_UNIT_PATTERN.finditer(folded_text)))
     quantity_focus = _is_quantity_question(question) and number_unit_count >= 3
@@ -223,6 +252,9 @@ def query_focused_excerpt(
     change_focus = _is_change_question(question) and number_unit_count >= 2
     person_focus = _is_person_acronym_question(question) and _has_multiple_acronym_records(
         normalized_text
+    )
+    explicit_unfixed_percentage_focus = analysis.asks_for_percentage and has_explicit_not_specified(
+        text
     )
     if (
         len(normalized_text) <= _EXCERPT_MAX_CHARACTERS
@@ -246,15 +278,19 @@ def query_focused_excerpt(
         person_role_excerpt = _person_role_excerpt(normalized_text, question)
         if person_role_excerpt:
             return person_role_excerpt
-    if not multi_value_focus and (
+    if (not multi_value_focus or explicit_unfixed_percentage_focus) and (
         analysis.asks_for_explicit_value
         or analysis.asks_for_person
         or analysis.is_yes_no
         or analysis.asks_for_policy_condition
     ):
         structured_excerpt = _structured_query_excerpt(
-            normalized_text,
-            question=question,
+            # Preserve extracted line boundaries until after structured row
+            # binding. Collapsing first turns a complete table into one line
+            # and makes an adjacent percentage indistinguishable from the
+            # requested row.
+            text,
+            question=focus_question,
             analysis=analysis,
         )
         if structured_excerpt:
@@ -334,6 +370,151 @@ def query_focused_excerpt(
     return excerpt
 
 
+def _attendance_relation_excerpt(text: str, question: str) -> str:
+    """Keep a policy scenario with its outcome across extracted table/section rows."""
+
+    folded_question = _fold_text(question)
+    if not any(cue in folded_question for cue in ("cham cong", "check-in", "check-out")):
+        return ""
+    lines = tuple(line.strip(" \t\u2022\uf0b7") for line in text.splitlines() if line.strip())
+    folded_lines = tuple(_fold_text(line) for line in lines)
+
+    if any(cue in folded_question for cue in ("remote", "hybrid", "lam o nha", "tu xa")):
+        scope_indexes = tuple(
+            index
+            for index, line in enumerate(folded_lines)
+            if "lam viec tu xa" in line or "hybrid" in line or line.strip(" :") == "remote"
+        )
+        for index, line in enumerate(folded_lines):
+            if "nghia vu cham cong" not in line:
+                continue
+            scopes = tuple(scope for scope in scope_indexes if scope <= index < scope + 16)
+            if not scopes:
+                continue
+            obligation = lines[index]
+            for continuation_index in range(index + 1, min(index + 4, len(lines))):
+                if "nhu khi lam tai van phong" in folded_lines[continuation_index]:
+                    obligation = f"{obligation} {lines[continuation_index]}"
+                    break
+            section_scopes = tuple(
+                scope for scope in scopes if "lam viec tu xa" in folded_lines[scope]
+            )
+            scope = lines[section_scopes[-1] if section_scopes else scopes[-1]]
+            if scope != lines[index]:
+                return f"Answer-focused evidence:\n{scope}\n{obligation}"
+            return f"Answer-focused evidence:\n{obligation}"
+
+    if "quen" in folded_question and any(
+        cue in folded_question for cue in ("cham cong", "check-in", "check-out")
+    ):
+        event_indexes = tuple(
+            index
+            for index, line in enumerate(folded_lines)
+            if "quen" in line and any(cue in line for cue in ("check-in", "check-out", "cham cong"))
+        )
+        for index, line in enumerate(folded_lines):
+            if not (
+                "yeu cau" in line
+                and "gui" in line
+                and re.search(r"\b\d+\s+(?:ngay|working days?|business days?)\b", line)
+            ):
+                continue
+            events = tuple(event for event in event_indexes if event <= index < event + 20)
+            if events:
+                deadline = re.sub(r"^\d+\.\s+", "", lines[index].split(";", 1)[0])
+                return f"Answer-focused evidence:\n{lines[events[-1]]}\n{deadline}"
+    return ""
+
+
+def _annual_leave_relation_excerpt(text: str, question: str) -> str:
+    intent = annual_leave_relation_intent(question)
+    if intent == "ordinary_allocation":
+        relation = ordinary_annual_leave_allocation(text)
+    elif intent == "seniority_increment":
+        years = requested_seniority_years(question)
+        relation = (
+            annual_leave_seniority_increment(text, requested_years=years)
+            if years is not None
+            else None
+        )
+    else:
+        return ""
+    return f"Answer-focused evidence:\n{relation.evidence}" if relation is not None else ""
+
+
+def _organization_profile_field_excerpt(
+    text: str,
+    question: str,
+    analysis: QuestionAnalysis,
+) -> str:
+    """Bind an organization-profile field to its PDF-interleaved value."""
+
+    folded_question = _fold_text(question)
+    lines = tuple(line.strip() for line in text.splitlines() if line.strip())
+    if asks_for_organization_activity(question):
+        for index, line in enumerate(lines):
+            if _fold_text(line) not in (
+                "linh vuc hoat dong",
+                "business areas",
+                "areas of operation",
+                "lines of business",
+            ):
+                continue
+            row = _interleaved_profile_row(lines, index, required_shape="list")
+            if row:
+                return row
+    if analysis.asks_for_percentage and any(
+        cue in folded_question for cue in ("nhan su", "nhan vien", "workforce", "staff")
+    ):
+        for index, line in enumerate(lines):
+            if _fold_text(line) not in (
+                "quy mo nhan su",
+                "workforce composition",
+                "staff composition",
+            ):
+                continue
+            row = _interleaved_profile_row(lines, index, required_shape="percentage")
+            if row:
+                return row
+    if any(cue in folded_question for cue in ("van phong", "office")) and any(
+        cue in folded_question for cue in ("o dau", "tai dau", "where", "locations")
+    ):
+        for line in lines:
+            folded_line = _fold_text(line)
+            match = re.match(
+                r"^(?:van phong|offices?)\s+"
+                r"((?:thanh pho|tinh|city|province|dia chi|address)\b.+)",
+                folded_line,
+            )
+            if match is not None:
+                value = line[len(line) - len(match.group(1)) :]
+                return f"Answer-focused evidence:\nVăn phòng: {value}"
+    return ""
+
+
+def _interleaved_profile_row(
+    lines: tuple[str, ...],
+    index: int,
+    *,
+    required_shape: str,
+) -> str:
+    if index == 0:
+        return ""
+    leading_value = lines[index - 1]
+    if required_shape == "list":
+        has_shape = leading_value.count(",") >= 2 and len(leading_value.split()) >= 5
+    else:
+        has_shape = _PERCENTAGE_PATTERN.search(_fold_text(leading_value)) is not None
+    if not has_shape:
+        return ""
+    value_parts = [leading_value]
+    if index + 1 < len(lines):
+        continuation = lines[index + 1]
+        if continuation[:1].islower() and not continuation.endswith("?"):
+            value_parts.append(continuation)
+    return f"Answer-focused evidence:\n{lines[index]}: {' '.join(value_parts)}"
+
+
 def _claim_focused_excerpt(text: str, information_needs: Sequence[str]) -> str:
     """Keep evidence for each backend-defined claim when packing compound context."""
     lines = tuple(line.strip() for line in text.splitlines() if line.strip())
@@ -373,14 +554,37 @@ def _structured_query_excerpt(
     if not indexes:
         return ""
     lines = tuple(line.strip() for line in text.splitlines() if line.strip())
-    selected_indexes = tuple(sorted(index for index in indexes if 0 <= index < len(lines)))
+    if analysis.asks_for_timeline:
+        timeline_rows = _query_matched_timeline_rows(lines, question=question)
+        if timeline_rows:
+            excerpt = "\n".join(timeline_rows).strip()
+            return f"Answer-focused evidence:\n{excerpt}"[:_EXCERPT_MAX_CHARACTERS].strip()
+    priority_indexes = tuple(index for index in indexes if 0 <= index < len(lines))
+    selected_indexes = tuple(
+        sorted(
+            _budget_structural_line_indexes(
+                lines,
+                priority_indexes=priority_indexes,
+            )
+        )
+    )
     selected, used_indexes = _wrapped_value_label_rows(
         lines,
         selected_indexes=selected_indexes,
         question=question,
         analysis=analysis,
     )
+    # A directly matched percentage row is already self-contained evidence.
+    # Do not append other structurally relevant lines: in flattened tables an
+    # adjacent premium/bonus percentage can otherwise displace the row that
+    # actually answers the requested work context.
+    if analysis.asks_for_percentage and selected:
+        excerpt = "\n".join(dict.fromkeys(selected)).strip()
+        return f"Answer-focused evidence:\n{excerpt}"[:_EXCERPT_MAX_CHARACTERS].strip()
     selected.extend(lines[index] for index in selected_indexes if index not in used_indexes)
+    if analysis.asks_for_percentage and has_explicit_not_specified(" ".join(selected)):
+        excerpt = " ".join(dict.fromkeys(selected)).strip()
+        return f"Answer-focused evidence:\n{excerpt}"[:_EXCERPT_MAX_CHARACTERS].strip()
     excerpt = "\n".join(dict.fromkeys(selected)).strip()
     if not excerpt:
         return ""
@@ -390,6 +594,85 @@ def _structured_query_excerpt(
     return excerpt[:_EXCERPT_MAX_CHARACTERS].strip()
 
 
+def _budget_structural_line_indexes(
+    lines: tuple[str, ...],
+    *,
+    priority_indexes: tuple[int, ...],
+) -> tuple[int, ...]:
+    """Fit relevant complete lines before restoring their source order.
+
+    Structural selection returns relevance order, while excerpts are rendered
+    in source order. If all earlier source lines are rendered first, a
+    high-priority wrapped clause near the end can be cut before its
+    continuation. Budget in relevance order and keep a trailing connector
+    with the following selected line so the final source-ordered excerpt does
+    not turn a qualified rule into an incomplete proposition.
+    """
+
+    available_characters = _EXCERPT_MAX_CHARACTERS - len("Answer-focused evidence:\n")
+    chosen: list[int] = []
+    used_characters = 0
+    for index in priority_indexes:
+        if index in chosen:
+            continue
+        group = [index]
+        wrapped_to_lowercase = (
+            index + 1 < len(lines)
+            and not lines[index].rstrip().endswith((".", "!", "?", ";"))
+            and lines[index + 1][:1].islower()
+        )
+        interrupted_table_cell = (
+            index + 2 < len(lines)
+            and not lines[index].rstrip().endswith((".", "!", "?", ";"))
+            and len(lines[index + 1]) <= 48
+            and lines[index + 1][:1].isupper()
+            and lines[index + 2][:1].islower()
+        )
+        if (
+            _line_requires_continuation(lines[index])
+            or wrapped_to_lowercase
+            or interrupted_table_cell
+        ) and index + 1 < len(lines):
+            group.append(index + 1)
+            # A flattened table can interrupt a wrapped value with its short
+            # row label. Keep the next continuation as well, rather than
+            # publishing a value that ends halfway through a policy clause.
+            if (
+                interrupted_table_cell
+                and len(lines[index + 1]) <= 48
+                and lines[index + 2][:1].islower()
+                and not lines[index + 1].rstrip().endswith((".", "!", "?", ";"))
+            ):
+                group.append(index + 2)
+        group_characters = sum(len(lines[group_index]) + 1 for group_index in group)
+        if chosen and used_characters + group_characters > available_characters:
+            continue
+        chosen.extend(group)
+        used_characters += group_characters
+    return tuple(dict.fromkeys(chosen))
+
+
+def _line_requires_continuation(line: str) -> bool:
+    folded = _fold_text(line).rstrip(" .,:;-\n")
+    return folded.endswith(
+        (
+            " khi",
+            " neu",
+            " va",
+            " hoac",
+            " cua",
+            " de",
+            " if",
+            " when",
+            " and",
+            " or",
+            " of",
+            " to",
+            " for",
+        )
+    )
+
+
 def _wrapped_value_label_rows(
     lines: tuple[str, ...],
     *,
@@ -397,6 +680,11 @@ def _wrapped_value_label_rows(
     question: str,
     analysis: QuestionAnalysis,
 ) -> tuple[list[str], set[int]]:
+    if analysis.asks_for_percentage:
+        rows, used = _query_matched_overtime_percentage_rows(lines, question=question)
+        if rows:
+            return rows, used
+
     if analysis.answer_type != "DATE":
         return [], set()
     _, terms, _ = _query_needles(question)
@@ -418,6 +706,158 @@ def _wrapped_value_label_rows(
         rows.append(f"{lines[index + 1]}: {lines[index]}")
         used.update((index, index + 1))
     return rows, used
+
+
+_TIMELINE_TERM_STOP_WORDS = frozenset(
+    {
+        "thuong",
+        "dien",
+        "ra",
+        "khoang",
+        "thoi",
+        "gian",
+        "nao",
+        "when",
+        "what",
+        "which",
+        "period",
+        "months",
+        "timeline",
+        "cycle",
+        "effective",
+        "date",
+    }
+)
+
+
+def _query_matched_timeline_rows(lines: tuple[str, ...], *, question: str) -> list[str]:
+    """Keep an ordered, query-matched policy timeline as a single evidence unit."""
+
+    _, terms, _ = _query_needles(question)
+    topic_terms = tuple(
+        term for term in terms if len(term) >= 3 and term not in _TIMELINE_TERM_STOP_WORDS
+    )
+    if not topic_terms:
+        return []
+    anchor_indexes = [
+        index
+        for index, line in enumerate(lines)
+        if all(term in _fold_text(line) for term in topic_terms)
+    ]
+    for anchor_index in anchor_indexes:
+        rows = [lines[anchor_index]]
+        # Stages can carry only their event and date after a heading that names
+        # the process. Retain their source order without inferring a date.
+        for line in lines[anchor_index + 1 : anchor_index + 9]:
+            folded_line = _fold_text(line)
+            if _TIMELINE_VALUE_PATTERN.search(folded_line) or any(
+                cue in folded_line
+                for cue in (
+                    "danh gia",
+                    "calibration",
+                    "phe duyet",
+                    "budget",
+                    "thong bao",
+                    "notification",
+                    "hieu luc",
+                    "effective",
+                )
+            ):
+                rows.append(line)
+                continue
+            if len(rows) > 1:
+                break
+        if len(rows) > 1:
+            return rows
+    return []
+
+
+_OT_DAY_TYPE_CUES: dict[str, tuple[str, ...]] = {
+    "normal_workday": ("ngay thuong", "ngay lam viec binh thuong", "normal workday", "weekday"),
+    "weekly_rest": ("ngay nghi hang tuan", "chu nhat", "weekly rest", "weekend", "sunday"),
+    "holiday": ("ngay le", "ngay nghi co huong luong", "tet", "public holiday", "holiday"),
+    "night_overtime": ("lam them vao ban dem", "night overtime"),
+    "night_work": ("lam viec ban dem", "night work", "night shift"),
+}
+
+_ADDITIONAL_PERCENTAGE_CUES = (
+    "duoc tra them",
+    "ngoai tien ot",
+    "additional percentage",
+    "additional pay",
+    "night premium",
+)
+
+
+def _query_matched_overtime_percentage_rows(
+    lines: tuple[str, ...],
+    *,
+    question: str,
+) -> tuple[list[str], set[int]]:
+    """Return the percentage row bound to the requested OT day type.
+
+    Extracted policy tables may put a value immediately before its row label.
+    The inverse layout (a label immediately before its value) is also common.
+    A label is therefore eligible on either side, but never across a previous
+    percentage: that boundary distinguishes the next row from an adjacent
+    premium such as a night-work supplement.
+    """
+
+    folded_question = _fold_text(question)
+    if not any(cue in folded_question for cue in ("ot", "overtime", "lam them")):
+        return [], set()
+    requested_day_types = tuple(
+        day_type
+        for day_type, cues in _OT_DAY_TYPE_CUES.items()
+        if any(cue in folded_question for cue in cues)
+    )
+    if "night_overtime" in requested_day_types:
+        requested_day_types = ("night_overtime",)
+    if len(requested_day_types) != 1:
+        return [], set()
+    requested_day_type = requested_day_types[0]
+
+    def has_requested_day_type(text: str) -> bool:
+        folded = _fold_text(text)
+        return any(cue in folded for cue in _OT_DAY_TYPE_CUES[requested_day_type])
+
+    for index, line in enumerate(lines):
+        if _PERCENTAGE_PATTERN.search(_fold_text(line)) is None:
+            continue
+        folded_line = _fold_text(line)
+        # A premium is a separate compensation concept, not a base OT rate
+        # for the requested day type. It may sit beside the holiday/rest row
+        # in a flattened table, so lexical proximity is not sufficient.
+        if requested_day_type in {"normal_workday", "weekly_rest", "holiday"} and any(
+            cue in folded_line for cue in _ADDITIONAL_PERCENTAGE_CUES
+        ):
+            continue
+
+        related_indexes = [index]
+        if has_requested_day_type(line):
+            if (
+                index + 1 < len(lines)
+                and has_requested_day_type(lines[index + 1])
+                and _PERCENTAGE_PATTERN.search(_fold_text(lines[index + 1])) is None
+            ):
+                related_indexes.append(index + 1)
+        elif (
+            index + 1 < len(lines)
+            and has_requested_day_type(lines[index + 1])
+            and _PERCENTAGE_PATTERN.search(_fold_text(lines[index + 1])) is None
+        ):
+            related_indexes.append(index + 1)
+        elif (
+            index > 0
+            and has_requested_day_type(lines[index - 1])
+            and (index < 2 or _PERCENTAGE_PATTERN.search(_fold_text(lines[index - 2])) is None)
+        ):
+            related_indexes.insert(0, index - 1)
+        else:
+            continue
+
+        return [" ".join(lines[row_index] for row_index in related_indexes)], set(related_indexes)
+    return [], set()
 
 
 def _format_multi_value_excerpt(text: str) -> str:
@@ -550,10 +990,25 @@ def _is_broad_multi_value_duration_question(
 
 def _is_person_acronym_question(question: str) -> bool:
     folded_question = _fold_text(question).strip()
+    analysis = analyze_question(question)
+    if analysis.asks_for_explicit_value and not analysis.asks_for_person:
+        # An acronym can name a policy/program in a numeric yes/no question
+        # (for example, whether an insurance rate is fixed).  Do not let the
+        # generic confirmation suffix reroute that request to person lookup.
+        return False
     return bool(_ACRONYM_PATTERN.search(question)) and (
         " la ai" in folded_question
         or folded_question.endswith(" ai")
+        or " ten gi" in folded_question
+        or folded_question.endswith(" ten")
+        or " what is the name" in folded_question
+        or " what's the name" in folded_question
         or " who " in f" {folded_question} "
+        or " hay xac nhan" in folded_question
+        or " vui long xac nhan" in folded_question
+        or " please confirm" in folded_question
+        or " confirm whether" in folded_question
+        or " confirm that" in folded_question
         or " dung khong" in folded_question
         or " phai khong" in folded_question
         or folded_question.startswith("co phai")
@@ -602,7 +1057,6 @@ def _person_role_excerpt(text: str, question: str) -> str:
             "digital",
             "gi",
             "nguoi",
-            "nova",
             "phu",
             "ten",
             "trach",

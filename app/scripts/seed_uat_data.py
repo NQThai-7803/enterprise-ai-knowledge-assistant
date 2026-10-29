@@ -37,6 +37,7 @@ from app.models import (
 
 ALLOWED_ENVIRONMENTS = {"development", "test"}
 UAT_ENABLED_VALUE = "true"
+UAT_ACCOUNTS_ONLY_VALUE = "true"
 MIN_UAT_PASSWORD_LENGTH = 12
 
 ADMIN_EMAIL = "admin.uat@example.test"
@@ -126,6 +127,23 @@ async def seed_uat_data(
                 department_id=knowledge_department.id,
             )
             await session.flush()
+
+            if os.getenv("UAT_SEED_ACCOUNTS_ONLY", "").strip().lower() == UAT_ACCOUNTS_ONLY_VALUE:
+                await session.commit()
+                return UatSeedResult(
+                    departments={
+                        KNOWLEDGE_DEPARTMENT_CODE: str(knowledge_department.id),
+                        OPERATIONS_DEPARTMENT_CODE: str(operations_department.id),
+                    },
+                    users={
+                        "admin": str(admin.id),
+                        "manager": str(manager.id),
+                        "staff": str(staff.id),
+                    },
+                    documents={},
+                    permissions={},
+                    feedback={},
+                )
 
             grounding_document = await _upsert_document_with_chunk(
                 session,

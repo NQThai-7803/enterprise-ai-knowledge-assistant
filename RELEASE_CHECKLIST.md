@@ -18,7 +18,8 @@ Use this checklist before treating the backend MVP as release-ready for a produc
 ## Database And Data
 
 - [ ] Alembic migrations are applied.
-- [ ] Alembic current revision equals head `20260722_0009`.
+- [ ] Alembic current revision equals the migration head verified from the exact release-candidate source and target database.
+  - Historical reference: the isolated V2 baseline checked on 2026-10-13 reported `20260822_0011`. This is not current-RC acceptance evidence.
 - [ ] PostgreSQL backup was created and restored on an isolated stack.
 - [ ] Upload volume backup was created and restored on an isolated stack.
 - [ ] Restored stack can download an existing Document and process a new upload.

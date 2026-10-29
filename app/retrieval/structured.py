@@ -14,8 +14,29 @@ _COUNT_VALUE_RE = re.compile(
     r"(?<!\d)\d+(?:[.,]\d+)?\s*(?:nguoi|nhan\s+su|nhan\s+vien|employees?|people)\b"
 )
 _MONEY_VALUE_RE = re.compile(
-    r"(?<!\d)\d+(?:[.,]\d+)?(?:\s*(?:-|\u2013|\u2014)\s*\d+(?:[.,]\d+)?)?\s*"
+    r"(?<!\d)(?:\d{1,3}(?:[.,]\d{3})+|\d+(?:[.,]\d+)?)"
+    r"(?:\s*(?:-|\u2013|\u2014)\s*(?:\d{1,3}(?:[.,]\d{3})+|\d+(?:[.,]\d+)?))?\s*"
     r"(?:trieu|dong|vnd|d|\u20ab)\b"
+)
+_MONETARY_PERIOD_ALIASES = {
+    "lan": "lan",
+    "visit": "lan",
+    "visits": "lan",
+    "occurrence": "lan",
+    "occurrences": "lan",
+    "ngay": "ngay",
+    "day": "ngay",
+    "days": "ngay",
+    "thang": "thang",
+    "month": "thang",
+    "months": "thang",
+    "nam": "nam",
+    "year": "nam",
+    "years": "nam",
+}
+_MONETARY_PERIOD_SUFFIX_RE = re.compile(
+    r"(?:\s+(?:dong|vnd|d))?\s*(?:/\s*|per\s+|moi\s+)"
+    r"(lan|visits?|occurrences?|ngay|days?|thang|months?|nam|years?)\b"
 )
 _TIME_RE = re.compile(
     r"(?<!\d)(?:[01]?\d|2[0-3])(?:[:h][0-5]\d)?\s*(?:-|\u2013|\u2014|den|to)\s*"
@@ -28,6 +49,37 @@ _LIST_MARKER_RE = re.compile(r"^\s*(?:[-*Ã¢â‚¬Â¢]|\d+[.)])\s+")
 _ACRONYM_RE = re.compile(r"\b[A-Z][A-Z0-9&/+.-]{1,}\b")
 _TITLE_TOKEN_RE = re.compile(r"\b[^\W\d_][\w'-]*\b", re.UNICODE)
 
+_SALARY_RANGE_RE = re.compile(
+    r"(?<!\d)\d+(?:[.,]\d+)?\s*(?:-|\u2013|\u2014)\s*\d+(?:[.,]\d+)?\s*"
+    r"(?:trieu|dong|vnd|d|\u20ab)\b"
+)
+_SALARY_BAND_VALUE_TERMS = frozenset(
+    {
+        "amount",
+        "band",
+        "bao",
+        "dai",
+        "dong",
+        "gross",
+        "khung",
+        "khoang",
+        "luong",
+        "muc",
+        "nao",
+        "nhieu",
+        "pay",
+        "range",
+        "salary",
+        "tham",
+        "thuoc",
+        "tien",
+        "trieu",
+        "thi",
+        "vay",
+        "voi",
+        "nhe",
+    }
+)
 _VALUELESS_TABLE_CUES = (
     "noi dung",
     "hang muc",
@@ -245,6 +297,55 @@ def build_structured_records(text: str) -> tuple[StructuredRecord, ...]:
     return tuple(records)
 
 
+def monetary_example_rows(
+    text: str,
+    *,
+    focus_terms: tuple[str, ...],
+    requested_period: str | None = None,
+) -> tuple[StructuredRecord, ...]:
+    """Find amount rows whose preceding example column names the queried expense.
+
+    Flattened PDF tables often place an example-expense cell on one line and
+    the category/amount cell on the next. Only adjacent structured records
+    under an explicit example-expense header qualify. A query-focused excerpt
+    produced by the context builder may omit that header, so a comma-delimited
+    example cell in that excerpt also preserves the same local row boundary.
+    """
+
+    folded = fold_text(text)
+    has_header = any(cue in folded for cue in ("vi du chi phi hop le", "eligible expense examples"))
+    focused_excerpt = folded.startswith("answer-focused evidence:")
+    if not has_header and not focused_excerpt:
+        return ()
+    terms = tuple(dict.fromkeys(term for term in focus_terms if len(term) >= 3))
+    if not terms:
+        return ()
+    required = min(2, len(terms))
+    matches: list[StructuredRecord] = []
+    for record in build_structured_records(text):
+        if not record.row_label or not record.row_value or "|" not in record.row_text:
+            continue
+        if not has_header and record.row_label.count(",") < 1:
+            continue
+        folded_label = fold_text(record.row_label)
+        if (
+            sum(
+                re.search(rf"(?<!\w){re.escape(term)}(?!\w)", folded_label) is not None
+                for term in terms
+            )
+            < required
+        ):
+            continue
+        values = monetary_value_numbers(record.row_value)
+        if len(values) != 1:
+            continue
+        periods = {period for _, period in monetary_value_period_pairs(record.row_value)}
+        if requested_period is not None and periods != {requested_period}:
+            continue
+        matches.append(record)
+    return tuple(matches)
+
+
 def _record_parts(row_text: str) -> tuple[str, str, str]:
     """Extract row label/value/condition without treating nearby numbers as values."""
     parts = [part.strip() for part in row_text.split("|") if part.strip()]
@@ -254,6 +355,128 @@ def _record_parts(row_text: str) -> tuple[str, str, str]:
     value = parts[1]
     condition = " | ".join(parts[2:])
     return label, value, condition
+
+
+def requested_monetary_period(question: str) -> str | None:
+    """Return an explicitly requested monetary recurrence, if unambiguous."""
+
+    folded = fold_text(question)
+    if re.search(r"\bbao\s+lau\s+(?:duoc\s+)?(?:moi|mot)\s+lan\b", folded):
+        # "How often" asks for the interval, not the amount per occurrence.
+        return None
+    cues = {
+        "lan": (
+            r"\b(?:moi|mot|tung)\s+lan\b",
+            r"\b(?:per|each)\s+(?:\w+\s+){0,2}(?:visit|occurrence)\b",
+        ),
+        "ngay": (r"\b(?:moi|mot|hang)\s+ngay\b", r"\bper\s+day\b", r"\bdaily\b"),
+        "thang": (r"\b(?:moi|mot|hang)\s+thang\b", r"\bper\s+month\b", r"\bmonthly\b"),
+        "nam": (r"\b(?:moi|mot|hang)\s+nam\b", r"\bper\s+year\b", r"\bannually\b"),
+    }
+    requested = tuple(
+        period
+        for period, patterns in cues.items()
+        if any(re.search(pattern, folded) for pattern in patterns)
+    )
+    return requested[0] if len(requested) == 1 else None
+
+
+def monetary_period_for_match(text: str, *, match_end: int) -> str | None:
+    """Read only a recurrence attached directly to this monetary value."""
+
+    suffix = fold_text(text[match_end : match_end + 45])
+    period_match = _MONETARY_PERIOD_SUFFIX_RE.match(suffix)
+    if period_match is None:
+        return None
+    return _MONETARY_PERIOD_ALIASES[period_match.group(1)]
+
+
+def monetary_period_bound_numbers(
+    text: str,
+    *,
+    period: str,
+    subject_phrases: tuple[str, ...] = (),
+) -> frozenset[str]:
+    """Numbers whose monetary expression directly carries the given recurrence."""
+
+    folded = fold_text(text)
+    values: set[str] = set()
+    for match in _MONEY_VALUE_RE.finditer(folded):
+        if monetary_period_for_match(folded, match_end=match.end()) != period:
+            continue
+        if not monetary_match_has_subject(
+            folded,
+            match_start=match.start(),
+            match_end=match.end(),
+            subject_phrases=subject_phrases,
+        ):
+            continue
+        numbers = re.findall(r"\d+(?:[.,]\d+)*", match.group(0))
+        if len(numbers) == 1:
+            values.add(numbers[0].replace(",", "."))
+    return frozenset(values)
+
+
+def monetary_value_period_pairs(text: str) -> frozenset[tuple[str, str]]:
+    """Keep an amount and its immediately attached period as one proposition."""
+
+    folded = fold_text(text)
+    pairs: set[tuple[str, str]] = set()
+    for match in _MONEY_VALUE_RE.finditer(folded):
+        period = monetary_period_for_match(folded, match_end=match.end())
+        numbers = re.findall(r"\d+(?:[.,]\d+)*", match.group(0))
+        if period is not None and len(numbers) == 1:
+            pairs.add((numbers[0].replace(",", "."), period))
+    return frozenset(pairs)
+
+
+def monetary_value_numbers(text: str) -> frozenset[str]:
+    """Canonical numeric parts of monetary expressions, preserving grouped digits."""
+
+    folded = fold_text(text)
+    values: set[str] = set()
+    for match in _MONEY_VALUE_RE.finditer(folded):
+        numbers = re.findall(r"\d+(?:[.,]\d+)*", match.group(0))
+        if len(numbers) == 1:
+            values.add(numbers[0].replace(",", "."))
+    return frozenset(values)
+
+
+def monetary_match_has_subject(
+    text: str,
+    *,
+    match_start: int,
+    match_end: int,
+    subject_phrases: tuple[str, ...],
+) -> bool:
+    """Bind a value to its field, including a wrapped label after a limit clause."""
+
+    if not subject_phrases:
+        return True
+    folded = fold_text(text)
+    phrases = tuple(fold_text(phrase) for phrase in subject_phrases)
+    line_start = folded.rfind("\n", 0, match_start) + 1
+    line_end = folded.find("\n", match_end)
+    if line_end < 0:
+        line_end = len(folded)
+    before = folded[line_start:match_start]
+    if any(phrase in before for phrase in phrases):
+        return True
+    if before.strip(" :-") not in {"toi da", "muc toi da", "maximum", "up to", "limit"}:
+        return False
+    next_value = _MONEY_VALUE_RE.search(folded, match_end)
+    boundary = min(line_end, next_value.start()) if next_value else line_end
+    if any(phrase in folded[match_end:boundary] for phrase in phrases):
+        return True
+    if line_end >= len(folded):
+        return False
+    next_line_end = folded.find("\n", line_end + 1)
+    if next_line_end < 0:
+        next_line_end = len(folded)
+    next_line = folded[line_end + 1 : next_line_end]
+    next_line_value = _MONEY_VALUE_RE.search(next_line)
+    label = next_line[: next_line_value.start()] if next_line_value else next_line
+    return any(phrase in label for phrase in phrases)
 
 
 def selected_structural_line_indexes(
@@ -268,6 +491,41 @@ def selected_structural_line_indexes(
         return ()
     folded_lines = tuple(fold_text(line) for line in lines)
     security_control_question = _asks_for_security_controls(question)
+    salary_band_row_indexes = _salary_band_row_indexes(
+        lines=lines,
+        folded_lines=folded_lines,
+        question=question,
+        analysis=analysis,
+    )
+    folded_question = fold_text(question)
+    is_salary_band_value_request = (
+        analysis.asks_for_amount
+        and any(
+            cue in folded_question for cue in ("luong", "salary", "pay", "compensation", "gross")
+        )
+        and any(
+            cue in folded_question
+            for cue in ("dai", "khoang", "range", "band", "khung", "min", "max")
+        )
+    )
+    if is_salary_band_value_request:
+        return salary_band_row_indexes[:max_indexes]
+    if analysis.asks_for_percentage:
+        # An extracted clause can wrap between the subject and its governing
+        # qualifier (for example, "the specific rate is updated" / "under
+        # current law").  Detect the complete semantic window before lexical
+        # line scoring so an adjacent operational row cannot displace it.
+        explicit_not_specified_indexes: list[int] = []
+        for start_index in range(len(lines)):
+            for width in (1, 2, 3):
+                end_index = min(len(lines), start_index + width)
+                if end_index - start_index != width:
+                    continue
+                if has_explicit_not_specified(" ".join(lines[start_index:end_index])):
+                    explicit_not_specified_indexes.extend(range(start_index, end_index))
+                    break
+        if explicit_not_specified_indexes:
+            return tuple(dict.fromkeys(explicit_not_specified_indexes))[:max_indexes]
     terms = tuple(
         term
         for term in question_terms(question)
@@ -304,11 +562,18 @@ def selected_structural_line_indexes(
         folded_lines=folded_lines,
         terms=terms,
     )
+    escalation_indexes = _sensitive_escalation_line_indexes(
+        folded_question=folded_question,
+        folded_lines=folded_lines,
+    )
 
-    if not scored and not relation_indexes:
+    if not scored and not relation_indexes and not escalation_indexes:
         return ()
 
     selected_indexes: list[int] = []
+    for index in escalation_indexes:
+        if index not in selected_indexes:
+            selected_indexes.append(index)
     for index in relation_indexes:
         if index not in selected_indexes:
             selected_indexes.append(index)
@@ -346,6 +611,49 @@ def selected_structural_line_indexes(
     return tuple(expanded[:max_indexes])
 
 
+def _sensitive_escalation_line_indexes(
+    *,
+    folded_question: str,
+    folded_lines: tuple[str, ...],
+) -> tuple[int, ...]:
+    """Keep the material reporting clause for a security escalation question."""
+
+    asks_recipient = any(
+        cue in folded_question
+        for cue in ("bao ai", "bao cho ai", "report to whom", "who to report", "contact who")
+    )
+    incident_cues = (
+        "tai khoan bi lo",
+        "lo tai khoan",
+        "lo thong tin xac thuc",
+        "dang nhap bat thuong",
+        "compromised account",
+        "credentials exposed",
+        "suspicious login",
+    )
+    if not asks_recipient or not any(cue in folded_question for cue in incident_cues):
+        return ()
+
+    reporting_cues = ("bao ngay", "bao cho", "report immediately", "report to", "contact")
+    indexes = tuple(
+        index
+        for index, line in enumerate(folded_lines)
+        if any(cue in line for cue in reporting_cues)
+        and any(
+            cue in line
+            for cue in (
+                "thong tin xac thuc",
+                "dang nhap bat thuong",
+                "tai khoan",
+                "credential",
+                "compromised",
+                "suspicious login",
+            )
+        )
+    )
+    return indexes[:2]
+
+
 def has_value_expression(text: str) -> bool:
     folded = fold_text(text)
     return (
@@ -356,8 +664,73 @@ def has_value_expression(text: str) -> bool:
     )
 
 
+def _salary_band_row_indexes(
+    *,
+    lines: tuple[str, ...],
+    folded_lines: tuple[str, ...],
+    question: str,
+    analysis: QuestionAnalysis,
+) -> tuple[int, ...]:
+    """Keep a requested salary role and its wrapped range as one table row."""
+
+    folded_question = fold_text(question)
+    if not analysis.asks_for_amount:
+        return ()
+    has_salary_cue = any(
+        cue in folded_question for cue in ("luong", "salary", "pay", "compensation", "gross")
+    )
+    has_band_cue = any(
+        cue in folded_question for cue in ("dai", "khoang", "range", "band", "khung", "min", "max")
+    )
+    if not (has_salary_cue and has_band_cue):
+        return ()
+    role_terms = tuple(
+        term
+        for term in question_terms(question)
+        if len(term) >= 3 and term not in _SALARY_BAND_VALUE_TERMS
+    )
+    if not role_terms:
+        return ()
+    for role_index, folded_line in enumerate(folded_lines):
+        if not all(_contains_folded_word(folded_line, term) for term in role_terms):
+            continue
+        value_index = next(
+            (
+                index
+                for index in range(role_index, min(len(lines), role_index + 4))
+                if _SALARY_RANGE_RE.search(folded_lines[index]) is not None
+            ),
+            None,
+        )
+        if value_index is None:
+            continue
+        header_index = next(
+            (
+                index
+                for index in range(role_index - 1, max(-1, role_index - 11), -1)
+                if any(
+                    cue in folded_lines[index]
+                    for cue in ("dai", "salary", "grade", "gross/thang", "bang")
+                )
+            ),
+            None,
+        )
+        indexes = list(range(role_index, value_index + 1))
+        if header_index is not None:
+            indexes.insert(0, header_index)
+        return tuple(indexes)
+    return ()
+
+
+def _contains_folded_word(text: str, term: str) -> bool:
+    return re.search(rf"(?<![a-z0-9_]){re.escape(term)}(?![a-z0-9_])", text) is not None
+
+
 def has_explicit_not_specified(text: str) -> bool:
-    folded = fold_text(text)
+    # PDF/table extraction frequently wraps one semantic clause across lines.
+    # Whitespace normalization preserves the relationship without changing
+    # words or inventing a value.
+    folded = " ".join(fold_text(text).split())
     return any(
         cue in folded
         for cue in (

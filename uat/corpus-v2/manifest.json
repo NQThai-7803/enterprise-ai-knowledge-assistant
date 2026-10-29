@@ -1,0 +1,44 @@
+{
+  "corpus_version": "2.0.0",
+  "created_at": "2026-09-29",
+  "status": "READY",
+  "runtime": {
+    "compose_project": "enterprise-ai-uat-v2",
+    "compose_files": ["compose.yaml", "compose.uat-corpus-v2.yaml"],
+    "api_url": "http://127.0.0.1:18000",
+    "migration_head": "20260822_0011",
+    "embedding_model": "intfloat/multilingual-e5-small",
+    "embedding_dimensions": 384,
+    "chunk_target_tokens": 500,
+    "chunk_overlap_tokens": 75
+  },
+  "validation": {
+    "validated_at": "2026-09-30",
+    "permanent_documents": 9,
+    "ready_documents": 9,
+    "actual_chunks": 143,
+    "embedding_dimensions_verified": 384,
+    "independent_restore_project": "enterprise-ai-uat-v2-restore-check",
+    "independent_restore_status": "PASS",
+    "semantic_smoke_status": "6/6 PASS",
+    "recovery_package": ".backups/uat-corpus-v2/20260930-010258"
+  },
+  "accounts": [
+    {"email": "admin.uat@example.test", "role": "ADMIN"},
+    {"email": "manager.uat@example.test", "role": "MANAGER"},
+    {"email": "staff.uat@example.test", "role": "STAFF"}
+  ],
+  "documents": [
+    {"code":"ND-CORP-001","title":"Giới thiệu và cơ cấu tổ chức Công ty Công nghệ Nova Digital","source":"artifacts/rag-h5-2-september-corpus-recovery/sources/Gioi_thieu_va_co_cau_to_chuc_Cong_ty_Cong_nghe_Nova_Digital.pdf","sha256":"593156f8b218e95ff5519000e95b8391b3338e9d4ee4e4742ae1bc327b9f7962","category":"enterprise_organization","visibility":"ORGANIZATION","owner":"admin.uat@example.test","required_grants":[],"expected_state":"READY","provenance":"Verified original Nova binary recovered from synchronized OneDrive policy directory."},
+    {"code":"ND-HR-002","title":"Nội quy lao động Công ty Công nghệ Nova Digital","source":"artifacts/rag-h5-2-september-corpus-recovery/sources/Noi_quy_lao_dong_Cong_ty_Cong_nghe_Nova_Digital.pdf","sha256":"3d92ef98c6e1dfd2723cea1f3740404f7d707ba27033b43a17101c9de6d5942a","category":"enterprise_labor_rules","visibility":"ORGANIZATION","owner":"admin.uat@example.test","required_grants":[],"expected_state":"READY","provenance":"Verified Nova source matched retained library and September evidence."},
+    {"code":"ND-HR-003","title":"Chính sách làm việc và chấm công Công ty Công nghệ Nova Digital","source":"artifacts/rag-h5-2-september-corpus-recovery/sources/Chinh_sach_lam_viec_va_cham_cong_Cong_ty_Cong_nghe_Nova_Digital.pdf","sha256":"75b949e101288bfae6d11b70abeb42a212807666f48b82824ecf9e59d64d8652","category":"enterprise_attendance","visibility":"ORGANIZATION","owner":"admin.uat@example.test","required_grants":[],"expected_state":"READY","provenance":"Verified Nova source matched retained library and September evidence."},
+    {"code":"ND-HR-004","title":"Chính sách nghỉ của người lao động Công ty Công nghệ Nova Digital","source":"artifacts/rag-h5-2-september-corpus-recovery/sources/Chinh_sach_nghi_cua_nguoi_lao_dong_Cong_ty_Cong_nghe_Nova_Digital.pdf","sha256":"efcc573cf4aded7fcce81953a50727ef8aaeaa812e82069d31f62fc612440413","category":"enterprise_leave","visibility":"ORGANIZATION","owner":"admin.uat@example.test","required_grants":[],"expected_state":"READY","provenance":"Verified Nova source matched retained library and September evidence."},
+    {"code":"ND-HR-005","title":"Chính sách tiền lương phụ cấp và thưởng Công ty Công nghệ Nova Digital","source":"artifacts/rag-h5-2-september-corpus-recovery/sources/Chinh_sach_tien_luong_phu_cap_va_thuong_Cong_ty_Cong_nghe_Nova_Digital.pdf","sha256":"e243fed816c48f66b400c1cf50f81ab701ecb68600af535bb398729d53a1198c","category":"enterprise_compensation","visibility":"ORGANIZATION","owner":"admin.uat@example.test","required_grants":[],"expected_state":"READY","provenance":"Verified Nova source matched retained library and September evidence."},
+    {"code":"ND-HR-006","title":"Chính sách bảo hiểm và phúc lợi Công ty Công nghệ Nova Digital","source":"artifacts/rag-h5-2-september-corpus-recovery/sources/Chinh_sach_bao_hiem_va_phuc_loi_Cong_ty_Cong_nghe_Nova_Digital.pdf","sha256":"75aedd6f49fee99f585d7ecad2d5f5968a8883b646840453c10bdbbe552f8874","category":"enterprise_benefits","visibility":"ORGANIZATION","owner":"admin.uat@example.test","required_grants":[],"expected_state":"READY","provenance":"Verified Nova source matched retained library and September evidence."},
+    {"code":"UAT-LEAVE-AUTHORITY-001","title":"Chính sách nghỉ của người lao động","source":"artifacts/rag-h5-2-september-corpus-recovery/sources/documents/2026/08/20723824-fc24-4522-96c1-4dc2c2369a4e.pdf","sha256":"24178db420422e474326986672b6c15cc67373ee6adbe1489ba5e8addf95f4f4","category":"enterprise_leave_authority_supplement","visibility":"ORGANIZATION","owner":"admin.uat@example.test","required_grants":[],"expected_state":"READY","provenance":"Exact checksum-matched source recovered from preserved upload archive; retained because annual-leave acceptance uses its statutory allocation evidence."},
+    {"code":"UAT-GROUNDING-001","title":"UAT Grounding Handbook","source":"artifacts/rag-h5-2-september-corpus-recovery/sources/uat/grounding-handbook.pdf","sha256":"43a4d9f1661b38f0e3245afd824849ba33d9fe87aa063873c11fdc01b3601040","category":"uat_permission_fixture","visibility":"PRIVATE","owner":"admin.uat@example.test","required_grants":[{"user":"manager.uat@example.test","permission":"VIEW"}],"expected_state":"READY","provenance":"Exact deterministic UAT fixture recovered from preserved upload archive; v2 owner is an authorized API uploader."},
+    {"code":"UAT-SHARED-001","title":"UAT Shared Knowledge Policy","source":"artifacts/rag-h5-2-september-corpus-recovery/sources/uat/shared-policy.pdf","sha256":"d6a93cb8db7620166ce9764a289ad83598c2fc3d657c8ef51f1adbf8b492080b","category":"uat_organization_fixture","visibility":"ORGANIZATION","owner":"admin.uat@example.test","required_grants":[],"expected_state":"READY","provenance":"Exact deterministic UAT fixture recovered from preserved upload archive."}
+  ],
+  "temporary_fixture_policy": "Upload/delete/grant/revoke live-test documents are ephemeral and are not permanent corpus members.",
+  "known_conflicts": [{"case":"Q018","documents":["ND-HR-002","ND-HR-003"],"values":["08:00-09:30","08:00-09:00"],"expected_behavior":"NO_ANSWER_INSUFFICIENT_AUTHORITY"}]
+}

@@ -341,6 +341,45 @@ def test_information_need_routing_prefers_remote_days_over_weekly_rest_duration(
     assert labels[0] == "SOURCE_2"
 
 
+def test_security_routing_prefers_multiple_controls_over_topical_mfa_row() -> None:
+    def source(index: int, text: str) -> PromptSource:
+        return PromptSource(
+            marker=f"[SOURCE_{index}]",
+            source_type=CitationSourceType.INTERNAL,
+            document_title="Chinh sach lam viec",
+            text=text,
+            page_numbers=(index,),
+            start_page=index,
+            end_page=index,
+            hybrid_score=1.0,
+            chunk_id=UUID(f"00000000-0000-0000-0010-{index:012d}"),
+            document_id=UUID(f"00000000-0000-0000-0011-{index:012d}"),
+        )
+
+    registry = PromptSourceRegistry(
+        sources=(
+            source(
+                1,
+                "Su dung thiet bi duoc phe duyet, VPN/MFA khi ap dung; "
+                "khong lam viec voi du lieu mat tren thiet bi hoac mang khong an toan.",
+            ),
+            source(
+                2,
+                "Nhan vien hybrid lam o nha cham cong tren HRM bang tai khoan ca nhan "
+                "va xac thuc nhieu lop khi he thong yeu cau.",
+            ),
+        )
+    )
+
+    labels = information_need_source_labels(
+        "Nhan vien hybrid phai tuan thu bao mat gi khi lam o nha",
+        source_registry=registry,
+        max_sources=2,
+    )
+
+    assert labels[0] == "SOURCE_1"
+
+
 def test_information_need_routing_excludes_numeric_expected_answer_scaffold() -> None:
     def source(index: int, text: str) -> PromptSource:
         return PromptSource(
