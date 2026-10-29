@@ -4,7 +4,9 @@
 
 Repo có **2 phạm vi** khác nhau, đừng lẫn số liệu giữa hai phạm vi:
 - **(A) Repo EAKA** — thư mục này, nhánh `wip/codex-handoff`. Gồm backend, frontend và RAG.
-- **(B) Workspace AUTH-02 candidate (R13–R27)** — nằm **ngoài repo**, tại `%LOCALAPPDATA%\Temp\eaka-auth02\20261023t080222z-2608a685\auth02-local-transport-work`. Workspace này **không có trong commit**: tìm trong repo không thấy `AUTH02`/`eaka-auth02` (chỉ có ID yêu cầu AUTH-02 trong `FUNCTIONAL_REQUIREMENTS.md`). Thư mục Temp có thể bị Windows dọn bất cứ lúc nào, nên **cần sao lưu riêng trước khi làm tiếp**. Trạng thái hiện tại của workspace này: NOT_VERIFIED.
+- **(B) Workspace AUTH-02 candidate (R13–R27)** — nằm **ngoài repo**, tại `%LOCALAPPDATA%\Temp\eaka-auth02\20261023t080222z-2608a685\auth02-local-transport-work`. Workspace này **không có trong commit**: tìm trong repo không thấy `AUTH02`/`eaka-auth02` (chỉ có ID yêu cầu AUTH-02 trong `FUNCTIONAL_REQUIREMENTS.md`). Thư mục Temp có thể bị Windows dọn bất cứ lúc nào, nên **cần sao lưu riêng trước khi làm tiếp**.
+  - **Đã xác nhận tồn tại (30/10, review tiếp nhận):** `%LOCALAPPDATA%\Temp\eaka-auth02\`, gồm 27.299 file, khoảng 397 MiB. Dưới `20261023t080222z-2608a685\` có `auth02-local-transport-work\`, `auth02b-work\`, `candidate\`, `infra\` và `manifest.json`. Khi sao lưu phải lấy toàn bộ `eaka-auth02\`.
+  - **Chưa sao lưu.** Nội dung file chưa được mở hay kiểm tra.
 
 ## 1. Công việc dở và bước tiếp theo
 **(B) AUTH-02**
@@ -16,10 +18,13 @@ Repo có **2 phạm vi** khác nhau, đừng lẫn số liệu giữa hai phạm
 - TASK-035 (Release Candidate) ở trạng thái **NO-GO**:
   - **S01:** Staff hỏi về tài liệu không có quyền thì nhận câu trả lời không liên quan nhưng có citation, thay vì NO_ANSWER. Nguyên nhân gốc chưa xác định.
   - **R05:** image API và worker build lệch source/package; backend chưa có lock file.
-- Thứ tự đề xuất (chi tiết trong Project doc `claude/bao-cao-kiem-thu-2026-10-28.md`):
+- Thứ tự đề xuất (chi tiết trong `docs/review/bao-cao-kiem-thu-2026-10-28.md`):
   1. Sửa fixture test.
   2. Đánh dấu `xfail(strict)` cho các contract S01.
   3. Xây bộ đánh giá held-out, xong rồi mới sửa logic xếp hạng và ngữ cảnh.
+- **Vấn đề đã đối chiếu code (c908a05):**
+  - **Ranking:** `_rank_hits_for_prompt` sắp xếp theo `alignment_score`; điểm reranker không có trong sort key, chỉ còn tác dụng qua `index` (tiêu chí cuối). Các bộ lọc theo chủ đề và `_filter_low_alignment_documents` có thể bỏ hit đúng. Khi bật reranker, `grounded_answer_service.py:1664` nối hit reranker vào **cuối** danh sách, nên hit đúng không bị loại hẳn mà bị đẩy xuống cuối, rồi bị `group_hits[:2]` (`:746`) cắt. Tác động trên toàn pipeline: NOT_VERIFIED.
+  - **Citation page:** `app/citations/mapper.py:73/105/120` luôn cite `start_page` của chunk (dòng 73 bắt buộc `page_numbers[0] == start_page`). Chunk trải nhiều trang luôn trỏ về trang đầu, dù evidence có thể nằm ở trang sau.
 
 ## 2. Test FAIL hiện tại và nguyên nhân
 **(B):** báo cáo R26 ghi independent 100 PASS, replay R24 43 PASS, combined 768 PASS, 3 historical deselected. R27 ghi `REGRESSION_NOT_RERUN`. **Lỗi lịch sử đã sửa, không phải lỗi hiện hành:** 10 failures ở R24 (reserved Windows path alias, SID uint32 overflow, type-insensitive mutation), đã sửa ở R25, R26 kiểm lại không còn tái hiện.
@@ -29,7 +34,7 @@ Repo có **2 phạm vi** khác nhau, đừng lẫn số liệu giữa hai phạm
   - 14 FAIL là contract **S01 cố ý để đỏ** — đây là blocker runtime thật: `tests/unit/test_multilingual_answer_responsiveness_contract.py` (8) và `test_task0353e_context_admission_contract.py` (6).
   - 2 FAIL do môi trường: font `C:/Windows/Fonts/arial.ttf`, và test cần `.env` riêng (`test_default_compose_keeps_llm_local_safe`).
 - **Integration + API có DB: 606 PASS / 40 FAIL.** Đây là lỗi fixture, không phải lỗi logic:
-  - 25 test FAIL vì `RERANKER_CANDIDATE_K` > `HYBRID_RETRIEVAL_MAX_TOP_K` trong `make_settings` của test. Khi đặt `RERANKER_CANDIDATE_K=10`, 25/28 PASS.
+  - 25 test FAIL vì `RERANKER_CANDIDATE_K` > `HYBRID_RETRIEVAL_MAX_TOP_K` trong `make_settings` của test. Con số "25/28 PASS" là tổng của 3 file: `test_hybrid_retrieval.py` (20), `test_grounded_answer_persistence.py` (5), `test_grounded_answer_citations.py` (3), chạy với `RERANKER_CANDIDATE_K=10` trên bản sao Linux ngày 28/10. 3 test còn fail: hybrid Vietnamese fallback (tự đặt `max_top_k` thấp), internal system messages, invalid citation. Trên Windows: NOT_VERIFIED.
   - 10 test chat/SSE nhận NO_ANSWER do fixture không vượt qua lớp kiểm chứng mới.
   - 1 test hard-code migration head `0010` (thực tế là `0011`).
   - 4 test conversation memory, trong đó "Are there exceptions?" bị mất chủ đề — **có thể là hồi quy thật**.
@@ -73,3 +78,4 @@ Quét bằng `rg -n 'artifacts' tests`, sau đó kiểm tra import `scripts.rele
 - Nhánh `wip/codex-handoff`. Commit gồm: đổi `.gitignore` từ `data/` thành `/data/` (để theo dõi được `frontend/src/components/data/DataTable.tsx`), thêm `HANDOFF.md`, và toàn bộ thay đổi trước đó chưa commit.
 - Commit với `core.autocrlf=input`: index giữ LF, working tree không đổi.
 - Commit có kèm file nháp `tmp_*_trace.py` và `.cache/huggingface/.agent_harnesses.json` (không chứa secret). Nên dọn ở một commit sau.
+- File rác khác đang được track (chỉ ghi lại, **chưa xóa**): `tore package.json package-lock.json`, `enterprise_ai_md_updates_2026-08-19_v6.zip`, `files-for-chat/` (38 file), gitlink `vite-monorepo` (mode 160000, không có `.gitmodules`).
