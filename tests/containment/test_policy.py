@@ -5,7 +5,7 @@ P1 neither changes that harness nor establishes an external execution boundary.
 """
 
 from copy import deepcopy
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from typing import Any
 
 import pytest
@@ -22,8 +22,7 @@ from tests.containment_guard import (
     validate_storage_binding,
 )
 
-
-NOW = datetime(2030, 1, 1, tzinfo=timezone.utc)
+NOW = datetime(2030, 1, 1, tzinfo=UTC)
 
 
 def synthetic_contract() -> dict[str, Any]:
@@ -371,8 +370,8 @@ def test_p06_equivalent_instants_normalize_to_utc() -> None:
 
     assert offset_result.contract.issued_at == utc_result.contract.issued_at
     assert offset_result.contract.expires_at == utc_result.contract.expires_at
-    assert offset_result.contract.issued_at.tzinfo is timezone.utc
-    assert offset_result.contract.expires_at.tzinfo is timezone.utc
+    assert offset_result.contract.issued_at.tzinfo is UTC
+    assert offset_result.contract.expires_at.tzinfo is UTC
 
 
 def test_p07_lease_interval_keeps_inclusive_start_and_exclusive_end() -> None:

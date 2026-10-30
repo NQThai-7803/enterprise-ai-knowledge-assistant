@@ -17,7 +17,7 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime, timezone
 from enum import StrEnum
 from types import MappingProxyType
 from typing import Protocol
@@ -153,7 +153,7 @@ def _utc(value: object) -> datetime:
     if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
         raise AdmissionRejected(AdmissionCode.INVALID_RECEIPT)
     try:
-        return value.astimezone(timezone.utc)
+        return value.astimezone(UTC)
     except OverflowError:
         raise AdmissionRejected(AdmissionCode.INVALID_RECEIPT) from None
 

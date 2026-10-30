@@ -6,7 +6,7 @@ No resource access. Do not run through the existing unsafe root pytest harness.
 from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import replace
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from types import MappingProxyType
 from typing import Any
 
@@ -28,8 +28,7 @@ from tests.containment_runtime import (
     review_admission,
 )
 
-
-NOW = datetime(2030, 1, 1, tzinfo=timezone.utc)
+NOW = datetime(2030, 1, 1, tzinfo=UTC)
 
 
 def projection() -> dict[str, Any]:

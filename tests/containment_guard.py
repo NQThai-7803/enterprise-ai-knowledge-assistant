@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import StrEnum
 from typing import NoReturn
 
@@ -160,7 +160,7 @@ def _instant(value: object) -> datetime:
     if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
         _reject(ErrorCode.INVALID_LEASE)
     try:
-        return value.astimezone(timezone.utc)
+        return value.astimezone(UTC)
     except OverflowError:
         raise PolicyViolation(ErrorCode.INVALID_LEASE) from None
 
