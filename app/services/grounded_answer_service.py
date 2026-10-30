@@ -7658,7 +7658,7 @@ def _structured_attendance_policy_answer(
         obligation = re.search(r"\b(?:giữ|giu)\s+(?:nguyên|nguyen)\b", clause, flags=re.IGNORECASE)
         if obligation is not None:
             clause = clause[obligation.start() :]
-    clause = clause.strip(" -â€¢\ufffd\u2022\uf0b7")
+    clause = clause.strip(" -\ufffd\u2022\uf0b7")
     if clause and clause[-1] not in ".!?":
         clause = f"{clause}."
     return f"{prefix}{clause}", (source_label,)
@@ -8742,7 +8742,7 @@ def _structured_named_topic_answer(
                 if clause_lines[-1].rstrip().endswith((".", "!", "?")):
                     break
                 clause_lines.append(continuation)
-            answer = " ".join(clause_lines).strip(" -â€¢ï‚·")
+            answer = " ".join(clause_lines).strip(" -\u2022\uf0b7")
             if not answer or is_non_answer_context(answer):
                 continue
             if answer[-1] not in ".!?":
@@ -9171,14 +9171,14 @@ def _structured_policy_clause_repair_generation(
                 or asks_for_scoped_self_policy
             ):
                 continue
-            clauses = tuple(part.strip(" -â€¢ï‚·") for part in re.split(r"[;]", combined))
+            clauses = tuple(part.strip(" -\u2022\uf0b7") for part in re.split(r"[;]", combined))
             answer = next(
                 (
                     clause
                     for clause in clauses
                     if any(cue in _fold_for_person_match(clause) for cue in required_cues)
                 ),
-                combined.strip(" -â€¢ï‚·"),
+                combined.strip(" -\u2022\uf0b7"),
             )
             if asks_for_oncall_allowance:
                 answer = re.sub(

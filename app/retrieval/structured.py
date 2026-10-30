@@ -45,7 +45,7 @@ _TIME_RE = re.compile(
 )
 _CLOCK_RE = re.compile(r"(?<!\d)(?:[01]?\d|2[0-3])(?:[:h][0-5]\d)(?!\d)")
 _KEY_VALUE_RE = re.compile(r"^\s*([^:|]{2,80})\s*[:|]\s*(.{1,240})\s*$")
-_LIST_MARKER_RE = re.compile(r"^\s*(?:[-*Ã¢â‚¬Â¢]|\d+[.)])\s+")
+_LIST_MARKER_RE = re.compile(r"^\s*(?:[-*\u2022]|\d+[.)])\s+")
 _ACRONYM_RE = re.compile(r"\b[A-Z][A-Z0-9&/+.-]{1,}\b")
 _TITLE_TOKEN_RE = re.compile(r"\b[^\W\d_][\w'-]*\b", re.UNICODE)
 
@@ -763,7 +763,7 @@ def value_units_for_analysis(analysis: QuestionAnalysis) -> tuple[str, ...]:
     if analysis.asks_for_duration:
         return ("gio", "ngay", "tuan", "thang", "nam", "hour", "day", "week", "month", "year")
     if analysis.asks_for_amount:
-        return ("dong", "trieu", "vnd", "Ã¢â€šÂ«")
+        return ("dong", "trieu", "vnd", "\u20ab")
     if analysis.asks_for_count:
         return ("nhan su", "nhan vien", "nguoi", "employee", "people")
     return _VALUE_CUES

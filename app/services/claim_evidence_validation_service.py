@@ -876,9 +876,9 @@ def _policy_evidence_segments(evidence: str) -> tuple[str, ...]:
 
     normalized = re.sub(r"[ \t]*\r?\n[ \t]*", " ", evidence)
     return tuple(
-        segment.strip(" \t\r\n-â€¢ï‚·")
-        for segment in re.split(r"(?:[â€¢ï‚·]+|(?<=[.!?;])\s+)", normalized)
-        if segment.strip(" \t\r\n-â€¢ï‚·")
+        segment.strip(" \t\r\n-\u2022\uf0b7")
+        for segment in re.split(r"(?:[\u2022\uf0b7]+|(?<=[.!?;])\s+)", normalized)
+        if segment.strip(" \t\r\n-\u2022\uf0b7")
     )
 
 
