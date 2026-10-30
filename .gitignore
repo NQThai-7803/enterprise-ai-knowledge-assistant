@@ -48,7 +48,13 @@ frontend/coverage/
 frontend/playwright-report/
 frontend/test-results/
 frontend/*.tsbuildinfo
-frontend/*.js
-frontend/*.d.ts
+# Stale tsc output from the tsconfig.node.json sources (it now uses noEmit).
+# Listed by name so hand-written config such as eslint.config.js stays tracked.
+frontend/vite.config.js
+frontend/vite.config.d.ts
+frontend/playwright.config.js
+frontend/playwright.config.d.ts
+frontend/playwright.live.config.js
+frontend/playwright.live.config.d.ts
 artifacts/
 
