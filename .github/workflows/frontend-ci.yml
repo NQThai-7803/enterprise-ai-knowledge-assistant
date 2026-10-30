@@ -20,7 +20,6 @@ jobs:
       CI: "true"
       VITE_API_BASE_URL: http://127.0.0.1:9
       PLAYWRIGHT_BASE_URL: http://127.0.0.1:5174
-      PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/frontend-playwright
     defaults:
       run:
         shell: bash
@@ -76,12 +75,17 @@ jobs:
 
       - name: Provision isolated Chromium runner dependencies
         id: chromium
+        # The runner context is not available in job-level env, so set the browser path per step.
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/frontend-playwright
         run: |
           set -euo pipefail
           ./node_modules/.bin/playwright install --with-deps chromium 2>&1 | tee ci-logs/chromium-install.log
 
       - name: Mocked Chromium regression
         id: playwright
+        env:
+          PLAYWRIGHT_BROWSERS_PATH: ${{ runner.temp }}/frontend-playwright
         run: |
           set -euo pipefail
           npm run test:e2e -- --config playwright.config.ts 2>&1 | tee ci-logs/playwright.log
