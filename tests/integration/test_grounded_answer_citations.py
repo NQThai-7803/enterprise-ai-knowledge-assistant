@@ -11,7 +11,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.chat.models import GroundingStatus
 from app.core.config import Settings
-from app.core.exceptions import CitationValidationFailedApplicationError
 from app.llm.models import LLMGenerationResult
 from app.models import (
     ChatMessage,
@@ -237,14 +236,7 @@ def test_answer_persists_citations_with_assistant_message(
     run_async(scenario())
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Spec conflict: API_SPEC.md:515 requires CITATION_VALIDATION_FAILED with no persisted "
-        "messages, but the service now repairs/retries and degrades to NO_ANSWER."
-    ),
-)
-def test_invalid_citation_persists_no_messages_or_citations(
+def test_invalid_citation_fails_safe_to_fixed_no_answer_without_citations(
     async_session_factory_for_tests: async_sessionmaker[AsyncSession],
 ) -> None:
     async def scenario() -> None:
@@ -270,17 +262,34 @@ def test_invalid_citation_persists_no_messages_or_citations(
             token_counter=FakeCounter(),
         )
 
-        with pytest.raises(CitationValidationFailedApplicationError):
-            await service.answer_question(
-                current_user=owner,
-                session_id=chat.id,
-                question="Nhân viên được nghỉ phép năm bao nhiêu ngày?",
-            )
+        result = await service.answer_question(
+            current_user=owner,
+            session_id=chat.id,
+            question="Nhân viên được nghỉ phép năm bao nhiêu ngày?",
+        )
+
+        no_answer = settings().chat_no_answer_message
+        assert result.grounding_status == GroundingStatus.NO_ANSWER
+        assert result.assistant_citations == ()
+        assert result.assistant_message.content == no_answer
+        assert "[SOURCE_" not in result.assistant_message.content
 
         async with async_session_factory_for_tests() as session:
-            message_count = await session.scalar(select(func.count()).select_from(ChatMessage))
+            messages = list(
+                await session.scalars(
+                    select(ChatMessage)
+                    .where(ChatMessage.session_id == chat.id)
+                    .order_by(ChatMessage.created_at.asc(), ChatMessage.id.asc())
+                )
+            )
             citation_count = await session.scalar(select(func.count()).select_from(MessageCitation))
-            assert message_count == 0
+            assert [message.role for message in messages] == [
+                ChatMessageRole.USER,
+                ChatMessageRole.ASSISTANT,
+            ]
+            assert messages[1].content == no_answer
+            assert "[SOURCE_" not in messages[1].content
+            assert "Nhân viên được nghỉ 12 ngày phép năm." not in messages[1].content
             assert citation_count == 0
 
     run_async(scenario())

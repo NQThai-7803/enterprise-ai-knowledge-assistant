@@ -24,6 +24,7 @@ from app.models import (
     ChatMessageRole,
     ChatSession,
     CitationSourceType,
+    MessageCitation,
     User,
     UserRole,
 )
@@ -95,7 +96,11 @@ class FakeCitationValidationService:
 
 
 class FakeCitationRepository:
+    def __init__(self) -> None:
+        self.calls = 0
+
     async def create_many(self, session: object, *, assistant_message: ChatMessage, citations):  # noqa: ANN001
+        self.calls += 1
         return tuple(citations)
 
 
@@ -297,6 +302,7 @@ def install_service(
     settings: Settings | None = None,
     citations: tuple[object, ...] | None = None,
     citation_error: Exception | None = None,
+    citation_repository: FakeCitationRepository | None = None,
 ) -> tuple[FakeRetrievalService, FakeLLMProvider]:
     resolved_retrieval = retrieval or FakeRetrievalService(retrieval_result(hit()))
     resolved_llm = llm or FakeLLMProvider(llm_answer())
@@ -306,7 +312,7 @@ def install_service(
         hybrid_retrieval_service=resolved_retrieval,
         llm_provider_factory=lambda: resolved_llm,
         token_counter=FakeCounter(),
-        citation_repository=FakeCitationRepository(),
+        citation_repository=citation_repository or FakeCitationRepository(),
         citation_validation_service=FakeCitationValidationService(
             citations=citations if citations is not None else (default_citation(),),
             error=citation_error,
@@ -517,14 +523,7 @@ def test_provider_failure_emits_safe_error_and_persists_no_assistant_message(
     assert run_async(count_messages(async_session_factory_for_tests, chat_session=chat)) == 0
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Spec conflict: API_SPEC.md:515 requires CITATION_VALIDATION_FAILED with no persisted "
-        "messages, but the service now repairs/retries and degrades to NO_ANSWER."
-    ),
-)
-def test_invalid_citation_emits_safe_error_and_persists_no_assistant_message(
+def test_invalid_citation_stream_fails_safe_to_fixed_no_answer(
     api_client: TestClient,
     async_session_factory_for_tests: async_sessionmaker[AsyncSession],
     make_user: Callable[..., User],
@@ -534,18 +533,51 @@ def test_invalid_citation_emits_safe_error_and_persists_no_assistant_message(
 
     owner = make_user(role=UserRole.STAFF)
     chat = create_session(async_session_factory_for_tests, owner=owner)
+    settings = make_settings()
+    citation_repository = FakeCitationRepository()
     install_service(
         api_client,
         async_session_factory_for_tests,
+        settings=settings,
         citation_error=CitationValidationError(CitationFailureCode.CITATION_MARKER_UNKNOWN),
+        citation_repository=citation_repository,
     )
 
     response = post_stream(api_client, make_auth_headers, owner, chat)
 
     events = parse_sse(response.text)
-    assert events[-1][0] == "stream.error"
-    assert events[-1][1]["code"] == "CITATION_VALIDATION_FAILED"
-    assert run_async(count_messages(async_session_factory_for_tests, chat_session=chat)) == 0
+    assert [event for event, _ in events][-1] == "message.completed"
+    assert "stream.error" not in [event for event, _ in events]
+    completed = events[-1][1]
+    assert completed["grounding_status"] == "NO_ANSWER"
+    assert completed["citations"] == []
+    assert completed["content"] == settings.chat_no_answer_message
+    serialized_events = json.dumps([payload for _, payload in events], ensure_ascii=False)
+    assert "[SOURCE_" not in serialized_events
+    assert GROUNDED_CONTEXT not in serialized_events
+    assert citation_repository.calls == 0
+
+    async def persisted() -> tuple[list[ChatMessage], int]:
+        async with async_session_factory_for_tests() as session:
+            messages = list(
+                await session.scalars(
+                    select(ChatMessage)
+                    .where(ChatMessage.session_id == chat.id)
+                    .order_by(ChatMessage.created_at.asc(), ChatMessage.id.asc())
+                )
+            )
+            citation_count = await session.scalar(select(func.count()).select_from(MessageCitation))
+            return messages, citation_count or 0
+
+    messages, citation_count = run_async(persisted())
+    assert [message.role for message in messages] == [
+        ChatMessageRole.USER,
+        ChatMessageRole.ASSISTANT,
+    ]
+    assert messages[1].content == settings.chat_no_answer_message
+    assert "[SOURCE_" not in messages[1].content
+    assert GROUNDED_CONTEXT not in messages[1].content
+    assert citation_count == 0
 
 
 def test_stream_preserves_no_answer_policy(
