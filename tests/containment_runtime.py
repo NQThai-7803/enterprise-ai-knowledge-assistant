@@ -137,16 +137,24 @@ class AdmissionReview:
 
 
 def _token(value: object) -> bool:
-    return type(value) is str and re.fullmatch(
-        r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}", value
-    ) is not None
+    return (
+        type(value) is str and re.fullmatch(r"[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}", value) is not None
+    )
 
 
 def _identity_valid(value: object) -> bool:
-    return type(value) is ExecutionIdentity and all(_token(item) for item in (
-        value.run_id, value.sandbox_id, value.audience, value.nonce,
-        value.source_id, value.policy_id, value.launch_id,
-    ))
+    return type(value) is ExecutionIdentity and all(
+        _token(item)
+        for item in (
+            value.run_id,
+            value.sandbox_id,
+            value.audience,
+            value.nonce,
+            value.source_id,
+            value.policy_id,
+            value.launch_id,
+        )
+    )
 
 
 def _utc(value: object) -> datetime:
@@ -198,8 +206,15 @@ def _snapshot_mapping(value: object) -> Mapping[str, object]:
 def _snapshot_identity(value: object) -> ExecutionIdentity:
     if not _identity_valid(value):
         raise AdmissionRejected(AdmissionCode.INVALID_CONTEXT)
-    return ExecutionIdentity(value.run_id, value.sandbox_id, value.audience, value.nonce,
-                             value.source_id, value.policy_id, value.launch_id)
+    return ExecutionIdentity(
+        value.run_id,
+        value.sandbox_id,
+        value.audience,
+        value.nonce,
+        value.source_id,
+        value.policy_id,
+        value.launch_id,
+    )
 
 
 def _snapshot_receipt(value: object) -> OperationReceipt:
@@ -207,19 +222,33 @@ def _snapshot_receipt(value: object) -> OperationReceipt:
         raise AdmissionRejected(AdmissionCode.INVALID_RECEIPT)
     # Check leaf types before a callback can observe them; retain existing local
     # receipt validation/error codes for blank IDs, versions and timestamp range.
-    if any(type(item) is not str for item in (
-        value.interface_version, value.receipt_id, value.manifest_id, value.lease_id,
-        value.operation, value.resource_id,
-    )) or not _identity_valid(value.identity):
+    if any(
+        type(item) is not str
+        for item in (
+            value.interface_version,
+            value.receipt_id,
+            value.manifest_id,
+            value.lease_id,
+            value.operation,
+            value.resource_id,
+        )
+    ) or not _identity_valid(value.identity):
         raise AdmissionRejected(AdmissionCode.INVALID_RECEIPT)
     for instant in (value.issued_at, value.expires_at):
-        if (type(instant) is not datetime or
-                (instant.tzinfo is not None and type(instant.tzinfo) is not timezone)):
+        if type(instant) is not datetime or (
+            instant.tzinfo is not None and type(instant.tzinfo) is not timezone
+        ):
             raise AdmissionRejected(AdmissionCode.INVALID_RECEIPT)
     return OperationReceipt(
-        value.interface_version, value.receipt_id, _snapshot_identity(value.identity),
-        value.manifest_id, value.lease_id, value.operation, value.resource_id,
-        value.issued_at, value.expires_at,
+        value.interface_version,
+        value.receipt_id,
+        _snapshot_identity(value.identity),
+        value.manifest_id,
+        value.lease_id,
+        value.operation,
+        value.resource_id,
+        value.issued_at,
+        value.expires_at,
     )
 
 
@@ -246,30 +275,40 @@ def _review(
     operation = str(operation)
     capability = Capability(operation)
     raw_context = bridge.get_context()
-    if (type(raw_context) is not LaunchContext
-            or type(raw_context.interface_version) is not str
-            or raw_context.interface_version != "1"
-            or not _identity_valid(raw_context.identity) or not _token(raw_context.manifest_id)):
+    if (
+        type(raw_context) is not LaunchContext
+        or type(raw_context.interface_version) is not str
+        or raw_context.interface_version != "1"
+        or not _identity_valid(raw_context.identity)
+        or not _token(raw_context.manifest_id)
+    ):
         raise AdmissionRejected(AdmissionCode.INVALID_CONTEXT)
     context = LaunchContext(
-        "1", _snapshot_identity(raw_context.identity), raw_context.manifest_id,
+        "1",
+        _snapshot_identity(raw_context.identity),
+        raw_context.manifest_id,
         _snapshot_mapping(raw_context.projection),
     )
     if context.identity != expected:
         raise AdmissionRejected(AdmissionCode.IDENTITY_MISMATCH)
 
-    policy = validate_contract(
-        context.projection, now=now, required_capabilities=(capability,)
-    )
+    policy = validate_contract(context.projection, now=now, required_capabilities=(capability,))
     contract = policy.contract
-    if (contract.run_id != expected.run_id or contract.sandbox_id != expected.sandbox_id
-            or contract.policy_version != expected.policy_id):
+    if (
+        contract.run_id != expected.run_id
+        or contract.sandbox_id != expected.sandbox_id
+        or contract.policy_version != expected.policy_id
+    ):
         raise AdmissionRejected(AdmissionCode.IDENTITY_MISMATCH)
     # Compare fully parsed declarations, never URL substrings or resource names.
     if capability in (Capability.DB_MIGRATE, Capability.DB_CLEANUP, Capability.DB_WRITE):
         validate_database_bindings(contract, migration=observed, session=observed, cleanup=observed)
         resource_id = contract.postgres.resource_id
-    elif capability in (Capability.REDIS_PURGE, Capability.CELERY_PUBLISH, Capability.CELERY_WORKER):
+    elif capability in (
+        Capability.REDIS_PURGE,
+        Capability.CELERY_PUBLISH,
+        Capability.CELERY_WORKER,
+    ):
         if set(observed) != {"redis", "queues"}:
             raise AdmissionRejected(AdmissionCode.INVALID_CONTEXT)
         validate_redis_binding(contract, observed["redis"])
@@ -285,16 +324,23 @@ def _review(
         raise AdmissionRejected(AdmissionCode.RESOURCE_NOT_ATTESTED)
     if bridge.execution_authorized(context, operation, now) is not True:
         raise AdmissionRejected(AdmissionCode.EXECUTION_NOT_AUTHORIZED)
-    if (type(receipt) is not OperationReceipt or receipt.interface_version != "1"
-            or not _token(receipt.receipt_id)):
+    if (
+        type(receipt) is not OperationReceipt
+        or receipt.interface_version != "1"
+        or not _token(receipt.receipt_id)
+    ):
         raise AdmissionRejected(AdmissionCode.INVALID_RECEIPT)
-    if (receipt.identity != expected or receipt.manifest_id != context.manifest_id
-            or receipt.lease_id != contract.lease_id or receipt.operation != operation
-            or receipt.resource_id != resource_id):
+    if (
+        receipt.identity != expected
+        or receipt.manifest_id != context.manifest_id
+        or receipt.lease_id != contract.lease_id
+        or receipt.operation != operation
+        or receipt.resource_id != resource_id
+    ):
         raise AdmissionRejected(AdmissionCode.RECEIPT_MISMATCH)
-    issued, expires, current = (_utc(value) for value in (
-        receipt.issued_at, receipt.expires_at, now
-    ))
+    issued, expires, current = (
+        _utc(value) for value in (receipt.issued_at, receipt.expires_at, now)
+    )
     if not (contract.issued_at <= issued <= current < expires <= contract.expires_at):
         raise AdmissionRejected(AdmissionCode.RECEIPT_STALE)
     if bridge.consume_receipt(context, receipt, now) is not True:

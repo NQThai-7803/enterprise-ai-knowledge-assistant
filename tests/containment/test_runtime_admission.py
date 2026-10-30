@@ -33,26 +33,46 @@ NOW = datetime(2030, 1, 1, tzinfo=UTC)
 
 def projection() -> dict[str, Any]:
     return {
-        "contract_version": "1", "policy_version": "e00-p1-v1",
-        "run_id": "synthetic-run", "sandbox_id": "synthetic-sandbox",
+        "contract_version": "1",
+        "policy_version": "e00-p1-v1",
+        "run_id": "synthetic-run",
+        "sandbox_id": "synthetic-sandbox",
         "lease_id": "synthetic-lease",
         "issued_at": NOW - timedelta(minutes=1),
         "expires_at": NOW + timedelta(minutes=5),
-        "postgres": {"resource_id": "db-instance", "database": "synthetic_db",
-                     "role": "synthetic_role", "schema": "public"},
-        "redis": {"instance_id": "redis-instance", "broker_instance_id": "redis-instance",
-                  "backend_instance_id": "redis-instance",
-                  "rate_limit_instance_id": "redis-instance",
-                  "broker_db": 1, "backend_db": 2, "rate_limit_db": 0},
-        "queues": {"default_queue": "default", "document_queue": "documents",
-                   "worker_queues": ["default", "documents"]},
-        "storage": {"resource_id": "volume", "root_id": "uploads",
-                    "root_path": "/scratch/uploads"},
+        "postgres": {
+            "resource_id": "db-instance",
+            "database": "synthetic_db",
+            "role": "synthetic_role",
+            "schema": "public",
+        },
+        "redis": {
+            "instance_id": "redis-instance",
+            "broker_instance_id": "redis-instance",
+            "backend_instance_id": "redis-instance",
+            "rate_limit_instance_id": "redis-instance",
+            "broker_db": 1,
+            "backend_db": 2,
+            "rate_limit_db": 0,
+        },
+        "queues": {
+            "default_queue": "default",
+            "document_queue": "documents",
+            "worker_queues": ["default", "documents"],
+        },
+        "storage": {"resource_id": "volume", "root_id": "uploads", "root_path": "/scratch/uploads"},
         "ownership": [
-            {"resource_id": resource_id, "kind": kind,
-             "run_id": "synthetic-run", "sandbox_id": "synthetic-sandbox"}
-            for resource_id, kind in (("db-instance", "postgres"),
-                                      ("redis-instance", "redis"), ("volume", "storage"))
+            {
+                "resource_id": resource_id,
+                "kind": kind,
+                "run_id": "synthetic-run",
+                "sandbox_id": "synthetic-sandbox",
+            }
+            for resource_id, kind in (
+                ("db-instance", "postgres"),
+                ("redis-instance", "redis"),
+                ("volume", "storage"),
+            )
         ],
         "capabilities": [item.value for item in Capability],
     }
@@ -80,9 +100,7 @@ class FakeBridge:
     def attest_resources(self, context: LaunchContext, now: datetime) -> bool:
         return self.attestation
 
-    def execution_authorized(
-        self, context: LaunchContext, operation: str, now: datetime
-    ) -> bool:
+    def execution_authorized(self, context: LaunchContext, operation: str, now: datetime) -> bool:
         return self.authorization
 
     def consume_receipt(
@@ -95,17 +113,36 @@ class FakeBridge:
 
 
 def scenario() -> dict[str, Any]:
-    identity = ExecutionIdentity("synthetic-run", "synthetic-sandbox", "synthetic-audience",
-                                 "synthetic-nonce", "synthetic-source", "e00-p1-v1",
-                                 "synthetic-launch")
+    identity = ExecutionIdentity(
+        "synthetic-run",
+        "synthetic-sandbox",
+        "synthetic-audience",
+        "synthetic-nonce",
+        "synthetic-source",
+        "e00-p1-v1",
+        "synthetic-launch",
+    )
     payload = projection()
     context = LaunchContext("1", identity, "synthetic-manifest", payload)
     receipt = OperationReceipt(
-        "1", "synthetic-receipt", identity, context.manifest_id, "synthetic-lease",
-        "db.cleanup", "db-instance", NOW - timedelta(seconds=1), NOW + timedelta(seconds=30),
+        "1",
+        "synthetic-receipt",
+        identity,
+        context.manifest_id,
+        "synthetic-lease",
+        "db.cleanup",
+        "db-instance",
+        NOW - timedelta(seconds=1),
+        NOW + timedelta(seconds=30),
     )
-    return {"bridge": FakeBridge(context), "expected": identity, "operation": "db.cleanup",
-            "observed": deepcopy(payload["postgres"]), "receipt": receipt, "now": NOW}
+    return {
+        "bridge": FakeBridge(context),
+        "expected": identity,
+        "operation": "db.cleanup",
+        "observed": deepcopy(payload["postgres"]),
+        "receipt": receipt,
+        "now": NOW,
+    }
 
 
 def reject(case: dict[str, Any], code: AdmissionCode) -> None:
@@ -140,8 +177,9 @@ def test_unsupported_context_interface() -> None:
     reject(case, AdmissionCode.INVALID_CONTEXT)
 
 
-@pytest.mark.parametrize("field", ["run_id", "sandbox_id", "audience", "nonce",
-                                   "source_id", "policy_id", "launch_id"])
+@pytest.mark.parametrize(
+    "field", ["run_id", "sandbox_id", "audience", "nonce", "source_id", "policy_id", "launch_id"]
+)
 def test_wrong_execution_identity(field: str) -> None:
     case = scenario()
     bridge = case["bridge"]
@@ -181,35 +219,57 @@ def test_database_binding_mismatch_reuses_p1() -> None:
     assert caught.value.code == ErrorCode.DATABASE_MISMATCH
 
 
-@pytest.mark.parametrize("field,value", [
-    ("identity", ExecutionIdentity("other-run", "synthetic-sandbox", "synthetic-audience",
-                                   "synthetic-nonce", "synthetic-source", "e00-p1-v1",
-                                   "synthetic-launch")),
-    ("manifest_id", "other-manifest"), ("lease_id", "other-lease"),
-    ("operation", "db.migrate"), ("resource_id", "other-db"),
-])
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        (
+            "identity",
+            ExecutionIdentity(
+                "other-run",
+                "synthetic-sandbox",
+                "synthetic-audience",
+                "synthetic-nonce",
+                "synthetic-source",
+                "e00-p1-v1",
+                "synthetic-launch",
+            ),
+        ),
+        ("manifest_id", "other-manifest"),
+        ("lease_id", "other-lease"),
+        ("operation", "db.migrate"),
+        ("resource_id", "other-db"),
+    ],
+)
 def test_receipt_binding_mismatch(field: str, value: object) -> None:
     case = scenario()
     case["receipt"] = replace(case["receipt"], **{field: value})
     reject(case, AdmissionCode.RECEIPT_MISMATCH)
 
 
-@pytest.mark.parametrize("field,value", [
-    ("expires_at", NOW), ("issued_at", NOW + timedelta(seconds=1)),
-    ("expires_at", NOW + timedelta(minutes=6)),
-])
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("expires_at", NOW),
+        ("issued_at", NOW + timedelta(seconds=1)),
+        ("expires_at", NOW + timedelta(minutes=6)),
+    ],
+)
 def test_stale_or_out_of_lease_receipt(field: str, value: datetime) -> None:
     case = scenario()
     case["receipt"] = replace(case["receipt"], **{field: value})
     reject(case, AdmissionCode.RECEIPT_STALE)
 
 
-@pytest.mark.parametrize("field,value", [
-    ("interface_version", "unsupported"), ("receipt_id", ""),
-    ("issued_at", NOW.replace(tzinfo=None)),
-    ("issued_at", datetime.min.replace(tzinfo=timezone(timedelta(hours=1)))),
-    ("expires_at", datetime.max.replace(tzinfo=timezone(timedelta(hours=-1)))),
-])
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("interface_version", "unsupported"),
+        ("receipt_id", ""),
+        ("issued_at", NOW.replace(tzinfo=None)),
+        ("issued_at", datetime.min.replace(tzinfo=timezone(timedelta(hours=1)))),
+        ("expires_at", datetime.max.replace(tzinfo=timezone(timedelta(hours=-1)))),
+    ],
+)
 def test_invalid_receipt(field: str, value: object) -> None:
     case = scenario()
     case["receipt"] = replace(case["receipt"], **{field: value})
@@ -234,11 +294,14 @@ def test_unknown_operation() -> None:
     reject(case, AdmissionCode.UNKNOWN_OPERATION)
 
 
-@pytest.mark.parametrize("attribute,code", [
-    ("provenance", AdmissionCode.PROVENANCE_NOT_VERIFIED),
-    ("attestation", AdmissionCode.RESOURCE_NOT_ATTESTED),
-    ("authorization", AdmissionCode.EXECUTION_NOT_AUTHORIZED),
-])
+@pytest.mark.parametrize(
+    "attribute,code",
+    [
+        ("provenance", AdmissionCode.PROVENANCE_NOT_VERIFIED),
+        ("attestation", AdmissionCode.RESOURCE_NOT_ATTESTED),
+        ("authorization", AdmissionCode.EXECUTION_NOT_AUTHORIZED),
+    ],
+)
 def test_structurally_valid_projection_does_not_replace_external_checks(
     attribute: str, code: AdmissionCode
 ) -> None:
@@ -353,11 +416,14 @@ def test_s03_bridge_cannot_mutate_nested_projection_or_consume_after_failure() -
     assert case["bridge"].spent == set()
 
 
-@pytest.mark.parametrize("operation,section,field,changed", [
-    ("db.cleanup", "postgres", "database", "other_database"),
-    ("redis.purge", "redis", "broker_db", 7),
-    ("storage.write", "storage", "root_path", "/scratch/other"),
-])
+@pytest.mark.parametrize(
+    "operation,section,field,changed",
+    [
+        ("db.cleanup", "postgres", "database", "other_database"),
+        ("redis.purge", "redis", "broker_db", 7),
+        ("storage.write", "storage", "root_path", "/scratch/other"),
+    ],
+)
 def test_s04_external_resource_alias_changes_do_not_change_checked_snapshot(
     operation: str, section: str, field: str, changed: object
 ) -> None:
@@ -377,8 +443,12 @@ def test_s04_external_resource_alias_changes_do_not_change_checked_snapshot(
             assert context.projection[section][field] == original_value
             return True
 
-    case.update(bridge=AliasBridge(case["bridge"].context), operation=operation, observed=observed,
-                receipt=replace(case["receipt"], operation=operation, resource_id=resource_id))
+    case.update(
+        bridge=AliasBridge(case["bridge"].context),
+        operation=operation,
+        observed=observed,
+        receipt=replace(case["receipt"], operation=operation, resource_id=resource_id),
+    )
     result = review_admission(**case)
     assert result.interface_status == "INTERFACE_CONSISTENT"
     assert payload[section][field] == changed
@@ -515,9 +585,13 @@ def test_s09_late_bridge_exception_is_sanitized() -> None:
 def test_s10_malformed_typed_errors_are_sanitized(exception_type, malformed: str) -> None:
     class BrokenBridge(FakeBridge):
         def get_context(self) -> LaunchContext:
-            code = (AdmissionCode.INVALID_CONTEXT if exception_type is AdmissionRejected
-                    else ErrorCode.INVALID_STRUCTURE)
+            code = (
+                AdmissionCode.INVALID_CONTEXT
+                if exception_type is AdmissionRejected
+                else ErrorCode.INVALID_STRUCTURE
+            )
             if malformed == "subclass":
+
                 class DerivedError(exception_type):
                     @property
                     def code(self):
@@ -554,8 +628,9 @@ def test_s11_positive_snapshot_does_not_establish_trust_or_authority() -> None:
 def test_s12_frozen_projection_preserves_p1_public_semantics() -> None:
     class CheckingBridge(FakeBridge):
         def verify_provenance(self, context, expected, now) -> bool:
-            pure = validate_contract(context.projection, now=now,
-                                     required_capabilities=(Capability.DB_CLEANUP,))
+            pure = validate_contract(
+                context.projection, now=now, required_capabilities=(Capability.DB_CLEANUP,)
+            )
             assert pure.contract.queues.worker_queues == ("default", "documents")
             assert pure.contract.issued_at == NOW - timedelta(minutes=1)
             assert pure.contract.expires_at == NOW + timedelta(minutes=5)

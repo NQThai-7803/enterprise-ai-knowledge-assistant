@@ -167,9 +167,9 @@ def _instant(value: object) -> datetime:
 
 def _database(value: object) -> DatabaseTarget:
     data = _record(value, "resource_id database role schema")
-    return DatabaseTarget(*(_identity(data[key]) for key in (
-        "resource_id", "database", "role", "schema"
-    )))
+    return DatabaseTarget(
+        *(_identity(data[key]) for key in ("resource_id", "database", "role", "schema"))
+    )
 
 
 def _redis_index(value: object) -> int:
@@ -179,16 +179,23 @@ def _redis_index(value: object) -> int:
 
 
 def _redis(value: object) -> RedisTarget:
-    data = _record(value, "instance_id broker_instance_id backend_instance_id "
-                   "rate_limit_instance_id broker_db backend_db rate_limit_db")
-    ids = tuple(_identity(data[key]) for key in (
-        "instance_id", "broker_instance_id", "backend_instance_id", "rate_limit_instance_id"
-    ))
+    data = _record(
+        value,
+        "instance_id broker_instance_id backend_instance_id "
+        "rate_limit_instance_id broker_db backend_db rate_limit_db",
+    )
+    ids = tuple(
+        _identity(data[key])
+        for key in (
+            "instance_id",
+            "broker_instance_id",
+            "backend_instance_id",
+            "rate_limit_instance_id",
+        )
+    )
     if len(set(ids)) != 1:
         _reject(ErrorCode.REDIS_MISMATCH)
-    indices = tuple(_redis_index(data[key]) for key in (
-        "broker_db", "backend_db", "rate_limit_db"
-    ))
+    indices = tuple(_redis_index(data[key]) for key in ("broker_db", "backend_db", "rate_limit_db"))
     if len(set(indices)) != 3:
         _reject(ErrorCode.REDIS_MISMATCH)
     return RedisTarget(*ids, *indices)
@@ -214,8 +221,10 @@ def _storage(value: object) -> StorageTarget:
     # non-ASCII segments. This is lexical validation, never symlink attestation.
     if not isinstance(path, str) or not path.startswith("/"):
         _reject(ErrorCode.STORAGE_MISMATCH)
-    if any(part in {"", ".", ".."} or not re.fullmatch(r"[A-Za-z0-9_.-]+", part)
-           for part in path[1:].split("/")):
+    if any(
+        part in {"", ".", ".."} or not re.fullmatch(r"[A-Za-z0-9_.-]+", part)
+        for part in path[1:].split("/")
+    ):
         _reject(ErrorCode.STORAGE_MISMATCH)
     return StorageTarget(resource_id, root_id, path)
 
@@ -244,16 +253,19 @@ def validate_contract(
     """
     if payload is None:
         _reject(ErrorCode.MISSING_CONTRACT)
-    data = _record(payload, "contract_version policy_version run_id sandbox_id lease_id "
-                   "issued_at expires_at postgres redis queues storage ownership capabilities")
+    data = _record(
+        payload,
+        "contract_version policy_version run_id sandbox_id lease_id "
+        "issued_at expires_at postgres redis queues storage ownership capabilities",
+    )
     if data["contract_version"] != "1" or data["policy_version"] != "e00-p1-v1":
         _reject(ErrorCode.UNSUPPORTED_VERSION)
     run_id = _identity(data["run_id"])
     sandbox_id = _identity(data["sandbox_id"])
     lease_id = _identity(data["lease_id"])
-    issued, expires, current = (_instant(value) for value in (
-        data["issued_at"], data["expires_at"], now
-    ))
+    issued, expires, current = (
+        _instant(value) for value in (data["issued_at"], data["expires_at"], now)
+    )
     if issued >= expires:
         _reject(ErrorCode.INVALID_LEASE)
     if current < issued:
@@ -264,18 +276,24 @@ def validate_contract(
     redis = _redis(data["redis"])
     queues = _queues(data["queues"])
     storage = _storage(data["storage"])
-    resources = ((postgres.resource_id, "postgres"), (redis.instance_id, "redis"),
-                 (storage.resource_id, "storage"))
+    resources = (
+        (postgres.resource_id, "postgres"),
+        (redis.instance_id, "redis"),
+        (storage.resource_id, "storage"),
+    )
     if len({resource_id for resource_id, _ in resources}) != 3:
         _reject(ErrorCode.OWNERSHIP_MISMATCH)
     owners: list[ResourceOwnership] = []
     for item in _sequence(data["ownership"]):
         owner = _record(item, "resource_id kind run_id sandbox_id")
-        owners.append(ResourceOwnership(*(_identity(owner[key]) for key in (
-            "resource_id", "kind", "run_id", "sandbox_id"
-        ))))
-    expected = {ResourceOwnership(resource_id, kind, run_id, sandbox_id)
-                for resource_id, kind in resources}
+        owners.append(
+            ResourceOwnership(
+                *(_identity(owner[key]) for key in ("resource_id", "kind", "run_id", "sandbox_id"))
+            )
+        )
+    expected = {
+        ResourceOwnership(resource_id, kind, run_id, sandbox_id) for resource_id, kind in resources
+    }
     if len(owners) != 3 or set(owners) != expected:
         _reject(ErrorCode.OWNERSHIP_MISMATCH)
     capabilities = _capabilities(data["capabilities"])
@@ -283,8 +301,19 @@ def validate_contract(
     if not set(required).issubset(capabilities):
         _reject(ErrorCode.MISSING_CAPABILITY)
     contract = TestTargetContract(
-        "1", "e00-p1-v1", run_id, sandbox_id, lease_id, issued, expires,
-        postgres, redis, queues, storage, tuple(owners), capabilities,
+        "1",
+        "e00-p1-v1",
+        run_id,
+        sandbox_id,
+        lease_id,
+        issued,
+        expires,
+        postgres,
+        redis,
+        queues,
+        storage,
+        tuple(owners),
+        capabilities,
     )
     return PolicyAssessment(contract)
 
@@ -309,9 +338,11 @@ def validate_redis_binding(contract: TestTargetContract, observed: Mapping[str, 
 def validate_queue_binding(contract: TestTargetContract, observed: Mapping[str, object]) -> None:
     actual = _queues(observed)
     expected = contract.queues
-    if (actual.default_queue != expected.default_queue
-            or actual.document_queue != expected.document_queue
-            or set(actual.worker_queues) != set(expected.worker_queues)):
+    if (
+        actual.default_queue != expected.default_queue
+        or actual.document_queue != expected.document_queue
+        or set(actual.worker_queues) != set(expected.worker_queues)
+    ):
         _reject(ErrorCode.QUEUE_MISMATCH)
 
 

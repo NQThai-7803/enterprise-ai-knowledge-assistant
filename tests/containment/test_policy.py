@@ -60,8 +60,12 @@ def synthetic_contract() -> dict[str, Any]:
             "root_path": "/scratch/uploads",
         },
         "ownership": [
-            {"resource_id": resource_id, "kind": kind, "run_id": "synthetic-run",
-             "sandbox_id": "synthetic-sandbox"}
+            {
+                "resource_id": resource_id,
+                "kind": kind,
+                "run_id": "synthetic-run",
+                "sandbox_id": "synthetic-sandbox",
+            }
             for resource_id, kind in (
                 ("synthetic-db-instance", "postgres"),
                 ("synthetic-redis-instance", "redis"),
@@ -122,18 +126,16 @@ def test_n05_database_name_is_not_provisioning_identity() -> None:
 def test_n06_database_consumer_mismatch(consumer: str, field: str) -> None:
     payload = synthetic_contract()
     contract = validate_contract(payload, now=NOW).contract
-    bindings = {name: deepcopy(payload["postgres"]) for name in (
-        "migration", "session", "cleanup"
-    )}
+    bindings = {name: deepcopy(payload["postgres"]) for name in ("migration", "session", "cleanup")}
     bindings[consumer][field] = "different-identity"
     with pytest.raises(PolicyViolation) as caught:
         validate_database_bindings(contract, **bindings)
     assert caught.value.code == ErrorCode.DATABASE_MISMATCH
 
 
-@pytest.mark.parametrize("field", [
-    "broker_instance_id", "backend_instance_id", "rate_limit_instance_id"
-])
+@pytest.mark.parametrize(
+    "field", ["broker_instance_id", "backend_instance_id", "rate_limit_instance_id"]
+)
 def test_n07_redis_instance_mismatch(field: str) -> None:
     payload = synthetic_contract()
     payload["redis"][field] = "different-instance"
@@ -172,18 +174,24 @@ def test_n08_worker_queue_mismatch() -> None:
 def test_n08_internally_consistent_queues_still_must_match_contract() -> None:
     payload = synthetic_contract()
     contract = validate_contract(payload, now=NOW).contract
-    observed = {"default_queue": "other", "document_queue": "documents",
-                "worker_queues": ["other", "documents"]}
+    observed = {
+        "default_queue": "other",
+        "document_queue": "documents",
+        "worker_queues": ["other", "documents"],
+    }
     with pytest.raises(PolicyViolation) as caught:
         validate_queue_binding(contract, observed)
     assert caught.value.code == ErrorCode.QUEUE_MISMATCH
 
 
-@pytest.mark.parametrize("field,value", [
-    ("resource_id", "another-volume"),
-    ("root_id", "another-root"),
-    ("root_path", "/scratch/other"),
-])
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("resource_id", "another-volume"),
+        ("root_id", "another-root"),
+        ("root_path", "/scratch/other"),
+    ],
+)
 def test_n09_storage_binding_mismatch(field: str, value: str) -> None:
     payload = synthetic_contract()
     contract = validate_contract(payload, now=NOW).contract
@@ -194,10 +202,19 @@ def test_n09_storage_binding_mismatch(field: str, value: str) -> None:
     assert caught.value.code == ErrorCode.STORAGE_MISMATCH
 
 
-@pytest.mark.parametrize("path", [
-    "/", "relative", "/scratch/../protected", "/scratch/./uploads",
-    "/scratch//uploads", "/scratch/uploads/", "C:\\synthetic", "/scratch\\uploads",
-])
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/",
+        "relative",
+        "/scratch/../protected",
+        "/scratch/./uploads",
+        "/scratch//uploads",
+        "/scratch/uploads/",
+        "C:\\synthetic",
+        "/scratch\\uploads",
+    ],
+)
 def test_n09_noncanonical_storage_path(path: str) -> None:
     payload = synthetic_contract()
     payload["storage"]["root_path"] = path
@@ -208,8 +225,7 @@ def test_n09_noncanonical_storage_path(path: str) -> None:
 def test_n10_missing_required_capability(capability: Capability) -> None:
     payload = synthetic_contract()
     payload["capabilities"].remove(capability.value)
-    assert_rejected(payload, ErrorCode.MISSING_CAPABILITY,
-                    required_capabilities=(capability,))
+    assert_rejected(payload, ErrorCode.MISSING_CAPABILITY, required_capabilities=(capability,))
 
 
 @pytest.mark.parametrize("section", [None, "postgres", "redis", "queues", "storage"])
@@ -294,9 +310,15 @@ def test_p01_consistent_contract_without_input_mutation() -> None:
 def test_p02_matching_database_bindings() -> None:
     payload = synthetic_contract()
     contract = validate_contract(payload, now=NOW).contract
-    assert validate_database_bindings(contract, migration=payload["postgres"],
-                                      session=payload["postgres"],
-                                      cleanup=payload["postgres"]) is None
+    assert (
+        validate_database_bindings(
+            contract,
+            migration=payload["postgres"],
+            session=payload["postgres"],
+            cleanup=payload["postgres"],
+        )
+        is None
+    )
 
 
 def test_p03_matching_redis_queue_and_storage_bindings() -> None:
@@ -314,11 +336,14 @@ def test_p04_valid_lease_at_issue_time() -> None:
     assert result.contract.issued_at < result.contract.expires_at
 
 
-@pytest.mark.parametrize("change,code", [
-    ("future", ErrorCode.LEASE_NOT_STARTED),
-    ("reversed", ErrorCode.INVALID_LEASE),
-    ("naive", ErrorCode.INVALID_LEASE),
-])
+@pytest.mark.parametrize(
+    "change,code",
+    [
+        ("future", ErrorCode.LEASE_NOT_STARTED),
+        ("reversed", ErrorCode.INVALID_LEASE),
+        ("naive", ErrorCode.INVALID_LEASE),
+    ],
+)
 def test_lease_rejections(change: str, code: ErrorCode) -> None:
     payload = synthetic_contract()
     if change == "future":
@@ -377,9 +402,7 @@ def test_p06_equivalent_instants_normalize_to_utc() -> None:
 def test_p07_lease_interval_keeps_inclusive_start_and_exclusive_end() -> None:
     payload = synthetic_contract()
     at_start = validate_contract(payload, now=payload["issued_at"])
-    before_end = validate_contract(
-        payload, now=payload["expires_at"] - timedelta(microseconds=1)
-    )
+    before_end = validate_contract(payload, now=payload["expires_at"] - timedelta(microseconds=1))
     assert at_start.structural_status == PolicyStatus.STRUCTURALLY_VALID
     assert before_end.structural_status == PolicyStatus.STRUCTURALLY_VALID
 
