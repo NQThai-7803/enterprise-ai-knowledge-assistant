@@ -118,9 +118,6 @@ SYSTEM POLICY
 
 CONVERSATION HISTORY
 <conversation_history>
---- CONVERSATION MESSAGE 1 USER START ---
-...
---- CONVERSATION MESSAGE 1 USER END ---
 </conversation_history>
 
 RETRIEVED CONTEXT
@@ -134,6 +131,12 @@ CURRENT QUESTION
 ...
 ```
 
+The grounded-answer flow passes no history rows to the prompt builder, so the
+`<conversation_history>` block is always empty. USER, ASSISTANT and internal SYSTEM messages
+never reach the LLM through it. Same-session history is used only before retrieval: the
+follow-up resolver rewrites the current question into a standalone question, and
+`CURRENT QUESTION` carries that standalone question.
+
 ## 10. Citation strategy
 
 Backend gáº¯n source marker trÆ°á»›c khi gá»­i LLM. Model chá»‰ tham chiáº¿u marker. Backend chuyá»ƒn marker thÃ nh citation object Ä‘Ã£ xÃ¡c thá»±c.
@@ -146,8 +149,8 @@ KhÃ´ng Ä‘á»ƒ model tá»± táº¡o document_id hoáº·c page number.
 - The builder loads USER, ASSISTANT, and internal SYSTEM messages from the current owned ChatSession only.
 - Ordering is `created_at ASC, id ASC`, with duplicate message IDs removed.
 - The conversation window is bounded by `CHAT_HISTORY_MAX_MESSAGES` and `CHAT_HISTORY_MAX_TOKENS`.
-- The builder trims recent messages first, formats the selected chronological window, and returns both prompt history and a bounded retrieval query.
-- Conversation history augments retrieval and prompt reference resolution, but retrieved context remains mandatory for answers.
+- The builder trims recent messages first, formats the selected chronological window, and returns both formatted history and a bounded retrieval query.
+- Conversation history only resolves follow-up references into a standalone question before retrieval. The grounded prompt receives an empty history block, and retrieved context remains mandatory for answers.
 - Citations are generated only from retrieved context source markers; history cannot produce citations.
 - Formatted prompts and formatted conversation history are not persisted.
 ## 12. Evaluation set

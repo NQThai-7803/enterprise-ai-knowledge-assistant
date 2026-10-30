@@ -282,10 +282,14 @@ def test_internal_system_messages_are_not_grounding_prompt_memory(
 
         await service.answer_question(current_user=owner, session_id=chat.id, question="Q")
 
+        # Same-session history only rewrites the question before retrieval; the grounded
+        # prompt gets an empty history block, so stored SYSTEM rows never reach the LLM.
         assert [message.role for message in llm.messages] == ["system", "user"]
         assert CONFIDENTIAL_MARKER not in llm.messages[0].content
-        assert CONFIDENTIAL_MARKER in llm.messages[1].content
-        assert "INTERNAL_SYSTEM" in llm.messages[1].content
+        assert CONFIDENTIAL_MARKER not in llm.messages[1].content
+        assert "INTERNAL_SYSTEM" not in llm.messages[1].content
+        assert "--- CONVERSATION MESSAGE" not in llm.messages[1].content
+        assert "<conversation_history>\n</conversation_history>" in llm.messages[1].content
 
     run_async(scenario())
 
