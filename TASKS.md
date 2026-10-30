@@ -1,6 +1,15 @@
 
 # Implementation Tasks
 
+## PROMPT 3b reference test environment completion and cleanup -- 2026-10-30
+
+**COMPLETED except volume removal.** `repo_layout` marker, scripts/ in the test image, `TESTING.md`, throwaway integration compose stack, `.venv*/` ignore, SYSTEM-memory test + `RAG_DESIGN.md`, `CITATION_VALIDATION_FAILED` warning log, safe Ruff fixes.
+
+Open follow-ups:
+- **High:** API auth tests are not isolated from the Redis rate limiter (14 HTTP 429 failures with real Redis). CI also provides Redis, so the CI api-integration lane is likely affected (NOT_VERIFIED). Reset or disable the limiter per test.
+- Awaiting approval: remove anonymous volume `7365c1dd...` (67.06 MB, PostgreSQL 17 data dir from the step-D `eaka-test-pg`, no container uses it).
+- `tests/containment_runtime.py:272` E501 and `ruff format` on the 4 containment files; `RAG_DESIGN.md` has pre-existing double-encoded Vietnamese text (e.g. line 105).
+
 ## PROMPT 3 follow-up: image built from the approved lock -- 2026-10-30
 
 **COMPLETED.** Build context trimmed, Dockerfile installs from `requirements.lock`, test tools pinned, frontend dev-tool audit fixes applied, runtime/test images verified offline. Reference test environment: `eaka-backend:prompt3-lock-test`.

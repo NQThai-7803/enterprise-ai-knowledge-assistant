@@ -6,6 +6,14 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### PROMPT 3b reference test environment and cleanup -- 2026-10-30
+
+- Added the `repo_layout` pytest marker, `scripts/` in the test image and `TESTING.md`.
+- Added `scripts/test/compose.integration.yaml` to run the integration lanes in the image.
+- Citation-failure NO_ANSWER fallbacks log a content-free `CITATION_VALIDATION_FAILED` warning.
+- Aligned the SYSTEM-memory test and `RAG_DESIGN.md` with the empty prompt history block.
+- Ignored `.venv*/`; applied safe Ruff fixes to containment tests.
+
 ### PROMPT 3 follow-up: image built from the approved lock -- 2026-10-30
 
 - Docker build context excludes local venvs, artifacts, data and caches.

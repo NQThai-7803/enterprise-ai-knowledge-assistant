@@ -1,5 +1,13 @@
 # Project Status
 
+## PROMPT 3b reference test environment completion and cleanup -- 2026-10-30
+
+**COMPLETED except volume removal (awaiting approval).**
+- Test image copies `scripts/`; new `repo_layout` marker on 18 infrastructure-file tests (skip with reason outside a checkout, fail inside one). Image `python -m pytest -q` exit 0: 1671 pass / 23 skip / 17 xfail. Host: 1693 pass / 1 skip / 17 xfail. See `TESTING.md`.
+- Integration in the image (`scripts/test/compose.integration.yaml`, tmpfs PostgreSQL/Redis, internal network) vs earlier Windows run: api-unit 49 = 49; integration 401 pass / 1 xfail (Windows 400 / 1 fail / 1 xfail; the fail was fixed in 3b); llm-provider 3 = 3; **api-integration 230 pass / 14 fail vs 244** because the login rate limiter counts across tests once real Redis is reachable (Windows pointed Redis at an unused port, so the limiter failed open). With `RATE_LIMIT_ENABLED=false` the file passes 24/24.
+- PyMuPDF 1.28.2 (image) vs 2.0 (`.venv312`): identical page count, page text, chunks and tokens on 4 synthetic PDFs; PDF integration tests identical.
+- Cleanup: `.venv*/` ignored; SYSTEM-memory test and `RAG_DESIGN.md` aligned; citation-failure fallback now logs a content-free WARNING; safe Ruff fixes in `tests/containment*` (1 E501 left).
+
 ## PROMPT 3 follow-up: image built from the approved lock -- 2026-10-30
 
 **COMPLETED; no answer logic changed. The reference test environment is now the image built from `requirements.lock`.** Earlier results (1692 pass / 17 xfail on Python 3.11 `.venv` and 3.12 `.venv312`) ran on unpinned, drifted dependencies (38 packages differ from the accepted lock).

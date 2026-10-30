@@ -119,7 +119,7 @@ TASK-027 SSE errors use the same safe chat/LLM/citation codes inside `stream.err
 
 Internal detailed codes include `CITATION_MARKER_MISSING`, `CITATION_MARKER_UNKNOWN`, `CITATION_MARKER_INVALID`, `CITATION_MAPPING_FAILED`, `CITATION_PERMISSION_REVALIDATION_FAILED`, and `CITATION_PERSISTENCE_FAILED`. Public errors do not include generated answers, source registry contents, excerpts, provider bodies, or markers from invalid output.
 
-Permission revalidation failure after LLM generation is downgraded to a successful NO_ANSWER response with empty citations rather than a public error. Invalid source markers that remain invalid after retry/repair are handled the same way. Today these fail-safe downgrades carry no citation error code in structured logs or audit metadata: the audit event is `CHAT_NO_ANSWER_GENERATED` with only `grounding_status` and `citation_count`.
+Permission revalidation failure after LLM generation is downgraded to a successful NO_ANSWER response with empty citations rather than a public error. Invalid source markers that remain invalid after retry/repair are handled the same way. The invalid-marker downgrade now emits one structured WARNING with `error_code=CITATION_VALIDATION_FAILED`, `conversation_id`, `marker_count` and a fixed `reason` code, with no question, answer or chunk text. Audit metadata is unchanged: `CHAT_NO_ANSWER_GENERATED` with only `grounding_status` and `citation_count`.
 
 ## TASK-021 feedback errors
 
