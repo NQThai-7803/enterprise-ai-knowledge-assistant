@@ -39,6 +39,7 @@ logs/
 
 # IDE
 .vscode/
+.claude/settings.local.json
 .idea/
 
 # Frontend
