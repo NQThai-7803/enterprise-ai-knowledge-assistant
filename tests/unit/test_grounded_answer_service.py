@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
 from collections.abc import Coroutine
 from dataclasses import replace
@@ -2346,6 +2347,61 @@ def test_provider_cannot_inject_unselected_citation() -> None:
         ]
 
     run_async(scenario())
+
+
+def test_invalid_citation_fallback_logs_content_free_warning(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    question = "Question about QUESTION_TEXT_MARKER policy?"
+    invented_answer = "ANSWER_TEXT_MARKER invented entitlement"
+
+    async def scenario() -> FakeLLMProvider:
+        from app.citations.errors import CitationFailureCode, CitationValidationError
+
+        class RejectingCitationValidationService:
+            async def validate_and_map(self, *, answer: str, source_registry, current_user):  # noqa: ANN001
+                raise CitationValidationError(CitationFailureCode.CITATION_MARKER_UNKNOWN)
+
+        llm = FakeLLMProvider(
+            LLMGenerationResult(
+                content=f'{{"answer":"{invented_answer}","citations":["SOURCE_999"]}}',
+                model="fake",
+                finish_reason="stop",
+                prompt_tokens=1,
+                completion_tokens=1,
+                response_time_ms=1,
+            )
+        )
+        service, *_ = make_service(
+            llm=llm, citation_validation=RejectingCitationValidationService()
+        )
+
+        result = await service.answer_question(
+            current_user=user(), session_id=chat_session().id, question=question
+        )
+
+        assert result.grounding_status == GroundingStatus.NO_ANSWER
+        assert result.assistant_citations == ()
+        return llm
+
+    with caplog.at_level(logging.WARNING, logger="app.services.grounded_answer_service"):
+        llm = asyncio.run(scenario())
+
+    assert llm.calls >= 1
+    records = [
+        record
+        for record in caplog.records
+        if getattr(record, "error_code", None) == "CITATION_VALIDATION_FAILED"
+    ]
+    assert len(records) == 1
+    record = records[0]
+    assert record.levelno == logging.WARNING
+    assert record.conversation_id == str(chat_session().id)
+    assert record.reason == "CITATION_MARKER_UNKNOWN"
+    assert record.marker_count == 1
+    logged = record.getMessage() + repr(vars(record))
+    for sensitive in ("QUESTION_TEXT_MARKER", "ANSWER_TEXT_MARKER", "allowed context"):
+        assert sensitive not in logged
 
 
 def test_no_answer_policy_remains_provider_independent() -> None:

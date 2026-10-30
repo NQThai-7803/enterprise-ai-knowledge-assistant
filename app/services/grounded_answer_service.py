@@ -551,6 +551,15 @@ class _AnswerDraft:
     prompt_tokens: int | None
     completion_tokens: int | None
     citations: tuple[object, ...] = ()
+    citation_failure: _CitationFailure | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class _CitationFailure:
+    """Why citation validation forced the fixed no-answer, without any chat or chunk text."""
+
+    reason: str
+    marker_count: int
 
 
 class _ClaimValidationRepairRequired(CitationValidationFailedApplicationError):
@@ -675,6 +684,11 @@ class GroundedAnswerService:
             question=normalized_question,
             conversation_context=conversation_context,
         )
+        if draft.citation_failure is not None:
+            _log_citation_validation_fallback(
+                conversation_id=session_id,
+                failure=draft.citation_failure,
+            )
         return await self._persist_message_pair(
             current_user=current_user,
             session_id=session_id,
@@ -858,13 +872,16 @@ class GroundedAnswerService:
                         provider=provider,
                         grounding_question=grounding_question,
                     )
-                except CitationValidationFailedApplicationError:
+                except CitationValidationFailedApplicationError as citation_error:
                     return _no_answer_draft(
                         self.settings.chat_no_answer_message,
                         selected_chunk_count=len(source_registry.sources),
                         response_time_ms=generation.response_time_ms,
                         prompt_tokens=generation.prompt_tokens,
                         completion_tokens=generation.completion_tokens,
+                        citation_failure=_citation_failure(
+                            citation_error, raw_output=generation.content
+                        ),
                     )
             try:
                 draft = await self._draft_from_generation(
@@ -895,13 +912,16 @@ class GroundedAnswerService:
                             messages=messages,
                             grounding_question=grounding_question,
                         )
-                    except CitationValidationFailedApplicationError:
+                    except CitationValidationFailedApplicationError as citation_error:
                         return _no_answer_draft(
                             self.settings.chat_no_answer_message,
                             selected_chunk_count=len(source_registry.sources),
                             response_time_ms=retry_generation.response_time_ms,
                             prompt_tokens=retry_generation.prompt_tokens,
                             completion_tokens=retry_generation.completion_tokens,
+                            citation_failure=_citation_failure(
+                                citation_error, raw_output=retry_generation.content
+                            ),
                         )
                     if _should_retry_incomplete_answer(
                         question=grounding_question,
@@ -939,13 +959,16 @@ class GroundedAnswerService:
                             messages=messages,
                             grounding_question=grounding_question,
                         )
-                    except CitationValidationFailedApplicationError:
+                    except CitationValidationFailedApplicationError as citation_error:
                         return _no_answer_draft(
                             self.settings.chat_no_answer_message,
                             selected_chunk_count=len(source_registry.sources),
                             response_time_ms=retry_generation.response_time_ms,
                             prompt_tokens=retry_generation.prompt_tokens,
                             completion_tokens=retry_generation.completion_tokens,
+                            citation_failure=_citation_failure(
+                                citation_error, raw_output=retry_generation.content
+                            ),
                         )
                     if _should_retry_incomplete_answer(
                         question=grounding_question,
@@ -978,13 +1001,16 @@ class GroundedAnswerService:
                                 messages=messages,
                                 grounding_question=grounding_question,
                             )
-                        except CitationValidationFailedApplicationError:
+                        except CitationValidationFailedApplicationError as citation_error:
                             return _no_answer_draft(
                                 self.settings.chat_no_answer_message,
                                 selected_chunk_count=len(source_registry.sources),
                                 response_time_ms=repair_generation.response_time_ms,
                                 prompt_tokens=repair_generation.prompt_tokens,
                                 completion_tokens=repair_generation.completion_tokens,
+                                citation_failure=_citation_failure(
+                                    citation_error, raw_output=repair_generation.content
+                                ),
                             )
                         if _should_retry_incomplete_answer(
                             question=grounding_question,
@@ -1043,7 +1069,7 @@ class GroundedAnswerService:
                             current_user=current_user,
                             grounding_question=grounding_question,
                         )
-                    except CitationValidationFailedApplicationError:
+                    except CitationValidationFailedApplicationError as citation_error:
                         deterministic_draft = await self._draft_from_deterministic_repair(
                             source_registry=source_registry,
                             current_user=current_user,
@@ -1055,6 +1081,9 @@ class GroundedAnswerService:
                             response_time_ms=structured_repair_generation.response_time_ms,
                             prompt_tokens=structured_repair_generation.prompt_tokens,
                             completion_tokens=structured_repair_generation.completion_tokens,
+                            citation_failure=_citation_failure(
+                                citation_error, raw_output=structured_repair_generation.content
+                            ),
                         )
                 if (
                     retry_draft.grounding_status == GroundingStatus.NO_ANSWER
@@ -1083,13 +1112,16 @@ class GroundedAnswerService:
                                 grounding_question=grounding_question,
                             )
                         )
-                    except CitationValidationFailedApplicationError:
+                    except CitationValidationFailedApplicationError as citation_error:
                         return _no_answer_draft(
                             self.settings.chat_no_answer_message,
                             selected_chunk_count=len(source_registry.sources),
                             response_time_ms=no_answer_retry_generation.response_time_ms,
                             prompt_tokens=no_answer_retry_generation.prompt_tokens,
                             completion_tokens=no_answer_retry_generation.completion_tokens,
+                            citation_failure=_citation_failure(
+                                citation_error, raw_output=no_answer_retry_generation.content
+                            ),
                         )
                     if _should_retry_incomplete_answer(
                         question=grounding_question,
@@ -1129,13 +1161,16 @@ class GroundedAnswerService:
                                 grounding_question=grounding_question,
                             )
                         )
-                    except CitationValidationFailedApplicationError:
+                    except CitationValidationFailedApplicationError as citation_error:
                         return _no_answer_draft(
                             self.settings.chat_no_answer_message,
                             selected_chunk_count=len(source_registry.sources),
                             response_time_ms=quality_retry_generation.response_time_ms,
                             prompt_tokens=quality_retry_generation.prompt_tokens,
                             completion_tokens=quality_retry_generation.completion_tokens,
+                            citation_failure=_citation_failure(
+                                citation_error, raw_output=quality_retry_generation.content
+                            ),
                         )
                     if _should_retry_incomplete_answer(
                         question=grounding_question,
@@ -10587,6 +10622,7 @@ def _no_answer_draft(
     response_time_ms: int | None = None,
     prompt_tokens: int | None = None,
     completion_tokens: int | None = None,
+    citation_failure: _CitationFailure | None = None,
 ) -> _AnswerDraft:
     return _AnswerDraft(
         content=content,
@@ -10596,6 +10632,61 @@ def _no_answer_draft(
         prompt_tokens=prompt_tokens,
         completion_tokens=completion_tokens,
         citations=(),
+        citation_failure=citation_failure,
+    )
+
+
+_SOURCE_IDENTIFIER_PATTERN = re.compile(r"\bSOURCE_[0-9]+\b")
+
+# Fixed parser messages (app/citations/grounded_output.py) mapped to citation failure codes.
+# The message only selects a code; it is never logged itself.
+_PARSE_FAILURE_REASONS = {
+    "Citation identifier is not in the source registry.": "CITATION_MARKER_UNKNOWN",
+    "Invalid citation identifier.": "CITATION_MARKER_INVALID",
+    "Citation identifiers must not be bracketed.": "CITATION_MARKER_INVALID",
+    "LLM answer must not contain citation markers.": "CITATION_MARKER_INVALID",
+    "LLM citations must not be empty.": "CITATION_MARKER_MISSING",
+}
+
+
+def _citation_failure(
+    error: CitationValidationFailedApplicationError,
+    *,
+    raw_output: str | None,
+) -> _CitationFailure:
+    """Classify a citation validation failure into a fixed code plus a marker count.
+
+    Only enum codes and a count leave this function, so the log built from it cannot
+    carry question, answer or chunk text.
+    """
+    cause = error.__cause__
+    if isinstance(error, _ClaimValidationRepairRequired):
+        reason = "CLAIM_NOT_SUPPORTED"
+    elif isinstance(cause, CitationValidationError):
+        reason = cause.code.value
+    elif isinstance(cause, ValueError):
+        reason = _PARSE_FAILURE_REASONS.get(str(cause), "GROUNDED_OUTPUT_INVALID")
+    else:
+        reason = "CITATIONS_MISSING_OR_UNUSABLE"
+    return _CitationFailure(
+        reason=reason,
+        marker_count=len(_SOURCE_IDENTIFIER_PATTERN.findall(raw_output or "")),
+    )
+
+
+def _log_citation_validation_fallback(
+    *,
+    conversation_id: UUID,
+    failure: _CitationFailure,
+) -> None:
+    logger.warning(
+        "Citation validation failed; returning the fixed no-answer.",
+        extra={
+            "error_code": "CITATION_VALIDATION_FAILED",
+            "conversation_id": str(conversation_id),
+            "marker_count": failure.marker_count,
+            "reason": failure.reason,
+        },
     )
 
 
