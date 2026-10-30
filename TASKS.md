@@ -1,6 +1,16 @@
 
 # Implementation Tasks
 
+## PROMPT 3 follow-up: image built from the approved lock -- 2026-10-30
+
+**COMPLETED.** Build context trimmed, Dockerfile installs from `requirements.lock`, test tools pinned, frontend dev-tool audit fixes applied, runtime/test images verified offline. Reference test environment: `eaka-backend:prompt3-lock-test`.
+
+Open follow-ups:
+- **Medium:** upgrade production dependency `zod` 3.25.76 -> 4.x (GHSA-mrhx-c7xc-m3w5, client-side memory exhaustion). Breaking major; migrate the 5 form schemas using `zodResolver` and re-run frontend checks.
+- Add `--require-hashes` (`uv pip compile --generate-hashes`) to the lock install.
+- Test image lacks `scripts/`, `deploy/` and repo config files: 2 eval-harness collection errors, 7 config-file failures, 11 compose skips. Decide whether to copy them into the test stage or mark those tests host-only.
+- Still not done from the takeover cleanup: `.venv*/` in `.gitignore`; SYSTEM-memory test plus `RAG_DESIGN.md`; citation-failure code in logs/audit; Ruff for `tests/containment*` and `tmp_*.py`; remove anonymous volume `7365c1dd...`.
+
 ## PROMPT 3 tiktoken offline bundle and backend dependency lock -- 2026-10-30
 
 **COMPLETED for source/doc changes; image build and `npm audit fix` await approval.** Tiktoken `cl100k_base` is bundled in the image under `/opt/tiktoken`; docs corrected; `requirements.lock` reproduces the accepted 92-package versions (91 runtime pins, no upgrade).

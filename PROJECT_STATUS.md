@@ -1,5 +1,14 @@
 # Project Status
 
+## PROMPT 3 follow-up: image built from the approved lock -- 2026-10-30
+
+**COMPLETED; no answer logic changed. The reference test environment is now the image built from `requirements.lock`.** Earlier results (1692 pass / 17 xfail on Python 3.11 `.venv` and 3.12 `.venv312`) ran on unpinned, drifted dependencies (38 packages differ from the accepted lock).
+- `.dockerignore` now excludes `.venv*`, `artifacts`, `.backups`, `data`, `.ci-data`, `vite-monorepo` and nested caches; estimated context 2,632 MiB -> 7.9 MiB (BuildKit transferred 1.66 MB).
+- Dockerfile installs `--no-deps -r requirements.lock` plus `pip check`; test stage pins pytest 9.2.0, pluggy 1.7.0, iniconfig 2.3.1, ruff 0.17.3.
+- `eaka-backend:prompt3-lock` (runtime, ~23.9 min cold build): `pip freeze` matches all 91 lock pins plus `wheel` 0.45.1 = the accepted 92-package lock; tiktoken encodes offline as user `app` with `--network=none`.
+- `eaka-backend:prompt3-lock-test`, `--network=none`, Python 3.12.16: 1662 pass / 7 fail / 12 skip / 17 xfail / 2 collection errors vs `.venv312` 1692 / 0 / 1 / 17. All differences are files outside the image (`scripts/`, `deploy/`, compose, Dockerfile, `.env.example`, `frontend/`) or no Docker Compose CLI; no library-version difference changed any outcome.
+- Frontend `npm audit fix` (dev-only bumps): lint/typecheck/Vitest 40/40/build pass; remaining finding is production `zod` 3.25.76 (needs major 4).
+
 ## PROMPT 3 tiktoken offline bundle and backend dependency lock -- 2026-10-30
 
 **COMPLETED for source changes; image build NOT_RUN (awaiting approval); no answer logic changed.**

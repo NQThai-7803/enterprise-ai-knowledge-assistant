@@ -6,6 +6,13 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### PROMPT 3 follow-up: image built from the approved lock -- 2026-10-30
+
+- Docker build context excludes local venvs, artifacts, data and caches.
+- The backend image installs exactly `requirements.lock` (`--no-deps`, `pip check`);
+  test-stage pytest/ruff are pinned. The image freeze equals the accepted lock.
+- Frontend: applied non-breaking `npm audit fix` for dev tooling.
+
 ### PROMPT 3 tiktoken offline bundle and dependency lock -- 2026-10-30
 
 - Docker image pre-bundles the `cl100k_base` tiktoken encoding under
