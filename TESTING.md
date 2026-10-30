@@ -45,8 +45,7 @@ Mark the test with the paths it reads, relative to the repository root:
 
 ```python
 @pytest.mark.repo_layout("compose.yaml", ".env.example")
-def test_something_about_compose() -> None:
-    ...
+def test_something_about_compose() -> None: ...
 ```
 
 The hook in `tests/conftest.py` checks those paths before the test runs.

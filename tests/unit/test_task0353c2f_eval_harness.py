@@ -88,18 +88,23 @@ def test_threshold_uses_development_only() -> None:
 def test_conflict_and_invalid_extraction_never_accept() -> None:
     cases = [
         {
-            "id": "conflict", "split": "development", "language": "EN",
-            "tags": [], "gold": "UNCERTAIN", "authorized_evidence": ["A", "not A"],
+            "id": "conflict",
+            "split": "development",
+            "language": "EN",
+            "tags": [],
+            "gold": "UNCERTAIN",
+            "authorized_evidence": ["A", "not A"],
         },
         {
-            "id": "invalid", "split": "final_test", "language": "VI",
-            "tags": [], "gold": "REJECT", "authorized_evidence": ["A"],
+            "id": "invalid",
+            "split": "final_test",
+            "language": "VI",
+            "tags": [],
+            "gold": "REJECT",
+            "authorized_evidence": ["A"],
         },
     ]
-    existing = [
-        {"id": case["id"], "decision": "ACCEPT", "latency_ms": 1.0}
-        for case in cases
-    ]
+    existing = [{"id": case["id"], "decision": "ACCEPT", "latency_ms": 1.0} for case in cases]
     extraction = [
         {
             "id": "conflict",
@@ -115,7 +120,9 @@ def test_conflict_and_invalid_extraction_never_accept() -> None:
     ]
     scored = [
         {
-            "id": case["id"], "oracle_min": 1.0, "automatic_min": 1.0,
+            "id": case["id"],
+            "oracle_min": 1.0,
+            "automatic_min": 1.0,
             "score_latency_ms": 1.0,
         }
         for case in cases
