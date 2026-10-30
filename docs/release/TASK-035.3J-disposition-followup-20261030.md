@@ -57,3 +57,42 @@ git show bd56fed:tmp_runtime_benefit_trace.py > tmp_runtime_benefit_trace.py
 ```
 
 `git show <removal-commit>^:<file>` restores the same content.
+
+## `vite-monorepo` Gitlink
+
+### Decision
+
+The owner approved removing the `vite-monorepo` Gitlink from the parent index with
+`git rm --cached vite-monorepo` and adding `/vite-monorepo/` to `.gitignore`. The local nested
+checkout, including its own `.git`, is kept unchanged on disk. This closes the open
+decision in `TASK-035.3K-gitlink-decision-report-20261014.md`, which stays as it was.
+
+### Reason
+
+- No reachable URL exists for the nested commit. The parent has no `.gitmodules`, the nested
+  repository has no remote, and the parent object store does not contain the commit
+  (TASK-035.3J gitlink reproducibility report and TASK-035.3K). A fresh clone could never
+  populate it.
+- `actions/checkout` v7, used by Frontend CI, treats the unmapped Gitlink as fatal:
+  `fatal: No url found for submodule path 'vite-monorepo' in .gitmodules` (run 41027432316).
+  Backend CI (`actions/checkout@v4`) only logged `git failed with exit code 128`.
+- No dependency on it was found: no reference in `frontend/package.json`,
+  `frontend/package-lock.json`, `frontend/tsconfig*` or `frontend/vite.config.*`, and no Docker,
+  compose or CI use. `.dockerignore` already excluded it. The TASK-035.3I/J release scripts only
+  label the path while listing inventory and do not require it.
+
+### Record
+
+| Item | Value |
+|---|---|
+| Gitlink entry | `160000 commit 3becadbd1d46a68a61a173731a3c7b946fec024f vite-monorepo` |
+| Last commit with the Gitlink | `833b2526674c07414ff1fc1fc13b7e909c098dcd` |
+| Local copy | `vite-monorepo/` (nested repository, local only, not backed up off-host) |
+
+To restore the Gitlink entry at the same commit:
+
+```powershell
+git update-index --add --cacheinfo 160000,3becadbd1d46a68a61a173731a3c7b946fec024f,vite-monorepo
+```
+
+Restoring it brings back the CI checkout failure until a reachable `.gitmodules` URL exists.
