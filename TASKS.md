@@ -1,6 +1,14 @@
 
 # Implementation Tasks
 
+## PROMPT 3d CI green and semantic retrieval flake -- 2026-10-30
+
+**IN PROGRESS.** Items 2-6 of PROMPT 3d have not started.
+
+Open follow-ups:
+- **Medium (not fixed): pin the pgvector image by tag or digest.** `pgvector/pgvector:pg17` floats in `.github/workflows/ci.yml:26`, `compose.yaml:35`, `compose.prod.yaml:61` and `scripts/test/compose.integration.yaml:48`. CI pulled pgvector 0.8.7 (`sha256:ac08538c...a75d`) while the local image is 0.8.6 (`sha256:cf134a76...8e6f`), so CI and local runs do not use the same extension.
+- **High (RAG, decision pending, not fixed): HNSW post-filter recall.** `search_permitted_chunks` filters permission and status after the HNSW index returns `hnsw.ef_search` (40) candidates. More than 40 nearer index elements that the user cannot see, or that belong to deleted but unvacuumed chunks, hide every permitted chunk. No unauthorized chunk is returned. Reproduced locally with the default planner. Two `xfail(strict)` tests in `tests/integration/test_semantic_retrieval_hnsw_recall.py` (integration lane) capture it: they force the index plan (`enable_seqscan`/`enable_sort` off) and fail with `RuntimeError` if the plan does not use HNSW. The fix direction (iterative scan, `ef_search`, pre-filtering by permission) must go through `eaka-rag-change-guard`.
+
 ## PROMPT 3c small fixes before PROMPT 4 -- 2026-10-30
 
 **COMPLETED.** Anonymous volume `7365c1dd...` removed. API test clients get a unique client address so the Redis login/refresh limiter never shares counters; new tests cover 429 on the over-limit login with real Redis and fail-open/fail-closed with Redis unreachable. Image and host: api-unit 51, api-integration 245 passed.
