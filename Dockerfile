@@ -75,6 +75,8 @@ RUN python -m pip install --no-cache-dir --no-deps \
         "pytest==9.2.0" "pluggy==1.7.0" "iniconfig==2.3.1" "ruff==0.17.3" \
     && python -m pip check
 COPY --chown=app:app tests ./tests
+# Test-only: the eval-harness unit tests import scripts/. The runtime stage stays without it.
+COPY --chown=app:app scripts ./scripts
 USER app
 
 CMD ["python", "-m", "pytest", "tests/unit", "-v"]

@@ -5,6 +5,7 @@ import os
 import subprocess
 import sys
 from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
 from sqlalchemy import delete
@@ -25,6 +26,35 @@ from app.models import (
     RefreshToken,
     User,
 )
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def pytest_runtest_setup(item: pytest.Item) -> None:
+    """Gate `repo_layout` tests on the repository files they read.
+
+    The test image ships only app/, tests/ and scripts/, so infrastructure files such as
+    Dockerfile or compose.yaml are absent there and the test is skipped with the missing
+    paths as the reason. In a repository checkout a missing file is a real regression,
+    so the test fails instead of skipping quietly.
+    """
+    marker = item.get_closest_marker("repo_layout")
+    if marker is None:
+        return
+    if not marker.args:
+        pytest.fail("repo_layout marker needs the repository paths the test reads.")
+    missing = [path for path in marker.args if not (REPO_ROOT / path).exists()]
+    if not missing:
+        return
+    if (REPO_ROOT / ".git").exists():
+        pytest.fail(
+            "repo_layout files missing from this repository checkout: " + ", ".join(missing),
+            pytrace=False,
+        )
+    pytest.skip(
+        "repo_layout: not a repository checkout (e.g. the test image); missing "
+        + ", ".join(missing)
+    )
 
 
 @pytest.fixture(scope="session")

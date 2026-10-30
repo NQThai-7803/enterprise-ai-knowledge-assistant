@@ -27,6 +27,7 @@ def _compose_config() -> dict[str, object]:
     return json.loads(result.stdout)
 
 
+@pytest.mark.repo_layout("Dockerfile")
 def test_dockerfile_uses_python_312_non_root_runtime() -> None:
     dockerfile = (ROOT / "Dockerfile").read_text(encoding="utf-8")
 
@@ -39,6 +40,7 @@ def test_dockerfile_uses_python_312_non_root_runtime() -> None:
     assert "create_all" not in dockerfile
 
 
+@pytest.mark.repo_layout(".dockerignore")
 def test_dockerignore_excludes_secrets_and_host_artifacts() -> None:
     dockerignore = (ROOT / ".dockerignore").read_text(encoding="utf-8").splitlines()
     ignored = {line.strip() for line in dockerignore if line.strip() and not line.startswith("#")}
@@ -55,12 +57,14 @@ def test_dockerignore_excludes_secrets_and_host_artifacts() -> None:
     assert "pyproject.toml" not in ignored
 
 
+@pytest.mark.repo_layout("compose.yaml")
 def test_compose_contains_required_backend_services() -> None:
     services = _compose_config()["services"]
 
     assert {"postgres", "redis", "migration", "api", "worker"}.issubset(services)
 
 
+@pytest.mark.repo_layout("compose.yaml")
 def test_api_worker_and_migration_use_same_application_image() -> None:
     services = _compose_config()["services"]
 
@@ -71,6 +75,7 @@ def test_api_worker_and_migration_use_same_application_image() -> None:
     assert services["migration"]["build"]["target"] == "runtime"
 
 
+@pytest.mark.repo_layout("compose.yaml")
 def test_migration_service_runs_alembic_upgrade_head_before_api_and_worker() -> None:
     services = _compose_config()["services"]
 
@@ -84,6 +89,7 @@ def test_migration_service_runs_alembic_upgrade_head_before_api_and_worker() -> 
     )
 
 
+@pytest.mark.repo_layout("compose.yaml")
 def test_containers_use_service_discovery_for_database_and_redis() -> None:
     services = _compose_config()["services"]
 
@@ -95,6 +101,7 @@ def test_containers_use_service_discovery_for_database_and_redis() -> None:
         assert environment["REDIS_URL"] == "redis://redis:6379/0"
 
 
+@pytest.mark.repo_layout("compose.yaml")
 def test_shared_upload_and_model_cache_volumes_are_mounted_to_api_and_worker() -> None:
     services = _compose_config()["services"]
 
@@ -105,6 +112,7 @@ def test_shared_upload_and_model_cache_volumes_are_mounted_to_api_and_worker() -
         assert volume_targets["/app/data/models"] == "model_cache"
 
 
+@pytest.mark.repo_layout("compose.yaml")
 def test_api_and_worker_security_relevant_compose_contracts() -> None:
     services = _compose_config()["services"]
 
@@ -117,6 +125,7 @@ def test_api_and_worker_security_relevant_compose_contracts() -> None:
     assert "alembic" not in services["api"]["command"]
 
 
+@pytest.mark.repo_layout("compose.yaml")
 def test_application_services_use_no_new_privileges() -> None:
     services = _compose_config()["services"]
 
@@ -184,6 +193,7 @@ def _compose_config_with_example_env(tmp_path: Path) -> dict[str, object]:
     return json.loads(result.stdout)
 
 
+@pytest.mark.repo_layout("compose.yaml", ".env.example")
 def test_default_compose_keeps_llm_local_safe(tmp_path: Path) -> None:
     services = _compose_config_with_example_env(tmp_path)["services"]
     environment = services["api"]["environment"]
@@ -206,6 +216,7 @@ def test_default_compose_keeps_llm_local_safe(tmp_path: Path) -> None:
         assert not environment.get("LLM_OPENAI_BASE_URL")
 
 
+@pytest.mark.repo_layout("compose.yaml", "compose.uat.yaml")
 def test_uat_compose_enables_local_deterministic_llm_provider() -> None:
     services = _compose_uat_config()["services"]
     environment = services["api"]["environment"]
@@ -222,6 +233,7 @@ def test_uat_compose_enables_local_deterministic_llm_provider() -> None:
     ]
 
 
+@pytest.mark.repo_layout("compose.yaml", "compose.uat.yaml")
 def test_uat_compose_runs_idempotent_seed_before_api_and_worker() -> None:
     services = _compose_uat_config()["services"]
     seed = services["uat-seed"]
@@ -249,6 +261,7 @@ def test_uat_compose_runs_idempotent_seed_before_api_and_worker() -> None:
     )
 
 
+@pytest.mark.repo_layout("frontend/tests/e2e-live/fake-openai-provider.mjs")
 def test_uat_fake_provider_is_local_only_and_covers_acceptance_questions() -> None:
     provider = (ROOT / "frontend/tests/e2e-live/fake-openai-provider.mjs").read_text(
         encoding="utf-8"
