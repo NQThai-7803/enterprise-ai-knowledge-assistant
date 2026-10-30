@@ -288,7 +288,7 @@ Implemented chunking security controls:
 - Chunk checksums use deterministic lowercase SHA-256 over UTF-8 chunk text bytes.
 - Page metadata is kept on chunks for future citation support.
 - Token limits, hard maximum chunk size, and bounded overlap protect resource usage.
-- `TiktokenTokenCounter` uses local tokenization and does not call network APIs.
+- `TiktokenTokenCounter` tokenizes locally and never sends document text anywhere. Correction: tiktoken needs a cached encoding file. Without one, the first `get_encoding()` call downloads it from `openaipublic.blob.core.windows.net` (outbound network; on an offline host chunking then fails with `INVALID_CHUNK_CONFIGURATION`). The Docker image bundles `cl100k_base` at build time under `TIKTOKEN_CACHE_DIR=/opt/tiktoken`, so runtime chunking in the image makes no network call; local non-Docker runs still download once into the tiktoken cache.
 - TASK-013 does not add LangChain, LlamaIndex, transformers, OCR, embedding calls, or automatic content-sending frameworks.
 
 Known limitations after TASK-013:

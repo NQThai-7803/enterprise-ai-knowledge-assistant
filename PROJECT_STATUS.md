@@ -1,5 +1,15 @@
 # Project Status
 
+## PROMPT 3 tiktoken offline bundle and backend dependency lock -- 2026-10-30
+
+**COMPLETED for source changes; image build NOT_RUN (awaiting approval); no answer logic changed.**
+- Dockerfile builder pre-downloads `cl100k_base` into `TIKTOKEN_CACHE_DIR=/opt/tiktoken`; runtime copies it and sets the same ENV. Host check: empty cache with sockets blocked fails on `openaipublic.blob.core.windows.net`; with the cache present the encoding loads with sockets blocked.
+- `SECURITY.md` and `ENVIRONMENT_VARIABLES.md` corrected: tiktoken is not network-free without a cached encoding.
+- New `requirements.lock` (uv 0.13.6, Linux x86_64, Python 3.12) constrained to the accepted TASK-035.3A 92-package lock: 91 pins, all versions identical, only `wheel` (build tooling) absent. No upgrade. Dockerfile does not use it yet.
+- Drift found: an unpinned `pip install -e ".[dev]"` today (`.venv312`) differs from the accepted lock in 38 packages (e.g. fastapi 0.162.0, PyMuPDF 2.0 plus new pymupdf-layout/onnxruntime, torch 2.15.0, huggingface-hub 2.4.0). The current unpinned Dockerfile would drift the same way.
+- Frontend `npm audit`: 6 findings (3 high, 3 moderate). Only `zod` 3.25.76 is a production dependency and its fix needs a breaking major (4.6.7). `npm audit fix` not run (awaiting approval). Lint 0 errors / 7 warnings, typecheck, Vitest 40/40 and build pass.
+- `.dockerignore` does not exclude `.venv312`.
+
 ## Takeover test realignment (PROMPT 1, PROMPT 2, pre-PROMPT 3) -- 2026-10-30
 
 **COMPLETED for test-contract realignment; no application code changed.**

@@ -153,7 +153,9 @@ Chunking variable rules:
 - `CHUNK_OVERLAP_TOKENS` is an integer greater than or equal to `0` and smaller than `CHUNK_TARGET_TOKENS`.
 - `CHUNK_MIN_TOKENS` is an integer greater than or equal to `0` and less than or equal to `CHUNK_TARGET_TOKENS`.
 - Tokenizer and chunking settings do not contain secrets.
-- Runtime chunking does not require network access.
+- Runtime chunking needs no network access only when the tiktoken encoding file is already cached. On first use without a cache, tiktoken downloads the encoding from `openaipublic.blob.core.windows.net`, which fails on offline hosts.
+- `TIKTOKEN_CACHE_DIR` is read by tiktoken itself, not by `Settings`. The Docker image sets it to `/opt/tiktoken` and pre-bundles `cl100k_base` at build time. Without it, tiktoken caches under the OS temp directory (`data-gym-cache`), which is lost when a container is recreated.
+- If `TOKENIZER_ENCODING_NAME` is changed from `cl100k_base`, bundle that encoding into `TIKTOKEN_CACHE_DIR` as well, or the first chunking run needs network access.
 ## Embeddings
 
 ```text

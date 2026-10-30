@@ -25,12 +25,17 @@ RUN python -c "import subprocess, sys, tomllib; deps = tomllib.load(open('pyproj
     && python -m pip check \
     && python -c "from typing_extensions import Annotated; import alembic, fastapi, sqlalchemy"
 
+# Bundle the default chunking encoding so runtime tokenization never downloads it.
+ENV TIKTOKEN_CACHE_DIR=/opt/tiktoken
+RUN python -c "import tiktoken; tiktoken.get_encoding('cl100k_base')"
+
 FROM python:3.12-slim AS runtime
 
 ENV PATH="/opt/venv/bin:${PATH}" \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/app \
     PYTHONUNBUFFERED=1 \
+    TIKTOKEN_CACHE_DIR=/opt/tiktoken \
     VIRTUAL_ENV=/opt/venv
 
 WORKDIR /app
@@ -47,6 +52,7 @@ RUN groupadd --system --gid 10001 app \
     && chown -R app:app /app
 
 COPY --from=builder /opt/venv /opt/venv
+COPY --from=builder /opt/tiktoken /opt/tiktoken
 COPY --chown=app:app app ./app
 COPY --chown=app:app alembic.ini pyproject.toml README.md ./
 

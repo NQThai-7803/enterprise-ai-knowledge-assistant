@@ -6,6 +6,15 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### PROMPT 3 tiktoken offline bundle and dependency lock -- 2026-10-30
+
+- Docker image pre-bundles the `cl100k_base` tiktoken encoding under
+  `TIKTOKEN_CACHE_DIR=/opt/tiktoken`, so runtime chunking does not download it.
+- Corrected the "no network" tiktoken statements in `SECURITY.md` and
+  `ENVIRONMENT_VARIABLES.md`.
+- Added `requirements.lock`, a Linux/Python 3.12 backend lock that reproduces
+  the accepted TASK-035.3A package versions without upgrades.
+
 ### Takeover test realignment -- 2026-10-30
 
 - Backed up the AUTH-02 workspace locally with a verified SHA-256 manifest.

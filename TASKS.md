@@ -1,6 +1,16 @@
 
 # Implementation Tasks
 
+## PROMPT 3 tiktoken offline bundle and backend dependency lock -- 2026-10-30
+
+**COMPLETED for source/doc changes; image build and `npm audit fix` await approval.** Tiktoken `cl100k_base` is bundled in the image under `/opt/tiktoken`; docs corrected; `requirements.lock` reproduces the accepted 92-package versions (91 runtime pins, no upgrade).
+
+Open follow-ups:
+- Approve a tagged image build to verify the bundled encoding loads with networking disabled.
+- Proposal: install from `requirements.lock` in the Dockerfile with `--no-deps` and the PyTorch CPU index, add hashes (`--generate-hashes`), and add a dev lock for CI.
+- Decide `npm audit fix` (dev-tool findings) and the `zod` 3 -> 4 major upgrade separately.
+- Exclude `.venv*/` in `.dockerignore` and `.gitignore`.
+
 ## Takeover test realignment (PROMPT 1, PROMPT 2, pre-PROMPT 3) -- 2026-10-30
 
 **COMPLETED; application code unchanged.** AUTH-02 local backup verified (27,299/27,299 SHA-256). Stale fixtures realigned (`283cb91`); invalid-citation tests and API docs aligned to fail-safe NO_ANSWER (`fc0d63e`). Default suite 1692 pass / 0 fail / 17 xfail on both Python 3.11.0 and 3.12.10. DB-backed CI lanes on Python 3.12: 696 pass / 1 fail / 1 xfail.
