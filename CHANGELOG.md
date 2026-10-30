@@ -6,6 +6,11 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### PROMPT 3c small fixes before PROMPT 4 -- 2026-10-30
+
+- API test clients use a unique client address, so the Redis rate limiter no longer
+  shares counters across tests; added real-Redis 429 and Redis-unreachable tests.
+
 ### PROMPT 3b reference test environment and cleanup -- 2026-10-30
 
 - Added the `repo_layout` pytest marker, `scripts/` in the test image and `TESTING.md`.

@@ -1,6 +1,16 @@
 
 # Implementation Tasks
 
+## PROMPT 3c small fixes before PROMPT 4 -- 2026-10-30
+
+**COMPLETED.** Anonymous volume `7365c1dd...` removed. API test clients get a unique client address so the Redis login/refresh limiter never shares counters; new tests cover 429 on the over-limit login with real Redis and fail-open/fail-closed with Redis unreachable. Image and host: api-unit 51, api-integration 245 passed.
+
+Open follow-ups:
+- **ADR (merge into PROMPT 7): login rate limiter fails open when Redis errors.** Outside production the login/refresh rules use `fail_closed=False`, so a Redis outage disables brute-force protection there. Decide the policy per environment.
+- **High:** CI has never reached the test step on this branch. Backend CI fails at Lint (24 errors in `tmp_*_trace.py`, 1 E501 in `tests/containment_runtime.py`). Frontend CI fails at parse time ("workflow file issue"), likely `${{ runner.temp }}` in job-level `env` (`frontend-ci.yml:23`).
+- **High (RAG, report only):** mojibake in runtime matching/output code: `app/retrieval/structured.py:48` (list bullet regex), `:766` (dong sign unit), `app/services/claim_evidence_validation_service.py:879-881` (segment split set breaks words at "â", e.g. "Nhân"), `app/services/grounded_answer_service.py:7661, 8745, 9174, 9181` (strip sets), `:9025, 9027` (garbled user-facing leave category text).
+- **Low:** `ruff format` on the 4 `tests/containment*` files and the E501 at `tests/containment_runtime.py:272`.
+
 ## PROMPT 3b reference test environment completion and cleanup -- 2026-10-30
 
 **COMPLETED except volume removal.** `repo_layout` marker, scripts/ in the test image, `TESTING.md`, throwaway integration compose stack, `.venv*/` ignore, SYSTEM-memory test + `RAG_DESIGN.md`, `CITATION_VALIDATION_FAILED` warning log, safe Ruff fixes.

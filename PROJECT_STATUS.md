@@ -1,5 +1,12 @@
 # Project Status
 
+## PROMPT 3c small fixes before PROMPT 4 -- 2026-10-30
+
+**COMPLETED.** Volume `7365c1dd...` removed (no container used it). Rate limiter isolated per test client without changing limiter logic; real-Redis 429 and Redis-unreachable fail-open/fail-closed are now tested. Image (`eaka-backend:prompt3c-test`): api-unit 51, api-integration 245, unit suite 1673 pass / 0 fail. Host with temporary PostgreSQL/Redis: api-unit 51, api-integration 245.
+- Mojibake scan of `app/`, `scripts/`, config and deploy files: 11 lines in 3 runtime files, all in matching, splitting or answer-text code (not prompt templates or the no-answer message). Not fixed yet.
+- CI on `wip/codex-handoff`: every run fails. Backend stops at Lint; frontend workflow is rejected before any job runs.
+- Building from the OneDrive working tree failed with BuildKit `invalid file request scripts/test/compose.integration.yaml`; the image was built from a clean copy of the build context.
+
 ## PROMPT 3b reference test environment completion and cleanup -- 2026-10-30
 
 **COMPLETED except volume removal (awaiting approval).**
