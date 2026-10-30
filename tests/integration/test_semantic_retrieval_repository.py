@@ -25,7 +25,8 @@ from tests.integration.retrieval_helpers import (
     search_rows,
 )
 
-pytestmark = pytest.mark.integration
+# semantic_query_diagnostics records query plans to diagnose intermittent CI failures.
+pytestmark = [pytest.mark.integration, pytest.mark.usefixtures("semantic_query_diagnostics")]
 HIDDEN_MARKER = "UNAUTHORIZED_RETRIEVAL_MARKER"
 
 
