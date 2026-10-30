@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from uuid import uuid4
 
 import pytest
@@ -113,6 +114,52 @@ async def test_redis_failure_fail_open_allows_non_critical_request() -> None:
         limiter=FailingLimiter(),
         settings=Settings(_env_file=None),
     )
+
+
+def unreachable_redis_settings(**overrides: object) -> Settings:
+    # Nothing listens on port 1, so the real Redis limiter fails to connect.
+    return Settings(
+        _env_file=None,
+        redis_url="redis://127.0.0.1:1/0",
+        redis_connect_timeout_seconds=1,
+        redis_socket_timeout_seconds=1,
+        **overrides,
+    )
+
+
+@pytest.mark.anyio
+async def test_login_limiter_fails_open_outside_production_when_redis_is_unreachable() -> None:
+    settings = unreachable_redis_settings(app_env="test")
+    rule = login_rule(settings)
+    limiter = RedisFixedWindowRateLimiter(settings)
+
+    assert rule.fail_closed is False
+    for _ in range(rule.requests + 3):
+        await enforce_rate_limit(
+            request_with_forwarded_headers(),
+            rule=rule,
+            identity="ip:127.0.0.1",
+            limiter=limiter,
+            settings=settings,
+        )
+
+
+@pytest.mark.anyio
+async def test_fail_closed_login_rule_rejects_when_redis_is_unreachable() -> None:
+    settings = unreachable_redis_settings(app_env="test")
+    # Production builds the login rule with fail_closed=True (see the policy test below).
+    rule = replace(login_rule(settings), fail_closed=True)
+
+    with pytest.raises(RateLimitExceededError) as exc_info:
+        await enforce_rate_limit(
+            request_with_forwarded_headers(),
+            rule=rule,
+            identity="ip:127.0.0.1",
+            limiter=RedisFixedWindowRateLimiter(settings),
+            settings=settings,
+        )
+
+    assert exc_info.value.code == "RATE_LIMIT_EXCEEDED"
 
 
 @pytest.mark.anyio

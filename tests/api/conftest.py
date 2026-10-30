@@ -13,6 +13,7 @@ from app.core.security import create_access_token
 from app.db.session import get_db_session
 from app.main import app
 from app.models import Department, User, UserRole
+from tests.api.rate_limit_isolation import isolated_client_address
 
 
 @pytest.fixture
@@ -29,7 +30,7 @@ def api_client(
 
     app.dependency_overrides[get_db_session] = override_get_db_session
     app.dependency_overrides[get_document_processing_enqueue] = lambda: lambda document_id: True
-    with TestClient(app) as client:
+    with TestClient(app, client=isolated_client_address()) as client:
         yield client
     app.dependency_overrides.clear()
 

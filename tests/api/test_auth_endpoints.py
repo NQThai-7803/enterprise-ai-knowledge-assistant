@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import time
 import uuid
 from collections.abc import AsyncIterator, Iterator
 from datetime import timedelta
@@ -8,6 +9,8 @@ from datetime import timedelta
 import jwt
 import pytest
 from fastapi.testclient import TestClient
+from redis import Redis
+from redis.exceptions import RedisError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -16,6 +19,7 @@ from app.core.security import create_access_token, hash_password, hash_refresh_t
 from app.db.session import get_db_session
 from app.main import app
 from app.models import RefreshToken, User, UserRole
+from tests.api.rate_limit_isolation import isolated_client_address
 
 pytestmark = pytest.mark.integration
 
@@ -33,7 +37,7 @@ def api_client(
                 raise
 
     app.dependency_overrides[get_db_session] = override_get_db_session
-    with TestClient(app) as client:
+    with TestClient(app, client=isolated_client_address()) as client:
         yield client
     app.dependency_overrides.clear()
 
@@ -541,3 +545,45 @@ def test_logout_of_already_revoked_owned_token_is_idempotent(
 
     assert first_response.status_code == 204
     assert second_response.status_code == 204
+
+
+def _redis_reachable(redis_url: str) -> bool:
+    client = Redis.from_url(redis_url, socket_connect_timeout=1, socket_timeout=1)
+    try:
+        return bool(client.ping())
+    except RedisError:
+        return False
+    finally:
+        client.close()
+
+
+def test_login_over_limit_within_window_is_rejected_by_real_redis(
+    api_client: TestClient,
+    async_session_factory_for_tests: async_sessionmaker[AsyncSession],
+) -> None:
+    settings = get_settings()
+    if not settings.rate_limit_enabled:
+        pytest.skip("RATE_LIMIT_ENABLED is false; this test checks the real login limiter.")
+    if not _redis_reachable(settings.redis_url):
+        pytest.skip("No Redis reachable at REDIS_URL; the login limiter fails open without it.")
+    user = create_test_user(async_session_factory_for_tests)
+    limit = settings.rate_limit_login_requests
+    window = settings.rate_limit_login_window_seconds
+    # The limiter uses fixed windows; start early in one so every attempt lands in it.
+    remaining = window - (time.time() % window)
+    if remaining < 10:
+        time.sleep(remaining + 0.5)
+
+    for _ in range(limit):
+        login(api_client, email=user.email)
+    rejected = api_client.post(
+        "/api/v1/auth/login",
+        json={"email": user.email, "password": "valid auth password"},
+    )
+
+    assert rejected.status_code == 429
+    assert rejected.json()["error"]["code"] == "RATE_LIMIT_EXCEEDED"
+    assert 0 < int(rejected.headers["retry-after"]) <= window
+    # Another client address has its own counter, so tests never share a limit.
+    with TestClient(app, client=isolated_client_address()) as other_client:
+        login(other_client, email=user.email)
