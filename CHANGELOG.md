@@ -6,6 +6,15 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### Takeover test realignment -- 2026-10-30
+
+- Backed up the AUTH-02 workspace locally with a verified SHA-256 manifest.
+- Realigned stale test fixtures and marked open S01 contracts as strict xfail.
+- Invalid-citation contract: `API_SPEC.md`/`API_ERROR_CODES.md` now document
+  the fail-safe NO_ANSWER path; the two tests assert it instead of xfailing.
+- Verified the default suite on Python 3.12.10 and the DB-backed CI lanes on a
+  throwaway PostgreSQL; one stale history-in-prompt assertion remains.
+
 ### TASK-035.3A isolated candidate qualification -- 2026-10-13
 
 - Preserved the accepted H5.2 working-tree source as a filtered, checksummed

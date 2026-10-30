@@ -1,6 +1,17 @@
 
 # Implementation Tasks
 
+## Takeover test realignment (PROMPT 1, PROMPT 2, pre-PROMPT 3) -- 2026-10-30
+
+**COMPLETED; application code unchanged.** AUTH-02 local backup verified (27,299/27,299 SHA-256). Stale fixtures realigned (`283cb91`); invalid-citation tests and API docs aligned to fail-safe NO_ANSWER (`fc0d63e`). Default suite 1692 pass / 0 fail / 17 xfail on both Python 3.11.0 and 3.12.10. DB-backed CI lanes on Python 3.12: 696 pass / 1 fail / 1 xfail.
+
+Open follow-ups:
+- Decide `test_internal_system_messages_are_not_grounding_prompt_memory` (stale assertion) and update `RAG_DESIGN.md` history section to the query-rewrite-only behaviour.
+- Fix follow-up topic loss (Travel Approval -> "Are there exceptions?", strict xfail).
+- Add a citation failure code to structured logs/audit for fail-safe NO_ANSWER downgrades.
+- Ignore `.venv*/` in `.gitignore`; clear the 33 Ruff lint and 7 format findings.
+- Off-host copy of the AUTH-02 backup; run Celery/model lanes.
+
 ## TASK-035.3M dependency vulnerability exposure triage -- 2026-10-14
 
 **COMPLETED as bounded read-only applicability/remediation decision package; no implementation authorization.** Six reports in `docs/release/TASK-035.3M-*20261014.md` recheck seven official frontend advisories against five unchanged dev-tool lock entries. Four brace advisories (`eslint → minimatch → brace-expansion`) and Vite are recommended **REMEDIATE_BEFORE_CANDIDATE**; nanoid's current PostCSS `non-secure(6)` path and Vitest's current jsdom/no-public-plugin path are recommended **VERIFIED_NOT_APPLICABLE only to those assessed configurations**, pending security-owner sign-off. No production frontend runtime exposure was verified in the inspected isolated build; build/test/dev-tool exposure and future Linux CI uncertainty remain. A second public-only pip-audit attempt via OSV failed DNS; backend and image advisory coverage remain **NOT VERIFIED**. CI/security and exact-version plans are proposals only. No source, dependency/lock, CI, image, V2, database/Redis or original Git index change. H5.2 historical V2 98/98 remains scoped; frozen 035.3B FAILED; full-tree Ruff and staging whitespace FAIL; source versioning approval NOT GRANTED; RAG B19/B21/R18 **OPEN/FAIL**; API/worker R05 skew **UNRESOLVED**; TASK-035 **IN PROGRESS**, RC **NO-GO**, deferrals **0**.

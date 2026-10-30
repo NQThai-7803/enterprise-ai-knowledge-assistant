@@ -1,5 +1,16 @@
 # Project Status
 
+## Takeover test realignment (PROMPT 1, PROMPT 2, pre-PROMPT 3) -- 2026-10-30
+
+**COMPLETED for test-contract realignment; no application code changed.**
+- PROMPT 1: AUTH-02 workspace copied to `%USERPROFILE%\eaka-backups\auth02-20261030-0057\` (27,299 files, 397.01 MiB, SHA-256 27,299/27,299 match). Temp original untouched, not in Git; off-host backup still open.
+- PROMPT 2 (`283cb91`, `tests/` only): default suite on Python 3.11.0 went from 1692 pass / 14 fail / 3 xfail to 1692 pass / 0 fail / 17 xfail (3 pre-existing + 14 S01 contracts). The follow-up topic-loss xfail and the 2 invalid-citation xfails sit in integration lanes.
+- Python 3.12.10 `.venv312` (torch 2.15.0+cpu): default suite identical, 1692 pass / 1 skip / 17 xfail / 0 fail. `.venv312` is not git-ignored and is not committed.
+- Invalid citation (`fc0d63e`): spec now matches the fail-safe code path (NO_ANSWER, empty citations, fixed no-answer persisted). No citation error code reaches structured logs or audit metadata (open, report only).
+- Integration on a throwaway pgvector pg17 DB, Python 3.12: api-unit 49/49, api-integration 244/244, integration 400 pass / 1 fail / 1 xfail, llm-provider 3/3.
+- Remaining fail `test_internal_system_messages_are_not_grounding_prompt_memory` is a stale assertion: since `206cee3` history only rewrites the query and the prompt history block is empty (unit-tested), but `RAG_DESIGN.md` still describes history in the prompt.
+- Still open: full-tree Ruff (33 lint, 7 format, pre-existing); Travel Approval follow-up topic loss; Celery/model/real-LLM lanes NOT_VERIFIED.
+
 ## TASK-035.3M dependency exposure and remediation decision -- 2026-10-14
 
 **COMPLETED for read-only triage; dependency remediation and CI implementation NOT AUTHORIZED; RC NO-GO.** Six 035.3M reports identify seven version-matching frontend advisories across five dev-tool lock entries, trace actual ESLint/PostCSS/Vite/Vitest call paths, separate assessed production-static-bundle absence from build/development exposure, and propose package-specific fixes plus CI gates. Four brace advisories and Vite are recommended for pre-candidate remediation; nanoid/Vitest current paths have scoped not-applicable recommendations requiring security-owner acceptance. OSV and PyPI public-only backend audit attempts both failed DNS, so full backend and image advisory coverage remain **NOT VERIFIED**. No production code, manifest, lock, workflow, Docker/V2 resource, Git index or historical evidence was changed. Source versioning approval **NOT GRANTED**; current RAG B19/B21/R18 safety **OPEN/FAIL**, API/worker R05 skew **UNRESOLVED**, full-tree Ruff and eight-path staging whitespace FAIL, TASK-035 **IN PROGRESS**, RC **NO-GO**, approved deferrals **0**. Historical H5.2 V2 98/98 and failed 035.3B candidate remain distinct.
