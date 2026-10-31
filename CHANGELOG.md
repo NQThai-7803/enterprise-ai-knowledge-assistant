@@ -6,6 +6,21 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### PROMPT 3d CI green and mojibake repair -- 2026-10-31
+
+- Fixed nine runtime literals stored as mojibake:
+  - the list-marker regex recognizes a real bullet;
+  - amount units include the dong sign;
+  - policy evidence segments split on bullets instead of on the letter a-circumflex;
+  - clause strip sets strip real bullets.
+- Two leave-category labels are deferred.
+- Added behaviour tests for the repaired literals and a guard test that fails on mojibake under `app/`.
+- Added semantic-retrieval query diagnostics (EXPLAIN on failure) and two strict-xfail tests for HNSW post-filter recall loss.
+- CI: archived root `tmp_*_trace.py` scripts, formatted the last files, set the Playwright browser path per step, dropped the unmapped `vite-monorepo` Gitlink, tracked `frontend/eslint.config.js`, and kept the real hybrid test settings within the hybrid cap.
+- Committed the project Claude skills and ignored `.claude/settings.local.json`.
+- Design proposal: `docs/design/hnsw-permission-recall.md`.
+- UAT Q001-Q100 before/after: 96 cases identical; Q073 changed answer language only; 3 cases vary by run order in both baseline and after. The historical 98/98 is an agent grade on the tuning set and is not an accuracy measure.
+
 ### PROMPT 3c small fixes before PROMPT 4 -- 2026-10-30
 
 - API test clients use a unique client address, so the Redis rate limiter no longer

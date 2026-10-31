@@ -1,5 +1,37 @@
 # Project Status
 
+## PROMPT 3d CI green, mojibake repair with before/after UAT -- 2026-10-31
+
+**COMPLETED except one deferred fix; Q073 label awaits the owner.**
+
+**CI and repository**
+- Backend and frontend CI are green (`60f5fd1`: Backend CI success, all 11 lanes including llm-provider, security scan and Docker build; Frontend CI success).
+- `vite-monorepo` Gitlink was dropped and `frontend/eslint.config.js` is now tracked.
+- `.claude/skills/` is committed; `.claude/settings.local.json` is ignored.
+
+**HNSW post-filter recall (open, design only)**
+- With the HNSW plan, `search_permitted_chunks` loses permitted chunks when more than 40 nearer index elements are unauthorized or dead. Nothing unauthorized is returned.
+- Reproduced locally and held by two strict-xfail tests.
+- CI caught no HNSW plan in 3 attempts (0/93 queries).
+- Design: `docs/design/hnsw-permission-recall.md` (exact KNN over permitted chunks behind an `OFFSET 0` fence, flag-gated).
+
+**UAT Q001-Q100**
+- Isolated stack `eaka-p3d-uat` with UAT Corpus v2 re-bootstrapped (9 documents, 143 chunks, manifest `a0c71bbc...`), real Ollama `qwen2.5:3b`, pgvector 0.8.6.
+- Sample EXPLAIN shows no HNSW use on this corpus.
+- Proxy grade (status + cited document codes against the TASK-035.3B grade): baseline 97/100 and 99/100; after the fix 97/100 and 99/100.
+- Groups: 96 cases identical in all four runs; 3 already varied in the baseline (Q002, Q033, Q096) and repeat by run order; 1 changed (Q073: same status and citation, answer switched from Vietnamese to English, label pending).
+- Q071 abstains in every run although ND-HR-005 p.7 supports the reference answer (`claim_validation_contradicted`). This was already present in the baseline.
+
+**The 98/98 figure is not an accuracy measure.** It was agent-graded ("inspected by the qualifying agent") on the Q001-Q100 tuning set, from a dirty-tree source snapshot (035.3A tar). That tar's `app/` equals HEAD except the `c72c5b7` logging change.
+
+**Mojibake (`4534430`)**
+- Nine literals now use Unicode escapes (bullet U+2022/U+F0B7, dong sign U+20AB).
+- New tests: 10 behaviour tests (9 fail on the old code) and a guard that scans `app/`.
+- Two leave-category labels are deferred: repairing them alone drops a row (see TASKS).
+- Image `prompt3d-fix-test`: unit 1686 pass / 23 skip / 18 xfail; api-unit 51, api-integration 245, integration 401 + 3 xfail, llm-provider 3.
+
+**NOT_VERIFIED:** generalization (no held-out set); the causes of Q073's language switch, the run-order variance and the Q071 contradiction verdict. Evidence is in `artifacts/prompt3d/` (local, git-ignored).
+
 ## PROMPT 3c small fixes before PROMPT 4 -- 2026-10-30
 
 **COMPLETED.** Volume `7365c1dd...` removed (no container used it). Rate limiter isolated per test client without changing limiter logic; real-Redis 429 and Redis-unreachable fail-open/fail-closed are now tested. Image (`eaka-backend:prompt3c-test`): api-unit 51, api-integration 245, unit suite 1673 pass / 0 fail. Host with temporary PostgreSQL/Redis: api-unit 51, api-integration 245.
