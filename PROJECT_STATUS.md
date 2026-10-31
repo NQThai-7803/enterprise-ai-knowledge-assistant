@@ -7,7 +7,7 @@
 - **Leave-category labels:** fixed with general row binding (`e14f217`). Unit tests check the exact Vietnamese display strings. No mojibake is left under `app/`.
 - **Eval harness:** added with an Ollama warm-up (`7631ae9`). Two warm-up runs from a cold start: proxy 99/100 each, and only Q096 differs between them (PROMPT 3d: 3 cases). Six answers changed against PROMPT 3d without touching their code paths, which points to Ollama state.
 - **Exact KNN over permitted chunks** (`5e40bfa`), behind a flag that defaults to off. Unit and integration tests pass with both flag values.
-  - Benchmark at 1k/10k/50k chunks: recall@k 1.0 for exact KNN, against 0.0-0.91 minimum for the current HNSW statement.
+  - Benchmark at 1k/10k/50k chunks: recall@k 1.0 for exact KNN; the current HNSW statement has a per-cell minimum recall of 0.0-0.825 and a mean of 0.04-0.91.
   - Wall p95 at 50k: 165-259 ms for exact KNN, 110-154 ms for the current statement.
   - The 100k cell was stopped for low memory.
 - **Q073:** labeled FAIL. The empty `evidence_text` follows from the English answer (`evidence.py:115`).
