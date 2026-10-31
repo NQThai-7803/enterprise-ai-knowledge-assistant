@@ -25,3 +25,5 @@ services:
       # Eval runs are reproducible: greedy decoding and a fixed seed (PROMPT 3f).
       LLM_TEMPERATURE: "0"
       LLM_SEED: ${EVAL_LLM_SEED:-20261031}
+      # Point at scripts/eval/ollama_usage_proxy.py to record token usage per call.
+      LLM_OLLAMA_BASE_URL: ${EVAL_OLLAMA_BASE_URL:-http://host.docker.internal:11434}
