@@ -8,6 +8,11 @@ Format follows a simplified Keep a Changelog style.
 
 ### PROMPT 4 -- 2026-10-31
 
+- Held-out v1 runs:
+  - `run_heldout.py --monitor` with the new `scripts/eval/host_monitor.py` records Available MB, pagefile % and Ollama PID per item;
+  - `scripts/eval/run_heldout.sh` handles metadata, warm-up and halves;
+  - `scripts/eval/heldout_grading.py` writes the owner's grading sheet (REVIEW flags, proxy hints, run validity, no labels).
+- Two VALID runs are stored in `docs/eval/runs/heldout-v1-f3cdbf3/`.
 - Held-out v1 frozen (2026-11-01): `docs/eval/heldout-v1.lock` holds the SHA256 and frozen commit. New `scripts/eval/run_heldout.py` refuses a hash mismatch and logs in as each item's role; `.gitattributes` keeps the held-out files LF.
 - Held-out v1 gold review changes:
   - new `ANSWERED_LIMITED` acceptable status with per-item pass criteria and FAIL examples (6 items);

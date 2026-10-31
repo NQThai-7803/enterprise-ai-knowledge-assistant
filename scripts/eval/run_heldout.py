@@ -101,6 +101,7 @@ def run(
     passwords: dict[str, str],
     delay_seconds: float = 0.5,
     client_factory=None,  # noqa: ANN001 - tests inject a fake
+    monitor=None,  # noqa: ANN001 - callable returning a host resource sample
 ) -> int:
     lock = verify_frozen()
     items = [i for i in load_items() if not selected or i["id"] in selected]
@@ -149,6 +150,8 @@ def run(
                 time.sleep(delay_seconds)
             client = clients.setdefault(item["role"], make_client(item["role"]))
             result = _ask(client, item, attempts=1)
+            if monitor is not None:
+                result["monitor"] = monitor()
             results.append(result)
             save("IN_PROGRESS")
             print(
@@ -164,6 +167,8 @@ def run(
             client = clients.setdefault(item["role"], make_client(item["role"]))
             retry = _ask(client, item, attempts=2)
             retry["first_attempt_failure_class"] = result.get("failure_class")
+            if monitor is not None:
+                retry["monitor"] = monitor()
             results[position] = retry
             save("IN_PROGRESS")
             print(
@@ -179,12 +184,24 @@ def run(
     return 0 if complete else 1
 
 
+def _host_monitor():  # noqa: ANN202
+    from scripts.eval.host_monitor import sample
+
+    url = os.environ.get("EVAL_OLLAMA", "http://127.0.0.1:11434")
+    return lambda: sample(url)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--case", action="append", default=[])
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--delay-seconds", type=float, default=0.5)
+    parser.add_argument(
+        "--monitor",
+        action="store_true",
+        help="after each item record host Available MB, pagefile %% and Ollama PID/liveness",
+    )
     args = parser.parse_args()
     passwords = {}
     for role in ACCOUNTS:
@@ -200,6 +217,7 @@ def main() -> int:
             base_url=os.environ.get("RAG_ACCEPTANCE_BASE_URL", "http://127.0.0.1:18190"),
             passwords=passwords,
             delay_seconds=max(0.0, args.delay_seconds),
+            monitor=_host_monitor() if args.monitor else None,
         )
     except HeldoutHashMismatchError as exc:
         print(f"REFUSED: {exc}", file=sys.stderr)

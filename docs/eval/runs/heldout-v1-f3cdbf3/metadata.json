@@ -1,0 +1,1083 @@
+{
+ "heldout": {
+  "file": "docs/eval/heldout-v1.yaml",
+  "sha256": "e4dd3c69445c443d337699bd2639afd17112221f5b6e6baf3018911a44272346",
+  "frozen_commit": "7efc4f08195d3d3229fabc4ea2fe3a4240e03f6f"
+ },
+ "system": {
+  "repo_head_at_run": "f3cdbf357d386f5b8a4e172ea7ad1987610b128c",
+  "api_image": "sha256:4f8152b4fe7c3394da4aee355500d86cfbceca82a684a1dfac62b4376c9b8c12",
+  "api_image_commit": "f3cdbf357d386f5b8a4e172ea7ad1987610b128c",
+  "llm": {
+   "provider": "ollama",
+   "model": "qwen2.5:3b",
+   "num_ctx_option": "8192",
+   "seed": "20261031",
+   "temperature": "0",
+   "base_url": "http://host.docker.internal:11434"
+  },
+  "flags_set_on_api": {
+   "LLM_PROMPT_TRUNCATION_GUARD_ENABLED": "",
+   "RAG_SEMANTIC_EXACT_PERMITTED_KNN_ENABLED": "",
+   "WEB_SEARCH_ENABLED": ""
+  },
+  "settings_in_container": {
+   "LLM_PROMPT_TRUNCATION_GUARD_ENABLED": false,
+   "RAG_SEMANTIC_EXACT_PERMITTED_KNN_ENABLED": true,
+   "WEB_SEARCH_ENABLED": false,
+   "LLM_SEED": 20261031,
+   "LLM_TEMPERATURE": 0.0
+  },
+  "ollama_context_length": "8192 (OLLAMA_CONTEXT_LENGTH on the host; /api/ps saved per run)"
+ },
+ "runs": [
+  {
+   "run": 1,
+   "started_at": "2026-10-31T19:14:39.053125+00:00",
+   "finished_at": "2026-10-31T19:24:17.427289+00:00",
+   "status": "COMPLETE",
+   "infra_error_cases": 0,
+   "warmup": {
+    "at": "2026-10-31T19:14:37.837776+00:00",
+    "model": "qwen2.5:3b",
+    "num_ctx": 8192,
+    "keep_alive": "10m",
+    "seed": 20261031,
+    "http_status": 200,
+    "elapsed_ms": 320,
+    "model_was_loaded_before": true,
+    "loaded_before": [
+     {
+      "name": "qwen2.5:3b",
+      "digest": "357c53fb659c5076de1d65ccb0b397446227b71a42be9d1603d46168015c9e4b",
+      "size_vram": 2318758051,
+      "expires_at": "2026-11-01T02:24:33.0349238+07:00"
+     }
+    ],
+    "loaded_after": [
+     {
+      "name": "qwen2.5:3b",
+      "digest": "357c53fb659c5076de1d65ccb0b397446227b71a42be9d1603d46168015c9e4b",
+      "size_vram": 2318758051,
+      "expires_at": "2026-11-01T02:24:37.837272+07:00"
+     }
+    ],
+    "completion_tokens": 2
+   },
+   "ollama_ps_before_run": [
+    {
+     "name": "qwen2.5:3b",
+     "context_length": 8192
+    }
+   ],
+   "validity": "VALID",
+   "violations": [],
+   "per_item": [
+    {
+     "id": "HO-001",
+     "status": "NO_ANSWER",
+     "latency_ms": 49727,
+     "available_mb": 419.0,
+     "pagefile_pct": 10.31,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:15:30.601634+00:00"
+    },
+    {
+     "id": "HO-002",
+     "status": "ANSWERED",
+     "latency_ms": 8767,
+     "available_mb": 486.0,
+     "pagefile_pct": 11.24,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:15:41.491805+00:00"
+    },
+    {
+     "id": "HO-003",
+     "status": "ANSWERED",
+     "latency_ms": 10011,
+     "available_mb": 451.0,
+     "pagefile_pct": 11.24,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:15:53.522000+00:00"
+    },
+    {
+     "id": "HO-004",
+     "status": "ANSWERED",
+     "latency_ms": 1341,
+     "available_mb": 410.0,
+     "pagefile_pct": 11.24,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:15:56.895709+00:00"
+    },
+    {
+     "id": "HO-005",
+     "status": "NO_ANSWER",
+     "latency_ms": 12769,
+     "available_mb": 430.0,
+     "pagefile_pct": 11.17,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:16:11.914944+00:00"
+    },
+    {
+     "id": "HO-006",
+     "status": "ANSWERED",
+     "latency_ms": 6395,
+     "available_mb": 452.0,
+     "pagefile_pct": 11.16,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:16:20.291919+00:00"
+    },
+    {
+     "id": "HO-007",
+     "status": "NO_ANSWER",
+     "latency_ms": 15780,
+     "available_mb": 419.0,
+     "pagefile_pct": 11.15,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:16:38.307077+00:00"
+    },
+    {
+     "id": "HO-008",
+     "status": "ANSWERED",
+     "latency_ms": 1328,
+     "available_mb": 453.0,
+     "pagefile_pct": 11.15,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:16:41.565704+00:00"
+    },
+    {
+     "id": "HO-009",
+     "status": "NO_ANSWER",
+     "latency_ms": 12196,
+     "available_mb": 472.0,
+     "pagefile_pct": 12.02,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:16:55.801274+00:00"
+    },
+    {
+     "id": "HO-010",
+     "status": "ANSWERED",
+     "latency_ms": 8208,
+     "available_mb": 437.0,
+     "pagefile_pct": 11.99,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:17:06.072823+00:00"
+    },
+    {
+     "id": "HO-011",
+     "status": "ANSWERED",
+     "latency_ms": 3543,
+     "available_mb": 577.0,
+     "pagefile_pct": 13.06,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:17:11.677379+00:00"
+    },
+    {
+     "id": "HO-012",
+     "status": "NO_ANSWER",
+     "latency_ms": 15646,
+     "available_mb": 476.0,
+     "pagefile_pct": 12.86,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:17:29.374320+00:00"
+    },
+    {
+     "id": "HO-013",
+     "status": "NO_ANSWER",
+     "latency_ms": 7888,
+     "available_mb": 445.0,
+     "pagefile_pct": 12.85,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:17:39.266745+00:00"
+    },
+    {
+     "id": "HO-014",
+     "status": "NO_ANSWER",
+     "latency_ms": 7188,
+     "available_mb": 485.0,
+     "pagefile_pct": 12.85,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:17:48.549676+00:00"
+    },
+    {
+     "id": "HO-015",
+     "status": "NO_ANSWER",
+     "latency_ms": 10630,
+     "available_mb": 441.0,
+     "pagefile_pct": 12.83,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:18:01.196862+00:00"
+    },
+    {
+     "id": "HO-016",
+     "status": "NO_ANSWER",
+     "latency_ms": 9220,
+     "available_mb": 619.0,
+     "pagefile_pct": 14.09,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:18:12.367430+00:00"
+    },
+    {
+     "id": "HO-017",
+     "status": "NO_ANSWER",
+     "latency_ms": 7743,
+     "available_mb": 526.0,
+     "pagefile_pct": 14.09,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:18:22.106661+00:00"
+    },
+    {
+     "id": "HO-018",
+     "status": "NO_ANSWER",
+     "latency_ms": 7682,
+     "available_mb": 1163.0,
+     "pagefile_pct": 15.86,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:18:31.731651+00:00"
+    },
+    {
+     "id": "HO-019",
+     "status": "NO_ANSWER",
+     "latency_ms": 13198,
+     "available_mb": 1033.0,
+     "pagefile_pct": 15.86,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:18:46.882554+00:00"
+    },
+    {
+     "id": "HO-020",
+     "status": "ANSWERED",
+     "latency_ms": 1480,
+     "available_mb": 1023.0,
+     "pagefile_pct": 15.86,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:18:50.467474+00:00"
+    },
+    {
+     "id": "HO-021",
+     "status": "NO_ANSWER",
+     "latency_ms": 18103,
+     "available_mb": 791.0,
+     "pagefile_pct": 15.79,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:19:20.648800+00:00"
+    },
+    {
+     "id": "HO-022",
+     "status": "ANSWERED",
+     "latency_ms": 9136,
+     "available_mb": 799.0,
+     "pagefile_pct": 15.78,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:19:31.723070+00:00"
+    },
+    {
+     "id": "HO-023",
+     "status": "ANSWERED",
+     "latency_ms": 1561,
+     "available_mb": 761.0,
+     "pagefile_pct": 15.78,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:19:35.256889+00:00"
+    },
+    {
+     "id": "HO-024",
+     "status": "NO_ANSWER",
+     "latency_ms": 8055,
+     "available_mb": 660.0,
+     "pagefile_pct": 15.78,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:19:45.335620+00:00"
+    },
+    {
+     "id": "HO-025",
+     "status": "NO_ANSWER",
+     "latency_ms": 14897,
+     "available_mb": 530.0,
+     "pagefile_pct": 14.55,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:20:02.247241+00:00"
+    },
+    {
+     "id": "HO-026",
+     "status": "ANSWERED",
+     "latency_ms": 1518,
+     "available_mb": 535.0,
+     "pagefile_pct": 14.55,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:20:05.701950+00:00"
+    },
+    {
+     "id": "HO-027",
+     "status": "ANSWERED",
+     "latency_ms": 13770,
+     "available_mb": 530.0,
+     "pagefile_pct": 14.65,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:20:21.519562+00:00"
+    },
+    {
+     "id": "HO-028",
+     "status": "NO_ANSWER",
+     "latency_ms": 14302,
+     "available_mb": 440.0,
+     "pagefile_pct": 14.61,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:20:37.909663+00:00"
+    },
+    {
+     "id": "HO-029",
+     "status": "ANSWERED",
+     "latency_ms": 22189,
+     "available_mb": 445.0,
+     "pagefile_pct": 14.62,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:21:02.029745+00:00"
+    },
+    {
+     "id": "HO-030",
+     "status": "ANSWERED",
+     "latency_ms": 13339,
+     "available_mb": 512.0,
+     "pagefile_pct": 16.22,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:21:17.268506+00:00"
+    },
+    {
+     "id": "HO-031",
+     "status": "NO_ANSWER",
+     "latency_ms": 20128,
+     "available_mb": 438.0,
+     "pagefile_pct": 16.16,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:21:39.517363+00:00"
+    },
+    {
+     "id": "HO-032",
+     "status": "NO_ANSWER",
+     "latency_ms": 17388,
+     "available_mb": 534.0,
+     "pagefile_pct": 17.4,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:21:58.930604+00:00"
+    },
+    {
+     "id": "HO-033",
+     "status": "NO_ANSWER",
+     "latency_ms": 19706,
+     "available_mb": 673.0,
+     "pagefile_pct": 18.8,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:22:20.767130+00:00"
+    },
+    {
+     "id": "HO-034",
+     "status": "ANSWERED",
+     "latency_ms": 22590,
+     "available_mb": 564.0,
+     "pagefile_pct": 18.8,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:22:45.358542+00:00"
+    },
+    {
+     "id": "HO-035",
+     "status": "NO_ANSWER",
+     "latency_ms": 21432,
+     "available_mb": 444.0,
+     "pagefile_pct": 18.25,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:23:08.894138+00:00"
+    },
+    {
+     "id": "HO-036",
+     "status": "NO_ANSWER",
+     "latency_ms": 11821,
+     "available_mb": 742.0,
+     "pagefile_pct": 19.67,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:23:22.688418+00:00"
+    },
+    {
+     "id": "HO-037",
+     "status": "NO_ANSWER",
+     "latency_ms": 18021,
+     "available_mb": 704.0,
+     "pagefile_pct": 19.67,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:23:42.688844+00:00"
+    },
+    {
+     "id": "HO-038",
+     "status": "NO_ANSWER",
+     "latency_ms": 16764,
+     "available_mb": 627.0,
+     "pagefile_pct": 19.66,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:24:01.441888+00:00"
+    },
+    {
+     "id": "HO-039",
+     "status": "ANSWERED",
+     "latency_ms": 1414,
+     "available_mb": 608.0,
+     "pagefile_pct": 19.66,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:24:04.766789+00:00"
+    },
+    {
+     "id": "HO-040",
+     "status": "ANSWERED",
+     "latency_ms": 10517,
+     "available_mb": 551.0,
+     "pagefile_pct": 19.66,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:24:17.245138+00:00"
+    }
+   ]
+  },
+  {
+   "run": 2,
+   "started_at": "2026-10-31T19:24:37.919249+00:00",
+   "finished_at": "2026-10-31T19:32:45.577388+00:00",
+   "status": "COMPLETE",
+   "infra_error_cases": 0,
+   "warmup": {
+    "at": "2026-10-31T19:24:36.499428+00:00",
+    "model": "qwen2.5:3b",
+    "num_ctx": 8192,
+    "keep_alive": "10m",
+    "seed": 20261031,
+    "http_status": 200,
+    "elapsed_ms": 432,
+    "model_was_loaded_before": true,
+    "loaded_before": [
+     {
+      "name": "qwen2.5:3b",
+      "digest": "357c53fb659c5076de1d65ccb0b397446227b71a42be9d1603d46168015c9e4b",
+      "size_vram": 2318758051,
+      "expires_at": "2026-11-01T02:34:15.8974962+07:00"
+     }
+    ],
+    "loaded_after": [
+     {
+      "name": "qwen2.5:3b",
+      "digest": "357c53fb659c5076de1d65ccb0b397446227b71a42be9d1603d46168015c9e4b",
+      "size_vram": 2318758051,
+      "expires_at": "2026-11-01T02:34:36.4989006+07:00"
+     }
+    ],
+    "completion_tokens": 2
+   },
+   "ollama_ps_before_run": [
+    {
+     "name": "qwen2.5:3b",
+     "context_length": 8192
+    }
+   ],
+   "validity": "VALID",
+   "violations": [],
+   "per_item": [
+    {
+     "id": "HO-001",
+     "status": "NO_ANSWER",
+     "latency_ms": 19821,
+     "available_mb": 484.0,
+     "pagefile_pct": 19.47,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:24:59.577047+00:00"
+    },
+    {
+     "id": "HO-002",
+     "status": "ANSWERED",
+     "latency_ms": 6956,
+     "available_mb": 453.0,
+     "pagefile_pct": 19.45,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:25:08.615529+00:00"
+    },
+    {
+     "id": "HO-003",
+     "status": "ANSWERED",
+     "latency_ms": 10163,
+     "available_mb": 467.0,
+     "pagefile_pct": 19.44,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:25:20.850236+00:00"
+    },
+    {
+     "id": "HO-004",
+     "status": "ANSWERED",
+     "latency_ms": 1422,
+     "available_mb": 467.0,
+     "pagefile_pct": 19.44,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:25:24.282240+00:00"
+    },
+    {
+     "id": "HO-005",
+     "status": "NO_ANSWER",
+     "latency_ms": 13325,
+     "available_mb": 614.0,
+     "pagefile_pct": 20.78,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:25:39.767676+00:00"
+    },
+    {
+     "id": "HO-006",
+     "status": "ANSWERED",
+     "latency_ms": 6679,
+     "available_mb": 487.0,
+     "pagefile_pct": 20.78,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:25:48.559193+00:00"
+    },
+    {
+     "id": "HO-007",
+     "status": "NO_ANSWER",
+     "latency_ms": 15734,
+     "available_mb": 538.0,
+     "pagefile_pct": 20.75,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:26:06.509714+00:00"
+    },
+    {
+     "id": "HO-008",
+     "status": "ANSWERED",
+     "latency_ms": 1330,
+     "available_mb": 520.0,
+     "pagefile_pct": 20.75,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:26:09.815609+00:00"
+    },
+    {
+     "id": "HO-009",
+     "status": "NO_ANSWER",
+     "latency_ms": 12243,
+     "available_mb": 520.0,
+     "pagefile_pct": 20.72,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:26:23.980138+00:00"
+    },
+    {
+     "id": "HO-010",
+     "status": "ANSWERED",
+     "latency_ms": 8041,
+     "available_mb": 540.0,
+     "pagefile_pct": 20.23,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:26:34.025318+00:00"
+    },
+    {
+     "id": "HO-011",
+     "status": "ANSWERED",
+     "latency_ms": 2401,
+     "available_mb": 495.0,
+     "pagefile_pct": 20.23,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:26:38.670044+00:00"
+    },
+    {
+     "id": "HO-012",
+     "status": "NO_ANSWER",
+     "latency_ms": 13019,
+     "available_mb": 441.0,
+     "pagefile_pct": 20.1,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:26:53.611046+00:00"
+    },
+    {
+     "id": "HO-013",
+     "status": "NO_ANSWER",
+     "latency_ms": 8167,
+     "available_mb": 447.0,
+     "pagefile_pct": 20.1,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:27:03.682688+00:00"
+    },
+    {
+     "id": "HO-014",
+     "status": "NO_ANSWER",
+     "latency_ms": 8482,
+     "available_mb": 467.0,
+     "pagefile_pct": 19.54,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:27:14.139004+00:00"
+    },
+    {
+     "id": "HO-015",
+     "status": "NO_ANSWER",
+     "latency_ms": 11408,
+     "available_mb": 415.0,
+     "pagefile_pct": 19.54,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:27:27.563621+00:00"
+    },
+    {
+     "id": "HO-016",
+     "status": "NO_ANSWER",
+     "latency_ms": 3659,
+     "available_mb": 917.0,
+     "pagefile_pct": 22.23,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:27:33.234165+00:00"
+    },
+    {
+     "id": "HO-017",
+     "status": "NO_ANSWER",
+     "latency_ms": 8181,
+     "available_mb": 878.0,
+     "pagefile_pct": 22.23,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:27:43.389466+00:00"
+    },
+    {
+     "id": "HO-018",
+     "status": "NO_ANSWER",
+     "latency_ms": 8017,
+     "available_mb": 801.0,
+     "pagefile_pct": 22.23,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:27:53.316900+00:00"
+    },
+    {
+     "id": "HO-019",
+     "status": "NO_ANSWER",
+     "latency_ms": 10906,
+     "available_mb": 715.0,
+     "pagefile_pct": 22.15,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:28:06.178216+00:00"
+    },
+    {
+     "id": "HO-020",
+     "status": "ANSWERED",
+     "latency_ms": 1853,
+     "available_mb": 682.0,
+     "pagefile_pct": 22.15,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:28:09.984717+00:00"
+    },
+    {
+     "id": "HO-021",
+     "status": "NO_ANSWER",
+     "latency_ms": 12840,
+     "available_mb": 656.0,
+     "pagefile_pct": 21.94,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:28:27.008370+00:00"
+    },
+    {
+     "id": "HO-022",
+     "status": "ANSWERED",
+     "latency_ms": 2735,
+     "available_mb": 647.0,
+     "pagefile_pct": 21.46,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:28:31.750414+00:00"
+    },
+    {
+     "id": "HO-023",
+     "status": "ANSWERED",
+     "latency_ms": 1559,
+     "available_mb": 624.0,
+     "pagefile_pct": 21.46,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:28:35.349306+00:00"
+    },
+    {
+     "id": "HO-024",
+     "status": "NO_ANSWER",
+     "latency_ms": 3844,
+     "available_mb": 550.0,
+     "pagefile_pct": 20.8,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:28:41.210334+00:00"
+    },
+    {
+     "id": "HO-025",
+     "status": "NO_ANSWER",
+     "latency_ms": 14500,
+     "available_mb": 549.0,
+     "pagefile_pct": 21.17,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:28:57.725011+00:00"
+    },
+    {
+     "id": "HO-026",
+     "status": "ANSWERED",
+     "latency_ms": 1578,
+     "available_mb": 571.0,
+     "pagefile_pct": 21.17,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:29:01.301076+00:00"
+    },
+    {
+     "id": "HO-027",
+     "status": "ANSWERED",
+     "latency_ms": 13563,
+     "available_mb": 552.0,
+     "pagefile_pct": 21.17,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:29:16.743041+00:00"
+    },
+    {
+     "id": "HO-028",
+     "status": "NO_ANSWER",
+     "latency_ms": 14672,
+     "available_mb": 486.0,
+     "pagefile_pct": 20.71,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:29:33.452699+00:00"
+    },
+    {
+     "id": "HO-029",
+     "status": "ANSWERED",
+     "latency_ms": 22225,
+     "available_mb": 494.0,
+     "pagefile_pct": 20.58,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:29:57.689055+00:00"
+    },
+    {
+     "id": "HO-030",
+     "status": "ANSWERED",
+     "latency_ms": 12440,
+     "available_mb": 474.0,
+     "pagefile_pct": 20.58,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:30:12.212525+00:00"
+    },
+    {
+     "id": "HO-031",
+     "status": "NO_ANSWER",
+     "latency_ms": 20817,
+     "available_mb": 698.0,
+     "pagefile_pct": 22.45,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:30:35.035801+00:00"
+    },
+    {
+     "id": "HO-032",
+     "status": "NO_ANSWER",
+     "latency_ms": 17603,
+     "available_mb": 635.0,
+     "pagefile_pct": 22.45,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:30:54.581754+00:00"
+    },
+    {
+     "id": "HO-033",
+     "status": "NO_ANSWER",
+     "latency_ms": 19528,
+     "available_mb": 526.0,
+     "pagefile_pct": 22.45,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:31:16.051878+00:00"
+    },
+    {
+     "id": "HO-034",
+     "status": "ANSWERED",
+     "latency_ms": 21668,
+     "available_mb": 510.0,
+     "pagefile_pct": 22.39,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:31:39.667870+00:00"
+    },
+    {
+     "id": "HO-035",
+     "status": "NO_ANSWER",
+     "latency_ms": 8521,
+     "available_mb": 597.0,
+     "pagefile_pct": 23.24,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:31:50.486988+00:00"
+    },
+    {
+     "id": "HO-036",
+     "status": "NO_ANSWER",
+     "latency_ms": 3538,
+     "available_mb": 488.0,
+     "pagefile_pct": 22.72,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:31:56.037936+00:00"
+    },
+    {
+     "id": "HO-037",
+     "status": "NO_ANSWER",
+     "latency_ms": 11380,
+     "available_mb": 416.0,
+     "pagefile_pct": 22.14,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:32:09.417023+00:00"
+    },
+    {
+     "id": "HO-038",
+     "status": "NO_ANSWER",
+     "latency_ms": 17186,
+     "available_mb": 443.0,
+     "pagefile_pct": 22.14,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:32:28.693210+00:00"
+    },
+    {
+     "id": "HO-039",
+     "status": "ANSWERED",
+     "latency_ms": 1513,
+     "available_mb": 449.0,
+     "pagefile_pct": 22.14,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:32:32.186257+00:00"
+    },
+    {
+     "id": "HO-040",
+     "status": "ANSWERED",
+     "latency_ms": 11151,
+     "available_mb": 447.0,
+     "pagefile_pct": 22.14,
+     "ollama_pids": [
+      11368
+     ],
+     "ollama_up": true,
+     "sampled_at": "2026-10-31T19:32:45.368761+00:00"
+    }
+   ]
+  }
+ ]
+}

@@ -8,24 +8,22 @@ Repo có **2 phạm vi** khác nhau, đừng lẫn số liệu giữa hai phạm
   - **Đã xác nhận tồn tại (30/10, review tiếp nhận):** `%LOCALAPPDATA%\Temp\eaka-auth02\`, gồm 27.299 file, khoảng 397 MiB. Dưới `20261023t080222z-2608a685\` có `auth02-local-transport-work\`, `auth02b-work\`, `candidate\`, `infra\` và `manifest.json`. Khi sao lưu phải lấy toàn bộ `eaka-auth02\`.
   - **Chưa sao lưu.** Nội dung file chưa được mở hay kiểm tra.
 
-## Trạng thái hiện tại (2026-11-01, trước khi khởi động lại máy)
-- **Đang làm:** PROMPT 4, mục 3, bước 5. Dừng vì thiếu RAM: `\Memory\Available MBytes` chỉ còn 1665, dưới ngưỡng 2500 MB.
-- **Held-out v1 đã đóng băng:**
-  - SHA256 `e4dd3c69445c443d337699bd2639afd17112221f5b6e6baf3018911a44272346`, ghi trong `docs/eval/heldout-v1.lock` (commit đóng băng `7efc4f0`).
-  - `scripts/eval/run_heldout.py` từ chối chạy nếu hash lệch.
-- **Ba stack đã `stop` (không down, volume còn nguyên). Giữ tắt cho tới khi owner bảo bật lại** (`docker compose -p <project> start`):
+## Trạng thái hiện tại (2026-11-01, sau khi chạy held-out)
+- **PROMPT 4, mục 3: đã chạy xong.**
+  - Đã chạy 2 lượt held-out v1 trên image `4f8152b4` (commit `f3cdbf3`), cả 2 lượt VALID.
+  - Bảng chấm ở `docs/eval/runs/heldout-v1-f3cdbf3/`.
+  - **Đang chờ owner chấm tay. Không tự gán nhãn.**
+- **Held-out v1 đã đóng băng:** SHA256 `e4dd3c69445c443d337699bd2639afd17112221f5b6e6baf3018911a44272346` (file `docs/eval/heldout-v1.lock`, commit `7efc4f0`).
+- **Ba stack vẫn đang `stop`, giữ tắt cho tới khi owner bảo bật lại:**
   - `enterprise-ai-uat-v2`
   - `enterprise-ai-knowledge-assistant`
   - `eaka-auth02-20261023t080222z-2608a685`
-  - `eaka-p3d-uat` cũng đang stop; đây là stack eval, chỉ dùng `start`/`stop`.
-- **Đã tạo `%USERPROFILE%\.wslconfig`** với `memory=4GB`, `swap=8GB` (trước đó chưa có file này).
-- **Ollama trên host:** `OLLAMA_CONTEXT_LENGTH=8192` (biến môi trường user), đã xác nhận qua `/api/ps`.
-- **Bước tiếp theo:**
-  1. Kiểm Available ≥ 2500 MB.
-  2. Build image từ HEAD (`git archive HEAD | docker build --target runtime ...`).
-  3. Chạy 2 lượt held-out ở foreground, cấu hình baseline v2: seed 20261031, temperature 0, warm-up, exact KNN, mọi guard tắt. Mỗi 10 câu ghi Available MB và pagefile usage vào metadata.
-  4. Viết script xuất `docs/eval/runs/heldout-v1-<commit>/` (`grading.md`, `grading.csv`, `metadata.json`). Không điền nhãn.
-  5. Báo tóm tắt rồi DỪNG để owner chấm.
+  - `eaka-p3d-uat` cũng đã `stop` sau khi chạy.
+  - Đủ 23 volume.
+- **Cấu hình máy:**
+  - `%USERPROFILE%\.wslconfig` đặt `memory=4GB`, `swap=8GB`.
+  - Ollama: biến môi trường user `OLLAMA_CONTEXT_LENGTH=8192`.
+  - Owner đã tắt SQL Server, các dịch vụ CEIP và VSS Writer để có RAM.
 
 ## 1. Công việc dở và bước tiếp theo
 **(B) AUTH-02**

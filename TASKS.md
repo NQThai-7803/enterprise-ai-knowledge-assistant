@@ -11,7 +11,14 @@
   - item 1: design (`2472377`), approved with changes;
   - item 2: `docs/eval/heldout-v1.yaml` (40 items) and `docs/eval/heldout-v1-review.md`.
 - **Frozen 2026-11-01:** gold approved by the owner. SHA256 `e4dd3c69…2346` of `docs/eval/heldout-v1.yaml` is in `docs/eval/heldout-v1.lock` (frozen commit `7efc4f0`). `scripts/eval/run_heldout.py` refuses to run on a mismatch.
-- Next: 2 runs on the baseline v2 config with every guard off, then the grading sheet (`docs/eval/runs/heldout-v1-<commit>/`). Blocked: the host has less than the 2 GB of free RAM the owner requires before a run.
+- **Runs done 2026-11-01:** 2 runs of image `4f8152b4` (commit `f3cdbf3`) with the baseline v2 config and every guard off. Both runs are VALID: 0 INFRA_ERROR, the same Ollama PID throughout, max latency 49.7 s and 22.2 s.
+  - Grading sheet: `docs/eval/runs/heldout-v1-f3cdbf3/`.
+  - **Waiting for the owner's manual labels.**
+- **Medium (found by held-out, not fixed): PDF bullet glyphs leak into answers.**
+  - 7 of 40 answers in each run contain U+F0B7 copied from chunk text.
+  - HO-008 starts with U+FFFD.
+  - Likely structured/deterministic answer paths that copy chunk lines.
+  - Fix in a later RAG task with a flag; check on Q001-Q100, not on held-out.
 - Owner decision: the guard's post-response check (`USAGE_BELOW_ESTIMATE`) stays log-only.
 - **Later (after PROMPT 7): corpus v3 + held-out v2** with documents at several classification levels and at least 3 roles with different access. Held-out v1 groups B/C are RBAC smoke-level only: one restricted document of about 100 characters, its text cut mid-word, and manager access equal to admin.
 - **Medium: corpus conflicts found while writing held-out gold.** None of these documents states a precedence rule:

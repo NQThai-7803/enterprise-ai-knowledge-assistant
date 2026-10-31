@@ -15,7 +15,9 @@
   - No surface duplicate reaches 0.60.
   - 7 items have e5 cosine >= 0.90 (REVIEW).
   - No held-out 4-gram appears in `app/`.
-  - **Waiting for the owner's gold review**; not frozen, not run.
+  - The gold is approved and the set is frozen (SHA256 `e4dd3c69…`).
+  - 2 VALID runs are done; the grading sheet is in `docs/eval/runs/heldout-v1-f3cdbf3/`.
+  - **Waiting for the owner's labels.**
 - Groups B/C are RBAC smoke-level (one tiny restricted document).
 
 ## PROMPT 3g -- 2026-10-31
