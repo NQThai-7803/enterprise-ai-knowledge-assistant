@@ -86,7 +86,7 @@ lives next to the detector, with a test that every entry is lower case and ASCII
     (`VPN/MFA`, `hybrid`, `salary review`, `on-call`, `stipend`); markers, numbers, money and
     times; quoted English inside Vietnamese.
   - Question kinds: mixed questions, English-only questions, unknown.
-  - The Q073 answer string must be flagged; the 97 Vietnamese answers of baseline v2 must not.
+  - The Q073 answer string must be flagged. The answers to the other 96 Vietnamese questions in baseline v2 must not be flagged.
     These are fixtures in the unit test, not runtime logic.
 - **Unit, grounded answer service with a fake LLM:**
   - English then Vietnamese → the Vietnamese answer with citations and non-empty `evidence_text`.
