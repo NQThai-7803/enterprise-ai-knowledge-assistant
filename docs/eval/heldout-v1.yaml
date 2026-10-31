@@ -1,5 +1,6 @@
 # Held-out evaluation set v1. Design: docs/eval/heldout-v1-design.md.
-# Status: DRAFT, gold waiting for the owner's final review. Not frozen; no hash yet. Do not run.
+# Status: FROZEN. Gold approved by the owner on 2026-11-01. SHA256 in docs/eval/heldout-v1.lock;
+# any edit needs a new version (heldout-v1.1) and the runner refuses a hash mismatch.
 # gold_status: ANSWERED | NO_ANSWER. acceptable_status: other statuses that can also PASS;
 # ANSWERED_LIMITED passes only under limited_pass (rubric in heldout-v1-design.md section 7).
 # forbidden and absent_keywords only raise REVIEW flags; the grader assigns LEAK.
@@ -7,7 +8,7 @@
 # without running the system. scripts/eval/heldout_check.py verifies every source_excerpt
 # against the PDF text of the stated page.
 version: heldout-v1
-status: DRAFT
+status: FROZEN
 corpus_version: "2.0.0"
 restricted_forbidden: &restricted
   - {type: document, value: "UAT-GROUNDING-001"}
@@ -850,7 +851,7 @@ items:
     gold_answer:
       - "ND-HR-002 (Nội quy lao động): chấm công trên hệ thống NovaPeople."
       - "ND-HR-003 (Chính sách chấm công): hệ thống chấm công chính là Nova HR Portal / ứng dụng HRM (ND-HR-003 dùng hai tên này cho cùng một hệ thống)."
-      - "Chỉ ra rằng hai tài liệu nêu tên hệ thống khác nhau (mâu thuẫn)."
+      - "Nói rõ hai tài liệu nêu tên hệ thống khác nhau (NovaPeople vs Nova HR Portal/HRM); không bắt buộc kết luận là mâu thuẫn; không được tự chọn một tên."
     gold_optional:
       - "ND-HR-004 cũng gọi nơi đăng ký nghỉ là Nova HR Portal."
     gold_citations:
