@@ -11,7 +11,7 @@ Known issue:
 Open follow-ups:
 - **Medium: the truncation guard cannot see a real Ollama truncation.** Ollama 0.40.13 cuts an over-long prompt to about half the context: it keeps the end and drops the beginning, system message first. It then reports the shortened count (2050 at 4096, 4098 at 8192), which stays below `LLM_CONTEXT_WINDOW - LLM_MAX_OUTPUT_TOKENS`. Proposal: compare `usage.prompt_tokens` with an app-side estimate of the prompt (token counter or characters/4.5) and flag when the reported count is much lower than the estimate. Through `eaka-rag-change-guard`.
 - **Medium: deployment must set `OLLAMA_CONTEXT_LENGTH`** (`DEPLOYMENT.md` 3.1). The development host now has `OLLAMA_CONTEXT_LENGTH=8192` as a user variable. Prod/UAT hosts that use Ollama need the same. The adapter still sends `options.num_ctx`, which `/v1` ignores.
-- **Low: the eval runner treats transport errors as OK.** `tests/acceptance/rag_h5_2_exact_100.py` sets `execution_status="OK"` for `http 0` (for example the host `WinError 10055` on Q063 in PROMPT 3g), so `--resume` does not retry them. Mark non-2xx and transport failures `INFRA_ERROR`.
+- **Fixed in PROMPT 4 item 0a (one keep-alive client, INFRA_ERROR retried once, excluded from the proxy score): the eval runner treated transport errors as OK.** `tests/acceptance/rag_h5_2_exact_100.py` sets `execution_status="OK"` for `http 0` (for example the host `WinError 10055` on Q063 in PROMPT 3g), so `--resume` does not retry them. Mark non-2xx and transport failures `INFRA_ERROR`.
 
 ## PROMPT 3f determinism, exact KNN default, baseline v2 -- 2026-10-31
 

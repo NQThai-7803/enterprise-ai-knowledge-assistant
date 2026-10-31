@@ -5,6 +5,9 @@ PROXY ONLY, not a semantic grade. A case is "match" when:
 - reference NO_ANSWER: run is NO_ANSWER with no citations.
 Document IDs are mapped to manifest codes (reference: V2 runtime manifest; run: this stack's).
 Also reports whether the answer text is identical to the reference answer.
+Cases with execution_status INFRA_ERROR (transport, timeout, 5xx; still failing after the runner's
+single end-of-run retry) are excluded from the score: proxy_match is null and the summary lists
+how many and which cases were excluded.
 
 usage: grade_proxy.py <reference_grade.json> <v2_runtime_manifest.json> <run_runtime_manifest.json>
                       <run_results.json> <out.json>
@@ -24,13 +27,15 @@ def code_map(manifest):
     return {d["id"]: d["code"] for d in manifest["documents"]}
 
 
-def main():
-    reference, v2_manifest, run_manifest, run, out = sys.argv[1:6]
-    ref_codes = code_map(load(v2_manifest))
-    run_codes = code_map(load(run_manifest))
-    ref_cases = {c["id"]: c for c in load(reference)["cases"]}
+INFRA_ERROR = "INFRA_ERROR"
+
+
+def grade(reference, v2_manifest, run_manifest, run):
+    ref_codes = code_map(v2_manifest)
+    run_codes = code_map(run_manifest)
+    ref_cases = {c["id"]: c for c in reference["cases"]}
     rows = []
-    for case in load(run)["cases"]:
+    for case in run["cases"]:
         ref = ref_cases[case["id"]]
         cited = sorted(
             {
@@ -41,7 +46,9 @@ def main():
         ref_cited = sorted(
             {ref_codes.get(c["document_id"], "?") for c in ref.get("citation_ids", [])}
         )
-        if ref["grounding_status"] == "NO_ANSWER":
+        if case.get("execution_status") == INFRA_ERROR:
+            match = None
+        elif ref["grounding_status"] == "NO_ANSWER":
             match = case.get("status") == "NO_ANSWER" and not cited
         else:
             match = case.get("status") == "ANSWERED" and cited == ref_cited
@@ -75,22 +82,35 @@ def main():
                 "proxy_match": match,
                 "latency_ms": case.get("latency_ms"),
                 "execution_status": case.get("execution_status"),
+                "attempts": case.get("attempts", 1),
             }
         )
+    excluded = [r["id"] for r in rows if r["proxy_match"] is None]
+    scored = [r for r in rows if r["proxy_match"] is not None]
     summary = {
         "cases": len(rows),
-        "proxy_match": sum(r["proxy_match"] for r in rows),
+        "scored_cases": len(scored),
+        "excluded_infra_error": len(excluded),
+        "excluded_infra_error_ids": excluded,
+        "proxy_match": sum(r["proxy_match"] for r in scored),
         "status_counts": dict(Counter(r["grounding_status"] for r in rows)),
-        "answer_identical_to_reference": sum(r["answer_identical_to_reference"] for r in rows),
-        "infra_errors": sum(r["execution_status"] != "OK" for r in rows),
+        "answer_identical_to_reference": sum(r["answer_identical_to_reference"] for r in scored),
+        "retried_cases": sum(int(r["attempts"] or 1) > 1 for r in rows),
         "note": (
             "proxy vs TASK-035.3B manual grade (status + cited document codes); "
-            "not a semantic grade"
+            "not a semantic grade; proxy_match counts scored_cases only"
         ),
     }
+    return {"summary": summary, "cases": rows}
+
+
+def main():
+    reference, v2_manifest, run_manifest, run, out = sys.argv[1:6]
+    result = grade(load(reference), load(v2_manifest), load(run_manifest), load(run))
     with open(out, "w", encoding="utf-8") as handle:
-        json.dump({"summary": summary, "cases": rows}, handle, ensure_ascii=False, indent=1)
-    print(json.dumps(summary, ensure_ascii=False))
+        json.dump(result, handle, ensure_ascii=False, indent=1)
+    print(json.dumps(result["summary"], ensure_ascii=False))
 
 
-main()
+if __name__ == "__main__":
+    main()

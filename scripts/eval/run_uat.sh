@@ -84,6 +84,13 @@ from datetime import UTC, datetime
 out = sys.argv[1]
 meta = json.load(open(f"{out}/metadata.json", encoding="utf-8"))
 meta["warmup"] = json.load(open(f"{out}/warmup.json", encoding="utf-8"))
+results = json.load(open(f"{out}/runtime_results.json", encoding="utf-8"))
+meta["runner_status"] = results.get("status")
+meta["infra_error_cases"] = results.get("infra_error_cases", 0)
+meta["infra_error_retried_cases"] = results.get("infra_error_retried_cases", 0)
+meta["infra_error_ids"] = [
+    c["id"] for c in results.get("cases", []) if c.get("execution_status") == "INFRA_ERROR"
+]
 meta["finished_at"] = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 json.dump(meta, open(f"{out}/metadata.json", "w", encoding="utf-8"), indent=1)
 EOF

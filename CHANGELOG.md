@@ -6,6 +6,10 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### PROMPT 4 -- 2026-10-31
+
+- Eval runner (`tests/acceptance/rag_h5_2_exact_100.py`, new `scripts/eval/eval_client.py`): one keep-alive `httpx.Client` per run; transport errors, timeouts and 5xx are `INFRA_ERROR` (never `OK`) and are retried once at the end of the run; run metadata counts them, and `grade_proxy.py` excludes them from the score and reports how many were excluded.
+
 ### PROMPT 3g -- 2026-10-31
 
 - Added `LLM_CONTEXT_WINDOW` (default 8192) and `LLM_PROMPT_TRUNCATION_GUARD_ENABLED` (default `false`). A grounded-answer LLM call whose usage reaches the window minus the output budget, or that returns no usage, logs `LLM_PROMPT_POSSIBLY_TRUNCATED`; with the flag on, the answer becomes the fixed no-answer.
