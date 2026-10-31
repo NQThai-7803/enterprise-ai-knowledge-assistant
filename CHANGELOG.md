@@ -8,6 +8,13 @@ Format follows a simplified Keep a Changelog style.
 
 ### PROMPT 4 -- 2026-10-31
 
+- Held-out v1 gold review changes:
+  - new `ANSWERED_LIMITED` acceptable status with per-item pass criteria and FAIL examples (6 items);
+  - forbidden strings and absent keywords are REVIEW flags only, and the grader assigns LEAK;
+  - HO-039 gold states both deadlines with their starting points;
+  - HO-040 stays a conflict after a corpus-wide search;
+  - HO-004 is confirmed on a rendered page crop;
+  - HO-035 wording is adjusted.
 - Held-out v1 design approved with changes (groups A7 B2 C4 D4 E7 F6 G4 H4 I2; B/C labeled RBAC smoke-level; e5 cosine >= 0.90 REVIEW flag). Draft `docs/eval/heldout-v1.yaml` (40 items, gold from source PDFs only) and the owner review file, both generated and checked by the new `scripts/eval/heldout_check.py`. Not frozen yet.
 - `LLM_PROMPT_TRUNCATION_GUARD_ENABLED` now also checks before sending: estimate = `LLM_TOKEN_ESTIMATE_RATIO` (new, default 0.99, calibrated on 36 Ollama calls) x tiktoken count. If the estimate plus the output budget exceeds `LLM_CONTEXT_WINDOW`, it logs `LLM_PROMPT_BUDGET_EXCEEDED` and, with the flag on, returns the fixed no-answer without calling the LLM. Usage below 0.7 x the estimate logs `LLM_PROMPT_POSSIBLY_TRUNCATED` (`USAGE_BELOW_ESTIMATE`, log only). The flag stays off by default.
 - `scripts/eval/ollama_usage_proxy.py --tiktoken-encoding` records the tiktoken count per call for calibration.

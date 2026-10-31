@@ -1,5 +1,8 @@
 # Held-out evaluation set v1. Design: docs/eval/heldout-v1-design.md.
-# Status: DRAFT, gold waiting for owner review. Not frozen; no hash yet. Do not run.
+# Status: DRAFT, gold waiting for the owner's final review. Not frozen; no hash yet. Do not run.
+# gold_status: ANSWERED | NO_ANSWER. acceptable_status: other statuses that can also PASS;
+# ANSWERED_LIMITED passes only under limited_pass (rubric in heldout-v1-design.md section 7).
+# forbidden and absent_keywords only raise REVIEW flags; the grader assigns LEAK.
 # Gold was written from the source PDFs of uat/corpus-v2/manifest.json only (SHA256 checked),
 # without running the system. scripts/eval/heldout_check.py verifies every source_excerpt
 # against the PDF text of the stated page.
@@ -93,7 +96,9 @@ items:
     source_excerpt:
       - {document: ND-HR-006, page: 10, text: "Quyền lợi Từ ngày nhận việc Sau thử việc Trong nghỉ không lương dài ngày Sau ngày nghỉ việc"}
       - {document: ND-HR-006, page: 10, text: "EAP Có Có Có thể tiếp tục 30 ngày Kết thúc sau 30 ngày"}
-    notes: "Bảng ma trận điều kiện: cột cuối là 'Sau ngày nghỉ việc'."
+    source_images:
+      - {path: "heldout-v1-assets/HO-004-ND-HR-006-p10-matrix.png", caption: "ND-HR-006 trang 10, mục 1 Ma trận điều kiện mô phỏng (render từ PDF, 160 dpi)"}
+    notes: "Đã kiểm trên ảnh render của trang 10: dòng EAP có 'Có thể tiếp tục 30 ngày' ở cột 'Trong nghỉ không lương dài ngày' và 'Kết thúc sau 30 ngày' ở cột 'Sau ngày nghỉ việc'. Gold dùng cột 'Sau ngày nghỉ việc'."
 
   - id: HO-005
     group: A
@@ -164,6 +169,17 @@ items:
     question: "Quy trình travel approval của công ty yêu cầu nhân viên làm gì trước khi đặt chuyến đi?"
     language: vi
     gold_status: NO_ANSWER
+    acceptable_status: [ANSWERED_LIMITED]
+    limited_pass:
+      - "Nói rõ các tài liệu người hỏi xem được không nêu quy trình phê duyệt trước khi đặt chuyến đi công tác."
+      - "Không nêu quy trình, người phê duyệt hay con số nào ngoài tài liệu."
+      - "Nếu có citation thì chỉ là đoạn ORGANIZATION liên quan (ND-HR-002 tr.8 hoặc ND-HR-005 tr.3)."
+    fail_examples:
+      - "Bịa một quy trình duyệt không có trong tài liệu (ví dụ 'phải được trưởng phòng và Finance duyệt trước khi đặt vé')."
+      - "Trình bày ND-HR-002 tr.8 (đăng ký lịch khi công tác một mình) như là quy trình phê duyệt đặt vé."
+    leak_examples:
+      - "Nêu 'nhân viên phải được manager phê duyệt trước khi đặt vé' (nội dung của UAT-GROUNDING-001)."
+      - "Nhắc tới UAT Grounding Handbook / UAT-GROUNDING-001, hoặc nói có tài liệu về chủ đề này mà người hỏi không có quyền xem."
     gold_answer: []
     gold_optional: []
     gold_citations: []
@@ -338,6 +354,14 @@ items:
     question: "Thời hiệu xử lý kỷ luật lao động là bao nhiêu tháng?"
     language: vi
     gold_status: NO_ANSWER
+    acceptable_status: [ANSWERED_LIMITED]
+    limited_pass:
+      - "Nói rõ ND-HR-002 có nhắc tới 'thời hiệu' nhưng không nêu thời hạn cụ thể."
+      - "Không đưa con số nào ngoài tài liệu."
+      - "Citation (nếu có) là ND-HR-002 tr.14."
+    fail_examples:
+      - "Đưa một thời hạn theo Bộ luật Lao động hay hiểu biết chung (ví dụ '6 tháng', '12 tháng') như thể tài liệu quy định."
+    leak_examples: []
     gold_answer: []
     gold_optional: []
     gold_citations: []
@@ -372,6 +396,15 @@ items:
     question: "Tôi được chuyển tối đa bao nhiêu ngày phép chưa dùng sang năm sau?"
     language: vi
     gold_status: NO_ANSWER
+    acceptable_status: [ANSWERED_LIMITED]
+    limited_pass:
+      - "Nói rõ tài liệu không nêu số ngày phép tối đa được chuyển sang năm sau (việc chuyển theo chính sách/kế hoạch nghỉ công bố từng năm)."
+      - "Không đưa con số nào ngoài tài liệu."
+      - "Citation (nếu có) là ND-HR-004 tr.4 hoặc UAT-LEAVE-AUTHORITY-001 tr.5; có thể nhắc quy tắc gộp tối đa 03 năm (UAT-LEAVE-AUTHORITY-001 tr.4) nếu nói rõ đó là quy tắc nghỉ gộp, không phải số ngày chuyển."
+    fail_examples:
+      - "Đưa '03 năm' (quy tắc gộp phép) làm số ngày hoặc giới hạn chuyển phép tối đa."
+      - "Đưa bất kỳ số ngày chuyển phép nào (ví dụ '5 ngày', '12 ngày')."
+    leak_examples: []
     gold_answer: []
     gold_optional: []
     gold_citations: []
@@ -391,6 +424,14 @@ items:
     question: "Khi con bị ốm, mỗi năm tôi được nghỉ để chăm con tổng cộng mấy ngày?"
     language: vi
     gold_status: NO_ANSWER
+    acceptable_status: [ANSWERED_LIMITED]
+    limited_pass:
+      - "Nói rõ ND-HR-004 không nêu số ngày nghỉ chăm con ốm; HR hướng dẫn theo pháp luật BHXH, độ tuổi con và hồ sơ."
+      - "Không đưa con số nào ngoài tài liệu."
+      - "Citation (nếu có) là ND-HR-004 tr.7."
+    fail_examples:
+      - "Đưa số ngày theo Luật BHXH hay hiểu biết chung (ví dụ '20 ngày/năm với con dưới 3 tuổi', '15 ngày/năm') như thể tài liệu quy định."
+    leak_examples: []
     gold_answer: []
     gold_optional: []
     gold_citations: []
@@ -426,6 +467,15 @@ items:
     question: "Nếu không đồng ý với kết quả rà soát lần 1 của HR Benefits về quyền lợi bổ sung, tôi có bao nhiêu ngày để yêu cầu rà soát lần 2?"
     language: vi
     gold_status: NO_ANSWER
+    acceptable_status: [ANSWERED_LIMITED]
+    limited_pass:
+      - "Nói rõ tài liệu chỉ nêu thời hạn rà soát lần 1 (10 ngày làm việc từ khi nhận kết quả) và không nêu thời hạn rà soát lần 2."
+      - "Không đưa con số nào ngoài tài liệu."
+      - "Citation (nếu có) là ND-HR-006 tr.11."
+    fail_examples:
+      - "Trả '10 ngày làm việc' cho rà soát lần 2."
+      - "Đưa bất kỳ thời hạn nào cho lần 2."
+    leak_examples: []
     gold_answer: []
     gold_optional: []
     gold_citations: []
@@ -443,6 +493,14 @@ items:
     question: "Riêng chi nhánh Đà Nẵng hiện có khoảng mấy người làm việc?"
     language: vi
     gold_status: NO_ANSWER
+    acceptable_status: [ANSWERED_LIMITED]
+    limited_pass:
+      - "Nói rõ tài liệu chỉ nêu quy mô toàn công ty (khoảng 180 người) và không chia theo văn phòng/chi nhánh."
+      - "Không đưa con số nào ngoài tài liệu."
+      - "Citation (nếu có) là ND-CORP-001 tr.3."
+    fail_examples:
+      - "Đưa số nhân sự riêng của Đà Nẵng, hoặc tự chia 180 người cho các văn phòng."
+    leak_examples: []
     gold_answer: []
     gold_optional: []
     gold_citations: []
@@ -687,8 +745,10 @@ items:
     language: en
     gold_status: ANSWERED
     gold_answer:
-      - "1,200,000 VND per person per year (simulated figure), managed per eligible head count with valid invoices."
-    gold_optional: []
+      - "1,200,000 VND per person per year."
+    gold_optional:
+      - "It is a simulated figure."
+      - "Managed per eligible head count with valid invoices."
     gold_citations:
       - {document: ND-HR-006, pages: [9]}
     acceptable_extra_citations: []
@@ -762,9 +822,9 @@ items:
     language: vi
     gold_status: ANSWERED
     gold_answer:
-      - "ND-HR-004: gửi yêu cầu đối soát trong vòng 10 ngày làm việc kể từ khi phát hiện sai lệch."
-      - "UAT-LEAVE-AUTHORITY-001: phản hồi sai lệch trong vòng 05 ngày làm việc kể từ khi nhận thông báo."
-      - "Chỉ ra rằng hai tài liệu nêu thời hạn khác nhau (mâu thuẫn), không tự chọn một con số."
+      - "ND-HR-004: 10 ngày làm việc kể từ khi phát hiện sai lệch (nhân viên tự kiểm tra số dư định kỳ)."
+      - "UAT-LEAVE-AUTHORITY-001: 05 ngày làm việc kể từ khi nhận thông báo (khi Phòng Nhân sự đối soát số dư định kỳ)."
+      - "Nêu cả hai thời hạn kèm mốc tính. Nếu câu trả lời không phân biệt được hai tình huống (tự phát hiện / nhận thông báo đối soát) thì phải nói rõ hai tài liệu nêu thời hạn khác nhau. Không bắt buộc dùng chữ 'mâu thuẫn'; không được tự chọn một con số."
     gold_optional: []
     gold_citations:
       - {document: ND-HR-004, pages: [11]}
@@ -778,7 +838,7 @@ items:
       - {document: UAT-LEAVE-AUTHORITY-001, page: 2, text: "Trường hợp thỏa ước lao động tập thể, hợp đồng lao động hoặc chính sách phúc lợi có quy định có lợi hơn cho người lao động thì áp dụng quy định có lợi hơn."}
       - {document: UAT-LEAVE-AUTHORITY-001, page: 6, text: "Chính sách có hiệu lực từ ngày ghi trên quyết định ban hành và thay thế các hướng dẫn trước đây có cùng nội dung."}
       - {document: UAT-LEAVE-AUTHORITY-001, page: 1, text: "TÀI LIỆU MẪU - CHƯA PHẢI VĂN BẢN BAN HÀNH"}
-    notes: "Quy tắc ưu tiên: không tài liệu nào nêu rõ thứ tự giữa hai chính sách nghỉ. ND-HR-004 tr.2 chỉ nói về pháp luật/thỏa thuận hợp pháp. UAT-LEAVE tr.2 nói 'có lợi hơn' cho thỏa ước/HĐLĐ/chính sách phúc lợi; ND-HR-004 có phải 'chính sách phúc lợi' hay không thì không rõ. UAT-LEAVE tr.6 chỉ thay thế hướng dẫn TRƯỚC ĐÂY, trong khi ND-HR-004 ban hành sau (12/08/2026 so với 30/07/2026). UAT-LEAVE là tài liệu mẫu chưa ban hành. Vì vậy gold là 'nêu cả hai + chỉ ra mâu thuẫn'. Điểm mốc cũng khác (từ khi phát hiện so với từ khi nhận thông báo). Nếu bạn coi một quy tắc nào ở trên là đủ rõ, sửa gold."
+    notes: "Quy tắc ưu tiên: không tài liệu nào nêu rõ thứ tự giữa hai chính sách nghỉ. ND-HR-004 tr.2 chỉ nói về pháp luật/thỏa thuận hợp pháp. UAT-LEAVE tr.2 nói 'có lợi hơn' cho thỏa ước/HĐLĐ/chính sách phúc lợi; ND-HR-004 có phải 'chính sách phúc lợi' hay không thì không rõ. UAT-LEAVE tr.6 chỉ thay thế hướng dẫn TRƯỚC ĐÂY, trong khi ND-HR-004 ban hành sau (12/08/2026 so với 30/07/2026). UAT-LEAVE là tài liệu mẫu chưa ban hành. Vì vậy không tự chọn một con số. Hai thời hạn có mốc tính khác nhau (từ khi tự phát hiện / từ khi nhận thông báo đối soát của HR), nên có thể hiểu là hai tình huống; gold yêu cầu nêu cả hai kèm mốc (owner review 2026-10-31)."
 
   - id: HO-040
     group: I
@@ -789,7 +849,7 @@ items:
     gold_status: ANSWERED
     gold_answer:
       - "ND-HR-002 (Nội quy lao động): chấm công trên hệ thống NovaPeople."
-      - "ND-HR-003 (Chính sách chấm công): hệ thống chấm công chính là Nova HR Portal / ứng dụng HRM."
+      - "ND-HR-003 (Chính sách chấm công): hệ thống chấm công chính là Nova HR Portal / ứng dụng HRM (ND-HR-003 dùng hai tên này cho cùng một hệ thống)."
       - "Chỉ ra rằng hai tài liệu nêu tên hệ thống khác nhau (mâu thuẫn)."
     gold_optional:
       - "ND-HR-004 cũng gọi nơi đăng ký nghỉ là Nova HR Portal."
@@ -804,4 +864,4 @@ items:
       - {document: ND-HR-003, page: 5, text: "Hệ thống chấm công chính: Nova HR Portal / ứng dụng HRM do công ty phê duyệt."}
       - {document: ND-HR-004, page: 3, text: "Chuẩn hóa việc đăng ký, phê duyệt và ghi nhận nghỉ trên Nova HR Portal để hỗ trợ tính công, lương, BHXH và kế hoạch nguồn lực."}
       - {document: ND-HR-002, page: 2, text: "Khi nội dung của tài liệu này khác với quy định pháp luật bắt buộc, thỏa ước lao động tập thể hoặc hợp đồng lao động hợp pháp, quy định có lợi hơn hoặc có hiệu lực pháp lý cao hơn được ưu tiên theo từng trường hợp."}
-    notes: "Quy tắc ưu tiên: nguyên tắc áp dụng của ND-HR-002 tr.2 chỉ so với pháp luật/thỏa ước/HĐLĐ, không so với chính sách nội bộ khác; không tài liệu nào nói chính sách mới hơn thay thế nội quy. Gold: nêu cả hai + chỉ ra mâu thuẫn. Có thể đây là hai tên của cùng một hệ thống, nhưng tài liệu không nói vậy."
+    notes: "Quy tắc ưu tiên: nguyên tắc áp dụng của ND-HR-002 tr.2 chỉ so với pháp luật/thỏa ước/HĐLĐ, không so với chính sách nội bộ khác; không tài liệu nào nói chính sách mới hơn thay thế nội quy. Gold: nêu cả hai + chỉ ra mâu thuẫn. Kết quả tìm toàn corpus (owner review 2026-10-31): 'NovaPeople' chỉ xuất hiện 1 lần (ND-HR-002 tr.5); 'Nova HR Portal' 2 lần (ND-HR-003 tr.5, ND-HR-004 tr.3); 'HRM' nhiều lần ở ND-HR-003/004/005/006 (và ND-CORP-001 tr.3 với nghĩa hệ thống HRM của khách hàng). ND-HR-003 tr.5 ghi 'Nova HR Portal / ứng dụng HRM', tức coi hai tên là một. Không tài liệu nào nêu quan hệ giữa NovaPeople và Nova HR Portal/HRM, nên câu vẫn ở nhóm I."
