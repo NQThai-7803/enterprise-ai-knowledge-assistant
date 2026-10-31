@@ -6,6 +6,13 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### PROMPT 3e -- 2026-10-31
+
+- Repaired the two remaining garbled leave-category labels (Unicode-escaped constants). Grouped annual-leave rows now bind generally: a row's own cue, then an adjacent label-only line (following line first). The mojibake guard allows no exceptions.
+- Added `RAG_SEMANTIC_EXACT_PERMITTED_KNN_ENABLED` (default `false`): exact nearest neighbours over permitted chunks behind an `OFFSET 0` fence, so the HNSW post-filter cannot drop permitted chunks. Added flag-on recall tests, a brute-force recall@k test, plan guards and `scripts/benchmark/hnsw_exact_knn.py`.
+- Added the UAT eval harness `scripts/eval/` with an Ollama warm-up whose time is recorded in the run metadata and not scored.
+- Owner label: Q073 FAIL (empty `evidence_text` plus an English answer).
+
 ### PROMPT 3d CI green and mojibake repair -- 2026-10-31
 
 - Fixed nine runtime literals stored as mojibake:
