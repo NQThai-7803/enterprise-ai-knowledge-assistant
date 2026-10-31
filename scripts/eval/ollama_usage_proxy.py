@@ -4,9 +4,13 @@ Eval only. Forwards every request to the upstream Ollama unchanged and, for chat
 appends one JSON line with the matched eval case id, prompt/completion tokens, message count,
 prompt size in characters and elapsed time. It never stores prompt or answer text; the case id is
 found by looking for each question of the question file inside the last user message.
+With --tiktoken-encoding it also records tiktoken_tokens: the sum of the tiktoken token counts of
+the message contents, the same count the app's prompt budget guard multiplies by
+LLM_TOKEN_ESTIMATE_RATIO (PROMPT 4 item 0b calibration).
 
 usage: ollama_usage_proxy.py <out.jsonl> [--listen 127.0.0.1:11435]
        [--upstream http://127.0.0.1:11434] [--questions artifacts/rag-h5-1-stress-uat.py]
+       [--tiktoken-encoding cl100k_base]
 Point the API at it with EVAL_OLLAMA_BASE_URL=http://host.docker.internal:11435.
 """
 
@@ -26,7 +30,7 @@ from urllib.request import Request, urlopen
 LOCK = threading.Lock()
 
 
-def make_handler(upstream: str, out_path: str, questions: list[tuple[str, str]]):
+def make_handler(upstream: str, out_path: str, questions: list[tuple[str, str]], encoding=None):
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, format, *args):  # noqa: A002 - silence default access log
             return
@@ -86,6 +90,10 @@ def make_handler(upstream: str, out_path: str, questions: list[tuple[str, str]])
                 "max_tokens": request.get("max_tokens"),
                 "num_ctx_option": (request.get("options") or {}).get("num_ctx"),
             }
+            if encoding is not None:
+                record["tiktoken_tokens"] = sum(
+                    len(encoding.encode(str(m.get("content", "")))) for m in messages
+                )
             with LOCK, open(out_path, "a", encoding="utf-8") as handle:
                 handle.write(json.dumps(record) + "\n")
 
@@ -98,13 +106,19 @@ def main() -> None:
     parser.add_argument("--listen", default="127.0.0.1:11435")
     parser.add_argument("--upstream", default="http://127.0.0.1:11434")
     parser.add_argument("--questions", default="artifacts/rag-h5-1-stress-uat.py")
+    parser.add_argument("--tiktoken-encoding", default=None)
     args = parser.parse_args()
+    encoding = None
+    if args.tiktoken_encoding:
+        import tiktoken
+
+        encoding = tiktoken.get_encoding(args.tiktoken_encoding)
     core = runpy.run_path(args.questions)["CORE"]
     # Longest question first, so a question that contains another one is matched first.
     questions = sorted(((row[0], row[2]) for row in core), key=lambda item: -len(item[1]))
     host, port = args.listen.rsplit(":", 1)
     server = ThreadingHTTPServer(
-        (host, int(port)), make_handler(args.upstream, args.out, questions)
+        (host, int(port)), make_handler(args.upstream, args.out, questions, encoding)
     )
     print(f"proxy {args.listen} -> {args.upstream}, logging to {args.out}", flush=True)
     server.serve_forever()

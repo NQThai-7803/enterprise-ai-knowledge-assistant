@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import re
 import unicodedata
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -851,6 +852,8 @@ class GroundedAnswerService:
                 context_window=self.settings.llm_context_window,
                 reserved_output_tokens=self.settings.llm_max_output_tokens,
                 enforce=self.settings.llm_prompt_truncation_guard_enabled,
+                token_counter=self.token_counter,
+                token_estimate_ratio=self.settings.llm_token_estimate_ratio,
             )
             generation = await provider.generate(
                 messages=messages,
@@ -1202,7 +1205,7 @@ class GroundedAnswerService:
             )
             raise _map_llm_error(exc) from exc
 
-        except _PromptPossiblyTruncatedError:
+        except _PromptGuardStopError:
             return _no_answer_draft(
                 self.settings.chat_no_answer_message,
                 selected_chunk_count=len(source_registry.sources),
@@ -10744,28 +10747,63 @@ def _detach_message(message: ChatMessage) -> ChatMessage:
 
 
 PROMPT_POSSIBLY_TRUNCATED_ERROR_CODE = "LLM_PROMPT_POSSIBLY_TRUNCATED"
+PROMPT_BUDGET_EXCEEDED_ERROR_CODE = "LLM_PROMPT_BUDGET_EXCEEDED"
+# Reported usage below this share of the app-side estimate means the provider likely cut the
+# prompt: Ollama keeps only about half its context of an over-long prompt and reports that count.
+PROMPT_USAGE_BELOW_ESTIMATE_FACTOR = 0.7
 
 
-class _PromptPossiblyTruncatedError(Exception):
+class _PromptGuardStopError(Exception):
     """Raised by _PromptTruncationGuard when the guard flag asks for the fixed no-answer."""
 
 
-def prompt_truncation_reason(prompt_tokens: int | None, *, threshold_tokens: int) -> str | None:
+def estimate_prompt_tokens(
+    messages: Sequence[LLMMessage], *, token_counter: TokenCounter, ratio: float
+) -> int:
+    """Provider prompt tokens estimated from the app tokenizer (sum over message contents)."""
+    return math.ceil(ratio * sum(token_counter.count(message.content) for message in messages))
+
+
+def prompt_budget_exceeded(
+    estimated_prompt_tokens: int, *, max_output_tokens: int, context_window: int
+) -> bool:
+    return estimated_prompt_tokens + max_output_tokens > context_window
+
+
+def prompt_truncation_reason(
+    prompt_tokens: int | None,
+    *,
+    threshold_tokens: int,
+    estimated_prompt_tokens: int | None = None,
+) -> str | None:
     """Why a provider may have cut the prompt, or None when usage looks safe."""
     if prompt_tokens is None:
         return "USAGE_MISSING"
     if prompt_tokens >= threshold_tokens:
         return "NEAR_CONTEXT_WINDOW"
+    if (
+        estimated_prompt_tokens is not None
+        and prompt_tokens < PROMPT_USAGE_BELOW_ESTIMATE_FACTOR * estimated_prompt_tokens
+    ):
+        return "USAGE_BELOW_ESTIMATE"
     return None
 
 
-class _PromptTruncationGuard:
-    """Check token usage after every LLM call made while answering one question.
+# Reasons that end the answer when the guard flag is on; USAGE_BELOW_ESTIMATE is only logged.
+_ENFORCED_TRUNCATION_REASONS = frozenset({"USAGE_MISSING", "NEAR_CONTEXT_WINDOW"})
 
-    A prompt at or above ``context_window - reserved_output_tokens`` tokens, or a response without
-    usage, may have been cut by the provider (Ollama drops the beginning, system message first).
-    The guard always logs a content-free WARNING; with ``enforce`` it also stops the answer so the
-    caller returns the fixed no-answer. Every other attribute is delegated to the provider.
+
+class _PromptTruncationGuard:
+    """Check the prompt size around every LLM call made while answering one question.
+
+    Before sending: the prompt is estimated as ``token_estimate_ratio`` x the app tokenizer count.
+    When that estimate plus the output budget exceeds ``context_window`` the provider would cut
+    the prompt (Ollama drops the beginning, system message first): the guard logs
+    LLM_PROMPT_BUDGET_EXCEEDED and, with ``enforce``, does not send the request.
+    After the response: usage at or above ``context_window - reserved_output_tokens``, or missing
+    usage, logs LLM_PROMPT_POSSIBLY_TRUNCATED and, with ``enforce``, stops the answer. Usage below
+    PROMPT_USAGE_BELOW_ESTIMATE_FACTOR x the estimate is logged with the same code only.
+    Logs carry counts, never prompt or answer text. Every other attribute is delegated.
     """
 
     def __init__(
@@ -10775,31 +10813,77 @@ class _PromptTruncationGuard:
         context_window: int,
         reserved_output_tokens: int,
         enforce: bool,
+        token_counter: TokenCounter | None = None,
+        token_estimate_ratio: float = 1.0,
     ) -> None:
         self._provider = provider
+        self._context_window = context_window
+        self._reserved_output_tokens = reserved_output_tokens
         self._threshold_tokens = max(1, context_window - reserved_output_tokens)
         self._enforce = enforce
+        self._token_counter = token_counter
+        self._token_estimate_ratio = token_estimate_ratio
 
     def __getattr__(self, name: str) -> object:
         return getattr(self._provider, name)
 
+    def _estimate(self, messages: object) -> int | None:
+        if self._token_counter is None or not isinstance(messages, Sequence):
+            return None
+        try:
+            return estimate_prompt_tokens(
+                messages, token_counter=self._token_counter, ratio=self._token_estimate_ratio
+            )
+        except Exception as exc:
+            logger.warning(
+                "LLM prompt size estimate failed; budget check skipped.",
+                extra={"error_type": exc.__class__.__name__},
+            )
+            return None
+
     async def generate(self, *args: object, **kwargs: object) -> LLMGenerationResult:
+        estimated = self._estimate(kwargs.get("messages"))
+        max_output_tokens = kwargs.get("max_output_tokens")
+        if not isinstance(max_output_tokens, int):
+            max_output_tokens = self._reserved_output_tokens
+        if estimated is not None and prompt_budget_exceeded(
+            estimated, max_output_tokens=max_output_tokens, context_window=self._context_window
+        ):
+            logger.warning(
+                "LLM prompt estimate exceeds the context window budget.",
+                extra={
+                    "error_code": PROMPT_BUDGET_EXCEEDED_ERROR_CODE,
+                    "estimated_prompt_tokens": estimated,
+                    "max_output_tokens": max_output_tokens,
+                    "context_window": self._context_window,
+                    "enforced": self._enforce,
+                },
+            )
+            if self._enforce:
+                raise _PromptGuardStopError("BUDGET_EXCEEDED")
+
         generation = await self._provider.generate(*args, **kwargs)
         prompt_tokens = getattr(generation, "prompt_tokens", None)
-        reason = prompt_truncation_reason(prompt_tokens, threshold_tokens=self._threshold_tokens)
+        reason = prompt_truncation_reason(
+            prompt_tokens,
+            threshold_tokens=self._threshold_tokens,
+            estimated_prompt_tokens=estimated,
+        )
         if reason is not None:
+            enforced = self._enforce and reason in _ENFORCED_TRUNCATION_REASONS
             logger.warning(
                 "LLM prompt may have been truncated by the provider.",
                 extra={
                     "error_code": PROMPT_POSSIBLY_TRUNCATED_ERROR_CODE,
                     "reason": reason,
                     "prompt_tokens": prompt_tokens,
+                    "estimated_prompt_tokens": estimated,
                     "threshold_tokens": self._threshold_tokens,
-                    "enforced": self._enforce,
+                    "enforced": enforced,
                 },
             )
-            if self._enforce:
-                raise _PromptPossiblyTruncatedError(reason)
+            if enforced:
+                raise _PromptGuardStopError(reason)
         return generation
 
 

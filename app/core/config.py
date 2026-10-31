@@ -170,6 +170,8 @@ class Settings(BaseSettings):
     llm_context_window: int = Field(default=8192, ge=1024)
     # Return the fixed no-answer when a prompt may have been cut by the provider (PROMPT 3g).
     llm_prompt_truncation_guard_enabled: bool = False
+    # Ollama prompt tokens per tiktoken token (tokenizer_encoding_name), calibrated in PROMPT 4.
+    llm_token_estimate_ratio: float = Field(default=0.99, gt=0.0, le=4.0)
     llm_base_url: str = Field(
         default="",
         validation_alias=AliasChoices("LLM_OPENAI_BASE_URL", "LLM_BASE_URL"),
