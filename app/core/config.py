@@ -128,8 +128,8 @@ class Settings(BaseSettings):
     hybrid_keyword_weight: float = Field(default=1.0, ge=0.0)
     hybrid_semantic_min_relevance_score: float = Field(default=0.30, ge=0.0, le=1.0)
     # Exact KNN over permitted chunks instead of the HNSW-capable statement
-    # (docs/design/hnsw-permission-recall.md). Off by default until benchmarked and approved.
-    rag_semantic_exact_permitted_knn_enabled: bool = False
+    # (docs/design/hnsw-permission-recall.md). On by default since PROMPT 3f; false rolls back.
+    rag_semantic_exact_permitted_knn_enabled: bool = True
     reranker_enabled: bool = True
     reranker_provider: Literal["sentence_transformers", "heuristic"] = "sentence_transformers"
     reranker_model: str = Field(default="BAAI/bge-reranker-v2-m3", min_length=1)

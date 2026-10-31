@@ -25,26 +25,27 @@ def _service(settings: Settings) -> SemanticRetrievalService:
     )
 
 
-def test_flag_defaults_to_the_current_statement(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_flag_defaults_to_exact_knn(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv("RAG_SEMANTIC_EXACT_PERMITTED_KNN_ENABLED", raising=False)
+    settings = Settings(_env_file=None)
+
+    assert settings.rag_semantic_exact_permitted_knn_enabled is True
+    assert _service(settings).repository.exact_permitted_knn is True
+    assert SemanticRetrievalRepository().exact_permitted_knn is True
+
+
+def test_flag_can_be_turned_off_for_rollback(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("RAG_SEMANTIC_EXACT_PERMITTED_KNN_ENABLED", "false")
     settings = Settings(_env_file=None)
 
     assert settings.rag_semantic_exact_permitted_knn_enabled is False
     assert _service(settings).repository.exact_permitted_knn is False
 
 
-def test_flag_is_read_from_the_environment(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("RAG_SEMANTIC_EXACT_PERMITTED_KNN_ENABLED", "true")
-    settings = Settings(_env_file=None)
-
-    assert settings.rag_semantic_exact_permitted_knn_enabled is True
-    assert _service(settings).repository.exact_permitted_knn is True
-
-
 def test_injected_repository_is_kept() -> None:
     repository = SemanticRetrievalRepository()
     service = SemanticRetrievalService(
-        settings=Settings(_env_file=None, rag_semantic_exact_permitted_knn_enabled=True),
+        settings=Settings(_env_file=None, rag_semantic_exact_permitted_knn_enabled=False),
         embedding_provider=_NoEmbedding(),
         session_provider=lambda: None,
         repository=repository,

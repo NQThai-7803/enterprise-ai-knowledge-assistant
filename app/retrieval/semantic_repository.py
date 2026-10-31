@@ -27,7 +27,7 @@ class RetrievalRow:
 
 
 class SemanticRetrievalRepository:
-    def __init__(self, *, exact_permitted_knn: bool = False) -> None:
+    def __init__(self, *, exact_permitted_knn: bool = True) -> None:
         self.exact_permitted_knn = exact_permitted_knn
 
     async def search_permitted_chunks(
@@ -56,7 +56,7 @@ async def search_permitted_chunks(
     current_user: User,
     top_k: int,
     min_relevance_score: float,
-    exact_permitted_knn: bool = False,
+    exact_permitted_knn: bool = True,
 ) -> tuple[RetrievalRow, ...]:
     vector = list(query_vector)
     cosine_distance = DocumentChunk.embedding.cosine_distance(vector)

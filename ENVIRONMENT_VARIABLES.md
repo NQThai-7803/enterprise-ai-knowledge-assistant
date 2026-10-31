@@ -221,7 +221,7 @@ HYBRID_RRF_K=60
 HYBRID_SEMANTIC_WEIGHT=1.0
 HYBRID_KEYWORD_WEIGHT=1.0
 HYBRID_SEMANTIC_MIN_RELEVANCE_SCORE=0.30
-RAG_SEMANTIC_EXACT_PERMITTED_KNN_ENABLED=false
+RAG_SEMANTIC_EXACT_PERMITTED_KNN_ENABLED=true
 ```
 
 Retrieval variable rules:
@@ -243,7 +243,7 @@ Retrieval variable rules:
 - `HYBRID_RRF_K` is an integer greater than `0`.
 - `HYBRID_SEMANTIC_WEIGHT` and `HYBRID_KEYWORD_WEIGHT` are finite numbers greater than or equal to `0.0`; they cannot both be `0.0`.
 - `HYBRID_SEMANTIC_MIN_RELEVANCE_SCORE` is a finite number in `[0.0, 1.0]`.
-- `RAG_SEMANTIC_EXACT_PERMITTED_KNN_ENABLED` (boolean, default `false`, added in PROMPT 3e): when `true`, semantic retrieval ranks every chunk the user may read exactly, instead of the statement the planner can serve through the HNSW index. The HNSW path applies permission and visibility after `hnsw.ef_search` candidates and can lose permitted chunks. See `docs/design/hnsw-permission-recall.md`. Keep `false` until the benchmark and UAT gates in that document are approved.
+- `RAG_SEMANTIC_EXACT_PERMITTED_KNN_ENABLED` (boolean, default `true` since PROMPT 3f, added in PROMPT 3e): semantic retrieval ranks every chunk the user may read exactly. Set `false` only to roll back to the statement the planner can serve through the HNSW index; that path applies permission and visibility after `hnsw.ef_search` candidates and can lose permitted chunks. See `docs/design/hnsw-permission-recall.md`, including the latency budget and the cells that are not verified yet.
 - Hybrid RRF scores are ranking scores, not probabilities.
 - These retrieval values are not secrets.
 - `RERANKER_ENABLED` enables the document/chunk reranking layer after hybrid retrieval and before final context packing.
