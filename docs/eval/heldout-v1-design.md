@@ -1,6 +1,7 @@
 # Design: held-out evaluation set v1
 
-Status: **PROPOSED, waiting for owner review (PROMPT 4 item 1).** No questions or gold exist yet.
+Status: **APPROVED with changes by the owner (PROMPT 4 item 2, 2026-10-31).** Questions and gold
+are drafted in `heldout-v1.yaml` and wait for the owner's gold review (`heldout-v1-review.md`).
 Date: 2026-10-31.
 
 ## 1. Purpose
@@ -43,38 +44,41 @@ Accounts come from `app/scripts/seed_uat_data.py`; access follows `app.core.perm
 | UAT-GROUNDING-001 | UAT Grounding Handbook | **PRIVATE**, grant VIEW to manager | 1 | manager, admin |
 | UAT-SHARED-001 | UAT Shared Knowledge Policy | ORGANIZATION | 1 | all |
 
-**Limitation that shapes groups B and C.** The corpus has exactly one restricted document. It
+**Limitation that shapes groups B and C: RBAC smoke-level.** The corpus has exactly one restricted document. It
 is one page of about 100 characters of English text: a travel approval rule. The PDF text itself
 stops mid-word ("UAT travel approval policy: staff must obtain manager approval before booking
 travel. Expense eviden"), so only the approval rule can be gold. Manager and admin
 see the same 9 documents, so a manager/admin pair cannot differ. Groups B and C therefore all
 use staff versus manager/admin on that single document. They test the permission path, but with
-very little content behind it. More restricted content needs a corpus change, and that would be
-held-out v2, outside this scope.
+very little content behind it, so B and C are an **RBAC smoke-level** test. Every result report of
+held-out v1 must say so. The manager gold on this document is based only on the text that really
+extracts from the PDF, quoted in the item. A real RBAC test needs corpus v3 + held-out v2 with
+documents at several classification levels and at least 3 roles with different access (TASKS,
+after PROMPT 7).
 
-## 4. Groups and proposed counts
+## 4. Groups and counts (approved)
 
 | Group | What it tests | Count | Gold status | Asked as |
 |---|---|---|---|---|
-| A | Answerable, by role: one ordinary fact per question, spread over the 7 large documents | 7 | ANSWERED | staff 4, manager 2, admin 1 |
-| B | Blocked: staff asks for content that exists only in `UAT-GROUNDING-001` | 4 | NO_ANSWER | staff |
-| C | Same question, two roles (3 pairs): 2 pairs on `UAT-GROUNDING-001` (manager or admin ANSWERED, staff NO_ANSWER) and 1 control pair on an ORGANIZATION document (both ANSWERED, same gold) | 6 | per role | pair |
+| A | Answerable, by role: one ordinary fact per question | 7 | ANSWERED | staff 4, manager 2, admin 1 |
+| B | Blocked: staff asks for content that exists only in `UAT-GROUNDING-001` (RBAC smoke-level) | 2 | NO_ANSWER | staff |
+| C | Same question, two roles: 1 pair on `UAT-GROUNDING-001` (manager ANSWERED, staff NO_ANSWER) and 1 control pair on an ORGANIZATION document (staff and admin, same gold) | 4 | per role | pair |
 | D | Out of corpus (topics no document covers) | 4 | NO_ANSWER | staff |
-| E | Near miss: wording close to a covered topic, but the asked fact is not in any document (the S01 pattern, where an unrelated chunk tempts an answer) | 5 | NO_ANSWER | staff |
+| E | Near miss: the question shares keywords with a document, but asks for a fact the document does not state (the S01 pattern). Includes "the document has a similar number for a different thing" traps | 7 | NO_ANSWER | staff |
 | F | Tables and numbers (Q071 pattern), bullet lists, currency amounts and ranges | 6 | ANSWERED | staff |
 | G | Needs 2 documents for a complete answer | 4 | ANSWERED | staff |
-| H | Language: 2 English questions, 2 Vietnamese questions with English terms (for example "payroll", "on-call", "stipend") | 4 | ANSWERED | staff |
-| | **Total** | **40** | 27 ANSWERED / 13 NO_ANSWER | |
+| H | Language: 2 English questions, 2 Vietnamese questions with English terms | 4 | ANSWERED | staff |
+| I | Conflict between 2 documents. Gold follows a precedence rule only if the documents themselves state one (never `app/retrieval/authority.py`); with no clear rule the gold is "state both and point out the conflict" | 2 | ANSWERED | staff |
+| | **Total** | **40** | 26 ANSWERED / 14 NO_ANSWER | |
 
 Notes:
-- B and the staff half of C ask about the same restricted fact in different words. So that the
-  "not leaked" result does not rest on one wording, B uses 4 phrasings that differ in language
-  and specificity.
 - For B and C, every ORGANIZATION document mentioning a related topic (for example "công tác"
-  in ND-HR-002/003/005) is checked while writing gold. If an ORGANIZATION document genuinely
-  answers the staff question, the question is rewritten. Gold must not depend on a coincidence.
-- No group repeats a Q001-Q100 topic in the same form. Several groups will touch the same
-  documents, which is unavoidable with 7 content documents.
+  in ND-HR-002/003/005) is checked while writing gold, and the nearest such passage is shown in
+  the review file. If an ORGANIZATION document genuinely answers the staff question, the question
+  is rewritten.
+- No group repeats a Q001-Q100 topic in the same form. Several groups touch the same documents,
+  which is unavoidable with 7 content documents. Q018 (the known start-time conflict) is not
+  reused for group I.
 
 ## 5. Record format (`docs/eval/heldout-v1.yaml`)
 
@@ -91,6 +95,7 @@ items:
     gold_status: ANSWERED        # ANSWERED | NO_ANSWER
     gold_answer:                 # required points, each checkable on its own; empty for NO_ANSWER
       - "…"
+    gold_optional: []            # points that may appear but are not needed for PASS
     gold_citations:              # documents and pages that support the points
       - {document: ND-HR-005, pages: [4]}
     acceptable_extra_citations: []   # other documents that may be cited without penalty
@@ -98,7 +103,8 @@ items:
       - {type: document, value: UAT-GROUNDING-001}
       - {type: title, value: "UAT Grounding Handbook"}
       - {type: content, value: "manager approval before booking travel"}
-    source_excerpt:              # verbatim lines from the PDF, for the owner's review only
+    absent_keywords: []          # B/D: keywords that must have 0 hits in what the role can see
+    source_excerpt:              # verbatim text of the PDF page (checked by heldout_check.py)
       - {document: ND-HR-005, page: 4, text: "…"}
     notes: ""
 ```
@@ -116,6 +122,11 @@ and key phrases. The other groups list nothing restricted, but any reference to
   2. `difflib.SequenceMatcher` ratio.
 - Report the maximum and the closest UAT id for every held-out question. Rewrite any question
   with a score of **0.60 or more** on either measure, then report the new maximum.
+- Semantic check: cosine similarity with `intfloat/multilingual-e5-small` (the app's embedding
+  model, `query: ` prefix, normalized) against the 100 UAT questions. A maximum of **0.90 or
+  more** flags the item **REVIEW**. It is never removed automatically; the review file shows the
+  nearest UAT question so the owner can decide. The model runs offline from the eval stack's
+  model cache (`scripts/eval/heldout_check.py e5`).
 - Also run `question_leak_check` the other way round: no 4-gram of a held-out question may
   appear in `app/` (it must not have been hard-coded already).
 
@@ -174,12 +185,12 @@ every final label by hand.
    reported separately. Passwords come from environment variables and are never written to
    artifacts.
 
-## 9. Open points for the owner
+## 9. Owner decisions (2026-10-31)
 
-1. Are the group counts in section 4 right? This draft gives A 7, B 4, C 6, D 4, E 5, F 6, G 4,
-   H 4, for 40 in total.
-2. Should the staff-only design of B and C stay? The corpus has one restricted document; held-out
-   v2 with more restricted documents is the alternative.
-3. Is a duplicate threshold of 0.60 acceptable?
-4. Should the Q018-style authority conflict (ND-HR-002 vs ND-HR-003) get a held-out item? This
-   draft leaves it out, because its expected behavior is already fixed by `known_conflicts`.
+1. Counts: A7, B2, C4, D4, E7, F6, G4, H4, I2 (section 4).
+2. B and C stay staff-only on the single restricted document and are labeled RBAC smoke-level;
+   corpus v3 + held-out v2 is recorded in TASKS for after PROMPT 7.
+3. Duplicate threshold 0.60 (3-gram and difflib) is kept; e5 cosine >= 0.90 adds a REVIEW flag.
+4. The Q018-style conflict is covered by the new group I, on conflicts other than Q018.
+5. Tooling: `scripts/eval/heldout_check.py check` verifies the YAML, the excerpts and the
+   duplicates and renders `heldout-v1-review.md`.

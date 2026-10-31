@@ -8,6 +8,7 @@ Format follows a simplified Keep a Changelog style.
 
 ### PROMPT 4 -- 2026-10-31
 
+- Held-out v1 design approved with changes (groups A7 B2 C4 D4 E7 F6 G4 H4 I2; B/C labeled RBAC smoke-level; e5 cosine >= 0.90 REVIEW flag). Draft `docs/eval/heldout-v1.yaml` (40 items, gold from source PDFs only) and the owner review file, both generated and checked by the new `scripts/eval/heldout_check.py`. Not frozen yet.
 - `LLM_PROMPT_TRUNCATION_GUARD_ENABLED` now also checks before sending: estimate = `LLM_TOKEN_ESTIMATE_RATIO` (new, default 0.99, calibrated on 36 Ollama calls) x tiktoken count. If the estimate plus the output budget exceeds `LLM_CONTEXT_WINDOW`, it logs `LLM_PROMPT_BUDGET_EXCEEDED` and, with the flag on, returns the fixed no-answer without calling the LLM. Usage below 0.7 x the estimate logs `LLM_PROMPT_POSSIBLY_TRUNCATED` (`USAGE_BELOW_ESTIMATE`, log only). The flag stays off by default.
 - `scripts/eval/ollama_usage_proxy.py --tiktoken-encoding` records the tiktoken count per call for calibration.
 - Eval runner (`tests/acceptance/rag_h5_2_exact_100.py`, new `scripts/eval/eval_client.py`): one keep-alive `httpx.Client` per run; transport errors, timeouts and 5xx are `INFRA_ERROR` (never `OK`) and are retried once at the end of the run; run metadata counts them, and `grade_proxy.py` excludes them from the score and reports how many were excluded.

@@ -1,6 +1,26 @@
 
 # Implementation Tasks
 
+## PROMPT 4 held-out v1 -- 2026-10-31
+
+**IN PROGRESS: gold waiting for owner review.**
+
+- Done:
+  - item 0a: runner INFRA_ERROR handling (`5eadd72`);
+  - item 0b: pre-send prompt budget guard with `LLM_TOKEN_ESTIMATE_RATIO=0.99` (`14f0460`);
+  - item 1: design (`2472377`), approved with changes;
+  - item 2: `docs/eval/heldout-v1.yaml` (40 items) and `docs/eval/heldout-v1-review.md`.
+- Next: item 3, after the owner approves the gold. Freeze with SHA256, then run 2 runs on the baseline v2 config with the guard off, and produce a side-by-side grading sheet for manual labels.
+- Owner decision: the guard's post-response check (`USAGE_BELOW_ESTIMATE`) stays log-only.
+- **Later (after PROMPT 7): corpus v3 + held-out v2** with documents at several classification levels and at least 3 roles with different access. Held-out v1 groups B/C are RBAC smoke-level only: one restricted document of about 100 characters, its text cut mid-word, and manager access equal to admin.
+- **Medium: corpus conflicts found while writing held-out gold.** None of these documents states a precedence rule:
+  - ND-HR-002 says the attendance system is NovaPeople; ND-HR-003 says Nova HR Portal.
+  - ND-HR-004 gives 10 working days to report a leave-balance error; UAT-LEAVE-AUTHORITY-001 gives 05.
+  - ND-CORP-001's document list gives codes that differ from the corpus (ND-HR-002 is listed as the attendance policy).
+  - ND-CORP-001 and ND-HR-002 give different HR and security contact addresses.
+  These are corpus facts, not app bugs; record them for corpus v3.
+- **Low: `eaka-rag-change-guard` still assumes `run_heldout.py` and `n_dev`.** Fill them in once held-out v1 is frozen (dev = Q001-Q100, test = held-out v1, n_test = 40).
+
 ## PROMPT 3g prompt truncation -- 2026-10-31
 
 **COMPLETED.** Baseline v2 stays the official baseline. Context 8192 changed no answer: the largest UAT prompt is 2979 tokens, and none reaches 4000.

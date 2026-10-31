@@ -1,5 +1,23 @@
 # Project Status
 
+## PROMPT 4 -- 2026-10-31 (in progress)
+
+- **Item 0a.** Eval runner:
+  - transport, timeout and 5xx failures are `INFRA_ERROR` and are retried once at the end of the run;
+  - the proxy grade excludes them.
+- **Item 0b.** Pre-send prompt budget guard behind `LLM_PROMPT_TRUNCATION_GUARD_ENABLED` (off):
+  - `LLM_TOKEN_ESTIMATE_RATIO=0.99`, calibrated on 36 Ollama calls;
+  - the post-response check stays log-only.
+- **Held-out v1.**
+  - The design is approved.
+  - 40 questions are drafted, with gold written from the source PDFs only.
+  - All 63 excerpts are verified on their page.
+  - No surface duplicate reaches 0.60.
+  - 7 items have e5 cosine >= 0.90 (REVIEW).
+  - No held-out 4-gram appears in `app/`.
+  - **Waiting for the owner's gold review**; not frozen, not run.
+- Groups B/C are RBAC smoke-level (one tiny restricted document).
+
 ## PROMPT 3g -- 2026-10-31
 
 **COMPLETED. Baseline v2 stays the official baseline.**

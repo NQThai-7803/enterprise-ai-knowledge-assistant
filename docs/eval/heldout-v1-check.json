@@ -1,0 +1,461 @@
+{
+ "items": 40,
+ "problems": [],
+ "excerpts_not_found": [],
+ "absent_keyword_hits": {},
+ "surface_rewrite": [],
+ "surface": {
+  "HO-001": {
+   "trigram_max": 0.114,
+   "trigram_nearest": "Q016",
+   "seqmatch_max": 0.456,
+   "seqmatch_nearest": "Q016",
+   "rewrite": false
+  },
+  "HO-002": {
+   "trigram_max": 0.213,
+   "trigram_nearest": "Q096",
+   "seqmatch_max": 0.429,
+   "seqmatch_nearest": "Q086",
+   "rewrite": false
+  },
+  "HO-003": {
+   "trigram_max": 0.183,
+   "trigram_nearest": "Q037",
+   "seqmatch_max": 0.423,
+   "seqmatch_nearest": "Q098",
+   "rewrite": false
+  },
+  "HO-004": {
+   "trigram_max": 0.258,
+   "trigram_nearest": "Q069",
+   "seqmatch_max": 0.504,
+   "seqmatch_nearest": "Q069",
+   "rewrite": false
+  },
+  "HO-005": {
+   "trigram_max": 0.204,
+   "trigram_nearest": "Q062",
+   "seqmatch_max": 0.49,
+   "seqmatch_nearest": "Q073",
+   "rewrite": false
+  },
+  "HO-006": {
+   "trigram_max": 0.227,
+   "trigram_nearest": "Q096",
+   "seqmatch_max": 0.455,
+   "seqmatch_nearest": "Q098",
+   "rewrite": false
+  },
+  "HO-007": {
+   "trigram_max": 0.216,
+   "trigram_nearest": "Q038",
+   "seqmatch_max": 0.463,
+   "seqmatch_nearest": "Q038",
+   "rewrite": false
+  },
+  "HO-008": {
+   "trigram_max": 0.22,
+   "trigram_nearest": "Q024",
+   "seqmatch_max": 0.51,
+   "seqmatch_nearest": "Q091",
+   "rewrite": false
+  },
+  "HO-009": {
+   "trigram_max": 0.074,
+   "trigram_nearest": "Q067",
+   "seqmatch_max": 0.442,
+   "seqmatch_nearest": "Q093",
+   "rewrite": false
+  },
+  "HO-010": {
+   "trigram_max": 0.209,
+   "trigram_nearest": "Q086",
+   "seqmatch_max": 0.5,
+   "seqmatch_nearest": "Q039",
+   "rewrite": false
+  },
+  "HO-011": {
+   "trigram_max": 0.209,
+   "trigram_nearest": "Q086",
+   "seqmatch_max": 0.5,
+   "seqmatch_nearest": "Q039",
+   "rewrite": false
+  },
+  "HO-012": {
+   "trigram_max": 0.194,
+   "trigram_nearest": "Q008",
+   "seqmatch_max": 0.475,
+   "seqmatch_nearest": "Q008",
+   "rewrite": false
+  },
+  "HO-013": {
+   "trigram_max": 0.194,
+   "trigram_nearest": "Q008",
+   "seqmatch_max": 0.475,
+   "seqmatch_nearest": "Q008",
+   "rewrite": false
+  },
+  "HO-014": {
+   "trigram_max": 0.377,
+   "trigram_nearest": "Q009",
+   "seqmatch_max": 0.586,
+   "seqmatch_nearest": "Q004",
+   "rewrite": false
+  },
+  "HO-015": {
+   "trigram_max": 0.129,
+   "trigram_nearest": "Q097",
+   "seqmatch_max": 0.464,
+   "seqmatch_nearest": "Q038",
+   "rewrite": false
+  },
+  "HO-016": {
+   "trigram_max": 0.113,
+   "trigram_nearest": "Q036",
+   "seqmatch_max": 0.455,
+   "seqmatch_nearest": "Q069",
+   "rewrite": false
+  },
+  "HO-017": {
+   "trigram_max": 0.228,
+   "trigram_nearest": "Q068",
+   "seqmatch_max": 0.568,
+   "seqmatch_nearest": "Q079",
+   "rewrite": false
+  },
+  "HO-018": {
+   "trigram_max": 0.23,
+   "trigram_nearest": "Q010",
+   "seqmatch_max": 0.559,
+   "seqmatch_nearest": "Q046",
+   "rewrite": false
+  },
+  "HO-019": {
+   "trigram_max": 0.212,
+   "trigram_nearest": "Q062",
+   "seqmatch_max": 0.511,
+   "seqmatch_nearest": "Q083",
+   "rewrite": false
+  },
+  "HO-020": {
+   "trigram_max": 0.291,
+   "trigram_nearest": "Q077",
+   "seqmatch_max": 0.523,
+   "seqmatch_nearest": "Q077",
+   "rewrite": false
+  },
+  "HO-021": {
+   "trigram_max": 0.393,
+   "trigram_nearest": "Q044",
+   "seqmatch_max": 0.571,
+   "seqmatch_nearest": "Q044",
+   "rewrite": false
+  },
+  "HO-022": {
+   "trigram_max": 0.253,
+   "trigram_nearest": "Q081",
+   "seqmatch_max": 0.558,
+   "seqmatch_nearest": "Q082",
+   "rewrite": false
+  },
+  "HO-023": {
+   "trigram_max": 0.167,
+   "trigram_nearest": "Q094",
+   "seqmatch_max": 0.404,
+   "seqmatch_nearest": "Q085",
+   "rewrite": false
+  },
+  "HO-024": {
+   "trigram_max": 0.244,
+   "trigram_nearest": "Q086",
+   "seqmatch_max": 0.5,
+   "seqmatch_nearest": "Q065",
+   "rewrite": false
+  },
+  "HO-025": {
+   "trigram_max": 0.306,
+   "trigram_nearest": "Q061",
+   "seqmatch_max": 0.527,
+   "seqmatch_nearest": "Q065",
+   "rewrite": false
+  },
+  "HO-026": {
+   "trigram_max": 0.28,
+   "trigram_nearest": "Q016",
+   "seqmatch_max": 0.517,
+   "seqmatch_nearest": "Q062",
+   "rewrite": false
+  },
+  "HO-027": {
+   "trigram_max": 0.167,
+   "trigram_nearest": "Q041",
+   "seqmatch_max": 0.467,
+   "seqmatch_nearest": "Q073",
+   "rewrite": false
+  },
+  "HO-028": {
+   "trigram_max": 0.264,
+   "trigram_nearest": "Q072",
+   "seqmatch_max": 0.426,
+   "seqmatch_nearest": "Q081",
+   "rewrite": false
+  },
+  "HO-029": {
+   "trigram_max": 0.327,
+   "trigram_nearest": "Q039",
+   "seqmatch_max": 0.478,
+   "seqmatch_nearest": "Q044",
+   "rewrite": false
+  },
+  "HO-030": {
+   "trigram_max": 0.361,
+   "trigram_nearest": "Q087",
+   "seqmatch_max": 0.441,
+   "seqmatch_nearest": "Q063",
+   "rewrite": false
+  },
+  "HO-031": {
+   "trigram_max": 0.28,
+   "trigram_nearest": "Q079",
+   "seqmatch_max": 0.427,
+   "seqmatch_nearest": "Q096",
+   "rewrite": false
+  },
+  "HO-032": {
+   "trigram_max": 0.212,
+   "trigram_nearest": "Q026",
+   "seqmatch_max": 0.55,
+   "seqmatch_nearest": "Q026",
+   "rewrite": false
+  },
+  "HO-033": {
+   "trigram_max": 0.282,
+   "trigram_nearest": "Q043",
+   "seqmatch_max": 0.507,
+   "seqmatch_nearest": "Q068",
+   "rewrite": false
+  },
+  "HO-034": {
+   "trigram_max": 0.253,
+   "trigram_nearest": "Q096",
+   "seqmatch_max": 0.446,
+   "seqmatch_nearest": "Q096",
+   "rewrite": false
+  },
+  "HO-035": {
+   "trigram_max": 0.057,
+   "trigram_nearest": "Q069",
+   "seqmatch_max": 0.393,
+   "seqmatch_nearest": "Q094",
+   "rewrite": false
+  },
+  "HO-036": {
+   "trigram_max": 0.064,
+   "trigram_nearest": "Q075",
+   "seqmatch_max": 0.368,
+   "seqmatch_nearest": "Q075",
+   "rewrite": false
+  },
+  "HO-037": {
+   "trigram_max": 0.209,
+   "trigram_nearest": "Q062",
+   "seqmatch_max": 0.544,
+   "seqmatch_nearest": "Q072",
+   "rewrite": false
+  },
+  "HO-038": {
+   "trigram_max": 0.292,
+   "trigram_nearest": "Q077",
+   "seqmatch_max": 0.539,
+   "seqmatch_nearest": "Q077",
+   "rewrite": false
+  },
+  "HO-039": {
+   "trigram_max": 0.247,
+   "trigram_nearest": "Q051",
+   "seqmatch_max": 0.483,
+   "seqmatch_nearest": "Q095",
+   "rewrite": false
+  },
+  "HO-040": {
+   "trigram_max": 0.297,
+   "trigram_nearest": "Q086",
+   "seqmatch_max": 0.538,
+   "seqmatch_nearest": "Q069",
+   "rewrite": false
+  }
+ },
+ "e5": {
+  "HO-001": {
+   "cosine_max": 0.8113,
+   "nearest": "Q036"
+  },
+  "HO-002": {
+   "cosine_max": 0.8886,
+   "nearest": "Q097"
+  },
+  "HO-003": {
+   "cosine_max": 0.8497,
+   "nearest": "Q037"
+  },
+  "HO-004": {
+   "cosine_max": 0.916,
+   "nearest": "Q083"
+  },
+  "HO-005": {
+   "cosine_max": 0.883,
+   "nearest": "Q073"
+  },
+  "HO-006": {
+   "cosine_max": 0.889,
+   "nearest": "Q098"
+  },
+  "HO-007": {
+   "cosine_max": 0.8509,
+   "nearest": "Q041"
+  },
+  "HO-008": {
+   "cosine_max": 0.8524,
+   "nearest": "Q047"
+  },
+  "HO-009": {
+   "cosine_max": 0.7642,
+   "nearest": "Q035"
+  },
+  "HO-010": {
+   "cosine_max": 0.8638,
+   "nearest": "Q039"
+  },
+  "HO-011": {
+   "cosine_max": 0.8638,
+   "nearest": "Q039"
+  },
+  "HO-012": {
+   "cosine_max": 0.86,
+   "nearest": "Q054"
+  },
+  "HO-013": {
+   "cosine_max": 0.86,
+   "nearest": "Q054"
+  },
+  "HO-014": {
+   "cosine_max": 0.9091,
+   "nearest": "Q002"
+  },
+  "HO-015": {
+   "cosine_max": 0.8372,
+   "nearest": "Q048"
+  },
+  "HO-016": {
+   "cosine_max": 0.82,
+   "nearest": "Q097"
+  },
+  "HO-017": {
+   "cosine_max": 0.8265,
+   "nearest": "Q078"
+  },
+  "HO-018": {
+   "cosine_max": 0.8883,
+   "nearest": "Q054"
+  },
+  "HO-019": {
+   "cosine_max": 0.8349,
+   "nearest": "Q006"
+  },
+  "HO-020": {
+   "cosine_max": 0.8937,
+   "nearest": "Q040"
+  },
+  "HO-021": {
+   "cosine_max": 0.9065,
+   "nearest": "Q044"
+  },
+  "HO-022": {
+   "cosine_max": 0.9077,
+   "nearest": "Q076"
+  },
+  "HO-023": {
+   "cosine_max": 0.8741,
+   "nearest": "Q048"
+  },
+  "HO-024": {
+   "cosine_max": 0.8494,
+   "nearest": "Q054"
+  },
+  "HO-025": {
+   "cosine_max": 0.8834,
+   "nearest": "Q061"
+  },
+  "HO-026": {
+   "cosine_max": 0.846,
+   "nearest": "Q054"
+  },
+  "HO-027": {
+   "cosine_max": 0.8622,
+   "nearest": "Q053"
+  },
+  "HO-028": {
+   "cosine_max": 0.8615,
+   "nearest": "Q072"
+  },
+  "HO-029": {
+   "cosine_max": 0.8915,
+   "nearest": "Q039"
+  },
+  "HO-030": {
+   "cosine_max": 0.9174,
+   "nearest": "Q087"
+  },
+  "HO-031": {
+   "cosine_max": 0.8784,
+   "nearest": "Q073"
+  },
+  "HO-032": {
+   "cosine_max": 0.8955,
+   "nearest": "Q026"
+  },
+  "HO-033": {
+   "cosine_max": 0.8917,
+   "nearest": "Q068"
+  },
+  "HO-034": {
+   "cosine_max": 0.9066,
+   "nearest": "Q081"
+  },
+  "HO-035": {
+   "cosine_max": 0.8022,
+   "nearest": "Q039"
+  },
+  "HO-036": {
+   "cosine_max": 0.7839,
+   "nearest": "Q075"
+  },
+  "HO-037": {
+   "cosine_max": 0.8661,
+   "nearest": "Q072"
+  },
+  "HO-038": {
+   "cosine_max": 0.873,
+   "nearest": "Q068"
+  },
+  "HO-039": {
+   "cosine_max": 0.8715,
+   "nearest": "Q042"
+  },
+  "HO-040": {
+   "cosine_max": 0.9104,
+   "nearest": "Q025"
+  }
+ },
+ "e5_review": [
+  "HO-004",
+  "HO-014",
+  "HO-021",
+  "HO-022",
+  "HO-030",
+  "HO-034",
+  "HO-040"
+ ],
+ "app_fourgram_hits": {}
+}

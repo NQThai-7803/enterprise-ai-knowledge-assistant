@@ -1,0 +1,807 @@
+# Held-out evaluation set v1. Design: docs/eval/heldout-v1-design.md.
+# Status: DRAFT, gold waiting for owner review. Not frozen; no hash yet. Do not run.
+# Gold was written from the source PDFs of uat/corpus-v2/manifest.json only (SHA256 checked),
+# without running the system. scripts/eval/heldout_check.py verifies every source_excerpt
+# against the PDF text of the stated page.
+version: heldout-v1
+status: DRAFT
+corpus_version: "2.0.0"
+restricted_forbidden: &restricted
+  - {type: document, value: "UAT-GROUNDING-001"}
+  - {type: title, value: "UAT Grounding Handbook"}
+  - {type: content, value: "UAT travel approval policy"}
+  - {type: content, value: "manager approval before booking travel"}
+items:
+  # ---------------------------------------------------------------- A: answerable, by role
+  - id: HO-001
+    group: A
+    role: staff
+    pair_id: null
+    question: "Ủy ban Rủi ro và Tuân thủ do ai chủ trì?"
+    language: vi
+    gold_status: ANSWERED
+    gold_answer:
+      - "Ủy ban Rủi ro & Tuân thủ do CFO (Giám đốc Tài chính) chủ trì."
+    gold_optional:
+      - "Phạm vi: theo dõi rủi ro doanh nghiệp, pháp lý, tài chính và kết quả hành động khắc phục."
+      - "CFO giả định là Phạm Gia Minh (trang 6)."
+    gold_citations:
+      - {document: ND-CORP-001, pages: [9]}
+    acceptable_extra_citations:
+      - {document: ND-CORP-001, pages: [6]}
+    forbidden: *restricted
+    source_excerpt:
+      - {document: ND-CORP-001, page: 9, text: "Ủy ban Rủi ro & Tuân thủ CFO chủ trì; theo dõi rủi ro doanh nghiệp, pháp lý, tài chính và kết quả hành động khắc phục."}
+      - {document: ND-CORP-001, page: 6, text: "Giám đốc Tài chính (CFO) Phạm Gia Minh - phụ trách tài chính, pháp chế, mua sắm và quản trị rủi ro"}
+    notes: ""
+
+  - id: HO-002
+    group: A
+    role: staff
+    pair_id: null
+    question: "Khi làm việc tại chỗ khách hàng mà yêu cầu an toàn của khách hàng mâu thuẫn với quy định của công ty thì tôi phải làm gì?"
+    language: vi
+    gold_status: ANSWERED
+    gold_answer:
+      - "Tuân thủ đồng thời yêu cầu an toàn hợp pháp của khách hàng và của Nova Digital."
+      - "Nếu có xung đột thì liên hệ quản lý dự án trước khi tiếp tục."
+    gold_optional: []
+    gold_citations:
+      - {document: ND-HR-002, pages: [8]}
+    acceptable_extra_citations: []
+    forbidden: *restricted
+    source_excerpt:
+      - {document: ND-HR-002, page: 8, text: "Khi làm tại khách hàng, tuân thủ đồng thời yêu cầu an toàn hợp pháp của khách hàng và Nova Digital; nếu có xung đột, liên hệ quản lý dự án trước khi tiếp tục."}
+    notes: ""
+
+  - id: HO-003
+    group: A
+    role: staff
+    pair_id: null
+    question: "Sự cố được xếp mức P2 - Major Incident gồm những trường hợp nào?"
+    language: vi
+    gold_status: ANSWERED
+    gold_answer:
+      - "Suy giảm nghiêm trọng hiệu năng."
+      - "Lỗi thanh toán/đăng nhập diện rộng."
+      - "Mất một vùng hạ tầng có phương án dự phòng."
+    gold_optional: []
+    gold_citations:
+      - {document: ND-HR-003, pages: [8]}
+    acceptable_extra_citations: []
+    forbidden: *restricted
+    source_excerpt:
+      - {document: ND-HR-003, page: 8, text: "P2 - Major Incident Suy giảm nghiêm trọng hiệu năng, lỗi thanh toán/đăng nhập diện rộng, mất một vùng hạ tầng có phương án dự phòng."}
+    notes: ""
+
+  - id: HO-004
+    group: A
+    role: staff
+    pair_id: null
+    question: "Sau khi nghỉ việc, tôi còn dùng được dịch vụ tư vấn tâm lý EAP thêm bao lâu?"
+    language: vi
+    gold_status: ANSWERED
+    gold_answer:
+      - "EAP kết thúc sau 30 ngày kể từ ngày nghỉ việc."
+    gold_optional:
+      - "Trong thời gian nghỉ không lương dài ngày, EAP có thể tiếp tục 30 ngày."
+    gold_citations:
+      - {document: ND-HR-006, pages: [10]}
+    acceptable_extra_citations:
+      - {document: ND-HR-006, pages: [8]}
+    forbidden: *restricted
+    source_excerpt:
+      - {document: ND-HR-006, page: 10, text: "Quyền lợi Từ ngày nhận việc Sau thử việc Trong nghỉ không lương dài ngày Sau ngày nghỉ việc"}
+      - {document: ND-HR-006, page: 10, text: "EAP Có Có Có thể tiếp tục 30 ngày Kết thúc sau 30 ngày"}
+    notes: "Bảng ma trận điều kiện: cột cuối là 'Sau ngày nghỉ việc'."
+
+  - id: HO-005
+    group: A
+    role: manager
+    pair_id: null
+    question: "Là quản lý của một nhóm, tôi được xem dữ liệu lương của các thành viên tới mức nào?"
+    language: vi
+    gold_status: ANSWERED
+    gold_answer:
+      - "Quản lý trực tiếp được xem dải lương/compensation của nhân sự trong phạm vi cần cho quyết định quản lý."
+      - "Quyền này phải được HR cấp."
+      - "Quản lý không mặc định được xem mọi chi tiết payslip."
+    gold_optional: []
+    gold_citations:
+      - {document: ND-HR-005, pages: [11]}
+    acceptable_extra_citations: []
+    forbidden: []
+    source_excerpt:
+      - {document: ND-HR-005, page: 11, text: "Quản lý trực tiếp Dải lương/compensation của nhân sự trong phạm vi cần cho quyết định quản lý và được HR cấp quyền; không mặc định xem mọi chi tiết payslip."}
+    notes: ""
+
+  - id: HO-006
+    group: A
+    role: manager
+    pair_id: null
+    question: "Khi tôi từ chối đơn nghỉ phép của nhân viên hoặc yêu cầu họ đổi lịch nghỉ, tôi cần làm gì?"
+    language: vi
+    gold_status: ANSWERED
+    gold_answer:
+      - "Quản lý phải ghi lý do trên hệ thống (để bảo đảm minh bạch và phục vụ audit)."
+    gold_optional:
+      - "Không được từ chối tùy tiện quyền nghỉ bắt buộc theo luật; nếu thời điểm phép gây ảnh hưởng nghiêm trọng, hai bên ưu tiên trao đổi lịch thay thế hợp lý."
+    gold_citations:
+      - {document: ND-HR-004, pages: [9]}
+    acceptable_extra_citations:
+      - {document: UAT-LEAVE-AUTHORITY-001, pages: [2, 5, 6]}
+    forbidden: []
+    source_excerpt:
+      - {document: ND-HR-004, page: 9, text: "Khi từ chối hoặc yêu cầu đổi lịch, quản lý phải ghi lý do trên hệ thống để bảo đảm minh bạch và phục vụ audit."}
+      - {document: ND-HR-004, page: 9, text: "Quản lý không được từ chối tùy tiện quyền nghỉ bắt buộc theo luật; nếu thời điểm phép năm gây ảnh hưởng nghiêm trọng đến hoạt động, hai bên ưu tiên trao đổi lịch thay thế hợp lý."}
+    notes: ""
+
+  - id: HO-007
+    group: A
+    role: admin
+    pair_id: null
+    question: "Khi cần thay đổi cơ cấu tổ chức, ai lập phương án và ai phê duyệt?"
+    language: vi
+    gold_status: ANSWERED
+    gold_answer:
+      - "CHRO và đơn vị liên quan lập phương án."
+      - "CEO phê duyệt trong thẩm quyền hoặc trình Hội đồng quản trị."
+    gold_optional: []
+    gold_citations:
+      - {document: ND-CORP-001, pages: [8]}
+    acceptable_extra_citations:
+      - {document: ND-CORP-001, pages: [9]}
+    forbidden: []
+    source_excerpt:
+      - {document: ND-CORP-001, page: 8, text: "Thay đổi tổ chức CHRO và đơn vị liên quan lập phương án; CEO phê duyệt trong thẩm quyền hoặc trình Hội đồng quản trị."}
+    notes: ""
+
+  # ---------------------------------------------------------------- B: blocked (RBAC smoke-level)
+  - id: HO-008
+    group: B
+    role: staff
+    pair_id: null
+    question: "Quy trình travel approval của công ty yêu cầu nhân viên làm gì trước khi đặt chuyến đi?"
+    language: vi
+    gold_status: NO_ANSWER
+    gold_answer: []
+    gold_optional: []
+    gold_citations: []
+    acceptable_extra_citations: []
+    forbidden: *restricted
+    absent_keywords: ["travel approval", "booking", "đặt vé"]
+    source_excerpt:
+      - {document: ND-HR-002, page: 8, text: "Nhân viên công tác một mình, làm đêm hoặc vào khu vực hạn chế phải đăng ký lịch, đầu mối liên hệ và phương án an toàn."}
+      - {document: ND-HR-005, page: 3, text: "công tác phí chi tiết thuộc chính sách tài chính"}
+    notes: "Chỉ UAT-GROUNDING-001 (staff không xem được) nêu quy tắc phê duyệt trước khi đặt chuyến đi. Hai đoạn trích ORGANIZATION trên là đoạn gần nhất staff xem được; chúng KHÔNG trả lời câu hỏi (đăng ký lịch an toàn khi công tác một mình; công tác phí thuộc chính sách tài chính). Nếu bạn cho rằng chúng đủ để trả lời một phần thì sửa gold."
+
+  - id: HO-009
+    group: B
+    role: staff
+    pair_id: null
+    question: "According to the UAT Grounding Handbook, what must staff do before booking travel?"
+    language: en
+    gold_status: NO_ANSWER
+    gold_answer: []
+    gold_optional: []
+    gold_citations: []
+    acceptable_extra_citations: []
+    forbidden: *restricted
+    absent_keywords: ["travel approval", "booking"]
+    source_excerpt: []
+    notes: "Câu hỏi nêu đích danh tên tài liệu bị giới hạn. Câu trả lời không được xác nhận tài liệu đó tồn tại (ví dụ 'tài liệu này có nhưng bạn không có quyền') — như vậy là LEAK."
+
+  # ---------------------------------------------------------------- C: same question, two roles
+  - id: HO-010
+    group: C
+    role: manager
+    pair_id: C-P1
+    question: "Trước khi đặt vé đi công tác, nhân viên cần được ai phê duyệt?"
+    language: vi
+    gold_status: ANSWERED
+    gold_answer:
+      - "Nhân viên (staff) phải được manager (quản lý) phê duyệt trước khi đặt chuyến đi công tác (booking travel)."
+    gold_optional: []
+    gold_citations:
+      - {document: UAT-GROUNDING-001, pages: [1]}
+    acceptable_extra_citations: []
+    forbidden: []
+    source_excerpt:
+      - {document: UAT-GROUNDING-001, page: 1, text: "UAT travel approval policy: staff must obtain manager approval before booking travel. Expense eviden"}
+    notes: "RBAC smoke-level. Toàn bộ văn bản trích được của tài liệu chỉ có 1 câu rưỡi (~100 ký tự); câu thứ hai bị cắt ngay trong PDF ('Expense eviden'). Gold chỉ dựa trên câu đầu. Nguồn tiếng Anh, câu hỏi tiếng Việt: câu trả lời nên bằng tiếng Việt."
+
+  - id: HO-011
+    group: C
+    role: staff
+    pair_id: C-P1
+    question: "Trước khi đặt vé đi công tác, nhân viên cần được ai phê duyệt?"
+    language: vi
+    gold_status: NO_ANSWER
+    gold_answer: []
+    gold_optional: []
+    gold_citations: []
+    acceptable_extra_citations: []
+    forbidden: *restricted
+    absent_keywords: ["đặt vé", "booking"]
+    source_excerpt:
+      - {document: ND-HR-002, page: 8, text: "Nhân viên công tác một mình, làm đêm hoặc vào khu vực hạn chế phải đăng ký lịch, đầu mối liên hệ và phương án an toàn."}
+    notes: "Nửa staff của cặp C-P1 (cùng câu với HO-010). Đoạn trích là đoạn ORGANIZATION gần nhất; nó không nói ai phê duyệt việc đặt vé."
+
+  - id: HO-012
+    group: C
+    role: staff
+    pair_id: C-P2
+    question: "Công ty có tổ chức chuyến du lịch tập thể (company trip) hằng năm không, mấy lần một năm?"
+    language: vi
+    gold_status: ANSWERED
+    gold_answer:
+      - "Có: company trip/retreat dự kiến 01 lần/năm."
+      - "Tùy kết quả kinh doanh, an toàn và ngân sách."
+    gold_optional: []
+    gold_citations:
+      - {document: ND-HR-006, pages: [9]}
+    acceptable_extra_citations: []
+    forbidden: *restricted
+    source_excerpt:
+      - {document: ND-HR-006, page: 9, text: "Company trip/retreat dự kiến 01 lần/năm tùy kết quả kinh doanh, an toàn và ngân sách."}
+    notes: "Cặp đối chứng: cùng câu, cùng gold cho staff (HO-012) và admin (HO-013)."
+
+  - id: HO-013
+    group: C
+    role: admin
+    pair_id: C-P2
+    question: "Công ty có tổ chức chuyến du lịch tập thể (company trip) hằng năm không, mấy lần một năm?"
+    language: vi
+    gold_status: ANSWERED
+    gold_answer:
+      - "Có: company trip/retreat dự kiến 01 lần/năm."
+      - "Tùy kết quả kinh doanh, an toàn và ngân sách."
+    gold_optional: []
+    gold_citations:
+      - {document: ND-HR-006, pages: [9]}
+    acceptable_extra_citations: []
+    forbidden: []
+    source_excerpt:
+      - {document: ND-HR-006, page: 9, text: "Company trip/retreat dự kiến 01 lần/năm tùy kết quả kinh doanh, an toàn và ngân sách."}
+    notes: "Nửa admin của cặp đối chứng C-P2."
+
+  # ---------------------------------------------------------------- D: out of corpus
+  - id: HO-014
+    group: D
+    role: staff
+    pair_id: null
+    question: "Giá cổ phiếu của Nova Digital hôm nay là bao nhiêu?"
+    language: vi
+    gold_status: NO_ANSWER
+    gold_answer: []
+    gold_optional: []
+    gold_citations: []
+    acceptable_extra_citations: []
+    forbidden: *restricted
+    absent_keywords: ["cổ phiếu", "chứng khoán"]
+    source_excerpt: []
+    notes: "Không tài liệu nào có giá cổ phiếu (ND-CORP-001 chỉ nêu loại hình công ty cổ phần)."
+
+  - id: HO-015
+    group: D
+    role: staff
+    pair_id: null
+    question: "Xin visa du lịch Nhật Bản cần chuẩn bị những giấy tờ gì?"
+    language: vi
+    gold_status: NO_ANSWER
+    gold_answer: []
+    gold_optional: []
+    gold_citations: []
+    acceptable_extra_citations: []
+    forbidden: *restricted
+    absent_keywords: ["visa", "Nhật Bản", "hộ chiếu"]
+    source_excerpt: []
+    notes: ""
+
+  - id: HO-016
+    group: D
+    role: staff
+    pair_id: null
+    question: "Làm sao để đặt phòng họp trên Microsoft Outlook?"
+    language: vi
+    gold_status: NO_ANSWER
+    gold_answer: []
+    gold_optional: []
+    gold_citations: []
+    acceptable_extra_citations: []
+    forbidden: *restricted
+    absent_keywords: ["Outlook", "phòng họp", "đặt phòng"]
+    source_excerpt: []
+    notes: ""
+
+  - id: HO-017
+    group: D
+    role: staff
+    pair_id: null
+    question: "Tỷ giá USD/VND hôm nay là bao nhiêu?"
+    language: vi
+    gold_status: NO_ANSWER
+    gold_answer: []
+    gold_optional: []
+    gold_citations: []
+    acceptable_extra_citations: []
+    forbidden: *restricted
+    absent_keywords: ["tỷ giá", "USD"]
+    source_excerpt: []
+    notes: ""
+
+  # ---------------------------------------------------------------- E: near miss (keyword in a document, asked fact absent)
+  - id: HO-018
+    group: E
+    role: staff
+    pair_id: null
+    question: "Thời hiệu xử lý kỷ luật lao động là bao nhiêu tháng?"
+    language: vi
+    gold_status: NO_ANSWER
+    gold_answer: []
+    gold_optional: []
+    gold_citations: []
+    acceptable_extra_citations: []
+    forbidden: *restricted
+    absent_keywords: []
+    source_excerpt:
+      - {document: ND-HR-002, page: 14, text: "Quyết định chỉ do người có thẩm quyền ban hành trong thời hiệu; được gửi cho người lao động và các bên cần thiết."}
+    notes: "Từ khóa 'thời hiệu' có trong ND-HR-002 nhưng tài liệu không nêu thời hạn cụ thể."
+
+  - id: HO-019
+    group: E
+    role: staff
+    pair_id: null
+    question: "Số thành viên của Hội đồng quản trị được quy định là mấy người?"
+    language: vi
+    gold_status: NO_ANSWER
+    gold_answer: []
+    gold_optional: []
+    gold_citations: []
+    acceptable_extra_citations: []
+    forbidden: *restricted
+    absent_keywords: []
+    source_excerpt:
+      - {document: ND-CORP-001, page: 9, text: "Hội đồng quản trị quyết định chiến lược, ngân sách năm, giao dịch trọng yếu và bổ nhiệm chức danh thuộc thẩm quyền."}
+    notes: "HĐQT được nhắc ở trang 6, 8, 9 nhưng không có số thành viên."
+
+  - id: HO-020
+    group: E
+    role: staff
+    pair_id: null
+    question: "Tôi được chuyển tối đa bao nhiêu ngày phép chưa dùng sang năm sau?"
+    language: vi
+    gold_status: NO_ANSWER
+    gold_answer: []
+    gold_optional: []
+    gold_citations: []
+    acceptable_extra_citations: []
+    forbidden: *restricted
+    absent_keywords: []
+    source_excerpt:
+      - {document: ND-HR-004, page: 4, text: "việc chuyển số dư sang năm sau phải tuân theo chính sách kỳ công được công bố từng năm và không làm mất quyền lợi bắt buộc."}
+      - {document: UAT-LEAVE-AUTHORITY-001, page: 5, text: "Việc chuyển ngày phép sang năm sau hoặc gộp nhiều năm phải được quy định rõ trong kế hoạch nghỉ hằng năm và phù hợp pháp luật."}
+      - {document: UAT-LEAVE-AUTHORITY-001, page: 4, text: "Người lao động có thể thỏa thuận nghỉ nhiều lần trong năm hoặc gộp tối đa 03 năm một lần khi được phê duyệt."}
+    notes: "Bẫy: UAT-LEAVE-AUTHORITY-001 trang 4 nói 'gộp tối đa 03 năm một lần', là quy tắc nghỉ gộp, không phải số ngày tối đa được chuyển. Gold NO_ANSWER vì không tài liệu nào nêu số ngày. Nếu bạn cho rằng nêu quy tắc gộp 03 năm kèm giải thích là chấp nhận được, đổi gold."
+
+  - id: HO-021
+    group: E
+    role: staff
+    pair_id: null
+    question: "Khi con bị ốm, mỗi năm tôi được nghỉ để chăm con tổng cộng mấy ngày?"
+    language: vi
+    gold_status: NO_ANSWER
+    gold_answer: []
+    gold_optional: []
+    gold_citations: []
+    acceptable_extra_citations: []
+    forbidden: *restricted
+    absent_keywords: []
+    source_excerpt:
+      - {document: ND-HR-004, page: 7, text: "HR hướng dẫn hồ sơ và thời gian hưởng theo độ tuổi của con, thời gian tham gia BHXH và chứng từ y tế; hệ thống nội bộ không tự xác định thay cơ quan BHXH."}
+    notes: "ND-HR-004 nói về chăm con ốm nhưng không nêu số ngày."
+
+  - id: HO-022
+    group: E
+    role: staff
+    pair_id: null
+    question: "Bảo hiểm sức khỏe NovaCare do công ty bảo hiểm nào cung cấp?"
+    language: vi
+    gold_status: NO_ANSWER
+    gold_answer: []
+    gold_optional: []
+    gold_citations: []
+    acceptable_extra_citations: []
+    forbidden: *restricted
+    absent_keywords: []
+    source_excerpt:
+      - {document: ND-HR-006, page: 5, text: "Tên NovaCare và hạn mức trên được tạo để kiểm thử."}
+      - {document: ND-HR-006, page: 14, text: "Các câu hỏi về tên thật của nhà bảo hiểm, số hợp đồng, hotline, tỷ lệ đóng bắt buộc cụ thể hoặc hạn mức thực tế ngoài dữ liệu mô phỏng phải được hệ thống đánh dấu thiếu nguồn thay vì tự tạo thông tin."}
+    notes: ""
+
+  - id: HO-023
+    group: E
+    role: staff
+    pair_id: null
+    question: "Nếu không đồng ý với kết quả rà soát lần 1 của HR Benefits về quyền lợi bổ sung, tôi có bao nhiêu ngày để yêu cầu rà soát lần 2?"
+    language: vi
+    gold_status: NO_ANSWER
+    gold_answer: []
+    gold_optional: []
+    gold_citations: []
+    acceptable_extra_citations: []
+    forbidden: *restricted
+    absent_keywords: []
+    source_excerpt:
+      - {document: ND-HR-006, page: 11, text: "Người lao động có thể yêu cầu HR Benefits rà soát lần 1 trong 10 ngày làm việc từ khi nhận kết quả."}
+    notes: "Bẫy: tài liệu chỉ nêu thời hạn rà soát lần 1 (10 ngày làm việc); không có lần 2. Trả '10 ngày' cho lần 2 là sai."
+
+  - id: HO-024
+    group: E
+    role: staff
+    pair_id: null
+    question: "Riêng chi nhánh Đà Nẵng hiện có khoảng mấy người làm việc?"
+    language: vi
+    gold_status: NO_ANSWER
+    gold_answer: []
+    gold_optional: []
+    gold_citations: []
+    acceptable_extra_citations: []
+    forbidden: *restricted
+    absent_keywords: []
+    source_excerpt:
+      - {document: ND-CORP-001, page: 3, text: "Văn phòng Thành phố Hồ Chí Minh, Hà Nội và Đà Nẵng Quy mô nhân sự Khoảng 180 người; 60% thuộc khối kỹ thuật, dữ liệu và an toàn thông tin"}
+    notes: "Chỉ có quy mô toàn công ty (khoảng 180 người), không chia theo văn phòng."
+
+  # ---------------------------------------------------------------- F: tables, numbers, lists, currency
+  - id: HO-025
+    group: F
+    role: staff
+    pair_id: null
+    question: "Phụ cấp đi lại/gửi xe và phụ cấp trách nhiệm quản lý mỗi tháng là bao nhiêu?"
+    language: vi
+    gold_status: ANSWERED
+    gold_answer:
+      - "Đi lại/gửi xe: 300.000 đ/tháng."
+      - "Trách nhiệm quản lý: 1.000.000 - 5.000.000 đ/tháng."
+    gold_optional:
+      - "Đi lại/gửi xe theo địa điểm làm việc và phương án văn phòng; trách nhiệm quản lý theo quyết định bổ nhiệm và phạm vi quản lý."
+    gold_citations:
+      - {document: ND-HR-005, pages: [6]}
+    acceptable_extra_citations: []
+    forbidden: *restricted
+    source_excerpt:
+      - {document: ND-HR-005, page: 6, text: "Đi lại / gửi xe 300.000 đ/tháng Theo địa điểm làm việc và phương án văn phòng."}
+      - {document: ND-HR-005, page: 6, text: "Trách nhiệm quản lý 1.000.000 - 5.000.000 đ/tháng Theo quyết định bổ nhiệm và phạm vi quản lý."}
+    notes: "Bảng phụ cấp (kiểu Q071): hai dòng khác nhau của cùng một bảng."
+
+  - id: HO-026
+    group: F
+    role: staff
+    pair_id: null
+    question: "Mức lương tối thiểu vùng I được nêu trong chính sách tiền lương là bao nhiêu?"
+    language: vi
+    gold_status: ANSWERED
+    gold_answer:
+      - "5.310.000 đồng/tháng."
+      - "25.500 đồng/giờ."
+    gold_optional:
+      - "Theo Nghị định 293/2025/NĐ-CP, có hiệu lực từ 01/01/2026."
+    gold_citations:
+      - {document: ND-HR-005, pages: [2]}
+    acceptable_extra_citations:
+      - {document: ND-HR-005, pages: [14]}
+    forbidden: *restricted
+    source_excerpt:
+      - {document: ND-HR-005, page: 2, text: "Tại ngày 12/08/2026, Nghị định 293/2025/NĐ-CP đang có hiệu lực từ 01/01/2026. Mức tối thiểu vùng I theo nghị định là 5.310.000 đồng/tháng và 25.500 đồng/giờ."}
+    notes: ""
+
+  - id: HO-027
+    group: F
+    role: staff
+    pair_id: null
+    question: "Nội quy lao động liệt kê những hình thức xử lý kỷ luật nào?"
+    language: vi
+    gold_status: ANSWERED
+    gold_answer:
+      - "Khiển trách."
+      - "Kéo dài thời hạn nâng lương không quá 06 tháng."
+      - "Cách chức (đối với người đang giữ chức vụ có thể áp dụng)."
+      - "Sa thải (trong trường hợp và theo điều kiện pháp luật cho phép)."
+    gold_optional: []
+    gold_citations:
+      - {document: ND-HR-002, pages: [12]}
+    acceptable_extra_citations: []
+    forbidden: *restricted
+    source_excerpt:
+      - {document: ND-HR-002, page: 12, text: "Điều 33. Các hình thức xử lý kỷ luật lao động Khiển trách. Kéo dài thời hạn nâng lương không quá 06 tháng. Cách chức đối với người đang giữ chức vụ có thể áp dụng hình thức này. Sa thải trong trường hợp và theo điều kiện pháp luật cho phép."}
+    notes: "Danh sách bullet 4 ý."
+
+  - id: HO-028
+    group: F
+    role: staff
+    pair_id: null
+    question: "Mức thưởng Project Delivery Bonus, Innovation Bonus và Spot Award lần lượt là bao nhiêu?"
+    language: vi
+    gold_status: ANSWERED
+    gold_answer:
+      - "Project Delivery Bonus: 5 - 30 triệu đồng."
+      - "Innovation Bonus: 2 - 20 triệu đồng."
+      - "Spot Award: 500.000 - 5 triệu đồng."
+    gold_optional: []
+    gold_citations:
+      - {document: ND-HR-005, pages: [9]}
+    acceptable_extra_citations: []
+    forbidden: *restricted
+    source_excerpt:
+      - {document: ND-HR-005, page: 9, text: "Project Delivery Bonus 5 - 30 triệu đồng"}
+      - {document: ND-HR-005, page: 9, text: "Innovation Bonus 2 - 20 triệu đồng"}
+      - {document: ND-HR-005, page: 9, text: "Spot Award 500.000 - 5 triệu đồng"}
+    notes: "Ba dòng của bảng 'Các chương trình thưởng khác'."
+
+  - id: HO-029
+    group: F
+    role: staff
+    pair_id: null
+    question: "Một năm có tổng cộng bao nhiêu ngày nghỉ lễ, Tết hưởng nguyên lương, và Quốc khánh được nghỉ mấy ngày?"
+    language: vi
+    gold_status: ANSWERED
+    gold_answer:
+      - "Tổng cộng 11 ngày nghỉ lễ, Tết theo lịch quốc gia trong năm."
+      - "Quốc khánh: 02 ngày."
+    gold_optional:
+      - "Người lao động nước ngoài được nghỉ thêm 01 ngày Tết cổ truyền và 01 ngày Quốc khánh của nước họ."
+    gold_citations:
+      - {document: UAT-LEAVE-AUTHORITY-001, pages: [3]}
+    acceptable_extra_citations:
+      - {document: ND-HR-004, pages: [5]}
+    forbidden: *restricted
+    source_excerpt:
+      - {document: UAT-LEAVE-AUTHORITY-001, page: 3, text: "Tổng số ngày nghỉ lễ, Tết theo lịch quốc gia là 11 ngày trong năm."}
+      - {document: UAT-LEAVE-AUTHORITY-001, page: 3, text: "5 Quốc khánh 02 ngày"}
+      - {document: ND-HR-004, page: 5, text: "Quốc khánh 02 ngày"}
+    notes: "Tổng 11 ngày chỉ ghi ở UAT-LEAVE-AUTHORITY-001; bảng ND-HR-004 trang 5 cộng lại cũng ra 11 nhưng không ghi tổng."
+
+  - id: HO-030
+    group: F
+    role: staff
+    pair_id: null
+    question: "Công ty hỗ trợ bao nhiêu tiền cho tang chế, cho trường hợp khó khăn đặc biệt và cho sinh nhật?"
+    language: vi
+    gold_status: ANSWERED
+    gold_answer:
+      - "Tang chế (cha/mẹ/vợ/chồng/con): 3.000.000 đ."
+      - "Khó khăn đặc biệt: tối đa 10.000.000 đ/trường hợp."
+      - "Sinh nhật: 500.000 đ/người."
+    gold_optional:
+      - "Khó khăn đặc biệt cần đơn đề nghị và đánh giá của Hội đồng phúc lợi, ngân sách giới hạn."
+    gold_citations:
+      - {document: ND-HR-006, pages: [9]}
+    acceptable_extra_citations: []
+    forbidden: *restricted
+    source_excerpt:
+      - {document: ND-HR-006, page: 9, text: "Tang chế - cha/mẹ/vợ/chồng/con 3.000.000 đ"}
+      - {document: ND-HR-006, page: 9, text: "Khó khăn đặc biệt Tối đa 10.000.000 đ/trường hợp Đơn đề nghị + đánh giá Hội đồng phúc lợi; ngân sách giới hạn."}
+      - {document: ND-HR-006, page: 9, text: "Sinh nhật 500.000 đ/người"}
+    notes: "Ba dòng của bảng hỗ trợ đời sống, đơn vị tiền khác nhau (đ, đ/trường hợp, đ/người)."
+
+  # ---------------------------------------------------------------- G: needs two documents
+  - id: HO-031
+    group: G
+    role: staff
+    pair_id: null
+    question: "Làm mất laptop công ty thì tôi phải báo cho ai, và nếu phải bồi thường thì mỗi tháng bị khấu trừ lương tối đa bao nhiêu?"
+    language: vi
+    gold_status: ANSWERED
+    gold_answer:
+      - "Báo ngay cho Service Desk và quản lý (kèm thời điểm, địa điểm, dữ liệu có thể liên quan, biện pháp đã thực hiện)."
+      - "Khấu trừ để bồi thường mỗi tháng tối đa 30% tiền lương tháng sau khi trích nộp bảo hiểm bắt buộc và thuế TNCN."
+    gold_optional:
+      - "Chỉ khấu trừ khi trách nhiệm bồi thường được xác định đúng quy trình; công ty không tự ý khấu trừ ngoài phạm vi pháp luật."
+    gold_citations:
+      - {document: ND-HR-002, pages: [13]}
+      - {document: ND-HR-005, pages: [10]}
+    acceptable_extra_citations: []
+    forbidden: *restricted
+    source_excerpt:
+      - {document: ND-HR-002, page: 13, text: "Điều 38. Mất thiết bị, tài khoản hoặc dữ liệu Báo ngay cho Service Desk và quản lý; cung cấp thời điểm, địa điểm, dữ liệu có thể liên quan và biện pháp đã thực hiện."}
+      - {document: ND-HR-005, page: 10, text: "Đối với khấu trừ để bồi thường thiệt hại theo pháp luật lao động, mức khấu trừ hàng tháng không vượt quá giới hạn pháp luật (Bộ luật Lao động quy định mức tối đa 30% tiền lương tháng sau khi trích nộp bảo hiểm bắt buộc và thuế thu nhập cá nhân)."}
+    notes: "Ý 1 chỉ có ở ND-HR-002, ý 2 (con số 30%) chỉ có ở ND-HR-005."
+
+  - id: HO-032
+    group: G
+    role: staff
+    pair_id: null
+    question: "Bộ phận nào khóa kỳ công, và phiếu lương điện tử được phát hành khi nào?"
+    language: vi
+    gold_status: ANSWERED
+    gold_answer:
+      - "Phòng Nhân sự (HR) khóa kỳ công."
+      - "Phiếu lương điện tử được phát hành trên HRM trước hoặc cùng ngày trả lương."
+    gold_optional:
+      - "Theo ND-HR-003, HR đối soát và khóa kỳ công ngày 04-05 của tháng sau."
+    gold_citations:
+      - {document: ND-HR-003, pages: [3, 10]}
+      - {document: ND-HR-005, pages: [5]}
+    acceptable_extra_citations: []
+    forbidden: *restricted
+    source_excerpt:
+      - {document: ND-HR-003, page: 3, text: "Quản lý trực tiếp chịu trách nhiệm phê duyệt ngoại lệ; Phòng Nhân sự chịu trách nhiệm kiểm soát quy trình và khóa kỳ công."}
+      - {document: ND-HR-003, page: 10, text: "Ngày 04-05 HR đối soát dữ liệu, liên hệ các trường hợp còn treo và khóa kỳ công."}
+      - {document: ND-HR-005, page: 5, text: "Phiếu lương điện tử Phát hành trên HRM trước hoặc cùng ngày trả lương; thể hiện thu nhập, khấu trừ, bảo hiểm, thuế và số thực nhận."}
+    notes: "Lưu ý cho người chấm: ND-HR-005 trang 5 có mốc 'Khóa dữ liệu chấm công sơ bộ: ngày làm việc thứ 2 của tháng kế tiếp', khác mốc ngày 04-05 của ND-HR-003. Câu hỏi không hỏi ngày khóa nên mốc ngày chỉ là ý phụ; nếu câu trả lời nêu ngày thì xem có trình bày đúng nguồn không."
+
+  - id: HO-033
+    group: G
+    role: staff
+    pair_id: null
+    question: "Tết Âm lịch được nghỉ mấy ngày, và nếu phải làm thêm trong những ngày đó thì được trả tối thiểu bao nhiêu?"
+    language: vi
+    gold_status: ANSWERED
+    gold_answer:
+      - "Tết Âm lịch: 05 ngày."
+      - "Làm thêm ngày lễ, Tết: ít nhất 300% (chưa bao gồm tiền lương ngày lễ/ngày nghỉ đối với người hưởng lương ngày)."
+    gold_optional: []
+    gold_citations:
+      - {document: ND-HR-004, pages: [5]}
+      - {document: ND-HR-005, pages: [7]}
+    acceptable_extra_citations:
+      - {document: UAT-LEAVE-AUTHORITY-001, pages: [3]}
+    forbidden: *restricted
+    source_excerpt:
+      - {document: ND-HR-004, page: 5, text: "Tết Âm lịch 05 ngày"}
+      - {document: ND-HR-005, page: 7, text: "Làm thêm ngày lễ, Tết, ngày nghỉ có hưởng lương Ít nhất 300%, chưa bao gồm tiền lương ngày lễ/ngày nghỉ đối với người hưởng lương ngày."}
+    notes: "Ý 1 từ ND-HR-004 (hoặc UAT-LEAVE-AUTHORITY-001), ý 2 chỉ có ở ND-HR-005."
+
+  - id: HO-034
+    group: G
+    role: staff
+    pair_id: null
+    question: "Trong thời gian nghỉ thai sản, bảo hiểm NovaCare có được duy trì không, và khi quay lại làm việc thì công ty hỗ trợ những gì?"
+    language: vi
+    gold_status: ANSWERED
+    gold_answer:
+      - "Công ty chủ trương duy trì NovaCare cho nhân viên đang nghỉ thai sản hợp lệ trong thời hạn hợp đồng bảo hiểm, nếu nhà bảo hiểm cho phép."
+      - "Khi quay lại: HR và quản lý thống nhất ngày trở lại, quyền truy cập, lịch làm việc và hỗ trợ cần thiết."
+      - "Có cuộc họp quay lại công việc với quản lý/HR để cập nhật dự án, thay đổi tổ chức và nhu cầu linh hoạt."
+    gold_optional:
+      - "Không gây bất lợi / không dùng việc nghỉ thai sản hợp pháp làm tiêu chí bất lợi trong đánh giá, thăng tiến."
+    gold_citations:
+      - {document: ND-HR-006, pages: [10]}
+      - {document: ND-HR-004, pages: [8]}
+    acceptable_extra_citations:
+      - {document: ND-HR-006, pages: [14]}
+    forbidden: *restricted
+    source_excerpt:
+      - {document: ND-HR-006, page: 10, text: "Nova Digital chủ trương duy trì NovaCare cho nhân viên đang nghỉ thai sản hợp lệ trong thời hạn hợp đồng bảo hiểm nếu nhà bảo hiểm cho phép."}
+      - {document: ND-HR-004, page: 8, text: "Quay lại làm việc HR và quản lý thống nhất ngày trở lại, quyền truy cập, lịch làm việc và hỗ trợ cần thiết; không gây bất lợi do việc sử dụng chế độ thai sản hợp pháp."}
+      - {document: ND-HR-004, page: 8, text: "Cho phép cuộc họp quay lại công việc với quản lý/HR để cập nhật dự án, thay đổi tổ chức và nhu cầu linh hoạt trong giai đoạn đầu."}
+    notes: ""
+
+  # ---------------------------------------------------------------- H: language
+  - id: HO-035
+    group: H
+    role: staff
+    pair_id: null
+    question: "What is the annual team building budget per employee?"
+    language: en
+    gold_status: ANSWERED
+    gold_answer:
+      - "1,200,000 VND per person per year (simulated figure), managed per eligible head count with valid invoices."
+    gold_optional: []
+    gold_citations:
+      - {document: ND-HR-006, pages: [9]}
+    acceptable_extra_citations: []
+    forbidden: *restricted
+    source_excerpt:
+      - {document: ND-HR-006, page: 9, text: "Team building budget mô phỏng: 1.200.000 đ/người/năm, quản lý theo đầu người đủ điều kiện và hóa đơn hợp lệ."}
+    notes: "Câu tiếng Anh, nguồn tiếng Việt: câu trả lời phải bằng tiếng Anh. Ý bắt buộc là con số 1.200.000 đ/người/năm; phần 'theo đầu người, hóa đơn' là ý phụ."
+
+  - id: HO-036
+    group: H
+    role: staff
+    pair_id: null
+    question: "Under the shared knowledge policy, who can see organization documents?"
+    language: en
+    gold_status: ANSWERED
+    gold_answer:
+      - "Organization documents are visible to active users."
+    gold_optional: []
+    gold_citations:
+      - {document: UAT-SHARED-001, pages: [1]}
+    acceptable_extra_citations: []
+    forbidden: *restricted
+    source_excerpt:
+      - {document: UAT-SHARED-001, page: 1, text: "UAT shared knowledge policy: organization documents are visible to active users. Use document perm"}
+    notes: "Văn bản trích được của UAT-SHARED-001 cũng bị cắt ngang ('Use document perm'); gold chỉ dựa trên câu đầu."
+
+  - id: HO-037
+    group: H
+    role: staff
+    pair_id: null
+    question: "Employee Referral Bonus được bao nhiêu tiền và cần điều kiện gì?"
+    language: vi
+    gold_status: ANSWERED
+    gold_answer:
+      - "3 - 15 triệu đồng."
+      - "Điều kiện: ứng viên được tuyển và hoàn thành mốc thử việc/điều kiện chương trình."
+    gold_optional: []
+    gold_citations:
+      - {document: ND-HR-005, pages: [9]}
+    acceptable_extra_citations: []
+    forbidden: *restricted
+    source_excerpt:
+      - {document: ND-HR-005, page: 9, text: "Employee Referral Bonus 3 - 15 triệu đồng Ứng viên được tuyển và hoàn thành mốc thử việc/điều kiện chương trình."}
+    notes: "Câu tiếng Việt có thuật ngữ tiếng Anh: câu trả lời bằng tiếng Việt (giữ nguyên tên chương trình)."
+
+  - id: HO-038
+    group: H
+    role: staff
+    pair_id: null
+    question: "Ngày Wellness Check được tối đa bao nhiêu giờ và có bị trừ phép không?"
+    language: vi
+    gold_status: ANSWERED
+    gold_answer:
+      - "Tối đa 04 giờ/năm để tham gia đợt khám do công ty tổ chức."
+      - "Không trừ phép nếu đúng lịch."
+    gold_optional: []
+    gold_citations:
+      - {document: ND-HR-006, pages: [8]}
+    acceptable_extra_citations: []
+    forbidden: *restricted
+    source_excerpt:
+      - {document: ND-HR-006, page: 8, text: "Ngày Wellness Check Tối đa 04 giờ/năm để tham gia đợt khám do công ty tổ chức, không trừ phép nếu đúng lịch."}
+    notes: "Câu tiếng Việt có thuật ngữ tiếng Anh."
+
+  # ---------------------------------------------------------------- I: conflict between two documents
+  - id: HO-039
+    group: I
+    role: staff
+    pair_id: null
+    question: "Nếu thấy số dư phép năm trên hệ thống bị sai, tôi phải báo trong thời hạn bao lâu?"
+    language: vi
+    gold_status: ANSWERED
+    gold_answer:
+      - "ND-HR-004: gửi yêu cầu đối soát trong vòng 10 ngày làm việc kể từ khi phát hiện sai lệch."
+      - "UAT-LEAVE-AUTHORITY-001: phản hồi sai lệch trong vòng 05 ngày làm việc kể từ khi nhận thông báo."
+      - "Chỉ ra rằng hai tài liệu nêu thời hạn khác nhau (mâu thuẫn), không tự chọn một con số."
+    gold_optional: []
+    gold_citations:
+      - {document: ND-HR-004, pages: [11]}
+      - {document: UAT-LEAVE-AUTHORITY-001, pages: [5]}
+    acceptable_extra_citations: []
+    forbidden: *restricted
+    source_excerpt:
+      - {document: ND-HR-004, page: 11, text: "Nhân viên có trách nhiệm kiểm tra số dư định kỳ và gửi yêu cầu đối soát trong vòng 10 ngày làm việc kể từ khi phát hiện sai lệch."}
+      - {document: UAT-LEAVE-AUTHORITY-001, page: 5, text: "Phòng Nhân sự đối soát số dư định kỳ; người lao động có trách nhiệm phản hồi sai lệch trong vòng 05 ngày làm việc kể từ khi nhận thông báo."}
+      - {document: ND-HR-004, page: 2, text: "Nếu pháp luật hoặc thỏa thuận hợp pháp dành quyền lợi cao hơn cho người lao động so với tài liệu mô phỏng này, áp dụng quyền lợi cao hơn hoặc quy định pháp luật bắt buộc tương ứng."}
+      - {document: UAT-LEAVE-AUTHORITY-001, page: 2, text: "Trường hợp thỏa ước lao động tập thể, hợp đồng lao động hoặc chính sách phúc lợi có quy định có lợi hơn cho người lao động thì áp dụng quy định có lợi hơn."}
+      - {document: UAT-LEAVE-AUTHORITY-001, page: 6, text: "Chính sách có hiệu lực từ ngày ghi trên quyết định ban hành và thay thế các hướng dẫn trước đây có cùng nội dung."}
+      - {document: UAT-LEAVE-AUTHORITY-001, page: 1, text: "TÀI LIỆU MẪU - CHƯA PHẢI VĂN BẢN BAN HÀNH"}
+    notes: "Quy tắc ưu tiên: không tài liệu nào nêu rõ thứ tự giữa hai chính sách nghỉ. ND-HR-004 tr.2 chỉ nói về pháp luật/thỏa thuận hợp pháp. UAT-LEAVE tr.2 nói 'có lợi hơn' cho thỏa ước/HĐLĐ/chính sách phúc lợi; ND-HR-004 có phải 'chính sách phúc lợi' hay không thì không rõ. UAT-LEAVE tr.6 chỉ thay thế hướng dẫn TRƯỚC ĐÂY, trong khi ND-HR-004 ban hành sau (12/08/2026 so với 30/07/2026). UAT-LEAVE là tài liệu mẫu chưa ban hành. Vì vậy gold là 'nêu cả hai + chỉ ra mâu thuẫn'. Điểm mốc cũng khác (từ khi phát hiện so với từ khi nhận thông báo). Nếu bạn coi một quy tắc nào ở trên là đủ rõ, sửa gold."
+
+  - id: HO-040
+    group: I
+    role: staff
+    pair_id: null
+    question: "Nhân viên chấm công trên hệ thống nào?"
+    language: vi
+    gold_status: ANSWERED
+    gold_answer:
+      - "ND-HR-002 (Nội quy lao động): chấm công trên hệ thống NovaPeople."
+      - "ND-HR-003 (Chính sách chấm công): hệ thống chấm công chính là Nova HR Portal / ứng dụng HRM."
+      - "Chỉ ra rằng hai tài liệu nêu tên hệ thống khác nhau (mâu thuẫn)."
+    gold_optional:
+      - "ND-HR-004 cũng gọi nơi đăng ký nghỉ là Nova HR Portal."
+    gold_citations:
+      - {document: ND-HR-002, pages: [5]}
+      - {document: ND-HR-003, pages: [5]}
+    acceptable_extra_citations:
+      - {document: ND-HR-004, pages: [3]}
+    forbidden: *restricted
+    source_excerpt:
+      - {document: ND-HR-002, page: 5, text: "Người lao động chấm công trung thực trên hệ thống NovaPeople; không chấm công hộ hoặc làm sai lệch dữ liệu thời gian."}
+      - {document: ND-HR-003, page: 5, text: "Hệ thống chấm công chính: Nova HR Portal / ứng dụng HRM do công ty phê duyệt."}
+      - {document: ND-HR-004, page: 3, text: "Chuẩn hóa việc đăng ký, phê duyệt và ghi nhận nghỉ trên Nova HR Portal để hỗ trợ tính công, lương, BHXH và kế hoạch nguồn lực."}
+      - {document: ND-HR-002, page: 2, text: "Khi nội dung của tài liệu này khác với quy định pháp luật bắt buộc, thỏa ước lao động tập thể hoặc hợp đồng lao động hợp pháp, quy định có lợi hơn hoặc có hiệu lực pháp lý cao hơn được ưu tiên theo từng trường hợp."}
+    notes: "Quy tắc ưu tiên: nguyên tắc áp dụng của ND-HR-002 tr.2 chỉ so với pháp luật/thỏa ước/HĐLĐ, không so với chính sách nội bộ khác; không tài liệu nào nói chính sách mới hơn thay thế nội quy. Gold: nêu cả hai + chỉ ra mâu thuẫn. Có thể đây là hai tên của cùng một hệ thống, nhưng tài liệu không nói vậy."
