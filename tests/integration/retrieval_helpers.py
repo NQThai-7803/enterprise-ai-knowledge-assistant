@@ -185,6 +185,7 @@ async def search_rows(
     user: User,
     top_k: int = 20,
     threshold: float = 0.0,
+    exact_permitted_knn: bool = False,
 ) -> tuple[RetrievalRow, ...]:
     await disable_postgres_jit(session)
     return await search_permitted_chunks(
@@ -193,6 +194,7 @@ async def search_rows(
         current_user=user,
         top_k=top_k,
         min_relevance_score=threshold,
+        exact_permitted_knn=exact_permitted_knn,
     )
 
 

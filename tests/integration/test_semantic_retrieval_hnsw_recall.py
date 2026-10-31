@@ -8,11 +8,14 @@ chunks the user may not see, or to chunks that were deleted but not vacuumed yet
 is discarded and an authorized user gets no result even though a permitted chunk matches. Nothing
 unauthorized is returned.
 
-The tests build that condition and are xfail(strict) until retrieval is fixed. The searching
-transaction forces the index plan itself (``enable_seqscan`` and ``enable_sort`` off; with only
-``enable_seqscan`` off the planner still avoids HNSW) and checks with EXPLAIN in that same
-transaction that the HNSW index is used. If it is not, the test raises ``RuntimeError``, which is
-reported as a real failure, never as an expected failure or an XPASS.
+The searching transaction forces the index-friendly planner settings itself (``enable_seqscan``
+and ``enable_sort`` off; with only ``enable_seqscan`` off the planner still avoids HNSW).
+
+- Flag off (default statement): xfail(strict). EXPLAIN in the same transaction must show the
+  HNSW index; if it does not, the test raises ``RuntimeError``, which is reported as a real
+  failure, never as an expected failure or an XPASS.
+- Flag on (``exact_permitted_knn``, docs/design/hnsw-permission-recall.md): the same scenarios
+  must return the permitted chunk, and the plan must not use the HNSW index.
 """
 
 from __future__ import annotations
@@ -87,9 +90,9 @@ async def _maintenance(engine: AsyncEngine, *statements: str) -> None:
             await conn.execute(text(statement))
 
 
-async def _search_with_forced_hnsw_plan(
-    session: AsyncSession, engine: AsyncEngine, user: User
-) -> tuple[RetrievalRow, ...]:
+async def _search_with_forced_index_settings(
+    session: AsyncSession, engine: AsyncEngine, user: User, *, exact_permitted_knn: bool
+) -> tuple[tuple[RetrievalRow, ...], str]:
     captured: list[tuple[str, object]] = []
 
     def capture(conn, cursor, statement, parameters, context, executemany) -> None:  # noqa: ANN001
@@ -100,7 +103,9 @@ async def _search_with_forced_hnsw_plan(
         await session.execute(text(setting))
     event.listen(engine.sync_engine, "before_cursor_execute", capture)
     try:
-        rows = await search_rows(session, user=user, top_k=1)
+        rows = await search_rows(
+            session, user=user, top_k=1, exact_permitted_knn=exact_permitted_knn
+        )
     finally:
         event.remove(engine.sync_engine, "before_cursor_execute", capture)
     if len(captured) != 1:
@@ -110,11 +115,11 @@ async def _search_with_forced_hnsw_plan(
     connection = await session.connection()
     plan = await connection.exec_driver_sql("EXPLAIN " + statement, parameters)
     plan_text = "\n".join(row[0] for row in plan.all())
-    if HNSW_INDEX not in plan_text:
+    if not exact_permitted_knn and HNSW_INDEX not in plan_text:
         raise RuntimeError(
             "precondition failed: the query did not use the HNSW index:\n" + plan_text
         )
-    return rows
+    return rows, plan_text
 
 
 def _run_recall_case(
@@ -122,6 +127,7 @@ def _run_recall_case(
     key: str,
     *,
     delete_nearer_chunks: bool,
+    exact_permitted_knn: bool = False,
 ) -> None:
     engine: AsyncEngine = async_session_factory_for_tests.kw["bind"]
 
@@ -164,9 +170,13 @@ def _run_recall_case(
                     )
                     await session.commit()
 
-                rows = await _search_with_forced_hnsw_plan(session, engine, staff)
+                rows, plan_text = await _search_with_forced_index_settings(
+                    session, engine, staff, exact_permitted_knn=exact_permitted_knn
+                )
 
                 assert row_document_ids(rows) == [allowed.id]
+                if exact_permitted_knn:
+                    assert HNSW_INDEX not in plan_text
         finally:
             # Leave no dead tuples behind and restore the table's autovacuum setting.
             await _clear_database_data(async_session_factory_for_tests)
@@ -194,4 +204,26 @@ def test_deleted_nearer_chunks_do_not_hide_permitted_chunk_under_hnsw(
 ) -> None:
     _run_recall_case(
         async_session_factory_for_tests, "hnsw-recall-deleted", delete_nearer_chunks=True
+    )
+
+
+def test_exact_knn_keeps_permitted_chunk_despite_nearer_unauthorized_chunks(
+    async_session_factory_for_tests: async_sessionmaker[AsyncSession],
+) -> None:
+    _run_recall_case(
+        async_session_factory_for_tests,
+        "exact-knn-unauthorized",
+        delete_nearer_chunks=False,
+        exact_permitted_knn=True,
+    )
+
+
+def test_exact_knn_keeps_permitted_chunk_despite_nearer_deleted_chunks(
+    async_session_factory_for_tests: async_sessionmaker[AsyncSession],
+) -> None:
+    _run_recall_case(
+        async_session_factory_for_tests,
+        "exact-knn-deleted",
+        delete_nearer_chunks=True,
+        exact_permitted_knn=True,
     )
