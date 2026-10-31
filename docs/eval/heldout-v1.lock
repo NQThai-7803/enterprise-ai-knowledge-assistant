@@ -1,0 +1,10 @@
+{
+ "version": "heldout-v1",
+ "file": "docs/eval/heldout-v1.yaml",
+ "sha256": "e4dd3c69445c443d337699bd2639afd17112221f5b6e6baf3018911a44272346",
+ "frozen_commit": "7efc4f08195d3d3229fabc4ea2fe3a4240e03f6f",
+ "frozen_at": "2026-11-01",
+ "items": 40,
+ "approved_by": "owner (PROMPT 4 item 3)",
+ "rule": "scripts/eval/run_heldout.py refuses to run when the file hash differs; any edit needs heldout-v1.1 with a new lock"
+}

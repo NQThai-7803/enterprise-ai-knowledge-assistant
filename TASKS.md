@@ -10,7 +10,8 @@
   - item 0b: pre-send prompt budget guard with `LLM_TOKEN_ESTIMATE_RATIO=0.99` (`14f0460`);
   - item 1: design (`2472377`), approved with changes;
   - item 2: `docs/eval/heldout-v1.yaml` (40 items) and `docs/eval/heldout-v1-review.md`.
-- Next: item 3, after the owner approves the gold. Freeze with SHA256, then run 2 runs on the baseline v2 config with the guard off, and produce a side-by-side grading sheet for manual labels.
+- **Frozen 2026-11-01:** gold approved by the owner. SHA256 `e4dd3c69…2346` of `docs/eval/heldout-v1.yaml` is in `docs/eval/heldout-v1.lock` (frozen commit `7efc4f0`). `scripts/eval/run_heldout.py` refuses to run on a mismatch.
+- Next: 2 runs on the baseline v2 config with every guard off, then the grading sheet (`docs/eval/runs/heldout-v1-<commit>/`). Blocked: the host has less than the 2 GB of free RAM the owner requires before a run.
 - Owner decision: the guard's post-response check (`USAGE_BELOW_ESTIMATE`) stays log-only.
 - **Later (after PROMPT 7): corpus v3 + held-out v2** with documents at several classification levels and at least 3 roles with different access. Held-out v1 groups B/C are RBAC smoke-level only: one restricted document of about 100 characters, its text cut mid-word, and manager access equal to admin.
 - **Medium: corpus conflicts found while writing held-out gold.** None of these documents states a precedence rule:
