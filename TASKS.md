@@ -1,12 +1,23 @@
 
 # Implementation Tasks
 
+## PROMPT 3f determinism, exact KNN default, baseline v2 -- 2026-10-31
+
+**COMPLETED.** Baseline v2 (`artifacts/baseline-v2/`, local) is the official baseline for PROMPT 4: commit `1b4cdfe`, seed 20261031, temperature 0, exact KNN on, warm-up, 2 runs at 99/100 proxy. Only Q096 differs between the runs.
+
+Open follow-ups:
+- **High (not fixed): `LLM_OLLAMA_NUM_CTX` has no effect.** The adapter sends `options.num_ctx` to Ollama's OpenAI-compatible `/v1/chat/completions`, which ignores `options`. On Ollama 0.40.13 the loaded context stays 4096 (verified with `/api/ps`; `/api/chat` with the same option gives 8192). Prompts longer than 4096 tokens are truncated by Ollama without an error. Options: call the native `/api/chat` for the ollama provider, or set `OLLAMA_CONTEXT_LENGTH` on the server. Decide before raising context or retrieval budgets.
+- **Medium (not fixed): Q096 still differs between a run that starts cold and the next one.** `LLM_SEED` changed no answer: decoding at temperature 0 is greedy. Hypothesis: Ollama's prompt/KV cache makes a prompt seen a second time compute differently. Both forms are stable and carry the same citation. Fully deterministic runs would need the cache disabled or a model reload per question; neither is available through `/v1`.
+- **Owner decision: answer language guard.** Design in `docs/design/answer-language-guard.md` (flag `RAG_ANSWER_LANGUAGE_GUARD_ENABLED`, default off; no new dependency). Not implemented.
+- **Medium: 100k-chunk exact-KNN cell still NOT_VERIFIED** (stopped twice for low memory). By linear extrapolation it would sit at or over the 5 % end-to-end budget (`docs/design/hnsw-permission-recall.md` section 7). Measure it before corpora of that size go to production.
+- **Low: LLM retries are not logged.** `app/llm/http.py:141-166` retries timeouts and 5xx silently, so retries cannot be counted from logs (PROMPT 3f item 1 had to infer them from latency). Add a content-free retry log line.
+
 ## PROMPT 3e evidence scan, leave labels, eval warm-up, exact KNN flag, Q071 -- 2026-10-31
 
 **COMPLETED except the 100k benchmark cell; default flip of the exact-KNN flag awaits the owner.**
 
 Open follow-ups:
-- **Owner decision: `RAG_SEMANTIC_EXACT_PERMITTED_KNN_ENABLED` default.** Implemented in `5e40bfa`, default `false`. Unit and integration pass with both values (image: unit 1692 pass / 17 xfail; integration 404 pass / 3 xfail). Benchmark on pgvector 0.8.6 with synthetic clustered vectors:
+- **DONE in PROMPT 3f (`1b4cdfe`, default true): `RAG_SEMANTIC_EXACT_PERMITTED_KNN_ENABLED` default.** Implemented in `5e40bfa`, default `false`. Unit and integration pass with both values (image: unit 1692 pass / 17 xfail; integration 404 pass / 3 xfail). Benchmark on pgvector 0.8.6 with synthetic clustered vectors:
   - 1k/10k/50k chunks: exact recall@k = 1.0 in every cell. The default statement used HNSW in every cell, with recall_min 0.0 in most cells, also at 100 % permitted.
   - Wall p95, including the connection: exact 47-59 ms at 1k, 56-155 ms at 10k, 165-259 ms at 50k. Default: 45-84, 59-138 and 110-154 ms.
   - EXPLAIN execution time at 50k: exact 63-91 ms, default 8-25 ms.
@@ -14,7 +25,7 @@ Open follow-ups:
   - The **100k cell did not finish**: the background run was stopped by Claude Code for low system memory. NOT_VERIFIED.
   - The semantic/hybrid model lanes were not run with the flag on.
 - **Medium: evidence_text after an off-language answer.** Only Q073 lost `evidence_text` (1 of 98-100 citations). Cause: `extract_exact_evidence` (`app/citations/evidence.py:65-126`, called at `app/citations/mapper.py:77`) scores source sentences by word overlap with the answer; an English answer to a Vietnamese source scores below `4.0` (`evidence.py:115`) and returns `None`. Why the answer became English is unexplained: segmenting, validation, prompt excerpt and the deterministic repair are identical before and after `4534430`. Decision pending.
-- **Medium: Ollama state changes answers.** With the warm-up, 2 runs from a cold start differ only on Q096 (PROMPT 3d without warm-up: 3 cases). Compared with PROMPT 3d, 6 answers changed (Q034, Q055, Q071, Q073, Q094, Q097), and several now match the 035.3B reference verbatim; none is an annual-leave question touched by `e14f217`. Before/after comparisons must use the same warm-up protocol (`scripts/eval/run_uat.sh`).
+- **Medium (see PROMPT 3f: seed has no effect; Q096 remains): Ollama state changes answers.** With the warm-up, 2 runs from a cold start differ only on Q096 (PROMPT 3d without warm-up: 3 cases). Compared with PROMPT 3d, 6 answers changed (Q034, Q055, Q071, Q073, Q094, Q097), and several now match the 035.3B reference verbatim; none is an annual-leave question touched by `e14f217`. Before/after comparisons must use the same warm-up protocol (`scripts/eval/run_uat.sh`).
 - **High (RAG, not fixed): Q071 contradiction not reproducible in isolation.** A traced cold single-question run and both warm-up runs answer correctly (SUPPORTED); the `claim_validation_contradicted` verdict needs the long PROMPT 3d run order. Method to capture it: `artifacts/prompt3e/item5-q071.md`. NOT_VERIFIED.
 - **Low: background runs are stopped on low memory.** Two long runs (UAT run 2 post-processing, 100k benchmark) were stopped by Claude Code. Run long jobs in smaller foreground steps, or with `CLAUDE_CODE_DISABLE_BG_SHELL_PRESSURE_REAP=1` if the owner agrees.
 

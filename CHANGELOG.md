@@ -6,6 +6,14 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### PROMPT 3f -- 2026-10-31
+
+- Added `LLM_SEED`. When set, it is sent as the OpenAI-compatible `seed`, and also as `options.seed` for Ollama. The eval stack pins `LLM_TEMPERATURE=0` and `LLM_SEED=20261031`.
+- `RAG_SEMANTIC_EXACT_PERMITTED_KNN_ENABLED` now defaults to `true`; set it `false` to roll back.
+- Eval harness: the warm-up sends the seed, metadata records seed and temperature, `run_uat.sh` can run in two halves, and a new `latency_by_position.py` analyses latency by position.
+- Documented that Ollama's `/v1` endpoint ignores `options`, so `LLM_OLLAMA_NUM_CTX` currently has no effect.
+- Design proposal: `docs/design/answer-language-guard.md`.
+
 ### PROMPT 3e -- 2026-10-31
 
 - Repaired the two remaining garbled leave-category labels (Unicode-escaped constants). Grouped annual-leave rows now bind generally: a row's own cue, then an adjacent label-only line (following line first). The mojibake guard allows no exceptions.

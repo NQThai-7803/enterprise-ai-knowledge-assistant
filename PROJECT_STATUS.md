@@ -1,5 +1,29 @@
 # Project Status
 
+## PROMPT 3f -- 2026-10-31
+
+**COMPLETED.** **Baseline v2** (`artifacts/baseline-v2/`) is the official baseline for PROMPT 4.
+
+**Latency (existing 3d/3e data)**
+- No LLM timeouts or provider errors in 600 requests.
+- Run-to-run answer changes go with large latency differences (median 8-20 s against under 1 s for unchanged cases), which points to extra generation steps in the cold run.
+- The 3d-to-3e changes do not go with latency.
+
+**`LLM_SEED`** (`84f71e7`)
+- Ollama `/v1` honors the top-level `seed` and ignores `options`, so `num_ctx` is not applied either.
+- Seed and warm-up runs: 99/100 identical, only Q096 differs. The seed changed no answer compared with PROMPT 3e.
+
+**Exact KNN over permitted chunks** (`1b4cdfe`)
+- Now the default, with `false` available for rollback.
+- Model lanes pass with the flag on and off (semantic and hybrid, 5/5 each); unit 1696 / 17 xfail; integration 404 / 3 xfail.
+- Latency budget: the statement's DB time stays at or below 5 % of the median end-to-end answer time. 1k-50k fit; 100k is NOT_VERIFIED.
+
+**Baseline v2:** commit `1b4cdfe`, seed 20261031, temperature 0, exact KNN on, warm-up.
+- 2 runs at 99/100 proxy.
+- Identical to the PROMPT 3e warm runs except the known Q096 variance.
+
+**Answer language guard:** designed only.
+
 ## PROMPT 3e -- 2026-10-31
 
 **COMPLETED except the 100k benchmark cell. The exact-KNN default stays off pending the owner's decision.** Details and follow-ups are in `TASKS.md`; evidence is in `artifacts/prompt3e/` (local).
