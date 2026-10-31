@@ -1,0 +1,23 @@
+# Isolated UAT eval stack (scripts/eval/README.md).
+# Layered on compose.yaml + compose.uat-corpus-v2.yaml + the repo .env (same config as V2),
+# with its own project name and volumes, no published DB/Redis ports, the API on
+# 127.0.0.1:18190, and the backend image given in P3D_BACKEND_IMAGE.
+x-p3d-image: &p3d_image
+  image: ${P3D_BACKEND_IMAGE:?}
+  pull_policy: never
+
+services:
+  postgres:
+    ports: !reset []
+  redis:
+    ports: !reset []
+  migration:
+    <<: *p3d_image
+  uat-v2-accounts:
+    <<: *p3d_image
+  worker:
+    <<: *p3d_image
+  api:
+    <<: *p3d_image
+    ports: !override
+      - "127.0.0.1:18190:8000"
