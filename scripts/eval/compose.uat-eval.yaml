@@ -21,3 +21,7 @@ services:
     <<: *p3d_image
     ports: !override
       - "127.0.0.1:18190:8000"
+    environment:
+      # Eval runs are reproducible: greedy decoding and a fixed seed (PROMPT 3f).
+      LLM_TEMPERATURE: "0"
+      LLM_SEED: ${EVAL_LLM_SEED:-20261031}

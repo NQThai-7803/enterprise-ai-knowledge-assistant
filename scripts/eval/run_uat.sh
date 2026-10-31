@@ -2,7 +2,10 @@
 # One Q001-Q100 run against an isolated UAT eval stack, with an Ollama warm-up, metadata and a
 # proxy grade. Run from the repository root (Git Bash on Windows or any POSIX shell).
 #
-#   EVAL_BACKEND_IMAGE=eaka-backend:<tag> bash scripts/eval/run_uat.sh artifacts/<task>/<run>
+#   EVAL_BACKEND_IMAGE=eaka-backend:<tag> bash scripts/eval/run_uat.sh artifacts/<task>/<run> [all|part1|part2]
+#
+# part1 writes the metadata, warms up Ollama and runs Q001-Q050; part2 resumes Q051-Q100 from the
+# same checkpoint and grades. Use the halves to keep each foreground command short.
 #
 # Inputs that are git-ignored and must exist locally: artifacts/rag-h5-1-stress-uat.py (questions),
 # artifacts/task-035-3b-20261013/case-level-semantic-citation-grade.json (reference grade),
@@ -10,6 +13,7 @@
 # manifest written by scripts/eval/bootstrap_corpus_v2.py.
 set -euo pipefail
 OUT="$1"
+PHASE="${2:-all}"
 PROJECT="${EVAL_PROJECT:-eaka-p3d-uat}"
 API="${EVAL_API:-http://127.0.0.1:18190}"
 OLLAMA="${EVAL_OLLAMA:-http://127.0.0.1:11434}"
@@ -30,6 +34,14 @@ NUM_CTX=$(docker inspect "$API_CID" --format '{{range .Config.Env}}{{println .}}
   | sed -n 's/^LLM_OLLAMA_NUM_CTX=//p')
 KEEP_ALIVE=$(docker inspect "$API_CID" --format '{{range .Config.Env}}{{println .}}{{end}}' \
   | sed -n 's/^LLM_OLLAMA_KEEP_ALIVE=//p')
+LLM_SEED=$(docker inspect "$API_CID" --format '{{range .Config.Env}}{{println .}}{{end}}' \
+  | sed -n 's/^LLM_SEED=//p')
+LLM_TEMPERATURE=$(docker inspect "$API_CID" --format '{{range .Config.Env}}{{println .}}{{end}}' \
+  | sed -n 's/^LLM_TEMPERATURE=//p')
+RUNNER=(env RAG_ACCEPTANCE_BASE_URL="$API" PYTHONIOENCODING=utf-8
+  python tests/acceptance/rag_h5_2_exact_100.py --output "$OUT/runtime_results.json")
+
+if [ "$PHASE" != "part2" ]; then
 python - "$OUT/metadata.json" <<EOF
 import json, sys
 json.dump({
@@ -41,7 +53,8 @@ json.dump({
     "postgres_image": "$(docker inspect "$("${COMPOSE[@]}" ps -q postgres)" --format '{{.Image}}')",
     "pgvector_extversion": "$(psql_value "SELECT extversion FROM pg_extension WHERE extname='vector'")",
     "postgres_server_version": "$(psql_value 'SHOW server_version')",
-    "llm": {"provider": "ollama", "model": "$LLM_MODEL", "num_ctx": "$NUM_CTX", "keep_alive": "$KEEP_ALIVE"},
+    "llm": {"provider": "ollama", "model": "$LLM_MODEL", "num_ctx": "$NUM_CTX",
+            "keep_alive": "$KEEP_ALIVE", "seed": "$LLM_SEED", "temperature": "$LLM_TEMPERATURE"},
     "compose_project": "$PROJECT",
     "runner": "tests/acceptance/rag_h5_2_exact_100.py",
 }, open(sys.argv[1], "w", encoding="utf-8"), indent=1)
@@ -49,10 +62,21 @@ EOF
 
 # Warm-up (not scored): load the model with the app's options before the first question.
 python scripts/eval/ollama_warmup.py "$OUT/warmup.json" --base-url "$OLLAMA" \
-  --model "${LLM_MODEL:-qwen2.5:3b}" --num-ctx "${NUM_CTX:-8192}" --keep-alive "${KEEP_ALIVE:-10m}"
+  --model "${LLM_MODEL:-qwen2.5:3b}" --num-ctx "${NUM_CTX:-8192}" --keep-alive "${KEEP_ALIVE:-10m}" \
+  ${LLM_SEED:+--seed "$LLM_SEED"}
+fi
 
-RAG_ACCEPTANCE_BASE_URL=$API PYTHONIOENCODING=utf-8 python tests/acceptance/rag_h5_2_exact_100.py \
-  --output "$OUT/runtime_results.json" > "$OUT/runner.log" 2>&1 || echo "runner exit $?" >> "$OUT/runner.log"
+case "$PHASE" in
+  part1)  # first half only; part2 resumes from the same checkpoint
+    CASES=()
+    for i in $(seq -w 1 50); do CASES+=(--case "Q0$i"); done
+    "${RUNNER[@]}" "${CASES[@]}" >> "$OUT/runner.log" 2>&1 || echo "runner exit $?" >> "$OUT/runner.log"
+    exit 0 ;;
+  part2)
+    "${RUNNER[@]}" --resume >> "$OUT/runner.log" 2>&1 || echo "runner exit $?" >> "$OUT/runner.log" ;;
+  *)
+    "${RUNNER[@]}" > "$OUT/runner.log" 2>&1 || echo "runner exit $?" >> "$OUT/runner.log" ;;
+esac
 
 python - "$OUT" <<'EOF'
 import json, sys

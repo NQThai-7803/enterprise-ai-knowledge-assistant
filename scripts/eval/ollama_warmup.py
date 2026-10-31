@@ -1,10 +1,11 @@
 """Send one warm-up chat request to Ollama before an eval run and report what it cost.
 
-The request mirrors the app's OpenAI-compatible call (same model, num_ctx and keep_alive, and the
-/no_think prefix used with reasoning_effort=none), so Ollama keeps the same loaded runner for the
-eval questions instead of reloading it. The result is not part of any eval score.
+The request mirrors the app's OpenAI-compatible call (same model, num_ctx, keep_alive and seed,
+and the /no_think prefix used with reasoning_effort=none), so Ollama keeps the same loaded runner
+for the eval questions instead of reloading it. The result is not part of any eval score.
 
 usage: ollama_warmup.py <out.json> [--base-url URL] [--model M] [--num-ctx N] [--keep-alive D]
+                        [--seed S]
 """
 
 from __future__ import annotations
@@ -36,6 +37,7 @@ def main() -> None:
     parser.add_argument("--model", default="qwen2.5:3b")
     parser.add_argument("--num-ctx", type=int, default=8192)
     parser.add_argument("--keep-alive", default="10m")
+    parser.add_argument("--seed", type=int, default=None)
     args = parser.parse_args()
 
     before = _loaded_models(args.base_url)
@@ -48,6 +50,9 @@ def main() -> None:
         "options": {"num_ctx": args.num_ctx},
         "keep_alive": args.keep_alive,
     }
+    if args.seed is not None:
+        payload["seed"] = args.seed
+        payload["options"]["seed"] = args.seed
     request = Request(
         f"{args.base_url}/v1/chat/completions",
         data=json.dumps(payload).encode(),
@@ -64,6 +69,7 @@ def main() -> None:
         "model": args.model,
         "num_ctx": args.num_ctx,
         "keep_alive": args.keep_alive,
+        "seed": args.seed,
         "http_status": status,
         "elapsed_ms": elapsed_ms,
         "model_was_loaded_before": any(m["name"] == args.model for m in before),

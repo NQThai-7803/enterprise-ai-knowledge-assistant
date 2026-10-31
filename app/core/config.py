@@ -163,6 +163,8 @@ class Settings(BaseSettings):
     llm_max_retries: int = Field(default=2, ge=0)
     llm_retry_backoff_seconds: float = Field(default=1.0, ge=0.0)
     llm_temperature: float = Field(default=0.0, ge=0.0, le=2.0)
+    # Sent as the OpenAI-compatible "seed" when set; unset leaves sampling to the provider.
+    llm_seed: int | None = Field(default=None, ge=0)
     llm_max_output_tokens: int = Field(default=1024, gt=0)
     llm_base_url: str = Field(
         default="",
@@ -329,6 +331,16 @@ class Settings(BaseSettings):
     def parse_csv_settings(cls, value: str | list[str]) -> list[str]:
         if isinstance(value, str):
             return [item.strip() for item in value.split(",") if item.strip()]
+        return value
+
+    @field_validator("llm_seed", mode="before")
+    @classmethod
+    def normalize_llm_seed(cls, value: object) -> object:
+        if isinstance(value, bool):
+            msg = "LLM_SEED must be an integer."
+            raise ValueError(msg)
+        if isinstance(value, str) and not value.strip():
+            return None
         return value
 
     @field_validator("llm_provider", mode="before")

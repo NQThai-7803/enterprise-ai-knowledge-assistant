@@ -315,6 +315,7 @@ LLM_STREAM_MAX_DURATION_SECONDS=120
 LLM_MAX_RETRIES=2
 LLM_RETRY_BACKOFF_SECONDS=1
 LLM_TEMPERATURE=0.0
+LLM_SEED=
 LLM_MAX_OUTPUT_TOKENS=1024
 LLM_NO_ANSWER_SENTINEL=__NO_ANSWER__
 ```
@@ -393,6 +394,8 @@ Validation rules:
 - Base URLs must be absolute `http` or `https` URLs with no embedded credentials, query, fragment, or query-based API key.
 - Remote production provider URLs must use `https`; `http` is allowed only for local development providers such as `localhost`, `127.0.0.1`, `::1`, and `host.docker.internal`.
 - Provider calls use explicit connect/read/write/pool timeouts, a bounded connection pool, bounded retries, and retry backoff.
+- `LLM_SEED` (optional non-negative integer, empty means unset, added in PROMPT 3f) is sent as the OpenAI-compatible `seed` field by the openai_compatible, ollama, lm_studio and openrouter adapters. For Ollama it is also placed in `options.seed`. The Azure, Gemini and Anthropic adapters do not send it. Ollama 0.40.13 honors the top-level `seed` on `/v1/chat/completions` and ignores `options` there (checked 2026-10-31). **Production recommendation:** keep `LLM_TEMPERATURE=0.0` and set a fixed `LLM_SEED`, so answers can be replayed for audits and incident reviews. A seed costs nothing at temperature 0. It does not remove the difference between the first request after a model load and later requests; the eval harness handles that with a warm-up. The code default stays unset so providers that reject the field keep working.
+- `LLM_OLLAMA_NUM_CTX` and `LLM_OLLAMA_KEEP_ALIVE` are sent with every Ollama request. Ollama's `/v1` endpoint ignores `options`, so `num_ctx` currently has **no effect**: the loaded context stays at the server default, 4096 on Ollama 0.40.13. Set the context on the Ollama server (for example `OLLAMA_CONTEXT_LENGTH`) until the adapter uses the native API. See TASKS.
 - Chat SSE uses `LLM_STREAM_HEARTBEAT_SECONDS` for empty heartbeat events and `LLM_STREAM_MAX_DURATION_SECONDS` as the total bounded stream duration. Heartbeats do not extend the maximum duration.
 - The app does not call an LLM at import, migration, startup, liveness, or readiness by default.
 - The app does not add an Ollama, LM Studio, or other LLM container to Compose in TASK-026.
