@@ -8973,6 +8973,54 @@ def _structured_condition_value_answer(
     return answer, source_label
 
 
+_ANNUAL_LEAVE_DURATION_PATTERN = re.compile(r"(?<!\d)(\d{1,2})\s+ngay\b")
+# User-facing leave-category labels, written as escapes so editors cannot re-garble them.
+_ANNUAL_LEAVE_SPECIAL_WORK = (
+    "c\u00f4ng vi\u1ec7c \u0111\u1eb7c bi\u1ec7t n\u1eb7ng nh\u1ecdc, "
+    "\u0111\u1ed9c h\u1ea1i, nguy hi\u1ec3m"
+)
+_ANNUAL_LEAVE_PROTECTED_WORKERS = (
+    "ng\u01b0\u1eddi ch\u01b0a th\u00e0nh ni\u00ean, ng\u01b0\u1eddi khuy\u1ebft t\u1eadt "
+    "ho\u1eb7c c\u00f4ng vi\u1ec7c n\u1eb7ng nh\u1ecdc, \u0111\u1ed9c h\u1ea1i, nguy hi\u1ec3m"
+)
+_ANNUAL_LEAVE_NORMAL_WORK = (
+    "c\u00f4ng vi\u1ec7c trong \u0111i\u1ec1u ki\u1ec7n b\u00ecnh th\u01b0\u1eddng"
+)
+
+
+def _annual_leave_category(folded_text: str) -> str | None:
+    """Map folded row text to its annual-leave category, most specific first."""
+    if "dac biet" in folded_text:
+        return _ANNUAL_LEAVE_SPECIAL_WORK
+    if any(cue in folded_text for cue in ("chua thanh nien", "khuyet tat")):
+        return _ANNUAL_LEAVE_PROTECTED_WORKERS
+    if "dieu kien binh thuong" in folded_text:
+        return _ANNUAL_LEAVE_NORMAL_WORK
+    return None
+
+
+def _annual_leave_neighbor_label_category(
+    folded_lines: tuple[str, ...],
+    index: int,
+) -> str | None:
+    """Bind a value-only row to an adjacent label row that has no value of its own.
+
+    Wrapped tables put the label either after the value ("12 ngay" then the
+    condition) or before it. A neighbor that carries its own duration belongs to
+    that duration, so only label-only neighbors are used; the following line is
+    tried first, then the preceding one.
+    """
+    for neighbor in (index + 1, index - 1):
+        if not 0 <= neighbor < len(folded_lines):
+            continue
+        if _ANNUAL_LEAVE_DURATION_PATTERN.search(folded_lines[neighbor]):
+            continue
+        category = _annual_leave_category(folded_lines[neighbor])
+        if category is not None:
+            return category
+    return None
+
+
 def _structured_grouped_duration_answer(
     *,
     question: str,
@@ -9010,31 +9058,21 @@ def _structured_grouped_duration_answer(
         lines = tuple(line.strip() for line in source.text.splitlines() if line.strip())
         folded_lines = tuple(_fold_for_person_match(line) for line in lines)
         for index, folded_line in enumerate(folded_lines):
-            for match in re.finditer(r"(?<!\d)(\d{1,2})\s+ngay\b", folded_line):
-                # PDF/table extraction often wraps a duration value before
-                # the condition label. Include both neighboring lines so a
+            for match in _ANNUAL_LEAVE_DURATION_PATTERN.finditer(folded_line):
+                # PDF/table extraction often wraps a duration value before or
+                # after its condition label. Include both neighboring lines so a
                 # row remains bound to its own condition.
                 local = " ".join(folded_lines[max(0, index - 1) : index + 2])
                 if any(cue in local for cue in excluded_cues):
                     continue
                 if not any(cue in local for cue in category_cues):
                     continue
-                if "dac biet" in folded_line:
-                    category = "công việc đặc biệt nặng nhọc, độc hại, nguy hiểm"
-                elif "dieu kien binh thuong" in folded_line:
-                    category = "cÃ´ng viá»‡c trong Ä‘iá»u kiá»‡n bÃ¬nh thÆ°á»ng"
-                elif "dac biet" in local:
-                    category = "cÃ´ng viá»‡c Ä‘áº·c biá»‡t náº·ng nhá»c, Ä‘á»™c háº¡i, nguy hiá»ƒm"
-                elif any(cue in local for cue in ("chua thanh nien", "khuyet tat")):
-                    category = (
-                        "người chưa thành niên, người khuyết tật hoặc "
-                        "công việc nặng nhọc, độc hại, nguy hiểm"
-                    )
-                elif "dieu kien binh thuong" in local:
-                    category = "công việc trong điều kiện bình thường"
-                elif "dac biet" in local:
-                    category = "công việc đặc biệt nặng nhọc, độc hại, nguy hiểm"
-                else:
+                category = _annual_leave_category(
+                    folded_line
+                ) or _annual_leave_neighbor_label_category(folded_lines, index)
+                if category is None:
+                    category = _annual_leave_category(local)
+                if category is None:
                     continue
                 entries.setdefault(category, (match.group(1), source.label))
     if len(entries) < 2:

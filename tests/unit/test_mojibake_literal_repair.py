@@ -8,8 +8,6 @@ from __future__ import annotations
 import json
 from uuid import UUID
 
-import pytest
-
 from app.citations.models import PromptSource, PromptSourceRegistry
 from app.models import CitationSourceType
 from app.retrieval.question_analysis import analyze_question, fold_text
@@ -140,25 +138,60 @@ def test_policy_clause_repair_strips_real_bullets_at_both_ends() -> None:
     assert "duoc ghi nhan rieng" in answer.casefold()
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Deferred: two leave-category labels in _structured_grouped_duration_answer are still "
-        "mojibake; repairing them needs a fix of that function's category grouping"
-    ),
-)
-def test_grouped_annual_leave_answer_names_categories_in_vietnamese() -> None:
+def _grouped_leave_answer(text: str) -> str:
     answer = _structured_grouped_duration_answer(
-        question="Nghỉ phép năm được bao nhiêu ngày?",
-        source_registry=_source(
-            "Công việc đặc biệt nặng nhọc, độc hại, nguy hiểm:\n"
-            "16 ngày làm việc\n"
-            "Lao động trong điều kiện bình thường: 12 ngày làm việc"
-        ),
+        question="Nghỉ phép năm được bao nhiêu ngày?", source_registry=_source(text)
+    )
+    assert answer is not None
+    return answer[0]
+
+
+def test_grouped_annual_leave_label_before_value_is_shown_in_vietnamese() -> None:
+    text = _grouped_leave_answer(
+        "Công việc đặc biệt nặng nhọc, độc hại, nguy hiểm:\n"
+        "16 ngày làm việc\n"
+        "Lao động trong điều kiện bình thường: 12 ngày làm việc"
     )
 
-    assert answer is not None
-    text = answer[0]
-    assert "12 ngày cho công việc trong điều kiện bình thường" in text
-    assert "16 ngày cho công việc đặc biệt nặng nhọc, độc hại, nguy hiểm" in text
-    assert "\u00c3" not in text and "\u00e1\u00bb" not in text
+    assert text == (
+        "Mức nghỉ hằng năm theo đối tượng là "
+        "16 ngày cho công việc đặc biệt nặng nhọc, độc hại, nguy hiểm; "
+        "12 ngày cho công việc trong điều kiện bình thường."
+    )
+
+
+def test_grouped_annual_leave_keeps_three_categories_when_a_value_wraps_after_its_label() -> None:
+    text = _grouped_leave_answer(
+        "Công việc trong điều kiện bình thường 12 ngày làm việc/năm.\n"
+        "Người chưa thành niên, người khuyết tật hoặc công việc nặng nhọc, độc hại, nguy hiểm\n"
+        "14 ngày\n"
+        "16 ngày Công việc đặc biệt nặng nhọc, độc hại, nguy hiểm."
+    )
+
+    assert text == (
+        "Mức nghỉ hằng năm theo đối tượng là "
+        "12 ngày cho công việc trong điều kiện bình thường; "
+        "14 ngày cho người chưa thành niên, người khuyết tật hoặc "
+        "công việc nặng nhọc, độc hại, nguy hiểm; "
+        "16 ngày cho công việc đặc biệt nặng nhọc, độc hại, nguy hiểm."
+    )
+
+
+def test_grouped_annual_leave_binds_values_that_precede_their_labels() -> None:
+    text = _grouped_leave_answer(
+        "Mức nghỉ Đối tượng áp dụng\n"
+        "12 ngày\n"
+        "Công việc trong điều kiện bình thường\n"
+        "14 ngày\n"
+        "Người chưa thành niên hoặc công việc nặng nhọc, độc hại\n"
+        "16 ngày\n"
+        "Công việc đặc biệt nặng nhọc, độc hại, nguy hiểm"
+    )
+
+    assert text == (
+        "Mức nghỉ hằng năm theo đối tượng là "
+        "12 ngày cho công việc trong điều kiện bình thường; "
+        "14 ngày cho người chưa thành niên, người khuyết tật hoặc "
+        "công việc nặng nhọc, độc hại, nguy hiểm; "
+        "16 ngày cho công việc đặc biệt nặng nhọc, độc hại, nguy hiểm."
+    )
