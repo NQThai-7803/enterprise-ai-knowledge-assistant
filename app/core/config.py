@@ -166,6 +166,10 @@ class Settings(BaseSettings):
     # Sent as the OpenAI-compatible "seed" when set; unset leaves sampling to the provider.
     llm_seed: int | None = Field(default=None, ge=0)
     llm_max_output_tokens: int = Field(default=1024, gt=0)
+    # Context length the LLM server really runs with (Ollama: OLLAMA_CONTEXT_LENGTH on the server).
+    llm_context_window: int = Field(default=8192, ge=1024)
+    # Return the fixed no-answer when a prompt may have been cut by the provider (PROMPT 3g).
+    llm_prompt_truncation_guard_enabled: bool = False
     llm_base_url: str = Field(
         default="",
         validation_alias=AliasChoices("LLM_OPENAI_BASE_URL", "LLM_BASE_URL"),

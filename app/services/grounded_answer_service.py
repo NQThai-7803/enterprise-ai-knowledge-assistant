@@ -846,7 +846,12 @@ class GroundedAnswerService:
         context_ms = int((perf_counter() - context_started) * 1000)
         provider = None
         try:
-            provider = self.llm_provider_factory()
+            provider = _PromptTruncationGuard(
+                self.llm_provider_factory(),
+                context_window=self.settings.llm_context_window,
+                reserved_output_tokens=self.settings.llm_max_output_tokens,
+                enforce=self.settings.llm_prompt_truncation_guard_enabled,
+            )
             generation = await provider.generate(
                 messages=messages,
                 temperature=self.settings.llm_temperature,
@@ -1196,6 +1201,12 @@ class GroundedAnswerService:
                 },
             )
             raise _map_llm_error(exc) from exc
+
+        except _PromptPossiblyTruncatedError:
+            return _no_answer_draft(
+                self.settings.chat_no_answer_message,
+                selected_chunk_count=len(source_registry.sources),
+            )
 
         except ApplicationError:
             raise
@@ -10730,6 +10741,66 @@ def _log_citation_validation_fallback(
 
 def _detach_message(message: ChatMessage) -> ChatMessage:
     return message
+
+
+PROMPT_POSSIBLY_TRUNCATED_ERROR_CODE = "LLM_PROMPT_POSSIBLY_TRUNCATED"
+
+
+class _PromptPossiblyTruncatedError(Exception):
+    """Raised by _PromptTruncationGuard when the guard flag asks for the fixed no-answer."""
+
+
+def prompt_truncation_reason(prompt_tokens: int | None, *, threshold_tokens: int) -> str | None:
+    """Why a provider may have cut the prompt, or None when usage looks safe."""
+    if prompt_tokens is None:
+        return "USAGE_MISSING"
+    if prompt_tokens >= threshold_tokens:
+        return "NEAR_CONTEXT_WINDOW"
+    return None
+
+
+class _PromptTruncationGuard:
+    """Check token usage after every LLM call made while answering one question.
+
+    A prompt at or above ``context_window - reserved_output_tokens`` tokens, or a response without
+    usage, may have been cut by the provider (Ollama drops the beginning, system message first).
+    The guard always logs a content-free WARNING; with ``enforce`` it also stops the answer so the
+    caller returns the fixed no-answer. Every other attribute is delegated to the provider.
+    """
+
+    def __init__(
+        self,
+        provider: object,
+        *,
+        context_window: int,
+        reserved_output_tokens: int,
+        enforce: bool,
+    ) -> None:
+        self._provider = provider
+        self._threshold_tokens = max(1, context_window - reserved_output_tokens)
+        self._enforce = enforce
+
+    def __getattr__(self, name: str) -> object:
+        return getattr(self._provider, name)
+
+    async def generate(self, *args: object, **kwargs: object) -> LLMGenerationResult:
+        generation = await self._provider.generate(*args, **kwargs)
+        prompt_tokens = getattr(generation, "prompt_tokens", None)
+        reason = prompt_truncation_reason(prompt_tokens, threshold_tokens=self._threshold_tokens)
+        if reason is not None:
+            logger.warning(
+                "LLM prompt may have been truncated by the provider.",
+                extra={
+                    "error_code": PROMPT_POSSIBLY_TRUNCATED_ERROR_CODE,
+                    "reason": reason,
+                    "prompt_tokens": prompt_tokens,
+                    "threshold_tokens": self._threshold_tokens,
+                    "enforced": self._enforce,
+                },
+            )
+            if self._enforce:
+                raise _PromptPossiblyTruncatedError(reason)
+        return generation
 
 
 def _map_llm_error(error: LLMError) -> ApplicationError:
