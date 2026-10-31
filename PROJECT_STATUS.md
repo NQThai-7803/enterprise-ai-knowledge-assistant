@@ -1,5 +1,26 @@
 # Project Status
 
+## PROMPT 3g -- 2026-10-31
+
+**COMPLETED. Baseline v2 stays the official baseline.**
+
+**Measurement at the old 4096 context** (`a6ac2bb`, logging proxy)
+- 36 LLM calls for 100 UAT questions; prompt_tokens min 414, p50 1873, p95 2307, max 2979. None is at 4000 or more.
+- Q071: 1645 tokens. Q073: 1923 and 1156. Q096: 2183 and 1357.
+- Ollama 0.40.13 cuts a prompt longer than its context to about half the context, keeping the end; the system message is lost first.
+
+**Server context** (`3481f86`)
+- The development host runs Ollama with `OLLAMA_CONTEXT_LENGTH=8192`, approved by the owner; `/api/ps` reports 8192.
+- The deployment docs now make this setting mandatory.
+- No compose file runs an Ollama service.
+
+**App guard** (`181a3be`): `LLM_CONTEXT_WINDOW` and `LLM_PROMPT_TRUNCATION_GUARD_ENABLED` (off). It warns on usage near the window or missing usage. Limitation: it cannot see Ollama's own truncation, which reports the shortened count.
+
+**UAT at context 8192** (2 runs)
+- Same as baseline v2, apart from Q096 noise and one host socket error on Q063 in run 1.
+- Q073 is still answered in English.
+- Q096 is a known issue (1/100).
+
 ## PROMPT 3f -- 2026-10-31
 
 **COMPLETED.** **Baseline v2** (`artifacts/baseline-v2/`) is the official baseline for PROMPT 4.

@@ -1,13 +1,25 @@
 
 # Implementation Tasks
 
+## PROMPT 3g prompt truncation -- 2026-10-31
+
+**COMPLETED.** Baseline v2 stays the official baseline. Context 8192 changed no answer: the largest UAT prompt is 2979 tokens, and none reaches 4000.
+
+Known issue:
+- **Q096 run-order noise (1/100).** A run that starts with a cold model and the following warm run differ on one clause of Q096. The status and citation are the same in both. Seed, warm-up and context 8192 do not remove it. Treat a Q096 difference as noise when comparing against baseline v2.
+
+Open follow-ups:
+- **Medium: the truncation guard cannot see a real Ollama truncation.** Ollama 0.40.13 cuts an over-long prompt to about half the context: it keeps the end and drops the beginning, system message first. It then reports the shortened count (2050 at 4096, 4098 at 8192), which stays below `LLM_CONTEXT_WINDOW - LLM_MAX_OUTPUT_TOKENS`. Proposal: compare `usage.prompt_tokens` with an app-side estimate of the prompt (token counter or characters/4.5) and flag when the reported count is much lower than the estimate. Through `eaka-rag-change-guard`.
+- **Medium: deployment must set `OLLAMA_CONTEXT_LENGTH`** (`DEPLOYMENT.md` 3.1). The development host now has `OLLAMA_CONTEXT_LENGTH=8192` as a user variable. Prod/UAT hosts that use Ollama need the same. The adapter still sends `options.num_ctx`, which `/v1` ignores.
+- **Low: the eval runner treats transport errors as OK.** `tests/acceptance/rag_h5_2_exact_100.py` sets `execution_status="OK"` for `http 0` (for example the host `WinError 10055` on Q063 in PROMPT 3g), so `--resume` does not retry them. Mark non-2xx and transport failures `INFRA_ERROR`.
+
 ## PROMPT 3f determinism, exact KNN default, baseline v2 -- 2026-10-31
 
 **COMPLETED.** Baseline v2 (`artifacts/baseline-v2/`, local) is the official baseline for PROMPT 4: commit `1b4cdfe`, seed 20261031, temperature 0, exact KNN on, warm-up, 2 runs at 99/100 proxy. Only Q096 differs between the runs.
 
 Open follow-ups:
-- **High (not fixed): `LLM_OLLAMA_NUM_CTX` has no effect.** The adapter sends `options.num_ctx` to Ollama's OpenAI-compatible `/v1/chat/completions`, which ignores `options`. On Ollama 0.40.13 the loaded context stays 4096 (verified with `/api/ps`; `/api/chat` with the same option gives 8192). Prompts longer than 4096 tokens are truncated by Ollama without an error. Options: call the native `/api/chat` for the ollama provider, or set `OLLAMA_CONTEXT_LENGTH` on the server. Decide before raising context or retrieval budgets.
-- **Medium (not fixed): Q096 still differs between a run that starts cold and the next one.** `LLM_SEED` changed no answer: decoding at temperature 0 is greedy. Hypothesis: Ollama's prompt/KV cache makes a prompt seen a second time compute differently. Both forms are stable and carry the same citation. Fully deterministic runs would need the cache disabled or a model reload per question; neither is available through `/v1`.
+- **Mitigated server-side in PROMPT 3g (`OLLAMA_CONTEXT_LENGTH=8192`, `DEPLOYMENT.md` 3.1); the adapter still ignores it: `LLM_OLLAMA_NUM_CTX` has no effect.** The adapter sends `options.num_ctx` to Ollama's OpenAI-compatible `/v1/chat/completions`, which ignores `options`. On Ollama 0.40.13 the loaded context stays 4096 (verified with `/api/ps`; `/api/chat` with the same option gives 8192). Prompts longer than 4096 tokens are truncated by Ollama without an error. Options: call the native `/api/chat` for the ollama provider, or set `OLLAMA_CONTEXT_LENGTH` on the server. Decide before raising context or retrieval budgets.
+- **Known issue (see PROMPT 3g): Q096 still differs between a run that starts cold and the next one.** `LLM_SEED` changed no answer: decoding at temperature 0 is greedy. Hypothesis: Ollama's prompt/KV cache makes a prompt seen a second time compute differently. Both forms are stable and carry the same citation. Fully deterministic runs would need the cache disabled or a model reload per question; neither is available through `/v1`.
 - **Owner decision: answer language guard.** Design in `docs/design/answer-language-guard.md` (flag `RAG_ANSWER_LANGUAGE_GUARD_ENABLED`, default off; no new dependency). Not implemented.
 - **Medium: 100k-chunk exact-KNN cell still NOT_VERIFIED** (stopped twice for low memory). By linear extrapolation it would sit at or over the 5 % end-to-end budget (`docs/design/hnsw-permission-recall.md` section 7). Measure it before corpora of that size go to production.
 - **Low: LLM retries are not logged.** `app/llm/http.py:141-166` retries timeouts and 5xx silently, so retries cannot be counted from logs (PROMPT 3f item 1 had to infer them from latency). Add a content-free retry log line.

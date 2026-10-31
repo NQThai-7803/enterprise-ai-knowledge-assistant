@@ -6,6 +6,13 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### PROMPT 3g -- 2026-10-31
+
+- Added `LLM_CONTEXT_WINDOW` (default 8192) and `LLM_PROMPT_TRUNCATION_GUARD_ENABLED` (default `false`). A grounded-answer LLM call whose usage reaches the window minus the output budget, or that returns no usage, logs `LLM_PROMPT_POSSIBLY_TRUNCATED`; with the flag on, the answer becomes the fixed no-answer.
+- `DEPLOYMENT.md` and `ENVIRONMENT_VARIABLES.md` now make `OLLAMA_CONTEXT_LENGTH` on the Ollama server mandatory, because `/v1` ignores `num_ctx` and Ollama silently drops the beginning of an over-long prompt.
+- Eval: `scripts/eval/ollama_usage_proxy.py` records token usage per LLM call.
+- Q096 is recorded as a known 1/100 run-order noise case.
+
 ### PROMPT 3f -- 2026-10-31
 
 - Added `LLM_SEED`. When set, it is sent as the OpenAI-compatible `seed`, and also as `options.seed` for Ollama. The eval stack pins `LLM_TEMPERATURE=0` and `LLM_SEED=20261031`.
