@@ -8,8 +8,8 @@ Chạy ngày 2026-11-05 trên stack `eaka-p3d-uat`, image `eaka-backend:heldout-
 2. **Trong 14 câu từ chối sai, 9 câu đã có gold trong prompt.** Câu trả lời bị chặn ở LLM, validator hoặc bước kiểm tra độ đầy đủ. 5 câu còn lại mất gold ở bước lọc và xếp hạng trước khi tới prompt.
 3. **Route deterministic bắt nhầm đúng như gợi ý.** Cả 6 câu HO-004, 008, 020, 023, 026, 039 đi `_structured_condition_value_answer`, không gọi LLM, và đều FAIL.
 4. **Đây là dấu hiệu overfit rõ nhất:** 75/100 câu dev đi route deterministic, held-out chỉ 6/40.
-5. **Cross-encoder không hề chạy.** `BAAI/bge-reranker-v2-m3` không có trong cache của stack nên hệ thống dùng alignment fallback, đúng với log của API. Mọi điểm "reranker" trong baseline hiện tại thực chất là điểm trùng từ.
-6. **Không thấy rò rỉ quyền ở phạm vi đã trace.** Chunk hạn chế không xuất hiện ở bất kỳ tầng nào của 140 câu với tài khoản staff.
+5. **Cross-encoder không hề chạy.** `BAAI/bge-reranker-v2-m3` không có trong cache của stack nên hệ thống dùng alignment fallback, đúng với log của API. Trên stack này, điểm "reranker" thực chất là điểm trùng từ.
+6. **Không thấy rò rỉ quyền ở phạm vi đã trace.** Chunk hạn chế không xuất hiện ở bất kỳ tầng nào trong 140 câu đã trace, với mọi tài khoản. Vì vậy con số này chưa kiểm tra được trường hợp manager có quyền thật sự nhận được tài liệu.
 
 ## Bảng câu × tầng bị chặn
 
@@ -17,11 +17,11 @@ Chạy ngày 2026-11-05 trên stack `eaka-p3d-uat`, image `eaka-backend:heldout-
 
 | Câu | Route | Hybrid | Gold vào prompt | Validator | Tầng chặn | Bằng chứng |
 |---|---|---:|---|---|---|---|
-| HO-004 | deterministic | 12 | Không | SUPPORTED | Deterministic | Cue `sau`; trả nội dung nghỉ phép cho câu về EAP; `low_alignment` bỏ gold |
+| HO-004 | deterministic | 12 | Không | SUPPORTED | Deterministic | Cue `sau `, `khi `; trả nội dung nghỉ phép cho câu về EAP; `low_alignment` bỏ gold |
 | HO-026 | deterministic | 4 | Có | SUPPORTED | Deterministic | Cue `neu ` khớp nhầm chữ "nêu"; bỏ qua gold đã có |
 | HO-039 | deterministic | 1 | Không | SUPPORTED | Deterministic | Cue `neu `; `low_alignment` bỏ 2 chunk gold (85 còn 1) |
 | HO-008 | deterministic | không có gold | — | SUPPORTED | Deterministic | Cue `khi `; đáng lẽ NO_ANSWER |
-| HO-020 | deterministic | không có gold | — | SUPPORTED | Deterministic | Cue `sau `; đáng lẽ NO_ANSWER |
+| HO-020 | deterministic | không có gold | — | SUPPORTED | Deterministic | Cue `chua du` khớp nhầm "chưa dùng"; đáng lẽ NO_ANSWER |
 | HO-023 | deterministic | không có gold | — | SUPPORTED | Deterministic | Cue `neu `; đáng lẽ NO_ANSWER |
 | HO-001 | LLM | 1 | Không | INSUFFICIENT | Lọc và xếp hạng | Tách sai "Ủy ban Rủi ro" / "Tuân thủ do ai chủ trì"; gold xuống hạng 10+ |
 | HO-007 | LLM | 2 | Không | INSUFFICIENT | Lọc và xếp hạng | `low_alignment` bỏ 3 chunk gold; câu phụ "Khi ai phê duyệt" |
@@ -63,8 +63,8 @@ Toàn bộ 26 câu có đáp án: gold có trong hybrid 25, sau `_prepare_prompt
 
 `_structured_condition_value_answer` (`app/services/grounded_answer_service.py:8876`) chạy trước LLM:
 - Chỉ cần câu hỏi chứa cue như `sau`, `neu`, `khi`, và một cửa sổ dòng có từ 2 giá trị kèm đơn vị. Không bắt buộc trùng chủ đề với câu hỏi.
-- So khớp sau khi bỏ dấu, nên `neu` (nếu) trùng với `nêu`.
-- Câu trả lời là nguyên văn nguồn, nên validator luôn trả SUPPORTED. Vì vậy nhánh này không có lớp nào chặn. Đây cùng loại lỗi với xfail "verbatim source support does not establish question responsiveness".
+- So khớp chuỗi con sau khi bỏ dấu, nên `neu ` (nếu) khớp cả "nêu" và `chua du` khớp cả "chưa dùng".
+- Câu trả lời là nguyên văn nguồn, và validator trả SUPPORTED ở cả 6 câu. Vì vậy không có lớp nào chặn nhánh này. Đây cùng loại lỗi với xfail "verbatim source support does not establish question responsiveness".
 - Câu trả lời dán từ bảng trong PDF, nên có ký tự bullet U+F0B7 mà TASKS đã ghi nhận.
 
 | | Deterministic | LLM |
