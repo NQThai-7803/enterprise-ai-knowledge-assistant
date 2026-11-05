@@ -59,3 +59,8 @@ frontend/playwright.live.config.js
 frontend/playwright.live.config.d.ts
 artifacts/
 
+
+# Handover 2026-11-05: block local caches and eaka-verify output
+node_modules/
+.cache/
+.verify/
