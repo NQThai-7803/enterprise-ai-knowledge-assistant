@@ -140,6 +140,8 @@ async def upload_with(
     enqueue_processing=None,
     content: bytes = PDF_BYTES,
     filename: str = "enqueue.pdf",
+    document_code: str | None = None,
+    document_version: str | None = None,
 ) -> tuple[Document, FakeSession, FakeStorage]:
     fake_session = session or FakeSession()
     fake_storage = storage or FakeStorage()
@@ -156,8 +158,21 @@ async def upload_with(
         access_scope=DocumentAccessScope.PRIVATE,
         department_id=None,
         current_user=make_user(),
+        document_code=document_code,
+        document_version=document_version,
     )
     return document, fake_session, fake_storage
+
+
+@pytest.mark.anyio
+async def test_upload_persists_normalized_authority_metadata() -> None:
+    document, _, _ = await upload_with(
+        document_code="  ND-HR-006  ",
+        document_version="  2.0.0  ",
+    )
+
+    assert document.document_code == "ND-HR-006"
+    assert document.document_version == "2.0.0"
 
 
 @pytest.mark.anyio

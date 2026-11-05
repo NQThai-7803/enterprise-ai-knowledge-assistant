@@ -127,6 +127,9 @@ class Settings(BaseSettings):
     hybrid_semantic_weight: float = Field(default=1.0, ge=0.0)
     hybrid_keyword_weight: float = Field(default=1.0, ge=0.0)
     hybrid_semantic_min_relevance_score: float = Field(default=0.30, ge=0.0, le=1.0)
+    # Exact KNN over permitted chunks instead of the HNSW-capable statement
+    # (docs/design/hnsw-permission-recall.md). On by default since PROMPT 3f; false rolls back.
+    rag_semantic_exact_permitted_knn_enabled: bool = True
     reranker_enabled: bool = True
     reranker_provider: Literal["sentence_transformers", "heuristic"] = "sentence_transformers"
     reranker_model: str = Field(default="BAAI/bge-reranker-v2-m3", min_length=1)
@@ -160,7 +163,15 @@ class Settings(BaseSettings):
     llm_max_retries: int = Field(default=2, ge=0)
     llm_retry_backoff_seconds: float = Field(default=1.0, ge=0.0)
     llm_temperature: float = Field(default=0.0, ge=0.0, le=2.0)
+    # Sent as the OpenAI-compatible "seed" when set; unset leaves sampling to the provider.
+    llm_seed: int | None = Field(default=None, ge=0)
     llm_max_output_tokens: int = Field(default=1024, gt=0)
+    # Context length the LLM server really runs with (Ollama: OLLAMA_CONTEXT_LENGTH on the server).
+    llm_context_window: int = Field(default=8192, ge=1024)
+    # Return the fixed no-answer when a prompt may have been cut by the provider (PROMPT 3g).
+    llm_prompt_truncation_guard_enabled: bool = False
+    # Ollama prompt tokens per tiktoken token (tokenizer_encoding_name), calibrated in PROMPT 4.
+    llm_token_estimate_ratio: float = Field(default=0.99, gt=0.0, le=4.0)
     llm_base_url: str = Field(
         default="",
         validation_alias=AliasChoices("LLM_OPENAI_BASE_URL", "LLM_BASE_URL"),
@@ -326,6 +337,16 @@ class Settings(BaseSettings):
     def parse_csv_settings(cls, value: str | list[str]) -> list[str]:
         if isinstance(value, str):
             return [item.strip() for item in value.split(",") if item.strip()]
+        return value
+
+    @field_validator("llm_seed", mode="before")
+    @classmethod
+    def normalize_llm_seed(cls, value: object) -> object:
+        if isinstance(value, bool):
+            msg = "LLM_SEED must be an integer."
+            raise ValueError(msg)
+        if isinstance(value, str) and not value.strip():
+            return None
         return value
 
     @field_validator("llm_provider", mode="before")

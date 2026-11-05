@@ -51,6 +51,11 @@ def make_settings(**overrides: object) -> Settings:
         "hybrid_semantic_min_relevance_score": 0.0,
     }
     defaults.update(overrides)
+    # Keep reranker sizing inside this test's hybrid cap; Settings rejects
+    # RERANKER_CANDIDATE_K > HYBRID_RETRIEVAL_MAX_TOP_K.
+    max_top_k = int(defaults["hybrid_retrieval_max_top_k"])
+    defaults.setdefault("reranker_candidate_k", max_top_k)
+    defaults.setdefault("reranker_top_k", min(6, int(defaults["reranker_candidate_k"])))
     return Settings(_env_file=None, **defaults)
 
 

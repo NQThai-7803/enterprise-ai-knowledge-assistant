@@ -549,7 +549,6 @@ def _important_term_coverage_score(folded: str, terms: tuple[str, ...]) -> float
         if len(term) >= 4
         and term
         not in {
-            "nova",
             "digital",
             "nhan",
             "vien",
@@ -565,7 +564,9 @@ def _important_term_coverage_score(folded: str, terms: tuple[str, ...]) -> float
     )
     if not important_terms:
         return 0.0
-    matched_count = sum(1 for term in important_terms if term in folded)
+    matched_count = sum(
+        1 for term in important_terms if re.search(rf"\b{re.escape(term)}\b", folded)
+    )
     if matched_count == 0:
         return -90.0
     score = matched_count * 35.0

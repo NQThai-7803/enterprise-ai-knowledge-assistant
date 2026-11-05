@@ -153,7 +153,9 @@ Chunking variable rules:
 - `CHUNK_OVERLAP_TOKENS` is an integer greater than or equal to `0` and smaller than `CHUNK_TARGET_TOKENS`.
 - `CHUNK_MIN_TOKENS` is an integer greater than or equal to `0` and less than or equal to `CHUNK_TARGET_TOKENS`.
 - Tokenizer and chunking settings do not contain secrets.
-- Runtime chunking does not require network access.
+- Runtime chunking needs no network access only when the tiktoken encoding file is already cached. On first use without a cache, tiktoken downloads the encoding from `openaipublic.blob.core.windows.net`, which fails on offline hosts.
+- `TIKTOKEN_CACHE_DIR` is read by tiktoken itself, not by `Settings`. The Docker image sets it to `/opt/tiktoken` and pre-bundles `cl100k_base` at build time. Without it, tiktoken caches under the OS temp directory (`data-gym-cache`), which is lost when a container is recreated.
+- If `TOKENIZER_ENCODING_NAME` is changed from `cl100k_base`, bundle that encoding into `TIKTOKEN_CACHE_DIR` as well, or the first chunking run needs network access.
 ## Embeddings
 
 ```text
@@ -219,6 +221,7 @@ HYBRID_RRF_K=60
 HYBRID_SEMANTIC_WEIGHT=1.0
 HYBRID_KEYWORD_WEIGHT=1.0
 HYBRID_SEMANTIC_MIN_RELEVANCE_SCORE=0.30
+RAG_SEMANTIC_EXACT_PERMITTED_KNN_ENABLED=true
 ```
 
 Retrieval variable rules:
@@ -240,6 +243,7 @@ Retrieval variable rules:
 - `HYBRID_RRF_K` is an integer greater than `0`.
 - `HYBRID_SEMANTIC_WEIGHT` and `HYBRID_KEYWORD_WEIGHT` are finite numbers greater than or equal to `0.0`; they cannot both be `0.0`.
 - `HYBRID_SEMANTIC_MIN_RELEVANCE_SCORE` is a finite number in `[0.0, 1.0]`.
+- `RAG_SEMANTIC_EXACT_PERMITTED_KNN_ENABLED` (boolean, default `true` since PROMPT 3f, added in PROMPT 3e): semantic retrieval ranks every chunk the user may read exactly. Set `false` only to roll back to the statement the planner can serve through the HNSW index; that path applies permission and visibility after `hnsw.ef_search` candidates and can lose permitted chunks. See `docs/design/hnsw-permission-recall.md`, including the latency budget and the cells that are not verified yet.
 - Hybrid RRF scores are ranking scores, not probabilities.
 - These retrieval values are not secrets.
 - `RERANKER_ENABLED` enables the document/chunk reranking layer after hybrid retrieval and before final context packing.
@@ -311,7 +315,11 @@ LLM_STREAM_MAX_DURATION_SECONDS=120
 LLM_MAX_RETRIES=2
 LLM_RETRY_BACKOFF_SECONDS=1
 LLM_TEMPERATURE=0.0
+LLM_SEED=
 LLM_MAX_OUTPUT_TOKENS=1024
+LLM_CONTEXT_WINDOW=8192
+LLM_PROMPT_TRUNCATION_GUARD_ENABLED=false
+LLM_TOKEN_ESTIMATE_RATIO=0.99
 LLM_NO_ANSWER_SENTINEL=__NO_ANSWER__
 ```
 
@@ -389,6 +397,11 @@ Validation rules:
 - Base URLs must be absolute `http` or `https` URLs with no embedded credentials, query, fragment, or query-based API key.
 - Remote production provider URLs must use `https`; `http` is allowed only for local development providers such as `localhost`, `127.0.0.1`, `::1`, and `host.docker.internal`.
 - Provider calls use explicit connect/read/write/pool timeouts, a bounded connection pool, bounded retries, and retry backoff.
+- `LLM_SEED` (optional non-negative integer, empty means unset, added in PROMPT 3f) is sent as the OpenAI-compatible `seed` field by the openai_compatible, ollama, lm_studio and openrouter adapters. For Ollama it is also placed in `options.seed`. The Azure, Gemini and Anthropic adapters do not send it. Ollama 0.40.13 honors the top-level `seed` on `/v1/chat/completions` and ignores `options` there (checked 2026-10-31). **Production recommendation:** keep `LLM_TEMPERATURE=0.0` and set a fixed `LLM_SEED`, so answers can be replayed for audits and incident reviews. A seed costs nothing at temperature 0. It does not remove the difference between the first request after a model load and later requests; the eval harness handles that with a warm-up. The code default stays unset so providers that reject the field keep working.
+- `LLM_CONTEXT_WINDOW` (integer >= 1024, default 8192, added in PROMPT 3g) is the context length the LLM server really runs with. For Ollama this is `OLLAMA_CONTEXT_LENGTH` on the server. After every grounded-answer LLM call, a response whose `usage.prompt_tokens` is at least `LLM_CONTEXT_WINDOW - LLM_MAX_OUTPUT_TOKENS`, or that has no usage, logs a content-free WARNING `error_code=LLM_PROMPT_POSSIBLY_TRUNCATED`.
+- `LLM_PROMPT_TRUNCATION_GUARD_ENABLED` (boolean, default `false`, added in PROMPT 3g, extended in PROMPT 4 item 0b): when `true`, the guard ends the answer with the fixed no-answer and no citations (1) **before sending**, when the estimated prompt plus `LLM_MAX_OUTPUT_TOKENS` exceeds `LLM_CONTEXT_WINDOW` (logged as `LLM_PROMPT_BUDGET_EXCEEDED`; the request is not sent), and (2) after a response with usage at or above `LLM_CONTEXT_WINDOW - LLM_MAX_OUTPUT_TOKENS` or without usage. With the flag off, both cases are logged only. In addition, a response whose `usage.prompt_tokens` is below 0.7 x the estimate logs `LLM_PROMPT_POSSIBLY_TRUNCATED` with `reason=USAGE_BELOW_ESTIMATE`. This is log-only even with the flag on. It is the signature of Ollama 0.40.13 cutting a prompt to about half its context and reporting the shortened count (2050 at 4096, 4098 at 8192), which the usage threshold alone cannot see. All guard logs carry counts only, never prompt or answer text.
+- `LLM_TOKEN_ESTIMATE_RATIO` (float, 0 < x <= 4, default `0.99`, added in PROMPT 4 item 0b): estimated provider prompt tokens = ceil(ratio x the sum of the `TOKENIZER_ENCODING_NAME` (tiktoken `cl100k_base`) counts of the message contents). Calibrated on the 36 LLM calls of a UAT Q001-Q100 run against Ollama 0.40.13 `qwen2.5:3b`; all 36 had the same case order and `prompt_tokens` as the PROMPT 3g measurement. Ollama/tiktoken was 0.779 to 0.985 (median 0.897, mean 0.898, stdev 0.053). The default 0.99 is the maximum rounded up, so no measured call is under-estimated. With it the estimate is 0.5% to 27.1% above the real count (mean 10.7%, at most 805 tokens), and the lowest real/estimate share is 0.787, above the 0.7 truncation signal. Recalibrate when the model or tokenizer changes (`scripts/eval/ollama_usage_proxy.py --tiktoken-encoding`).
+- `LLM_OLLAMA_NUM_CTX` and `LLM_OLLAMA_KEEP_ALIVE` are sent with every Ollama request. Ollama's `/v1` endpoint ignores `options`, so `num_ctx` has **no effect**. **Server-side requirement:** set `OLLAMA_CONTEXT_LENGTH` on the Ollama server, at least `LLM_CONTEXT_WINDOW`, and restart Ollama (`DEPLOYMENT.md` section 3.1). Without it the server default (4096 on Ollama 0.40.13) applies, and longer prompts lose their beginning, including the system instructions, without any error.
 - Chat SSE uses `LLM_STREAM_HEARTBEAT_SECONDS` for empty heartbeat events and `LLM_STREAM_MAX_DURATION_SECONDS` as the total bounded stream duration. Heartbeats do not extend the maximum duration.
 - The app does not call an LLM at import, migration, startup, liveness, or readiness by default.
 - The app does not add an Ollama, LM Studio, or other LLM container to Compose in TASK-026.

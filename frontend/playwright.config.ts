@@ -7,6 +7,8 @@ export default defineConfig({
     timeout: 5_000,
   },
   fullyParallel: true,
+  workers: process.env.CI ? 1 : undefined,
+  globalTimeout: process.env.CI ? 600_000 : undefined,
   reporter: "list",
   use: {
     baseURL: process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:5174",
@@ -19,9 +21,11 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "npm run dev -- --port 5174",
+    command: process.env.CI
+      ? "npm run dev -- --port 5174 --strictPort"
+      : "npm run dev -- --port 5174",
     url: "http://127.0.0.1:5174",
-    reuseExistingServer: true,
+    reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },
 });

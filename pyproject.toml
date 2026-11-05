@@ -54,6 +54,7 @@ markers = [
     "real_llm_provider_integration: opt-in tests that call a real LLM provider with synthetic content",
     "real_llm_acceptance: opt-in manual/integration acceptance for strict grounded real LLM runtime",
     "streaming_chat_integration: tests that verify chat SSE transport with mocked providers",
+    "repo_layout: tests that read repository infrastructure files; skipped only outside a repo checkout",
 ]
 
 [tool.ruff]

@@ -1,0 +1,10 @@
+# Isolated V2 Redis recovery. The original redis_data volume is retained unchanged.
+services:
+  redis:
+    volumes: !override
+      - redis_recovery_data:/data
+
+volumes:
+  redis_recovery_data:
+    external: true
+    name: enterprise-ai-uat-v2_redis_recovery_20261002

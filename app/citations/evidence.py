@@ -284,9 +284,12 @@ def _exact_value_evidence(
     if not claim_values:
         return None
 
-    candidate_folded = fold_text(candidate)
-
-    matched_values = [value for value in claim_values if fold_text(value) in candidate_folded]
+    source_values = _extract_values(candidate)
+    matched_values = [
+        source_value
+        for source_value in source_values
+        if any(fold_text(source_value) == fold_text(value) for value in claim_values)
+    ]
 
     if not matched_values:
         return None
@@ -300,6 +303,12 @@ def _exact_value_evidence(
 def _extract_values(text: str) -> tuple[str, ...]:
     value_pattern = re.compile(
         r"""
+        # Monetary amounts with grouped digits and a currency unit.
+        \b\d{1,3}(?:[.,]\d{3})+(?:[.,]\d+)?\s*
+        (?:đ|₫|d|dong|vnd)\b
+
+        |
+
         # Time range: 8:00 - 16:00
         \b\d{1,2}:\d{2}
         (?:\s*[-–—]\s*\d{1,2}:\d{2})?\b

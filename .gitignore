@@ -6,6 +6,8 @@ __pycache__/
 
 # Virtual environments
 .venv/
+.venv*/
+/vite-monorepo/
 venv/
 env/
 
@@ -30,13 +32,14 @@ dist/
 
 # Local data and logs
 .backups/
-data/
+/data/
 data/models/
 logs/
 *.log
 
 # IDE
 .vscode/
+.claude/settings.local.json
 .idea/
 
 # Frontend
@@ -46,7 +49,29 @@ frontend/coverage/
 frontend/playwright-report/
 frontend/test-results/
 frontend/*.tsbuildinfo
-frontend/*.js
-frontend/*.d.ts
+# Stale tsc output from the tsconfig.node.json sources (it now uses noEmit).
+# Listed by name so hand-written config such as eslint.config.js stays tracked.
+frontend/vite.config.js
+frontend/vite.config.d.ts
+frontend/playwright.config.js
+frontend/playwright.config.d.ts
+frontend/playwright.live.config.js
+frontend/playwright.live.config.d.ts
 artifacts/
 
+
+# Handover 2026-11-05: block local caches and eaka-verify output
+node_modules/
+.cache/
+.verify/
+
+# Handover 2026-11-05: junk kept locally, removed from git
+/tore package.json package-lock.json
+/enterprise_ai_md_updates_2026-08-19_v6.zip
+/files-for-chat/
+
+# Knowledge graph: the map is committed, only its cache is ignored
+graphify-out/cache/
+
+# Output of the RAG change guard
+.eval/

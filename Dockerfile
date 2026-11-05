@@ -15,15 +15,24 @@ WORKDIR /build
 RUN python -m venv "${VIRTUAL_ENV}" \
     && python -m pip install --upgrade "pip>=25,<26" "setuptools>=80,<81" "wheel>=0.45,<0.46"
 
-# The app uses CPU embeddings in the MVP; preinstalling CPU Torch avoids CUDA wheels in the image.
-RUN python -m pip install --index-url https://download.pytorch.org/whl/cpu "torch>=2.3,<3"
+COPY requirements.lock ./
 
-COPY pyproject.toml ./
+# The app uses CPU embeddings in the MVP; the lock pins the CPU Torch wheel. Installing it in its
+# own layer keeps the large download cached when other pins change.
+RUN python -m pip install --no-deps --index-url https://download.pytorch.org/whl/cpu \
+        -c requirements.lock torch
 
-RUN python -c "import subprocess, sys, tomllib; deps = tomllib.load(open('pyproject.toml', 'rb'))['project']['dependencies']; subprocess.check_call([sys.executable, '-m', 'pip', 'install', *deps])" \
-    && python -m pip install --force-reinstall --no-deps --index-url https://pypi.org/simple "typing_extensions>=4.12,<5" \
+# Install exactly the approved pins; --no-deps keeps pip from resolving anything outside the lock.
+RUN python -m pip install --no-deps -r requirements.lock \
+        --extra-index-url https://download.pytorch.org/whl/cpu \
+    && python -m pip install --force-reinstall --no-deps --index-url https://pypi.org/simple \
+        -c requirements.lock typing_extensions \
     && python -m pip check \
     && python -c "from typing_extensions import Annotated; import alembic, fastapi, sqlalchemy"
+
+# Bundle the default chunking encoding so runtime tokenization never downloads it.
+ENV TIKTOKEN_CACHE_DIR=/opt/tiktoken
+RUN python -c "import tiktoken; tiktoken.get_encoding('cl100k_base')"
 
 FROM python:3.12-slim AS runtime
 
@@ -31,6 +40,7 @@ ENV PATH="/opt/venv/bin:${PATH}" \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/app \
     PYTHONUNBUFFERED=1 \
+    TIKTOKEN_CACHE_DIR=/opt/tiktoken \
     VIRTUAL_ENV=/opt/venv
 
 WORKDIR /app
@@ -47,6 +57,7 @@ RUN groupadd --system --gid 10001 app \
     && chown -R app:app /app
 
 COPY --from=builder /opt/venv /opt/venv
+COPY --from=builder /opt/tiktoken /opt/tiktoken
 COPY --chown=app:app app ./app
 COPY --chown=app:app alembic.ini pyproject.toml README.md ./
 
@@ -59,8 +70,13 @@ CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 FROM runtime AS test
 
 USER root
-RUN python -m pip install --no-cache-dir "pytest>=8.0.0" "ruff>=0.6.0"
+# Pinned test tools; packaging and pygments already come from requirements.lock.
+RUN python -m pip install --no-cache-dir --no-deps \
+        "pytest==9.2.0" "pluggy==1.7.0" "iniconfig==2.3.1" "ruff==0.17.3" \
+    && python -m pip check
 COPY --chown=app:app tests ./tests
+# Test-only: the eval-harness unit tests import scripts/. The runtime stage stays without it.
+COPY --chown=app:app scripts ./scripts
 USER app
 
 CMD ["python", "-m", "pytest", "tests/unit", "-v"]

@@ -37,6 +37,7 @@ def _compose_prod_config() -> dict[str, object]:
     return json.loads(result.stdout)
 
 
+@pytest.mark.repo_layout("compose.prod.yaml", ".env.production.example")
 def test_production_compose_defines_runtime_observability_services() -> None:
     services = _compose_prod_config()["services"]
 
@@ -57,6 +58,7 @@ def test_production_compose_defines_runtime_observability_services() -> None:
     assert services["reverse-proxy"]["ports"]
 
 
+@pytest.mark.repo_layout("compose.prod.yaml", ".env.production.example")
 def test_production_compose_sets_restart_healthchecks_and_resource_limits() -> None:
     services = _compose_prod_config()["services"]
 
@@ -75,6 +77,7 @@ def test_production_compose_sets_restart_healthchecks_and_resource_limits() -> N
     assert "runtime_validation" in " ".join(services["worker"]["command"])
 
 
+@pytest.mark.repo_layout("deploy/nginx/conf.d/app.conf", "deploy/nginx/nginx.conf")
 def test_reverse_proxy_config_supports_sse_limits_and_security_headers() -> None:
     config = (ROOT / "deploy" / "nginx" / "conf.d" / "app.conf").read_text(encoding="utf-8")
     nginx = (ROOT / "deploy" / "nginx" / "nginx.conf").read_text(encoding="utf-8")
@@ -91,6 +94,11 @@ def test_reverse_proxy_config_supports_sse_limits_and_security_headers() -> None
     assert "request_id" in nginx
 
 
+@pytest.mark.repo_layout(
+    "deploy/prometheus/prometheus.yml",
+    "deploy/grafana/provisioning/datasources/prometheus.yml",
+    "deploy/grafana/dashboards/system-overview.json",
+)
 def test_prometheus_and_grafana_provisioning_are_safe() -> None:
     prometheus = (ROOT / "deploy" / "prometheus" / "prometheus.yml").read_text(encoding="utf-8")
     datasource = (
@@ -109,6 +117,7 @@ def test_prometheus_and_grafana_provisioning_are_safe() -> None:
     assert "secret" not in dashboard.lower()
 
 
+@pytest.mark.repo_layout("scripts/backup")
 def test_backup_restore_scripts_are_present_and_guarded() -> None:
     script_dir = ROOT / "scripts" / "backup"
     postgres_backup = (script_dir / "postgres_backup.ps1").read_text(encoding="utf-8")

@@ -61,6 +61,11 @@ def make_settings(**overrides: object) -> Settings:
         "keyword_min_rank": 0.0,
     }
     defaults.update(overrides)
+    # Keep reranker sizing inside this test's hybrid cap; Settings rejects
+    # RERANKER_CANDIDATE_K > HYBRID_RETRIEVAL_MAX_TOP_K.
+    max_top_k = int(defaults["hybrid_retrieval_max_top_k"])
+    defaults.setdefault("reranker_candidate_k", max_top_k)
+    defaults.setdefault("reranker_top_k", min(6, int(defaults["reranker_candidate_k"])))
     return Settings(_env_file=None, **defaults)
 
 
@@ -277,10 +282,14 @@ def test_internal_system_messages_are_not_grounding_prompt_memory(
 
         await service.answer_question(current_user=owner, session_id=chat.id, question="Q")
 
+        # Same-session history only rewrites the question before retrieval; the grounded
+        # prompt gets an empty history block, so stored SYSTEM rows never reach the LLM.
         assert [message.role for message in llm.messages] == ["system", "user"]
         assert CONFIDENTIAL_MARKER not in llm.messages[0].content
-        assert CONFIDENTIAL_MARKER in llm.messages[1].content
-        assert "INTERNAL_SYSTEM" in llm.messages[1].content
+        assert CONFIDENTIAL_MARKER not in llm.messages[1].content
+        assert "INTERNAL_SYSTEM" not in llm.messages[1].content
+        assert "--- CONVERSATION MESSAGE" not in llm.messages[1].content
+        assert "<conversation_history>\n</conversation_history>" in llm.messages[1].content
 
     run_async(scenario())
 

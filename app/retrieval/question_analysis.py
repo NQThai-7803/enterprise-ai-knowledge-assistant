@@ -29,6 +29,7 @@ ANSWER_TYPES = frozenset(
         "PERCENTAGE",
         "TIME",
         "TIME_RANGE",
+        "TIMELINE",
         "DURATION",
         "YES_NO",
         "LIST",
@@ -46,6 +47,7 @@ class QuestionAnalysis:
     answer_type: str
     is_yes_no: bool = False
     asks_for_time_range: bool = False
+    asks_for_timeline: bool = False
     asks_for_person: bool = False
     asks_for_amount: bool = False
     asks_for_percentage: bool = False
@@ -82,6 +84,8 @@ _CONVERSATIONAL_REPLACEMENTS = {
     "dc": "duoc",
     "cty": "cong ty",
     "nv": "nhan vien",
+    "tieng": "gio",
+    "wfh": "remote",
 }
 
 
@@ -94,13 +98,16 @@ def retrieval_query_variants(question: str) -> RetrievalQueryVariants:
     normalized = re.sub(r"\s*([?!.,:;])\s*", r"\1 ", normalized).strip()
     folded = fold_text(normalized)
     tokens = re.findall(r"\w+|[^\w\s]", folded, re.UNICODE)
+    folded_tokens = " ".join(tokens).strip()
     expanded: list[str] = []
     for token in tokens:
         expanded.extend(_CONVERSATIONAL_REPLACEMENTS.get(token, token).split())
     normalized_retrieval = " ".join(expanded).strip()
     canonical_retrieval = _canonicalize_retrieval_language(normalized_retrieval)
     semantic_normalized = (
-        canonical_retrieval if canonical_retrieval != normalized_retrieval else normalized
+        canonical_retrieval
+        if canonical_retrieval != normalized_retrieval or normalized_retrieval != folded_tokens
+        else normalized
     )
     return RetrievalQueryVariants(
         original=original,
@@ -111,19 +118,43 @@ def retrieval_query_variants(question: str) -> RetrievalQueryVariants:
 
 def _canonicalize_retrieval_language(value: str) -> str:
     """Normalize narrow conversational policy phrases without adding facts."""
+    canonical = re.sub(r"\bproduction\s+incident\b", "su co", value)
+    # Retrieval-only vocabulary: common English developer phrasing should
+    # find a Vietnamese policy clause about the same repository/credential.
+    canonical = re.sub(r"\bsource\s+code\b", "ma nguon", canonical)
+    canonical = re.sub(r"\bgithub\b", "kho ma nguon", canonical)
+    if any(cue in canonical for cue in ("ho tro", "tro cap", "phuc loi", "benefit", "support")):
+        # In benefit questions, conversational Vietnamese ``có con`` names
+        # the same life event that policy tables normally label ``sinh con``.
+        canonical = re.sub(r"\bco con\b", "sinh con", canonical)
+    if any(
+        cue in canonical
+        for cue in (
+            "nghi phep",
+            "on call",
+            "on-call",
+            "hybrid",
+            "remote",
+            "phu cap",
+            "tro cap",
+            "bao hiem",
+        )
+    ):
+        canonical = re.sub(r"\btoi\b", "nhan vien", canonical)
+        canonical = re.sub(r"\bma phai\b", "nhung phai", canonical)
     canonical = re.sub(
         r"\bcan tuan thu bao mat (?:nao|gi)\b",
         "yeu cau bao mat gi",
-        value,
+        canonical,
     )
     canonical = re.sub(
         r"\bphai (?:bao dam|dam bao) an toan gi\b",
         "yeu cau bao mat gi",
         canonical,
     )
-    if "nam vien" in canonical and any(
-        cue in canonical for cue in ("bao hiem", "han muc", "novacare")
-    ):
+    if re.search(r"\b(?:checkout|check\s*-?\s*out)\b", canonical):
+        canonical = f"{canonical} cham cong dieu chinh"
+    if "nam vien" in canonical:
         canonical = re.sub(r"\bnam vien\b", "noi tru", canonical)
     if "yeu cau bao mat gi" in canonical and any(
         cue in canonical for cue in ("hybrid", "lam o nha", "lam viec tu xa")
@@ -142,13 +173,34 @@ def analyze_question(question: str) -> QuestionAnalysis:
         and "how much" not in folded
     )
     asks_for_person = _asks_for_person(folded)
+    asks_for_organization = _asks_for_organization(folded)
     asks_for_percentage = (
         "phan tram" in folded or "%" in question or _asks_for_percentage_like(folded)
     )
-    asks_for_amount = False if asks_for_percentage else _asks_for_amount(folded)
+    asks_for_timeline = _asks_for_timeline(folded)
+    asks_for_amount = (
+        False
+        if asks_for_percentage or asks_for_timeline
+        else (_asks_for_amount(folded) or _asks_for_salary_band_value(folded))
+    )
     asks_for_count = _asks_for_count(folded)
-    asks_for_duration = False if asks_for_amount else _asks_for_duration(folded)
-    asks_for_time_range = _asks_for_time_range(folded)
+    # A yes/no question can mention a time field (for example, whether remote
+    # staff must keep core hours) without asking the model to return the range.
+    # Treating the field name itself as a range request activates numeric
+    # extraction and can discard the governing policy clause.
+    asks_for_clock_time = _asks_for_time(folded)
+    asks_for_named_endpoint = asks_for_clock_time and any(
+        cue in folded
+        for cue in ("bat dau", "ket thuc", "starts at", "start at", "ends at", "end at")
+    )
+    asks_for_time_range = _asks_for_time_range(folded) and not (
+        is_yes_no or asks_for_named_endpoint
+    )
+    asks_for_duration = (
+        False
+        if asks_for_amount or asks_for_time_range or asks_for_clock_time
+        else _asks_for_duration(folded)
+    )
     asks_for_date = _asks_for_date(folded)
     asks_for_policy_condition = _asks_for_policy_condition(folded)
     explicit_value = any(
@@ -158,9 +210,10 @@ def analyze_question(question: str) -> QuestionAnalysis:
             asks_for_count,
             asks_for_duration,
             asks_for_time_range,
+            asks_for_timeline,
             asks_for_date,
             "bao nhieu" in folded,
-            " may" in folded,
+            " may" in folded and not asks_for_organization,
             any(cue in folded for cue in ("grade nao", "so nao", "muc nao")),
             " how many " in padded,
             " how much " in padded,
@@ -180,7 +233,9 @@ def analyze_question(question: str) -> QuestionAnalysis:
         answer_type = "DATE"
     elif asks_for_time_range:
         answer_type = "TIME_RANGE"
-    elif _asks_for_time(folded):
+    elif asks_for_timeline:
+        answer_type = "TIMELINE"
+    elif asks_for_clock_time:
         answer_type = "TIME"
     elif asks_for_duration:
         answer_type = "DURATION"
@@ -188,6 +243,8 @@ def analyze_question(question: str) -> QuestionAnalysis:
         answer_type = "AMOUNT"
     elif asks_for_count:
         answer_type = "COUNT"
+    elif asks_for_organization:
+        answer_type = "ORGANIZATION"
     elif is_yes_no:
         answer_type = "YES_NO"
     elif _asks_for_purpose(folded):
@@ -209,6 +266,7 @@ def analyze_question(question: str) -> QuestionAnalysis:
         answer_type=answer_type,
         is_yes_no=is_yes_no,
         asks_for_time_range=asks_for_time_range,
+        asks_for_timeline=asks_for_timeline,
         asks_for_person=asks_for_person,
         asks_for_amount=asks_for_amount,
         asks_for_percentage=asks_for_percentage,
@@ -238,6 +296,28 @@ def fold_text(text: str) -> str:
     return normalized.translate(_VIETNAMESE_BASE_TRANSLATION)
 
 
+def asks_for_organization_activity(question: str) -> bool:
+    """Detect requests for an organization's lines of business or activity."""
+
+    folded = fold_text(question)
+    has_organization = any(
+        re.search(rf"\b{re.escape(cue)}\b", folded) is not None
+        for cue in ("cong ty", "doanh nghiep", "company", "business")
+    )
+    asks_areas = any(
+        re.search(rf"\b{re.escape(cue)}\b", folded) is not None
+        for cue in (
+            "mang gi",
+            "linh vuc",
+            "hoat dong",
+            "business areas",
+            "areas of business",
+            "what does the company do",
+        )
+    )
+    return has_organization and asks_areas
+
+
 def _is_yes_no_question(folded: str) -> bool:
     stripped = folded.strip()
     return (
@@ -263,6 +343,38 @@ def _is_yes_no_question(folded: str) -> bool:
 def _asks_for_person(folded: str) -> bool:
     stripped = folded.strip()
     padded = f" {stripped} "
+    ai_product_context = any(
+        re.search(pattern, stripped)
+        for pattern in (
+            r"\bpublic\s+ai\b",
+            r"\bcong\s+cu\s+ai\b",
+            r"\bdich\s+vu\s+ai\b",
+            r"\bai\s+tao\b",
+            r"\bket\s+qua\s+ai\b",
+            r"\bchatgpt\b",
+        )
+    )
+    if ai_product_context and not any(cue in stripped for cue in (" la ai", "ai la ", " who ")):
+        return False
+    # "Who approves/reviews this request?" asks for a workflow actor, which
+    # may be a role (for example, the direct manager) rather than a person's
+    # name. Treating it as a PERSON lookup biases ranking toward document
+    # metadata containing named authors/approvers and incorrectly activates
+    # full-name completeness checks.
+    asks_for_workflow_actor = any(
+        cue in padded
+        for cue in (
+            " duyet ",
+            " phe duyet ",
+            " xac nhan ",
+            " approve ",
+            " approves ",
+            " review ",
+            " reviews ",
+        )
+    ) and not any(cue in stripped for cue in (" ten gi", " ten la gi", " name"))
+    if asks_for_workflow_actor:
+        return False
     return (
         " la ai" in stripped
         or stripped.endswith(" ai")
@@ -271,6 +383,18 @@ def _asks_for_person(folded: str) -> bool:
         or stripped.startswith("who ")
         or " ten gi" in stripped
         or " ten la gi" in stripped
+    )
+
+
+def _asks_for_organization(folded: str) -> bool:
+    """Recognize a requested unit even when casual wording contains `mấy`."""
+
+    return any(
+        re.search(pattern, folded) is not None
+        for pattern in (
+            r"\b(?:bo phan|phong ban|don vi|nhom) nao\b",
+            r"\b(?:which|what) (?:department|team|unit)\b",
+        )
     )
 
 
@@ -287,7 +411,7 @@ def _asks_for_year(folded: str) -> bool:
 
 
 def _asks_for_percentage_like(folded: str) -> bool:
-    if "ty le" in folded or "percentage" in folded:
+    if re.search(r"\bty\s+le\b", folded) or re.search(r"\bpercentage\b", folded):
         return True
     if re.search(r"\b(?:ot\s+bao nhieu|bao nhieu\s+ot)\b", folded):
         return True
@@ -313,6 +437,7 @@ def _asks_for_percentage_like(folded: str) -> bool:
     return any(
         cue in folded
         for cue in (
+            "ot",
             "lam them",
             "overtime",
             "ban dem",
@@ -341,10 +466,15 @@ def _asks_for_time(folded: str) -> bool:
 def _asks_for_time_range(folded: str) -> bool:
     padded = f" {folded} "
     return (
-        " khoang nao" in padded
+        re.search(r"\btu\s+may\s+gio\s+(?:toi|den)\s+may\s+gio\b", folded) is not None
+        or " khoang nao" in padded
         or " khung gio" in padded
+        or " khung bat dau" in padded
+        or " khung ket thuc" in padded
         or " gio cot loi" in padded
         or " core hour" in padded
+        or " start window" in padded
+        or " end window" in padded
         or " time range" in padded
         or " time interval" in padded
         or " between what time" in padded
@@ -360,11 +490,7 @@ def _asks_for_amount(folded: str) -> bool:
     )
     if asks_paid_leave_duration:
         return False
-    if (
-        asks_quantity
-        and "nam vien" in folded
-        and any(cue in folded for cue in ("bao hiem", "han muc", "novacare"))
-    ):
+    if asks_quantity and "nam vien" in folded:
         return True
     if not asks_quantity:
         padded = f" {folded} "
@@ -393,23 +519,79 @@ def _asks_for_amount(folded: str) -> bool:
         ):
             return True
     money_terms = (
-        " dong ",
-        " trieu ",
-        " tien ",
-        " luong ",
-        " phu cap ",
-        " tro cap ",
-        " ho tro ",
-        " chi tra ",
-        " han muc ",
-        " noi tru ",
-        " ngoai tru ",
-        " allowance ",
-        " salary ",
-        " support ",
-        " amount ",
+        "dong",
+        "trieu",
+        "tien",
+        "luong",
+        "phu cap",
+        "tro cap",
+        "ho tro",
+        "chi tra",
+        "han muc",
+        "noi tru",
+        "ngoai tru",
+        "allowance",
+        "salary",
+        "support",
+        "amount",
     )
-    return asks_quantity and any(term.strip() in folded for term in money_terms)
+    return asks_quantity and any(
+        re.search(rf"(?<!\w){re.escape(term)}(?!\w)", folded) is not None for term in money_terms
+    )
+
+
+def _asks_for_salary_band_value(folded: str) -> bool:
+    """Recognize a compensation-band request without requiring ``bao nhieu``.
+
+    A band/range is itself a value request when it is explicitly scoped to
+    compensation.  Keeping both signals mandatory avoids classifying generic
+    role, schedule, leave, or policy-range questions as monetary amounts.
+    """
+
+    if "nghi khong luong" in folded or "unpaid leave" in folded:
+        return False
+    salary_cues = ("luong", "salary", "pay", "compensation", "gross")
+    band_cues = ("dai", "khoang", "range", "band", "khung", "min", "max")
+    return any(cue in folded for cue in salary_cues) and any(cue in folded for cue in band_cues)
+
+
+def _asks_for_timeline(folded: str) -> bool:
+    """Recognize ordered policy timing, distinct from a monetary amount.
+
+    A compensation term can describe an amount, but a question about a cycle,
+    stage, period, or effective date asks for temporal policy evidence. Both a
+    temporal form and a process/effective-date anchor are required so ordinary
+    salary and payment questions retain their existing classifications.
+    """
+
+    temporal_form = any(
+        cue in folded
+        for cue in (
+            "khoang thoi gian",
+            "giai doan",
+            "chu ky",
+            "timeline",
+            "thang nao",
+            "what period",
+            "which months",
+            "review cycle",
+            "effective date",
+            "when is",
+        )
+    )
+    process_anchor = any(
+        cue in folded
+        for cue in (
+            "review",
+            "danh gia",
+            "calibration",
+            "phe duyet ngan sach",
+            "budget approval",
+            "hieu luc",
+            "effective",
+        )
+    )
+    return temporal_form and process_anchor
 
 
 def _asks_for_count(folded: str) -> bool:
@@ -432,12 +614,15 @@ def _asks_for_count(folded: str) -> bool:
 def _asks_for_duration(folded: str) -> bool:
     return (
         re.search(r"\bso\s+(?:ngay|gio|tuan|thang|nam)\b", folded) is not None
-        or re.search(r"\bmay\s+(?:ngay|tuan|thang|nam)\b", folded) is not None
+        or re.search(r"\bmay\s+(?:ngay|gio|tieng|tuan|thang|nam)\b", folded) is not None
         or re.search(r"\bnumber\s+of\s+(?:days?|hours?|weeks?|months?|years?)\b", folded)
         is not None
         or " bao lau" in folded
         or " trong bao lau" in folded
-        or re.search(r"bao nhieu\s+(?:\w+\s+){0,4}(?:ngay|gio|tuan|thang|nam)\b", folded)
+        or re.search(
+            r"bao nhieu\s+(?:\w+\s+){0,4}(?:ngay|gio|tieng|tuan|thang|nam)\b",
+            folded,
+        )
         is not None
         or re.search(
             r"how many\s+(?:\w+\s+){0,4}(?:days?|hours?|weeks?|months?|years?)\b",

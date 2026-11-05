@@ -16,6 +16,7 @@ from app.core.security import hash_password
 from app.db.session import get_db_session
 from app.main import create_app
 from app.models import User, UserRole
+from tests.api.rate_limit_isolation import isolated_client_address
 
 PASSWORD = "valid auth password"
 
@@ -185,7 +186,7 @@ def rbac_integration_client(
     application.include_router(create_test_router())
     application.dependency_overrides[get_db_session] = override_get_db_session
 
-    with TestClient(application) as client:
+    with TestClient(application, client=isolated_client_address()) as client:
         yield client
 
     application.dependency_overrides.clear()

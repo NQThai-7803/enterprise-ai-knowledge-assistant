@@ -39,6 +39,7 @@ class OpenAICompatibleLLMProvider(BaseHTTPProvider):
         transport: httpx.AsyncBaseTransport | None = None,
         ollama_num_ctx: int | None = None,
         ollama_keep_alive: str | None = None,
+        seed: int | None = None,
     ) -> None:
         if not model.strip():
             raise LLMError(LLMFailureCode.LLM_NOT_CONFIGURED)
@@ -62,6 +63,7 @@ class OpenAICompatibleLLMProvider(BaseHTTPProvider):
         self._reasoning_effort = (reasoning_effort or "").strip() or None
         self._ollama_num_ctx = ollama_num_ctx
         self._ollama_keep_alive = (ollama_keep_alive or "").strip() or None
+        self._seed = seed
 
     async def generate(
         self,
@@ -109,11 +111,18 @@ class OpenAICompatibleLLMProvider(BaseHTTPProvider):
         if self._reasoning_effort:
             payload["reasoning_effort"] = self._reasoning_effort
             payload["reasoning"] = {"effort": self._reasoning_effort}
+        if self._seed is not None:
+            # OpenAI-compatible field. Ollama's /v1 endpoint honors it; it ignores "options".
+            payload["seed"] = self._seed
         if self.provider_name == "ollama":
+            options: dict[str, object] = {}
             if self._ollama_num_ctx is not None:
-                payload["options"] = {
-                    "num_ctx": self._ollama_num_ctx,
-                }
+                options["num_ctx"] = self._ollama_num_ctx
+            if self._seed is not None:
+                # Native Ollama form, kept for the /api endpoints; /v1 reads the top-level seed.
+                options["seed"] = self._seed
+            if options:
+                payload["options"] = options
 
             if self._ollama_keep_alive:
                 payload["keep_alive"] = self._ollama_keep_alive

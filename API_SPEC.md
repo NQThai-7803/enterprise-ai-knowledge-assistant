@@ -512,7 +512,7 @@ Rules:
 - The service calls permission-aware `HybridRetrievalService` for context.
 - Empty retrieval or empty context returns a successful fixed no-answer and does not call the LLM.
 - LLM source markers are validated before the generated answer is returned or persisted.
-- Unknown, malformed, missing, or too many source markers return `502 CITATION_VALIDATION_FAILED` and persist no messages.
+- Unknown, malformed, missing, or too many source markers trigger bounded structured retry/repair. If the markers are still invalid afterwards, the request fails safe: `HTTP 201` (SSE: `message.completed`) with `grounding_status=NO_ANSWER`, empty citations, and the USER/ASSISTANT pair persisted with the fixed `CHAT_NO_ANSWER_MESSAGE`. No MessageCitation rows, `[SOURCE_n]` markers, or generated answer text are returned or persisted. A citation mapping failure after valid markers still returns `502 CITATION_MAPPING_FAILED`.
 - Permission revalidation failure after LLM generation downgrades to the fixed no-answer with empty citations.
 - USER, ASSISTANT, and MessageCitation rows are persisted atomically.
 

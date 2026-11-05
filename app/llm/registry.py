@@ -108,6 +108,7 @@ class LLMProviderRegistry:
                 api_key=self.settings.llm_api_key,
                 model=self.settings.llm_model,
                 provider_name=provider_name,
+                seed=self.settings.llm_seed,
                 **common,
             )
         if provider_name == OLLAMA_PROVIDER:
@@ -122,6 +123,7 @@ class LLMProviderRegistry:
                 reasoning_effort=self.settings.llm_ollama_reasoning_effort,
                 ollama_num_ctx=self.settings.llm_ollama_num_ctx,
                 ollama_keep_alive=self.settings.llm_ollama_keep_alive,
+                seed=self.settings.llm_seed,
                 **common,
             )
         if provider_name == LM_STUDIO_PROVIDER:
@@ -130,6 +132,7 @@ class LLMProviderRegistry:
                 api_key=None,
                 model=_required_model(self.settings.llm_lm_studio_model, self.settings.llm_model),
                 provider_name=provider_name,
+                seed=self.settings.llm_seed,
                 **common,
             )
         if provider_name == OPENROUTER_PROVIDER:
@@ -138,6 +141,7 @@ class LLMProviderRegistry:
                 api_key=self.settings.llm_openrouter_api_key,
                 model=_required_model(self.settings.llm_openrouter_model, self.settings.llm_model),
                 provider_name=provider_name,
+                seed=self.settings.llm_seed,
                 **common,
             )
         if provider_name == AZURE_OPENAI_PROVIDER:

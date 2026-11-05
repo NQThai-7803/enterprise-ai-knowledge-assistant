@@ -24,6 +24,7 @@ from app.models import (
     ChatMessageRole,
     ChatSession,
     CitationSourceType,
+    MessageCitation,
     User,
     UserRole,
 )
@@ -95,7 +96,11 @@ class FakeCitationValidationService:
 
 
 class FakeCitationRepository:
+    def __init__(self) -> None:
+        self.calls = 0
+
     async def create_many(self, session: object, *, assistant_message: ChatMessage, citations):  # noqa: ANN001
+        self.calls += 1
         return tuple(citations)
 
 
@@ -222,7 +227,13 @@ def make_settings(**overrides: object) -> Settings:
     return Settings(_env_file=None, **defaults)
 
 
-def hit(text: str = "authorized context") -> HybridRetrievalHit:
+# Context and answer agree, so the real claim validation keeps the ANSWERED path.
+GROUNDED_CONTEXT = "Nhân viên được nghỉ 12 ngày phép năm."
+GROUNDED_ANSWER_JSON = '{"answer":"Nhân viên được nghỉ 12 ngày phép năm.","citations":["SOURCE_1"]}'
+GROUNDED_ANSWER_DISPLAY = "Nhân viên được nghỉ 12 ngày phép năm. [1]"
+
+
+def hit(text: str = GROUNDED_CONTEXT) -> HybridRetrievalHit:
     return HybridRetrievalHit(
         chunk_id=uuid.UUID("00000000-0000-0000-0000-000000000101"),
         document_id=uuid.UUID("00000000-0000-0000-0000-000000000201"),
@@ -257,7 +268,7 @@ def retrieval_result(*hits: HybridRetrievalHit) -> HybridRetrievalResult:
 
 
 def llm_answer(
-    content: str = '{"answer":"Grounded answer","citations":["SOURCE_1"]}',
+    content: str = GROUNDED_ANSWER_JSON,
 ) -> LLMGenerationResult:
     return LLMGenerationResult(
         content=content,
@@ -291,6 +302,7 @@ def install_service(
     settings: Settings | None = None,
     citations: tuple[object, ...] | None = None,
     citation_error: Exception | None = None,
+    citation_repository: FakeCitationRepository | None = None,
 ) -> tuple[FakeRetrievalService, FakeLLMProvider]:
     resolved_retrieval = retrieval or FakeRetrievalService(retrieval_result(hit()))
     resolved_llm = llm or FakeLLMProvider(llm_answer())
@@ -300,7 +312,7 @@ def install_service(
         hybrid_retrieval_service=resolved_retrieval,
         llm_provider_factory=lambda: resolved_llm,
         token_counter=FakeCounter(),
-        citation_repository=FakeCitationRepository(),
+        citation_repository=citation_repository or FakeCitationRepository(),
         citation_validation_service=FakeCitationValidationService(
             citations=citations if citations is not None else (default_citation(),),
             error=citation_error,
@@ -400,10 +412,10 @@ def test_stream_success_persists_assistant_message_once_and_returns_final_payloa
         "citations.ready",
         "message.completed",
     ]
-    assert events[1][1] == {"sequence": 1, "content": "Grounded answer [1]"}
+    assert events[1][1] == {"sequence": 1, "content": GROUNDED_ANSWER_DISPLAY}
     completed = events[-1][1]
     assert completed["message_id"]
-    assert completed["content"] == "Grounded answer [1]"
+    assert completed["content"] == GROUNDED_ANSWER_DISPLAY
     assert completed["provider"] == "openai_compatible"
     assert completed["model"] == "fake-model"
     assert completed["usage"] == {
@@ -459,8 +471,10 @@ def test_stream_uses_current_session_conversation_memory(
 
     events = parse_sse(response.text)
     assert events[-1][0] == "message.completed"
-    assert retrieval.queries == ["Does it apply on Saturday?"]
-    assert "Working policy?" in llm.messages[1].content
+    # History resolves the follow-up topic; the prior assistant answer is not evidence.
+    assert retrieval.queries == ["Does Working policy apply on Saturday?"]
+    assert retrieval.queries[0] in llm.messages[1].content
+    assert "08:00-17:00 applies on working days." not in llm.messages[1].content
 
 
 def test_stream_endpoint_checks_session_ownership(
@@ -509,7 +523,7 @@ def test_provider_failure_emits_safe_error_and_persists_no_assistant_message(
     assert run_async(count_messages(async_session_factory_for_tests, chat_session=chat)) == 0
 
 
-def test_invalid_citation_emits_safe_error_and_persists_no_assistant_message(
+def test_invalid_citation_stream_fails_safe_to_fixed_no_answer(
     api_client: TestClient,
     async_session_factory_for_tests: async_sessionmaker[AsyncSession],
     make_user: Callable[..., User],
@@ -519,18 +533,51 @@ def test_invalid_citation_emits_safe_error_and_persists_no_assistant_message(
 
     owner = make_user(role=UserRole.STAFF)
     chat = create_session(async_session_factory_for_tests, owner=owner)
+    settings = make_settings()
+    citation_repository = FakeCitationRepository()
     install_service(
         api_client,
         async_session_factory_for_tests,
+        settings=settings,
         citation_error=CitationValidationError(CitationFailureCode.CITATION_MARKER_UNKNOWN),
+        citation_repository=citation_repository,
     )
 
     response = post_stream(api_client, make_auth_headers, owner, chat)
 
     events = parse_sse(response.text)
-    assert events[-1][0] == "stream.error"
-    assert events[-1][1]["code"] == "CITATION_VALIDATION_FAILED"
-    assert run_async(count_messages(async_session_factory_for_tests, chat_session=chat)) == 0
+    assert [event for event, _ in events][-1] == "message.completed"
+    assert "stream.error" not in [event for event, _ in events]
+    completed = events[-1][1]
+    assert completed["grounding_status"] == "NO_ANSWER"
+    assert completed["citations"] == []
+    assert completed["content"] == settings.chat_no_answer_message
+    serialized_events = json.dumps([payload for _, payload in events], ensure_ascii=False)
+    assert "[SOURCE_" not in serialized_events
+    assert GROUNDED_CONTEXT not in serialized_events
+    assert citation_repository.calls == 0
+
+    async def persisted() -> tuple[list[ChatMessage], int]:
+        async with async_session_factory_for_tests() as session:
+            messages = list(
+                await session.scalars(
+                    select(ChatMessage)
+                    .where(ChatMessage.session_id == chat.id)
+                    .order_by(ChatMessage.created_at.asc(), ChatMessage.id.asc())
+                )
+            )
+            citation_count = await session.scalar(select(func.count()).select_from(MessageCitation))
+            return messages, citation_count or 0
+
+    messages, citation_count = run_async(persisted())
+    assert [message.role for message in messages] == [
+        ChatMessageRole.USER,
+        ChatMessageRole.ASSISTANT,
+    ]
+    assert messages[1].content == settings.chat_no_answer_message
+    assert "[SOURCE_" not in messages[1].content
+    assert GROUNDED_CONTEXT not in messages[1].content
+    assert citation_count == 0
 
 
 def test_stream_preserves_no_answer_policy(

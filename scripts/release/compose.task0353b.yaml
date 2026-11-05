@@ -1,0 +1,150 @@
+name: enterprise-ai-task0353b
+
+# Isolated archived-V2 candidate qualification. Do not combine with compose.yaml
+# or the existing TASK-035.3A synthetic project. No migration or account-seed
+# service is defined: the verified archive supplies schema, corpus and users.
+x-candidate-env: &candidate-env
+  APP_ENV: development
+  APP_DEBUG: "false"
+  DEBUG: "false"
+  RAG_DIAGNOSTICS_ENABLED: "true"
+  SECRET_KEY: ci-task0353b-local-only-secret-key-000000000000000000000000
+  DATABASE_URL: postgresql+asyncpg://task0353b:task0353b-local-only-password@postgres:5432/task0353b
+  REDIS_URL: redis://redis:6379/0
+  CELERY_BROKER_URL: redis://redis:6379/1
+  CELERY_RESULT_BACKEND: redis://redis:6379/2
+  CELERY_WORKER_CONCURRENCY: "1"
+  STORAGE_BACKEND: local
+  LOCAL_STORAGE_PATH: /app/data/uploads
+  EMBEDDING_MODEL_CACHE_PATH: /app/data/models
+  HF_HOME: /app/data/models/huggingface
+  SENTENCE_TRANSFORMERS_HOME: /app/data/models/sentence-transformers
+  EMBEDDING_MODEL_NAME: intfloat/multilingual-e5-small
+  EMBEDDING_DIMENSIONS: "384"
+  EMBEDDING_LOCAL_FILES_ONLY: "false"
+  EMBEDDING_DEVICE: cpu
+  EMBEDDING_NORMALIZE: "true"
+  EMBEDDING_QUERY_PREFIX: "query: "
+  EMBEDDING_PASSAGE_PREFIX: "passage: "
+  EMBEDDING_BATCH_SIZE: "16"
+  CHUNK_TARGET_TOKENS: "500"
+  CHUNK_OVERLAP_TOKENS: "75"
+  RETRIEVAL_TOP_K: "10"
+  RERANKER_TOP_K: "6"
+  LLM_ENABLED: "true"
+  LLM_PROVIDER: ollama
+  LLM_OLLAMA_BASE_URL: http://host.docker.internal:11434
+  LLM_OLLAMA_MODEL: qwen2.5:3b
+  LLM_OLLAMA_NUM_CTX: "8192"
+  LLM_OLLAMA_KEEP_ALIVE: 10m
+  LLM_OLLAMA_REASONING_EFFORT: none
+  LLM_TEMPERATURE: "0"
+  LLM_MAX_OUTPUT_TOKENS: "512"
+  LLM_TIMEOUT_SECONDS: "180"
+  RATE_LIMIT_LOGIN_REQUESTS: "1000"
+  RATE_LIMIT_CHAT_REQUESTS: "1000"
+  RATE_LIMIT_UPLOAD_REQUESTS: "1000"
+  UAT_SEED_ENABLED: "false"
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    pull_policy: never
+    restart: "no"
+    environment:
+      POSTGRES_DB: task0353b
+      POSTGRES_USER: task0353b
+      POSTGRES_PASSWORD: task0353b-local-only-password
+    ports:
+      - "127.0.0.1:15436:5432"
+    volumes:
+      - task0353b_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U task0353b -d task0353b"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks: [candidate]
+
+  redis:
+    image: redis:7-alpine
+    pull_policy: never
+    restart: "no"
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:16386:6379"
+    volumes:
+      - task0353b_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    networks: [candidate]
+
+  api:
+    image: enterprise-ai-knowledge-assistant-api:task0353a-20261013-3ae9c41f
+    pull_policy: never
+    restart: "no"
+    environment: *candidate-env
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+    ports:
+      - "127.0.0.1:18036:8000"
+    volumes:
+      - task0353b_uploads:/app/data/uploads
+      - task0353b_model_cache:/app/data/models
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/ready', timeout=5).read()"]
+      interval: 10s
+      timeout: 8s
+      retries: 12
+      start_period: 15s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    security_opt: ["no-new-privileges:true"]
+    networks: [candidate]
+
+  worker:
+    image: enterprise-ai-knowledge-assistant-worker:task0353a-20261013-3ae9c41f
+    pull_policy: never
+    restart: "no"
+    environment: *candidate-env
+    command:
+      - celery
+      - -A
+      - app.workers.celery_app:celery_app
+      - worker
+      - --loglevel=INFO
+      - --queues=default,documents
+      - --concurrency=1
+      - --hostname=worker@%h
+    volumes:
+      - task0353b_uploads:/app/data/uploads
+      - task0353b_model_cache:/app/data/models
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.workers.celery_app:celery_app inspect ping -d worker@$$(hostname) --timeout=10 | grep -q pong"]
+      interval: 20s
+      timeout: 15s
+      retries: 8
+      start_period: 20s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    security_opt: ["no-new-privileges:true"]
+    networks: [candidate]
+
+volumes:
+  task0353b_pg_data:
+  task0353b_redis_data:
+  task0353b_uploads:
+  task0353b_model_cache:
+
+networks:
+  candidate:
+    driver: bridge

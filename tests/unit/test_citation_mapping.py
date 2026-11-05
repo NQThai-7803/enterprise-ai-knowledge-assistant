@@ -97,6 +97,16 @@ def test_evidence_centered_excerpt_keeps_late_numeric_fact() -> None:
     assert "200%" in excerpt
 
 
+def test_exact_evidence_preserves_source_currency_and_amount() -> None:
+    evidence = extract_exact_evidence(
+        answer="Support is 1.500.000 d/24 thang. [SOURCE_1]",
+        marker="[SOURCE_1]",
+        source_text="Ergonomic support 1.500.000 đ/24 tháng.",
+    )
+    assert evidence is not None
+    assert "1.500.000 đ" in evidence
+
+
 def test_mapping_centers_excerpt_on_shared_value_when_markers_are_joined() -> None:
     source_registry = build_prompt_source_registry(
         context_items=(

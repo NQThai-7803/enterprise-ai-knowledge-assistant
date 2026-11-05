@@ -113,13 +113,13 @@ Provider bodies, prompts, questions, answers, context, API keys, authorization h
 TASK-027 SSE errors use the same safe chat/LLM/citation codes inside `stream.error` after SSE headers have been sent. `STREAM_TIMEOUT`, `STREAM_INTERNAL_ERROR`, and `STREAM_CANCELLED` are stream-event codes, not JSON error-envelope HTTP responses.
 ## TASK-020 citation errors
 
-- `CITATION_VALIDATION_FAILED` (`502`): provider answer contains missing, malformed, unknown, unselected, or over-limit source markers.
+- `CITATION_VALIDATION_FAILED` (`502`): chat no longer returns this code for invalid source markers (missing, malformed, unknown, unselected, or over-limit). Those first get bounded structured retry/repair and then fail safe to a successful `NO_ANSWER` with empty citations and the fixed no-answer message persisted.
 - `CITATION_MAPPING_FAILED` (`502`): validated markers could not be safely mapped to backend sources, page metadata, excerpt, or relevance constraints.
 - `CITATION_PERSISTENCE_FAILED` (`500`): citation persistence failed after answer validation.
 
 Internal detailed codes include `CITATION_MARKER_MISSING`, `CITATION_MARKER_UNKNOWN`, `CITATION_MARKER_INVALID`, `CITATION_MAPPING_FAILED`, `CITATION_PERMISSION_REVALIDATION_FAILED`, and `CITATION_PERSISTENCE_FAILED`. Public errors do not include generated answers, source registry contents, excerpts, provider bodies, or markers from invalid output.
 
-Permission revalidation failure after LLM generation is downgraded to a successful NO_ANSWER response with empty citations rather than a public error.
+Permission revalidation failure after LLM generation is downgraded to a successful NO_ANSWER response with empty citations rather than a public error. Invalid source markers that remain invalid after retry/repair are handled the same way. The invalid-marker downgrade now emits one structured WARNING with `error_code=CITATION_VALIDATION_FAILED`, `conversation_id`, `marker_count` and a fixed `reason` code, with no question, answer or chunk text. Audit metadata is unchanged: `CHAT_NO_ANSWER_GENERATED` with only `grounding_status` and `citation_count`.
 
 ## TASK-021 feedback errors
 

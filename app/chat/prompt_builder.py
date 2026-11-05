@@ -443,7 +443,7 @@ def _information_need_source_score(  # noqa: ANN001
             if cue in folded_source
         }
         if matched_controls:
-            score += 420 + len(matched_controls) * 80
+            score += 420 + len(matched_controls) * 120
         else:
             score -= 140
 

@@ -46,6 +46,10 @@ def make_settings() -> Settings:
         hybrid_retrieval_max_top_k=5,
         hybrid_candidate_multiplier=2,
         hybrid_semantic_min_relevance_score=0.0,
+        # Settings rejects RERANKER_CANDIDATE_K > HYBRID_RETRIEVAL_MAX_TOP_K. These tests call
+        # HybridRetrievalService directly, which never reads reranker settings.
+        reranker_candidate_k=5,
+        reranker_top_k=5,
     )
 
 

@@ -11,7 +11,6 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.chat.models import GroundingStatus
 from app.core.config import Settings
-from app.core.exceptions import CitationValidationFailedApplicationError
 from app.llm.models import LLMGenerationResult
 from app.models import (
     ChatMessage,
@@ -237,7 +236,7 @@ def test_answer_persists_citations_with_assistant_message(
     run_async(scenario())
 
 
-def test_invalid_citation_persists_no_messages_or_citations(
+def test_invalid_citation_fails_safe_to_fixed_no_answer_without_citations(
     async_session_factory_for_tests: async_sessionmaker[AsyncSession],
 ) -> None:
     async def scenario() -> None:
@@ -245,7 +244,12 @@ def test_invalid_citation_persists_no_messages_or_citations(
             owner = await create_user(session, "citation-invalid-owner", role=UserRole.STAFF)
             chat = await create_chat_session(session, owner)
             document = await create_document(session, "citation-invalid-doc", uploader=owner)
-            chunk = await create_chunk(session, "citation-invalid-chunk", document=document)
+            chunk = await create_chunk(
+                session,
+                "citation-invalid-chunk",
+                document=document,
+                text="Nhân viên được nghỉ 12 ngày phép năm.",
+            )
         service = GroundedAnswerService(
             settings=settings(),
             session_provider=async_session_factory_for_tests,
@@ -253,18 +257,39 @@ def test_invalid_citation_persists_no_messages_or_citations(
                 result_for_hit(retrieval_hit(document, chunk))
             ),
             llm_provider_factory=lambda: FakeLLMProvider(
-                '{"answer":"Invented source","citations":["SOURCE_999"]}'
+                '{"answer":"Nhân viên được nghỉ 12 ngày phép năm.","citations":["SOURCE_999"]}'
             ),
             token_counter=FakeCounter(),
         )
 
-        with pytest.raises(CitationValidationFailedApplicationError):
-            await service.answer_question(current_user=owner, session_id=chat.id, question="Q")
+        result = await service.answer_question(
+            current_user=owner,
+            session_id=chat.id,
+            question="Nhân viên được nghỉ phép năm bao nhiêu ngày?",
+        )
+
+        no_answer = settings().chat_no_answer_message
+        assert result.grounding_status == GroundingStatus.NO_ANSWER
+        assert result.assistant_citations == ()
+        assert result.assistant_message.content == no_answer
+        assert "[SOURCE_" not in result.assistant_message.content
 
         async with async_session_factory_for_tests() as session:
-            message_count = await session.scalar(select(func.count()).select_from(ChatMessage))
+            messages = list(
+                await session.scalars(
+                    select(ChatMessage)
+                    .where(ChatMessage.session_id == chat.id)
+                    .order_by(ChatMessage.created_at.asc(), ChatMessage.id.asc())
+                )
+            )
             citation_count = await session.scalar(select(func.count()).select_from(MessageCitation))
-            assert message_count == 0
+            assert [message.role for message in messages] == [
+                ChatMessageRole.USER,
+                ChatMessageRole.ASSISTANT,
+            ]
+            assert messages[1].content == no_answer
+            assert "[SOURCE_" not in messages[1].content
+            assert "Nhân viên được nghỉ 12 ngày phép năm." not in messages[1].content
             assert citation_count == 0
 
     run_async(scenario())

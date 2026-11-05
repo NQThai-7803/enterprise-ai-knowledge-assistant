@@ -1,0 +1,162 @@
+{
+ "HO-001": {
+  "cosine_max": 0.8113,
+  "nearest": "Q036"
+ },
+ "HO-002": {
+  "cosine_max": 0.8886,
+  "nearest": "Q097"
+ },
+ "HO-003": {
+  "cosine_max": 0.8497,
+  "nearest": "Q037"
+ },
+ "HO-004": {
+  "cosine_max": 0.916,
+  "nearest": "Q083"
+ },
+ "HO-005": {
+  "cosine_max": 0.883,
+  "nearest": "Q073"
+ },
+ "HO-006": {
+  "cosine_max": 0.889,
+  "nearest": "Q098"
+ },
+ "HO-007": {
+  "cosine_max": 0.8509,
+  "nearest": "Q041"
+ },
+ "HO-008": {
+  "cosine_max": 0.8524,
+  "nearest": "Q047"
+ },
+ "HO-009": {
+  "cosine_max": 0.7642,
+  "nearest": "Q035"
+ },
+ "HO-010": {
+  "cosine_max": 0.8638,
+  "nearest": "Q039"
+ },
+ "HO-011": {
+  "cosine_max": 0.8638,
+  "nearest": "Q039"
+ },
+ "HO-012": {
+  "cosine_max": 0.86,
+  "nearest": "Q054"
+ },
+ "HO-013": {
+  "cosine_max": 0.86,
+  "nearest": "Q054"
+ },
+ "HO-014": {
+  "cosine_max": 0.9091,
+  "nearest": "Q002"
+ },
+ "HO-015": {
+  "cosine_max": 0.8372,
+  "nearest": "Q048"
+ },
+ "HO-016": {
+  "cosine_max": 0.82,
+  "nearest": "Q097"
+ },
+ "HO-017": {
+  "cosine_max": 0.8265,
+  "nearest": "Q078"
+ },
+ "HO-018": {
+  "cosine_max": 0.8883,
+  "nearest": "Q054"
+ },
+ "HO-019": {
+  "cosine_max": 0.8349,
+  "nearest": "Q006"
+ },
+ "HO-020": {
+  "cosine_max": 0.8937,
+  "nearest": "Q040"
+ },
+ "HO-021": {
+  "cosine_max": 0.9065,
+  "nearest": "Q044"
+ },
+ "HO-022": {
+  "cosine_max": 0.9077,
+  "nearest": "Q076"
+ },
+ "HO-023": {
+  "cosine_max": 0.8741,
+  "nearest": "Q048"
+ },
+ "HO-024": {
+  "cosine_max": 0.8494,
+  "nearest": "Q054"
+ },
+ "HO-025": {
+  "cosine_max": 0.8834,
+  "nearest": "Q061"
+ },
+ "HO-026": {
+  "cosine_max": 0.846,
+  "nearest": "Q054"
+ },
+ "HO-027": {
+  "cosine_max": 0.8622,
+  "nearest": "Q053"
+ },
+ "HO-028": {
+  "cosine_max": 0.8615,
+  "nearest": "Q072"
+ },
+ "HO-029": {
+  "cosine_max": 0.8915,
+  "nearest": "Q039"
+ },
+ "HO-030": {
+  "cosine_max": 0.9174,
+  "nearest": "Q087"
+ },
+ "HO-031": {
+  "cosine_max": 0.8784,
+  "nearest": "Q073"
+ },
+ "HO-032": {
+  "cosine_max": 0.8955,
+  "nearest": "Q026"
+ },
+ "HO-033": {
+  "cosine_max": 0.8917,
+  "nearest": "Q068"
+ },
+ "HO-034": {
+  "cosine_max": 0.9066,
+  "nearest": "Q081"
+ },
+ "HO-035": {
+  "cosine_max": 0.8022,
+  "nearest": "Q039"
+ },
+ "HO-036": {
+  "cosine_max": 0.7839,
+  "nearest": "Q075"
+ },
+ "HO-037": {
+  "cosine_max": 0.8661,
+  "nearest": "Q072"
+ },
+ "HO-038": {
+  "cosine_max": 0.873,
+  "nearest": "Q068"
+ },
+ "HO-039": {
+  "cosine_max": 0.8715,
+  "nearest": "Q042"
+ },
+ "HO-040": {
+  "cosine_max": 0.9104,
+  "nearest": "Q025"
+ }
+}

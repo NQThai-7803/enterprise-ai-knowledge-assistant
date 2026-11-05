@@ -1,0 +1,36 @@
+services:
+  postgres:
+    ports: !override
+      - "127.0.0.1:25432:5432"
+
+  redis:
+    ports: !override
+      - "127.0.0.1:26379:6379"
+
+  api:
+    ports: !override
+      - "127.0.0.1:28000:8000"
+    environment:
+      APP_ENV: development
+      APP_DEBUG: "false"
+      RAG_DIAGNOSTICS_ENABLED: "true"
+      CHUNK_TARGET_TOKENS: "500"
+      CHUNK_OVERLAP_TOKENS: "75"
+      EMBEDDING_MODEL_NAME: intfloat/multilingual-e5-small
+      EMBEDDING_DIMENSIONS: "384"
+      LLM_ENABLED: "true"
+      LLM_PROVIDER: ollama
+      LLM_OLLAMA_BASE_URL: http://host.docker.internal:11434
+      LLM_OLLAMA_MODEL: qwen2.5:3b
+      RATE_LIMIT_LOGIN_REQUESTS: "1000"
+      RATE_LIMIT_CHAT_REQUESTS: "1000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  worker:
+    environment:
+      APP_ENV: development
+      CHUNK_TARGET_TOKENS: "500"
+      CHUNK_OVERLAP_TOKENS: "75"
+      EMBEDDING_MODEL_NAME: intfloat/multilingual-e5-small
+      EMBEDDING_DIMENSIONS: "384"

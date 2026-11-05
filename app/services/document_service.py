@@ -170,6 +170,8 @@ class DocumentService:
         upload_limits = self._require_upload_limits()
         normalized_title = normalize_title(title)
         normalized_description = normalize_description(description)
+        normalized_document_code = normalize_optional_metadata(document_code)
+        normalized_document_version = normalize_optional_metadata(document_version)
         original_filename = sanitize_original_filename(file.filename)
         file_type = resolve_supported_document_file_type(
             filename=original_filename,
@@ -203,12 +205,6 @@ class DocumentService:
             duplicate = await document_repository.get_active_duplicate_by_uploader_and_checksum(
                 self.session,
                 uploaded_by=current_user.id,
-                document_code=normalize_optional_metadata(document_code),
-                document_version=normalize_optional_metadata(document_version),
-                effective_from=effective_from,
-                effective_to=effective_to,
-                lifecycle_status=lifecycle_status,
-                supersedes_document_id=supersedes_document_id,
                 checksum_sha256=processor.checksum_sha256,
             )
             if duplicate is not None:
@@ -226,6 +222,12 @@ class DocumentService:
                 access_scope=access_scope,
                 department_id=validated_department_id,
                 uploaded_by=current_user.id,
+                document_code=normalized_document_code,
+                document_version=normalized_document_version,
+                effective_from=effective_from,
+                effective_to=effective_to,
+                lifecycle_status=lifecycle_status,
+                supersedes_document_id=supersedes_document_id,
             )
             await self.session.flush()
             await AuditService(self.session).record_success(

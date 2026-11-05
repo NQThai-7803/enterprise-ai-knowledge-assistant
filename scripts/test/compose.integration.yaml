@@ -1,0 +1,89 @@
+# Throwaway stack for the PostgreSQL-backed CI test lanes, run inside the backend test image.
+#
+#   $env:EAKA_TEST_IMAGE = "eaka-backend:<tag>"   # built with: docker build --target test
+#   $env:EAKA_TEST_OUT = "<host dir for JUnit XML and logs>"
+#   docker compose -p eaka-it -f scripts/test/compose.integration.yaml run --rm tests
+#   docker compose -p eaka-it -f scripts/test/compose.integration.yaml down -v
+#
+# Always pass an explicit project name (-p) that no other stack uses. The database and Redis
+# keep their data on tmpfs, publish no host ports and sit on an internal network, so the run
+# cannot reach or change any other local stack and leaves no data behind.
+
+x-test-environment: &test_environment
+  APP_ENV: test
+  APP_DEBUG: "false"
+  SECRET_KEY: ci-local-only-secret-key-000000000000000000000000
+  JWT_ALGORITHM: HS256
+  JWT_ISSUER: enterprise-ai-knowledge-assistant
+  JWT_AUDIENCE: enterprise-ai-api
+  ACCESS_TOKEN_EXPIRE_MINUTES: "15"
+  REFRESH_TOKEN_EXPIRE_DAYS: "7"
+  DATABASE_URL: postgresql+asyncpg://app_user:test-only-local@postgres:5432/enterprise_ai_test
+  REDIS_URL: redis://redis:6379/0
+  CELERY_BROKER_URL: redis://redis:6379/1
+  CELERY_RESULT_BACKEND: redis://redis:6379/2
+  CELERY_TASK_DEFAULT_QUEUE: default
+  CELERY_DOCUMENT_QUEUE: documents
+  CELERY_WORKER_CONCURRENCY: "1"
+  STORAGE_BACKEND: local
+  LOCAL_STORAGE_PATH: /tmp/ci-data/uploads
+  EMBEDDING_MODEL_CACHE_PATH: /tmp/ci-data/models
+  HF_HOME: /tmp/ci-data/models/huggingface
+  SENTENCE_TRANSFORMERS_HOME: /tmp/ci-data/models/sentence-transformers
+  EMBEDDING_PROVIDER: sentence_transformers
+  EMBEDDING_MODEL_NAME: intfloat/multilingual-e5-small
+  EMBEDDING_DIMENSIONS: "384"
+  EMBEDDING_DEVICE: cpu
+  EMBEDDING_LOCAL_FILES_ONLY: "false"
+  LLM_ENABLED: "false"
+  LLM_PROVIDER: openai_compatible
+  LLM_BASE_URL: http://localhost:11434/v1
+  LLM_API_KEY: ""
+  LLM_MODEL: ""
+  LOG_LEVEL: INFO
+  LOG_FORMAT: json
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: app_user
+      POSTGRES_PASSWORD: test-only-local
+      POSTGRES_DB: enterprise_ai_test
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app_user -d enterprise_ai_test"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+    networks: [testnet]
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    tmpfs:
+      - /data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+    networks: [testnet]
+
+  tests:
+    image: ${EAKA_TEST_IMAGE:?set EAKA_TEST_IMAGE to a backend test image tag}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment: *test_environment
+    command: ["sh", "scripts/test/run_integration_lanes.sh", "/out"]
+    volumes:
+      - ${EAKA_TEST_OUT:?set EAKA_TEST_OUT to a host directory for reports}:/out
+    networks: [testnet]
+
+networks:
+  testnet:
+    internal: true

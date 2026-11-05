@@ -3,6 +3,7 @@
 .agents
 .codex
 .venv
+.venv*
 venv
 __pycache__
 *.pyc
@@ -25,3 +26,12 @@ frontend/node_modules
 frontend/dist
 .DS_Store
 Thumbs.db
+# Local-only state and caches; the image only copies app/, tests/ and build files.
+artifacts
+.backups
+data
+.ci-data
+vite-monorepo
+**/__pycache__
+**/*.pyc
+**/node_modules

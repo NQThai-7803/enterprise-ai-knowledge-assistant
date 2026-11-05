@@ -57,7 +57,9 @@ class SemanticRetrievalService:
         self.settings = settings
         self.embedding_provider = embedding_provider
         self.session_provider = session_provider
-        self.repository = repository or SemanticRetrievalRepository()
+        self.repository = repository or SemanticRetrievalRepository(
+            exact_permitted_knn=settings.rag_semantic_exact_permitted_knn_enabled
+        )
 
     async def retrieve(
         self,
