@@ -72,3 +72,6 @@ node_modules/
 
 # Knowledge graph: the map is committed, only its cache is ignored
 graphify-out/cache/
+
+# Output of the RAG change guard
+.eval/
