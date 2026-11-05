@@ -8,6 +8,7 @@ Format follows a simplified Keep a Changelog style.
 
 ### PROMPT 4.5 -- 2026-11-05
 
+- RBAC dev set: `tests/acceptance/rbac_dev_v1.yaml`, `scripts/eval/run_rbac_dev.py`, `scripts/diagnostics/rbac_retrieval_check.py`; results in `docs/eval/runs/rbac-dev-v1/score.md`.
 - `reranker_mode` in `/health/ready`, `RERANKER_FALLBACK_ACTIVE` warnings, and eval runners that refuse a mode mismatch. A rerank timeout or error falls back for that request only; only a failed load keeps the fallback on.
 - PROMPT 4b: `scripts/diagnostics/` traces answers from outside `app/`; results in `docs/eval/runs/heldout-v1-f3cdbf3/diagnosis.md`.
 - `metrics.py`: `answerable_accuracy` and `refusal_accuracy`. `eaka-rag-change-guard` and `HANDOFF.md`: held-out v1 is diagnostic; published numbers need held-out v2.

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import Counter
 
+from scripts.diagnostics import rbac_retrieval_check
 from scripts.eval import metrics, run_rbac_dev
 
 CODES = {"d-mgr": "RBAC-MGR-001", "d-org": "RBAC-ORG-001"}
@@ -66,6 +67,11 @@ def test_each_leak_signal_is_reported() -> None:
     assert run_rbac_dev.leak_reasons(canary, ITEM, DOCUMENT, CODES) == ["canary"]
 
 
+def test_soft_hyphen_from_pdf_extraction_does_not_hide_a_canary() -> None:
+    case = _case("ANSWERED", "Ma: RBAC\u00adCANARY\u00adMGR\u00ad7Q4K")
+    assert run_rbac_dev.leak_reasons(case, ITEM, DOCUMENT, CODES) == ["canary"]
+
+
 def test_control_needs_status_citation_and_fact() -> None:
     good = _case("ANSWERED", "47 triệu đồng", [{"document_id": "d-mgr"}])
     assert run_rbac_dev.control_passed(good, ITEM, CODES) is True
@@ -112,3 +118,31 @@ def test_score_counts_leaks_and_marks_inconclusive_negatives() -> None:
     failed_control = metrics.rbac_results(_graded(_case(), _case()))
     assert failed_control["inconclusive_negatives"] == ["RBD-X"]
     assert failed_control["control"]["false_refusal_rate"]["value"] == 1.0
+
+
+def test_retrieval_check_needs_the_control_to_see_the_chunk() -> None:
+    result = rbac_retrieval_check.verdicts(
+        {"A": ["retrieve"], "B": [], "C": ["retrieve"]},
+        {"A": [], "B": [], "C": ["sources"]},
+    )
+    assert result["A"]["conclusive"] is True
+    assert result["B"]["conclusive"] is False
+    assert result["B"]["leak"] is False
+    assert result["C"]["leak"] is True
+
+
+def test_retrieval_check_reads_every_layer() -> None:
+    entry = {"cut_chunks": ["c1"]}
+    empty = {"cut_chunks": []}
+    result = {
+        "gold_chunks": {"chunks": ["c1"]},
+        "trace": {
+            "retrieve": [entry],
+            "semantic": [empty],
+            "keyword": [empty],
+            "prepared": [empty],
+            "rerank": [{"output": empty}],
+            "sources": [{"chunk": "c1"}],
+        },
+    }
+    assert rbac_retrieval_check.seen_at(result) == ["retrieve", "sources"]

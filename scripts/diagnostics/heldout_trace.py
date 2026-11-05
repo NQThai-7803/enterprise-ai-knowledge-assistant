@@ -441,7 +441,7 @@ def _analysis_view(question: str) -> dict[str, Any]:
 
 async def _trace_item(service: Any, item: dict[str, Any], ids: dict[str, str]) -> dict[str, Any]:
     async with async_session_factory() as session:
-        user = await get_by_email(session, ROLE_EMAIL.format(item["role"]))
+        user = await get_by_email(session, item.get("email") or ROLE_EMAIL.format(item["role"]))
         gold = await _gold_chunks(session, item, ids)
     REC.start(set(gold["chunks"]))
     question = item["question"]

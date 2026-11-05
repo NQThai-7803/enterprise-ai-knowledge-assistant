@@ -46,7 +46,7 @@ docker compose --profile frontend up -d frontend
 
 ## Việc đang dở
 
-**Bước tiếp theo là PROMPT 4b: chẩn đoán vì sao điểm thấp.** Không sửa `app/`, kết quả tóm tắt vào `docs/eval/runs/heldout-v1-f3cdbf3/diagnosis.md`. Sau đó là 4.5c (bộ RBAC dev), rồi PROMPT 5.
+**PROMPT 4b và 4.5 đã xong** (`docs/eval/runs/heldout-v1-f3cdbf3/diagnosis.md`, `docs/eval/runs/rbac-dev-v1/score.md`). **Bước tiếp theo:** chờ chủ dự án quyết định PROMPT 5 và thứ tự sửa route deterministic, alignment filter, validator. PROMPT 6 lùi lại sau các sửa đó (DEC-009).
 
 Báo cáo kiểm thử 28/10: [`docs/review/bao-cao-kiem-thu-2026-10-28.md`](docs/review/bao-cao-kiem-thu-2026-10-28.md).
 

@@ -15,7 +15,9 @@
 - **Done 2026-11-05: official PROMPT 4 score** in `docs/eval/runs/heldout-v1-f3cdbf3/score.md`: accuracy 27.5 % (11/40) in both runs, false refusals 14/26, false answers 5/14, 0 leaks at RBAC smoke level. Graded by Claude, delegated by the owner.
 - **Held-out v1 is USED FOR DIAGNOSIS, not a test set any more (DEC-008). Held-out v2 is required before release.**
 - **Done 2026-11-05: PROMPT 4b diagnosis** in `docs/eval/runs/heldout-v1-f3cdbf3/diagnosis.md`. Retrieval is not the bottleneck (gold in hybrid 25/26). Dev 75/100 deterministic vs held-out 6/40, all 6 FAIL. **The cross-encoder never ran: `BAAI/bge-reranker-v2-m3` is missing from the stack cache, so PROMPT 6 has no reranker signal until that is decided.**
-- Then: 4.5c RBAC dev set on stack `eaka-rbac-dev`.
+- **Done 2026-11-05: 4.5c RBAC dev set** (`docs/eval/runs/rbac-dev-v1/score.md`). Retrieval: 18/18 pairs filtered correctly, 0 leaks. Answer layer: 4/18 controls pass, 5/18 negatives get an unrelated answer from a visible document.
+- **Medium, new from 4.5c, not fixed:** answers can start with the internal prefix `Answer-focused evidence:` (RBD-04, 05); an answer can cite a document that does not hold its fact (RBD-06). Fix together with the deterministic route.
+- **Dev check after the reranker changes:** Q001-Q100 on `eaka-backend:prompt45` (`dec733a`, `artifacts/prompt45/dev-after`, resumed after a host reboot at Q038): 99/100 proxy as in baseline v2, same statuses. Q055, Q073, Q094 and Q097 differ in wording. Baseline v2 was on an older image, so this is not attributed.
 - Decided: dev is graded with `grade_proxy` and marked `proxy`; dev does not measure permission leaks until 4.5c.
 - **Low: 31 existing `app/` lines share a 4-gram with Q001-Q100** (19 in `grounded_answer_service.py`), 0 with held-out v1. Existing code, not reviewed line by line; `check` only looks at added lines.
 

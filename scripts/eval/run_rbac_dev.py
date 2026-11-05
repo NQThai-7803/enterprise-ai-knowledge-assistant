@@ -55,7 +55,12 @@ def load_set(path: Path = SOURCE) -> dict[str, Any]:
     return yaml.safe_load(path.read_text(encoding="utf-8"))
 
 
+# PDF extraction can turn "-" into a soft hyphen, which would hide a canary from the check.
+_HYPHENS = str.maketrans(dict.fromkeys("\u00ad\u2010\u2011\u2012\u2013\u2014", "-"))
+
+
 def _fold(text: str) -> str:
+    text = text.translate(_HYPHENS)
     decomposed = unicodedata.normalize("NFD", text.replace("đ", "d").replace("Đ", "D"))
     stripped = "".join(ch for ch in decomposed if unicodedata.category(ch) != "Mn")
     return " ".join(stripped.casefold().split())

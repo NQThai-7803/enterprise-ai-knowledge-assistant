@@ -9,7 +9,8 @@
 - **Held-out v1 is now used for diagnosis, not a test set (DEC-008).**
 - **Of the 11 PASS, 9 are correct refusals:** answerable accuracy 7.7 % (2/26), refusal accuracy 64.3 % (9/14).
 - **PROMPT 4b done:** `diagnosis.md`. Of 14 false refusals, gold reached the prompt in 9; none failed at retrieval. The deterministic route caused 6 FAILs. The cross-encoder fell back to alignment scoring.
-- **Next:** owner review of the diagnosis, then 4.5c.
+- **4.5c done:** RBAC dev set. Permission filtering held on 18/18 pairs with 0 leaks at retrieval and API level. Answers are weak: 4/18 controls pass and 5/18 negatives get an unrelated answer from a visible document.
+- **Next:** owner decision on PROMPT 5 and the fixes to the deterministic route, the alignment filter and the validator.
 
 ## PROMPT 4 -- 2026-10-31 (in progress)
 
