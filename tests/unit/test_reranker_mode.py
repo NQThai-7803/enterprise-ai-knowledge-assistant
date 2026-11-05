@@ -6,6 +6,7 @@ import argparse
 import asyncio
 import json
 import logging
+import threading
 from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
@@ -209,3 +210,86 @@ def test_mode_change_during_a_run_invalidates_it(
     assert reranker_check.finish(output, meta, "http://x", 0) == reranker_check.EXIT_MODE_CHANGED
     payload = json.loads(output.read_text(encoding="utf-8"))
     assert payload["reranker_mode_end"] == "lexical_fallback"
+
+
+class _Model:
+    def __init__(self, *, release: threading.Event | None = None, error: bool = False) -> None:
+        self.release = release
+        self.error = error
+
+    def predict(self, pairs: list[list[str]], **kwargs: object) -> list[float]:
+        if self.release is not None:
+            self.release.wait(5)
+        if self.error:
+            raise RuntimeError("predict failed")
+        return [0.1 * index for index in range(len(pairs))]
+
+
+def _rerank(reranker: object) -> tuple:
+    return asyncio.run(reranker.rerank(query="q", hits=(_hit(0), _hit(1)), top_k=1))
+
+
+def test_timeout_falls_back_for_that_request_only(caplog: pytest.LogCaptureFixture) -> None:
+    release = threading.Event()
+    model = _Model(release=release)
+    reranker = _reranker(model_loader=lambda name, **kwargs: model, timeout_seconds=0.05)
+    with caplog.at_level(logging.WARNING):
+        first = _rerank(reranker)
+    assert "RERANKER_TIMEOUT" in _codes(caplog)
+    assert ERROR_CODE in _codes(caplog)
+    assert first[0].chunk_index == 0  # lexical order keeps the first hit on a tie
+    assert reranker._model_load_failed is False
+    assert reranker.mode == "cross_encoder"
+
+    release.set()
+    caplog.clear()
+    reranker._timeout_seconds = 5.0
+    with caplog.at_level(logging.WARNING):
+        second = _rerank(reranker)
+    assert second[0].chunk_index == 1  # the model scored the second hit higher
+    assert _codes(caplog) == []
+
+
+def test_load_failure_sets_the_flag_and_is_not_retried(caplog: pytest.LogCaptureFixture) -> None:
+    calls = []
+
+    def loader(name: str, **kwargs: object) -> object:
+        calls.append(name)
+        raise RuntimeError("no model")
+
+    reranker = _reranker(model_loader=loader)
+    with caplog.at_level(logging.WARNING):
+        _rerank(reranker)
+        _rerank(reranker)
+    assert reranker._model_load_failed is True
+    assert reranker.mode == "lexical_fallback"
+    assert len(calls) == 1
+    assert "RERANKER_TIMEOUT" not in _codes(caplog)
+
+
+def test_slow_load_that_times_out_is_not_a_load_failure_and_loads_once() -> None:
+    release = threading.Event()
+    created = []
+
+    def loader(name: str, **kwargs: object) -> object:
+        created.append(name)
+        release.wait(5)
+        return _Model()
+
+    reranker = _reranker(model_loader=loader, timeout_seconds=0.05)
+    _rerank(reranker)
+    assert reranker._model_load_failed is False
+    release.set()
+    reranker._timeout_seconds = 5.0
+    assert _rerank(reranker)[0].chunk_index == 1
+    assert len(created) == 1
+
+
+def test_predict_error_falls_back_without_the_load_flag(caplog: pytest.LogCaptureFixture) -> None:
+    model = _Model(error=True)
+    reranker = _reranker(model_loader=lambda name, **kwargs: model)
+    with caplog.at_level(logging.WARNING):
+        assert len(_rerank(reranker)) == 1
+    assert "RERANKER_PREDICT_FAILED" in _codes(caplog)
+    assert reranker._model_load_failed is False
+    assert reranker.mode == "cross_encoder"

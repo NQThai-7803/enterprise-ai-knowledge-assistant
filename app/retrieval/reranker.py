@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
+import threading
 from collections.abc import Sequence
 from dataclasses import replace
 from math import isfinite
@@ -31,6 +32,8 @@ RERANKER_MODE_CROSS_ENCODER = "cross_encoder"
 RERANKER_MODE_LEXICAL_FALLBACK = "lexical_fallback"
 RERANKER_MODE_DISABLED = "disabled"
 RERANKER_FALLBACK_ACTIVE = "RERANKER_FALLBACK_ACTIVE"
+RERANKER_TIMEOUT = "RERANKER_TIMEOUT"
+RERANKER_PREDICT_FAILED = "RERANKER_PREDICT_FAILED"
 _WEIGHT_FILES = ("model.safetensors", "pytorch_model.bin")
 
 _ACRONYM_RE = re.compile(r"\b[A-Z][A-Z0-9&/+.-]{1,}\b")
@@ -308,6 +311,7 @@ class SentenceTransformerCrossEncoderReranker:
         self._model_loader = model_loader
         self._model: Any | None = None
         self._model_load_failed = False
+        self._model_load_lock = threading.Lock()
         self._fallback = fallback or HeuristicRetrievalReranker()
 
     @property
@@ -347,16 +351,35 @@ class SentenceTransformerCrossEncoderReranker:
                     hit_tuple,
                     abandon_on_cancel=True,
                 )
-        except Exception as exc:
-            self._model_load_failed = True
+        except TimeoutError:
+            # Only this request falls back; the model stays usable for the next one.
             logger.warning(
-                "Retrieval reranker unavailable; falling back to alignment reranking.",
-                extra={
-                    "provider": "sentence_transformers",
-                    "model": self._model_name,
-                    "error_type": exc.__class__.__name__,
-                },
+                "%s: reranking exceeded %s s; lexical ranking for this request.",
+                RERANKER_TIMEOUT,
+                self._timeout_seconds,
+                extra={"error_code": RERANKER_TIMEOUT, "model": self._model_name},
             )
+            return await self._fallback.rerank(query=query, hits=hit_tuple, top_k=top_k)
+        except Exception as exc:
+            if self._model_load_failed:
+                logger.warning(
+                    "Retrieval reranker unavailable; falling back to alignment reranking.",
+                    extra={
+                        "provider": "sentence_transformers",
+                        "model": self._model_name,
+                        "error_type": exc.__class__.__name__,
+                    },
+                )
+            else:
+                logger.warning(
+                    "%s: reranking failed; lexical ranking for this request.",
+                    RERANKER_PREDICT_FAILED,
+                    extra={
+                        "error_code": RERANKER_PREDICT_FAILED,
+                        "model": self._model_name,
+                        "error_type": exc.__class__.__name__,
+                    },
+                )
             return await self._fallback.rerank(query=query, hits=hit_tuple, top_k=top_k)
 
         alignment_ranked = _scored_hits(query=query, hits=hit_tuple)
@@ -401,8 +424,17 @@ class SentenceTransformerCrossEncoderReranker:
         return scores
 
     def _get_model(self) -> Any:
-        if self._model is not None:
+        """Load once, even when a request that timed out is still loading in its thread."""
+        with self._model_load_lock:
+            if self._model is None:
+                try:
+                    self._load_model()
+                except Exception:
+                    self._model_load_failed = True
+                    raise
             return self._model
+
+    def _load_model(self) -> None:
         loader = self._model_loader
         if loader is None:
             from sentence_transformers import CrossEncoder
@@ -438,7 +470,6 @@ class SentenceTransformerCrossEncoderReranker:
                 }
             }
             self._model = loader(self._model_name, **compatible_kwargs)
-        return self._model
 
 
 def _model_files_cached(model_name: str, *, cache_folder: str, revision: str) -> bool:
