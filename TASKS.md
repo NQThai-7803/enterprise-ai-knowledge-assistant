@@ -1,6 +1,16 @@
 
 # Implementation Tasks
 
+## PROMPT 4.5 eval tooling before PROMPT 5 -- 2026-11-05
+
+**IN PROGRESS. Approved by the owner; no `app/` change.**
+
+- Done: 4.5a `scripts/eval/metrics.py`; 4.5b `scripts/eval/question_leak.py`, `question_fingerprints.json`, guard checker exits 2 without a source.
+- Waiting: owner labels, then the official PROMPT 4 score.
+- Then: PROMPT 4b diagnosis, then 4.5c RBAC dev set on stack `eaka-rbac-dev`.
+- Decided: dev is graded with `grade_proxy` and marked `proxy`; dev does not measure permission leaks until 4.5c.
+- **Low: 31 existing `app/` lines share a 4-gram with Q001-Q100** (19 in `grounded_answer_service.py`), 0 with held-out v1. Existing code, not reviewed line by line; `check` only looks at added lines.
+
 ## PROMPT 4 held-out v1 -- 2026-10-31
 
 **IN PROGRESS: gold waiting for owner review.**
@@ -28,9 +38,9 @@
   - ND-CORP-001 and ND-HR-002 give different HR and security contact addresses.
   These are corpus facts, not app bugs; record them for corpus v3.
 - **DONE 2026-11-05: `eaka-rag-change-guard` paths.** Dev runner `tests/acceptance/rag_h5_2_exact_100.py --output`, `n_dev = 100`, real test map; held-out v1 stays the test split. Thresholds and rules unchanged.
-- **Medium: the guard's `check_no_question_leak.py` currently finds no questions.** It reads `tests/acceptance`, `uat`, `eval`, while Q001-Q100 live in the git-ignored `artifacts/` and held-out v1 in `docs/eval/`; it warns and exits 0. Its clean result proves nothing until the owner decides how to give it sources without letting a skill read `docs/eval/`.
-- **Medium: no dev tool computes the guard's gate metrics.** `scripts/eval/` has no `permission_leak_count`, `false_answer_rate` or `answer_accuracy`; `grade_proxy.py` is a proxy grade. Decide this before PROMPT 5.
-- **Low: `.eval/`, the guard's output folder, is not in `.gitignore`.**
+- **DONE 2026-11-05 (PROMPT 4.5b): `check_no_question_leak.py` compares fingerprints and exits 2 without a usable source.**
+- **DONE 2026-11-05 (PROMPT 4.5a): `scripts/eval/metrics.py` computes the guard's gate metrics.** Permission leaks on dev stay unmeasured until 4.5c.
+- **DONE 2026-11-05 (`943526a`): `.eval/` is in `.gitignore`.**
 
 ## PROMPT 3g prompt truncation -- 2026-10-31
 

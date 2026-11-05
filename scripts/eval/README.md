@@ -12,5 +12,7 @@ It never touches the V2, AUTH-02 or main stacks.
 | `eval_client.py` | HTTP client of the runner: one keep-alive `httpx.Client` per run. Transport errors, timeouts, 5xx, a 2xx without an answer body and a 429 after its retries are `INFRA_ERROR`, never `OK`; other 4xx are `HTTP_ERROR`. |
 | `grade_proxy.py` | Proxy grade against the TASK-035.3B agent grade: status plus cited document codes. **Not a semantic grade.** `INFRA_ERROR` cases are excluded from the score; the summary reports `scored_cases`, `excluded_infra_error` and their IDs. |
 | `compare_before_after.py` | Splits cases into (a) identical in every run and (b) changed; (b) is split again into b1 (baseline already varied) and b2 (new change). |
+| `metrics.py` | Per-run `permission_leak_count`, `false_answer_rate`, `false_refusal_rate`, `answer_accuracy`, `citation_accuracy`. Held-out uses the owner's labels and refuses blank ones; dev uses `grade_proxy.py` output, is marked `proxy` and reports the leak count as null (not measured). |
+| `question_leak.py` | Hashed word 4-grams of dev and held-out questions in `question_fingerprints.json`, no question text. `check` compares added `app/` lines, `overlap` compares the two sets; both exit 2 when the source is missing, empty or stale. |
 
 The questions, reference grade and manifests live under the git-ignored `artifacts/` directory.

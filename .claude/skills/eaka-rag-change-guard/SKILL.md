@@ -37,6 +37,7 @@ Lõi RAG là nơi rủi ro cao nhất của EAKA: sai một chỗ là lộ tài 
    python .claude/skills/eaka-rag-change-guard/scripts/check_no_question_leak.py --staged
    ```
    Exit code ≠ 0 → xem từng match; nếu là trùng thật thì sửa lại cho tổng quát.
+   Exit code 2 = không có nguồn câu hỏi hoặc lỗi git: kết quả không có giá trị, phải xử lý trước khi đi tiếp. Fingerprint build bằng `python scripts/eval/question_leak.py build`.
 6. Chạy các file test bắt buộc theo bảng ánh xạ bên dưới (dùng skill `eaka-verify` để chạy trong môi trường chuẩn).
 7. Chạy lại held-out với flag **bật**:
    ```bash

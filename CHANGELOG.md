@@ -6,6 +6,11 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### PROMPT 4.5 -- 2026-11-05
+
+- `scripts/eval/metrics.py`: per-run gate metrics; manual labels for held-out, `proxy` for dev; null when unmeasured.
+- `scripts/eval/question_leak.py` and `question_fingerprints.json`: question checks through hashed 4-grams; a missing or stale source now fails with exit 2.
+
 ### PROMPT 4 -- 2026-10-31
 
 - `eaka-rag-change-guard`: real dev runner path, `--output`, `n_dev = 100` and the module-to-test map. Thresholds and rules unchanged.

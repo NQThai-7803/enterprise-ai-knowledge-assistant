@@ -1,5 +1,10 @@
 # Project Status
 
+## PROMPT 4.5 -- 2026-11-05 (in progress)
+
+- **4.5a, 4.5b done.** Gate metrics and fingerprint question check; baseline v2 reproduces 99/100 proxy through `metrics.py`. Max dev/held-out Jaccard 0.190 (limit 0.60).
+- **Next:** owner labels, official PROMPT 4 score, PROMPT 4b diagnosis, 4.5c.
+
 ## PROMPT 4 -- 2026-10-31 (in progress)
 
 - **Handover 2026-11-05.** Branch `handover/2026-11-05`, `HANDOFF.md` rewritten, `eaka-rag-change-guard` paths corrected. Locked image: unit 1496 pass / 1 fail (image has no `docs/eval/`) / 17 xfail / 5 skip; API 296 pass; integration 404 pass / 3 xfail; Celery 4 pass.
