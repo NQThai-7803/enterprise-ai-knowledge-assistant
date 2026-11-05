@@ -23,7 +23,9 @@ Lõi RAG là nơi rủi ro cao nhất của EAKA: sai một chỗ là lộ tài 
    python tests/acceptance/rag_h5_2_exact_100.py --output .eval/before.json
    ```
    Split dev = Q001-Q100; chạy theo stack và biến môi trường trong `scripts/eval/README.md`.
-   **Không bao giờ chạy split `test`** (held-out v1, `scripts/eval/run_heldout.py`) trong quá trình phát triển. Split test chỉ chạy ở mốc release và phải có người duyệt.
+   **Không bao giờ chạy split `test`** (held-out v2, chưa có) trong quá trình phát triển. Split test chỉ chạy ở mốc release và phải có người duyệt.
+   Held-out v1 (`scripts/eval/run_heldout.py`): diagnostic — đã dùng để chẩn đoán theo DEC-008, được phép chạy để chẩn đoán.
+   Mọi con số công bố ra ngoài (release, báo cáo) phải đo trên held-out v2.
 
 ### Khi sửa
 3. Đặt mọi thay đổi hành vi sau một setting flag (ví dụ `EAKA_RAG_<FEATURE>_ENABLED`), **mặc định giữ hành vi cũ**.

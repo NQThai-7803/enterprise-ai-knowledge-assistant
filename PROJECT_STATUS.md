@@ -5,6 +5,7 @@
 - **4.5a, 4.5b done.** Gate metrics and fingerprint question check; baseline v2 reproduces 99/100 proxy through `metrics.py`. Max dev/held-out Jaccard 0.190 (limit 0.60).
 - **Official held-out v1 score (2 runs):** accuracy 27.5 %, with partial 30.0 %, false refusals 53.8 %, false answers 35.7 %, citations 41.7 % / 50.0 %, 0 leaks at RBAC smoke level. Graded by Claude, delegated by the owner.
 - **Held-out v1 is now used for diagnosis, not a test set (DEC-008).**
+- **Of the 11 PASS, 9 are correct refusals:** answerable accuracy 7.7 % (2/26), refusal accuracy 64.3 % (9/14).
 - **Next:** PROMPT 4b diagnosis, 4.5c.
 
 ## PROMPT 4 -- 2026-10-31 (in progress)
