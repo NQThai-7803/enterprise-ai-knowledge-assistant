@@ -146,3 +146,13 @@ def test_retrieval_check_reads_every_layer() -> None:
         },
     }
     assert rbac_retrieval_check.seen_at(result) == ["retrieve", "sources"]
+
+
+def test_route_names_the_answering_branch_only_for_the_deterministic_route() -> None:
+    hits = [{"branch": "_structured_a"}, {"branch": "_structured_b"}]
+    route = rbac_retrieval_check.route_of(
+        {"route": "deterministic", "trace": {"structured_hits": hits}}
+    )
+    assert route == {"route": "deterministic", "branch": "_structured_b"}
+    llm = rbac_retrieval_check.route_of({"route": "llm", "trace": {"structured_hits": hits}})
+    assert llm == {"route": "llm", "branch": None}

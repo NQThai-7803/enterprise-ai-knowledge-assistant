@@ -52,6 +52,16 @@ def seen_at(result: Mapping[str, Any]) -> list[str]:
     return seen
 
 
+def route_of(result: Mapping[str, Any]) -> dict[str, str | None]:
+    """The route a question took before any LLM call, and the branch that answered."""
+    hits = result["trace"]["structured_hits"]
+    is_deterministic = result["route"] == "deterministic" and bool(hits)
+    return {
+        "route": result["route"],
+        "branch": hits[-1]["branch"] if is_deterministic else None,
+    }
+
+
 def verdicts(
     control: Mapping[str, list[str]], negative: Mapping[str, list[str]]
 ) -> dict[str, dict[str, Any]]:
@@ -66,7 +76,7 @@ def verdicts(
     }
 
 
-def _trace(container: str, items: list[dict[str, Any]], codes: dict[str, str]) -> dict[str, list]:
+def _trace(container: str, items: list[dict[str, Any]], codes: dict[str, str]) -> list[dict]:
     with tempfile.TemporaryDirectory() as folder:
         path = Path(folder) / "in.json"
         out = Path(folder) / "out.json"
@@ -101,8 +111,7 @@ def _trace(container: str, items: list[dict[str, Any]], codes: dict[str, str]) -
         subprocess.run(
             ["docker", "cp", f"{container}:/tmp/rbac_out.json", str(out)], check=True, env=ENV
         )
-        results = json.loads(out.read_text(encoding="utf-8"))["results"]
-    return {result["id"]: seen_at(result) for result in results}
+        return json.loads(out.read_text(encoding="utf-8"))["results"]
 
 
 def main() -> int:
@@ -134,7 +143,13 @@ def main() -> int:
     control = _trace(args.container, items("control"), codes)
     admin.revoke(ids[revocable["code"]], role)
     negative = _trace(args.container, items("account"), codes)
-    result = verdicts(control, negative)
+    result = verdicts(
+        {row["id"]: seen_at(row) for row in control},
+        {row["id"]: seen_at(row) for row in negative},
+    )
+    for key, rows in (("control", control), ("negative", negative)):
+        for row in rows:
+            result[row["id"]][f"{key}_route"] = route_of(row)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=1), encoding="utf-8")
     conclusive = sum(row["conclusive"] for row in result.values())
