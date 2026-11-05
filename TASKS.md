@@ -6,14 +6,16 @@
 **IN PROGRESS. Approved by the owner; no `app/` change.**
 
 - Done: 4.5a `scripts/eval/metrics.py`; 4.5b `scripts/eval/question_leak.py`, `question_fingerprints.json`, guard checker exits 2 without a source.
-- Waiting: owner labels, then the official PROMPT 4 score.
-- Then: PROMPT 4b diagnosis, then 4.5c RBAC dev set on stack `eaka-rbac-dev`.
+- **Done 2026-11-05: official PROMPT 4 score** in `docs/eval/runs/heldout-v1-f3cdbf3/score.md`: accuracy 27.5 % (11/40) in both runs, false refusals 14/26, false answers 5/14, 0 leaks at RBAC smoke level. Graded by Claude, delegated by the owner.
+- **Held-out v1 is USED FOR DIAGNOSIS, not a test set any more (DEC-008). Held-out v2 is required before release.**
+- Next: PROMPT 4b diagnosis. Owner's hint, check it first: HO-004, 008, 020, 023, 026, 039 answer in about 1.3-1.5 s with text copied from UAT-LEAVE-AUTHORITY-001 p.3 and `|` in the evidence, probably a deterministic route matching wrongly.
+- Then: 4.5c RBAC dev set on stack `eaka-rbac-dev`.
 - Decided: dev is graded with `grade_proxy` and marked `proxy`; dev does not measure permission leaks until 4.5c.
 - **Low: 31 existing `app/` lines share a 4-gram with Q001-Q100** (19 in `grounded_answer_service.py`), 0 with held-out v1. Existing code, not reviewed line by line; `check` only looks at added lines.
 
 ## PROMPT 4 held-out v1 -- 2026-10-31
 
-**IN PROGRESS: gold waiting for owner review.**
+**Runs and score done; see PROMPT 4.5 above.**
 
 - Done:
   - item 0a: runner INFRA_ERROR handling (`5eadd72`);
@@ -23,7 +25,7 @@
 - **Frozen 2026-11-01:** gold approved by the owner. SHA256 `e4dd3c69…2346` of `docs/eval/heldout-v1.yaml` is in `docs/eval/heldout-v1.lock` (frozen commit `7efc4f0`). `scripts/eval/run_heldout.py` refuses to run on a mismatch.
 - **Runs done 2026-11-01:** 2 runs of image `4f8152b4` (commit `f3cdbf3`) with the baseline v2 config and every guard off. Both runs are VALID: 0 INFRA_ERROR, the same Ollama PID throughout, max latency 49.7 s and 22.2 s.
   - Grading sheet: `docs/eval/runs/heldout-v1-f3cdbf3/`.
-  - **Waiting for the owner's manual labels.**
+  - Labelled 40/40 on 2026-11-05 by Claude, delegated by the owner.
 - **Medium (found by held-out, not fixed): PDF bullet glyphs leak into answers.**
   - 7 of 40 answers in each run contain U+F0B7 copied from chunk text.
   - HO-008 starts with U+FFFD.

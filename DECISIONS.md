@@ -29,3 +29,7 @@ Permission filtering occurs before context is sent to the LLM. Citations are val
 ## DEC-007 — Provider abstraction
 
 Embedding, LLM and storage providers must be replaceable through interfaces.
+
+## DEC-008 — Held-out v1 is used for diagnosis
+
+Since the official score (2026-11-05, `docs/eval/runs/heldout-v1-f3cdbf3/score.md`), held-out v1 is used for diagnosis and is no longer a test set. A new held-out v2 is required before release. Dev stays Q001-Q100.

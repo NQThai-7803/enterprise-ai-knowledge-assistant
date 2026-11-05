@@ -3,7 +3,9 @@
 ## PROMPT 4.5 -- 2026-11-05 (in progress)
 
 - **4.5a, 4.5b done.** Gate metrics and fingerprint question check; baseline v2 reproduces 99/100 proxy through `metrics.py`. Max dev/held-out Jaccard 0.190 (limit 0.60).
-- **Next:** owner labels, official PROMPT 4 score, PROMPT 4b diagnosis, 4.5c.
+- **Official held-out v1 score (2 runs):** accuracy 27.5 %, with partial 30.0 %, false refusals 53.8 %, false answers 35.7 %, citations 41.7 % / 50.0 %, 0 leaks at RBAC smoke level. Graded by Claude, delegated by the owner.
+- **Held-out v1 is now used for diagnosis, not a test set (DEC-008).**
+- **Next:** PROMPT 4b diagnosis, 4.5c.
 
 ## PROMPT 4 -- 2026-10-31 (in progress)
 
@@ -23,7 +25,7 @@
   - No held-out 4-gram appears in `app/`.
   - The gold is approved and the set is frozen (SHA256 `e4dd3c69…`).
   - 2 VALID runs are done; the grading sheet is in `docs/eval/runs/heldout-v1-f3cdbf3/`.
-  - **Waiting for the owner's labels.**
+  - Labelled and scored 2026-11-05 (`score.md`).
 - Groups B/C are RBAC smoke-level (one tiny restricted document).
 
 ## PROMPT 3g -- 2026-10-31
