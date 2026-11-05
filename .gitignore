@@ -70,5 +70,5 @@ node_modules/
 /enterprise_ai_md_updates_2026-08-19_v6.zip
 /files-for-chat/
 
-# Knowledge graph output: never commit without asking the owner
-graphify-out/
+# Knowledge graph: the map is committed, only its cache is ignored
+graphify-out/cache/

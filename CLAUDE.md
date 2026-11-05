@@ -8,6 +8,9 @@ Invoke the task-observer skill at the start of every multi-step, tool-using sess
 
 Internal RAG knowledge assistant: FastAPI + SQLAlchemy 2 (async) + PostgreSQL/pgvector + Redis/Celery backend in `app/`, React/TypeScript/Vite frontend in `frontend/`. The corpus and UAT questions are mostly Vietnamese. The project docs (`ARCHITECTURE.md`, `RAG_DESIGN.md`, `API_SPEC.md`, `DATABASE_DESIGN.md`, `SECURITY.md`, `RBAC.md`, `TESTING_STRATEGY.md`) are the source of truth for design. The latest handoff and current task state are in `CODEX_START_HERE.md` (the top section is the newest), `PROJECT_STATUS.md` and `TASKS.md`.
 
+`graphify-out/` là bản đồ tham khảo cấu trúc code; luôn đọc code thật trước khi sửa (theo `eaka-rag-change-guard`).
+Graph có thể lỗi thời: xem commit hash ghi trong `graphify-out/GRAPH_REPORT.md`. Không cài git hook tự rebuild graph.
+
 ## Commands
 
 Backend (Python 3.12+, install with `pip install -e ".[dev]"`):
