@@ -3,6 +3,12 @@
 
 ## PROMPT 4.5 eval tooling before PROMPT 5 -- 2026-11-05
 
+**Reranker deferred by the owner (2026-11-05, option C; DEC-009):**
+- PROMPT 6 moves after the fixes to the deterministic route, the alignment filter and the validator.
+- Later, compare `BAAI/bge-reranker-v2-m3` with `cross-encoder/mmarco-mMiniLMv2-L12-H384-v1` on GitHub Actions, since `bge-reranker-v2-m3` (2271 MB of weights) does not fit this 8 GB host.
+- No baseline v3. Baseline v2 stays the dev baseline, measured with `lexical_fallback`.
+- **Low, for when a real reranker runs:** a run reporting `cross_encoder` can still have requests that fell back on a timeout; count `RERANKER_TIMEOUT` in the log or expose a counter. A timed-out rerank thread keeps running until it ends, so repeated timeouts can pile up CPU work.
+
 **IN PROGRESS. Approved by the owner; no `app/` change.**
 
 - Done: 4.5a `scripts/eval/metrics.py`; 4.5b `scripts/eval/question_leak.py`, `question_fingerprints.json`, guard checker exits 2 without a source.

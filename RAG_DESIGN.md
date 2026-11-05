@@ -607,3 +607,15 @@ Current technical debt for RAG design:
 - Multi-row/table `evidence_text` should capture the full supporting span instead of one narrow value.
 - Runtime UAT latency should be profiled and reduced.
 - Production corpus should separate factual policy clauses from sample-question/test-question content.
+
+## Reranker status (2026-11-05)
+
+The configured cross-encoder `BAAI/bge-reranker-v2-m3` has not run in any measurement we have verified. On 2026-11-05 the model caches of `eaka-p3d-uat` and `enterprise-ai-uat-v2` held no weights for it, and the `eaka-p3d-uat` API log shows the fallback. Baseline v2 and held-out v1 ran on `eaka-p3d-uat`, so they ranked with `lexical_fallback`: the `reranker_score` values there are alignment scores. The five other model cache volumes were not checked.
+
+`GET /health/ready` reports `reranker_mode`: `cross_encoder`, `lexical_fallback` or `disabled`. Each use of the fallback logs `RERANKER_FALLBACK_ACTIVE`, and so does startup.
+
+- A failed model load turns the fallback on until the process restarts.
+- A rerank timeout logs `RERANKER_TIMEOUT` and falls back for that request only.
+- A rerank error logs `RERANKER_PREDICT_FAILED` and falls back for that request only.
+
+The eval runners record the mode and refuse a run when it differs from the expected one. The current eval stacks expect `lexical_fallback`.

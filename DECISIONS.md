@@ -33,3 +33,7 @@ Embedding, LLM and storage providers must be replaceable through interfaces.
 ## DEC-008 — Held-out v1 is used for diagnosis
 
 Since the official score (2026-11-05, `docs/eval/runs/heldout-v1-f3cdbf3/score.md`), held-out v1 is used for diagnosis and is no longer a test set. A new held-out v2 is required before release. Dev stays Q001-Q100.
+
+## DEC-009 — Reranker deferred; RAM limits for eval
+
+Stay on the lexical fallback for now. PROMPT 6 comes after the fixes to the deterministic route, the alignment filter and the validator. The 1000 MB Available limit applies only when loading or measuring a model alone, with Ollama not loaded. During eval runs the held-out validity rules apply: no INFRA_ERROR, no Ollama restart, no item above 120 s.

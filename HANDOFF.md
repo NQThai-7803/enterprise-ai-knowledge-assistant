@@ -22,6 +22,7 @@ docker compose --profile frontend up -d frontend
 - **Dev** = Q001-Q100, baseline v2 đạt 99/100 theo proxy; Q096 lệch giữa các lượt là nhiễu đã biết.
 - **Held-out v1 đã chấm** (2026-11-05, Claude chấm theo ủy quyền của chủ dự án; [`score.md`](docs/eval/runs/heldout-v1-f3cdbf3/score.md)): `answer_accuracy` 27,5% (11/40). Trong 11 PASS có 9 câu là từ chối đúng: `answerable_accuracy` 7,7% (2/26), `refusal_accuracy` 64,3% (9/14). Từ chối sai 14/26, trả lời sai 5/14, 0 rò rỉ ở mức kiểm tra sơ.
 - **Held-out v1 giờ là bộ diagnostic** (DEC-008), không còn là tập test. Con số công bố ra ngoài phải đo trên held-out v2, chưa có.
+- **Reranker:** hệ thống đang xếp hạng bằng `lexical_fallback`. Cross-encoder chưa từng chạy trong các lần đo đã xác minh (đã kiểm 2 volume: `eaka-p3d-uat`, `enterprise-ai-uat-v2`). Xem chế độ hiện tại ở `GET /health/ready`.
 - TASK-035 (release candidate) vẫn NO-GO vì lỗi S01 chưa đóng.
 
 ## Test (2026-11-05, image build từ `requirements.lock`, pgvector/Redis tạm)

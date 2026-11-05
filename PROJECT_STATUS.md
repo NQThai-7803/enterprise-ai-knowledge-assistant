@@ -2,6 +2,8 @@
 
 ## PROMPT 4.5 -- 2026-11-05 (in progress)
 
+- **Reranker.** The configured cross-encoder `BAAI/bge-reranker-v2-m3` has not run in any measurement we have verified. On 2026-11-05 the model caches of `eaka-p3d-uat` and `enterprise-ai-uat-v2` held no weights for it, and the `eaka-p3d-uat` API log shows the fallback. Baseline v2 and held-out v1 ran on `eaka-p3d-uat`, so they ranked with `lexical_fallback`: the `reranker_score` values there are alignment scores. The five other model cache volumes were not checked. Baseline v2 stays the dev baseline, labelled `lexical_fallback`; there is no baseline v3.
+- **Fallback is visible.** `reranker_mode` in `/health/ready`, `RERANKER_FALLBACK_ACTIVE` in the log, eval runners refuse a mismatch. A timeout now falls back for that request only.
 - **4.5a, 4.5b done.** Gate metrics and fingerprint question check; baseline v2 reproduces 99/100 proxy through `metrics.py`. Max dev/held-out Jaccard 0.190 (limit 0.60).
 - **Official held-out v1 score (2 runs):** accuracy 27.5 %, with partial 30.0 %, false refusals 53.8 %, false answers 35.7 %, citations 41.7 % / 50.0 %, 0 leaks at RBAC smoke level. Graded by Claude, delegated by the owner.
 - **Held-out v1 is now used for diagnosis, not a test set (DEC-008).**
