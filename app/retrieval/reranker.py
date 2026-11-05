@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from dataclasses import replace
 from math import isfinite
 from numbers import Real
+from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
 import anyio
@@ -25,6 +26,12 @@ from app.retrieval.structured import (
 )
 
 logger = logging.getLogger(__name__)
+
+RERANKER_MODE_CROSS_ENCODER = "cross_encoder"
+RERANKER_MODE_LEXICAL_FALLBACK = "lexical_fallback"
+RERANKER_MODE_DISABLED = "disabled"
+RERANKER_FALLBACK_ACTIVE = "RERANKER_FALLBACK_ACTIVE"
+_WEIGHT_FILES = ("model.safetensors", "pytorch_model.bin")
 
 _ACRONYM_RE = re.compile(r"\b[A-Z][A-Z0-9&/+.-]{1,}\b")
 _NAME_TOKEN_RE = re.compile(r"\b[^\W\d_][\w'-]*\b", re.UNICODE)
@@ -232,7 +239,18 @@ class RetrievalReranker(Protocol):
     ) -> tuple[HybridRetrievalHit, ...]: ...
 
 
+def log_reranker_fallback_active(*, context: str) -> None:
+    logger.warning(
+        "%s: ranking with lexical alignment, not the cross-encoder (%s).",
+        RERANKER_FALLBACK_ACTIVE,
+        context,
+        extra={"error_code": RERANKER_FALLBACK_ACTIVE},
+    )
+
+
 class HeuristicRetrievalReranker:
+    mode = RERANKER_MODE_LEXICAL_FALLBACK
+
     async def rerank(
         self,
         *,
@@ -242,6 +260,7 @@ class HeuristicRetrievalReranker:
     ) -> tuple[HybridRetrievalHit, ...]:
         if top_k <= 0:
             raise ValueError("top_k must be greater than zero.")
+        log_reranker_fallback_active(context="rerank")
         return _rank_with_alignment(query=query, hits=tuple(hits), top_k=top_k)
 
 
@@ -290,6 +309,21 @@ class SentenceTransformerCrossEncoderReranker:
         self._model: Any | None = None
         self._model_load_failed = False
         self._fallback = fallback or HeuristicRetrievalReranker()
+
+    @property
+    def mode(self) -> str:
+        """What the next rerank will use; a model missing from the cache cannot load."""
+        if self._model_load_failed:
+            return RERANKER_MODE_LEXICAL_FALLBACK
+        if self._model is not None or self._model_loader is not None:
+            return RERANKER_MODE_CROSS_ENCODER
+        if _model_files_cached(
+            self._model_name,
+            cache_folder=self._cache_folder,
+            revision=self._model_revision,
+        ):
+            return RERANKER_MODE_CROSS_ENCODER
+        return RERANKER_MODE_LEXICAL_FALLBACK
 
     async def rerank(
         self,
@@ -405,6 +439,32 @@ class SentenceTransformerCrossEncoderReranker:
             }
             self._model = loader(self._model_name, **compatible_kwargs)
         return self._model
+
+
+def _model_files_cached(model_name: str, *, cache_folder: str, revision: str) -> bool:
+    """Check for the config and weights without loading the model."""
+    local = Path(model_name)
+    if local.is_dir():
+        names = {path.name for path in local.iterdir()}
+        return "config.json" in names and any(name in names for name in _WEIGHT_FILES)
+    try:
+        from huggingface_hub import try_to_load_from_cache
+    except ImportError:
+        return False
+
+    def cached(filename: str) -> bool:
+        path = try_to_load_from_cache(
+            repo_id=model_name,
+            filename=filename,
+            cache_dir=cache_folder,
+            revision=revision or None,
+        )
+        return isinstance(path, str)
+
+    try:
+        return cached("config.json") and any(cached(name) for name in _WEIGHT_FILES)
+    except (OSError, ValueError):
+        return False
 
 
 def _rank_with_alignment(

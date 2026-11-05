@@ -2,9 +2,13 @@ from __future__ import annotations
 
 from app.core.config import Settings
 from app.retrieval.reranker import (
+    RERANKER_MODE_CROSS_ENCODER,
+    RERANKER_MODE_DISABLED,
+    RERANKER_MODE_LEXICAL_FALLBACK,
     HeuristicRetrievalReranker,
     RetrievalReranker,
     SentenceTransformerCrossEncoderReranker,
+    log_reranker_fallback_active,
 )
 
 _RERANKER_CACHE: dict[tuple[object, ...], RetrievalReranker] = {}
@@ -42,3 +46,17 @@ def create_retrieval_reranker(settings: Settings) -> RetrievalReranker:
         )
     _RERANKER_CACHE[cache_key] = reranker
     return reranker
+
+
+def resolve_reranker_mode(settings: Settings) -> str:
+    """Report what ranks candidates now: cross_encoder, lexical_fallback or disabled."""
+    if not settings.reranker_enabled:
+        return RERANKER_MODE_DISABLED
+    return getattr(create_retrieval_reranker(settings), "mode", RERANKER_MODE_CROSS_ENCODER)
+
+
+def log_reranker_startup_status(settings: Settings) -> str:
+    mode = resolve_reranker_mode(settings)
+    if mode == RERANKER_MODE_LEXICAL_FALLBACK:
+        log_reranker_fallback_active(context="startup")
+    return mode

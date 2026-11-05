@@ -17,12 +17,18 @@ COMPOSE=(docker compose -p "$PROJECT" -f compose.yaml -f compose.uat-corpus-v2.y
   -f scripts/eval/compose.uat-eval.yaml)
 mkdir -p "$OUT"
 API_CID=$("${COMPOSE[@]}" ps -q api)
+API_URL_FOR_CHECK="${EVAL_API:-http://127.0.0.1:18190}"
+# Refuse the run before anything starts when the stack ranks with something unexpected.
+# The current eval stacks have no cross-encoder weights, so they expect lexical_fallback.
+export EVAL_EXPECTED_RERANKER_MODE="${EVAL_EXPECTED_RERANKER_MODE:-lexical_fallback}"
+RERANKER_ARGS=(); [ -n "${EVAL_ALLOW_RERANKER_FALLBACK:-}" ] && RERANKER_ARGS=(--allow-reranker-fallback)
+RERANKER_MODE=$(python scripts/eval/reranker_check.py --base-url "$API_URL_FOR_CHECK" ${RERANKER_ARGS[@]+"${RERANKER_ARGS[@]}"})
 env_of() {
   docker inspect "$API_CID" --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n "s/^$1=//p"
 }
 RUNNER=(env RAG_ACCEPTANCE_BASE_URL="${EVAL_API:-http://127.0.0.1:18190}" EVAL_OLLAMA="$OLLAMA"
   PYTHONIOENCODING=utf-8 python scripts/eval/run_heldout.py --monitor
-  --output "$OUT/runtime_results.json")
+  --output "$OUT/runtime_results.json" ${RERANKER_ARGS[@]+"${RERANKER_ARGS[@]}"})
 
 if [ "$PHASE" != "part2" ]; then
 API_IMAGE=$(docker inspect "$API_CID" --format '{{.Image}}')
@@ -43,6 +49,9 @@ json.dump({
         "RAG_SEMANTIC_EXACT_PERMITTED_KNN_ENABLED": "$(env_of RAG_SEMANTIC_EXACT_PERMITTED_KNN_ENABLED)",
         "WEB_SEARCH_ENABLED": "$(env_of WEB_SEARCH_ENABLED)",
     },
+    "reranker_mode": "$RERANKER_MODE",
+    "expected_reranker_mode": "$EVAL_EXPECTED_RERANKER_MODE",
+    "allow_reranker_fallback": "${EVAL_ALLOW_RERANKER_FALLBACK:-}",
     "compose_project": "$PROJECT",
     "runner": "scripts/eval/run_heldout.py",
 }, open(sys.argv[1], "w", encoding="utf-8"), indent=1)

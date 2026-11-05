@@ -71,6 +71,7 @@ def test_health_ready_returns_200_when_dependencies_are_available(
     assert response.json() == {
         "status": "ready",
         "checks": {"database": "ok", "redis": "ok"},
+        "reranker_mode": "lexical_fallback",
     }
 
 
@@ -98,6 +99,7 @@ def test_health_ready_returns_503_when_database_is_unavailable(
     assert response.json() == {
         "status": "not_ready",
         "checks": {"database": "unavailable", "redis": "ok"},
+        "reranker_mode": "lexical_fallback",
     }
 
 
@@ -125,6 +127,7 @@ def test_health_ready_returns_503_when_redis_is_unavailable(
     assert response.json() == {
         "status": "not_ready",
         "checks": {"database": "ok", "redis": "unavailable"},
+        "reranker_mode": "lexical_fallback",
     }
 
 

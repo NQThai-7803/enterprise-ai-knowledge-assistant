@@ -860,6 +860,8 @@ The report does not return actor email, actor full name, request/response bodies
 
 Readiness checks database connectivity.
 
+`GET /health/ready` also returns `reranker_mode`: `cross_encoder`, `lexical_fallback` or `disabled`. It says what ranks candidates at that moment; the eval runners read it.
+
 ## TASK-025 hardening errors
 
 All API error responses keep the standard envelope:

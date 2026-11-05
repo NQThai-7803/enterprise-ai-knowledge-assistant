@@ -34,11 +34,13 @@ from app.core.middleware import (
 )
 from app.db.session import dispose_database_engine
 from app.llm.manager import LLMProviderManager
+from app.retrieval.reranker_factory import log_reranker_startup_status
 from app.web_search.manager import WebSearchProviderManager
 
 
 @asynccontextmanager
 async def lifespan(application: FastAPI) -> AsyncIterator[None]:
+    log_reranker_startup_status(application.state.settings)
     try:
         yield
     finally:
