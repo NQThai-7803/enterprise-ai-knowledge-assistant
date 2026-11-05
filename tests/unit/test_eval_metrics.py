@@ -41,6 +41,15 @@ def test_rates_use_their_own_denominators() -> None:
     assert result["answer_accuracy_with_partial"]["numerator"] == 3
 
 
+def test_accuracy_is_split_by_gold_status() -> None:
+    result = _score([_yes("A1"), _yes("A2", grade="FAIL"), _yes("A3", grade="PARTIAL"), _no("N1")])
+    assert result["answerable_accuracy"]["ids"] == ["A1"]
+    assert result["answerable_accuracy"]["denominator"] == 3
+    assert result["refusal_accuracy"]["ids"] == ["N1"]
+    assert result["refusal_accuracy"]["denominator"] == 1
+    assert _score([_yes("A1")])["refusal_accuracy"]["value"] is None
+
+
 def test_empty_denominator_is_null_not_zero() -> None:
     result = _score([_yes("A1")])
     assert result["false_answer_rate"]["value"] is None

@@ -105,6 +105,8 @@ def score(
         ),
         "answer_accuracy": _rate(passed, len(cases)),
         "answer_accuracy_with_partial": _rate(passed + partial, len(cases)),
+        "answerable_accuracy": _rate([c.id for c in gold_yes if c.grade == PASS], len(gold_yes)),
+        "refusal_accuracy": _rate([c.id for c in gold_no if c.grade == PASS], len(gold_no)),
         "citation_accuracy": _rate(
             [c.id for c in both if c.required_docs <= c.cited_docs <= c.allowed_docs], len(both)
         ),
@@ -232,6 +234,8 @@ RATES = (
     "false_refusal_rate",
     "answer_accuracy",
     "answer_accuracy_with_partial",
+    "answerable_accuracy",
+    "refusal_accuracy",
     "citation_accuracy",
 )
 

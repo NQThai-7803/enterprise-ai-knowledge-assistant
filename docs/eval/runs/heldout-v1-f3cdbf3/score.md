@@ -20,6 +20,8 @@
 | false_refusal_rate | 53.8% (14/26) | 53.8% (14/26) |
 | answer_accuracy | 27.5% (11/40) | 27.5% (11/40) |
 | answer_accuracy_with_partial | 30.0% (12/40) | 30.0% (12/40) |
+| answerable_accuracy | 7.7% (2/26) | 7.7% (2/26) |
+| refusal_accuracy | 64.3% (9/14) | 64.3% (9/14) |
 | citation_accuracy | 41.7% (5/12) | 50.0% (6/12) |
 
 **run1**
@@ -31,6 +33,8 @@
 
 - False answers: HO-008, HO-011, HO-020, HO-022, HO-023
 - False refusals: HO-001, HO-005, HO-007, HO-012, HO-013, HO-025, HO-028, HO-031, HO-032, HO-033, HO-035, HO-036, HO-037, HO-038
+
+**Trong 11 PASS có 9 câu là từ chối đúng.** Chỉ 2/26 câu có đáp án được trả lời đạt (`answerable_accuracy` 7,7%); `refusal_accuracy` là 9/14. Đừng đọc `answer_accuracy` 27,5% như khả năng trả lời đúng.
 
 ## So với split dev
 
