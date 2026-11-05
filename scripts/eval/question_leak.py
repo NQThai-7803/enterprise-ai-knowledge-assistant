@@ -31,9 +31,10 @@ FINGERPRINTS = ROOT / "scripts" / "eval" / "question_fingerprints.json"
 DEV_SOURCE = ROOT / "artifacts" / "rag-h5-1-stress-uat.py"
 LOCK = ROOT / "docs" / "eval" / "heldout-v1.lock"
 HELDOUT = ROOT / "docs" / "eval" / "heldout-v1.yaml"
+RBAC_SOURCE = ROOT / "tests" / "acceptance" / "rbac_dev_v1.yaml"
 SALT = b"eaka-question-fingerprint-v1"
 GRAM_SIZE = 4
-EXPECTED_COUNTS = {"dev": 100, "heldout": 40}
+EXPECTED_COUNTS = {"dev": 100, "heldout": 40, "rbac": 18}
 OVERLAP_LIMIT = 0.60
 ESCAPE = re.compile(r"\\u([0-9a-fA-F]{4})")
 WORD = re.compile(r"\w+")
@@ -65,10 +66,14 @@ def fingerprint(text: str) -> list[str]:
 
 
 def build_payload(
-    dev: Iterable[tuple[str, str]], heldout: Iterable[tuple[str, str]], lock_sha256: str
+    dev: Iterable[tuple[str, str]],
+    heldout: Iterable[tuple[str, str]],
+    lock_sha256: str,
+    rbac: Iterable[tuple[str, str]] = (),
 ) -> dict[str, Any]:
     dev_items = {case_id: fingerprint(question) for case_id, question in dev}
     heldout_items = {case_id: fingerprint(question) for case_id, question in heldout}
+    rbac_items = {case_id: fingerprint(question) for case_id, question in rbac}
     return {
         "version": 1,
         "gram_size": GRAM_SIZE,
@@ -79,6 +84,7 @@ def build_payload(
                 "lock_sha256": lock_sha256,
                 "items": heldout_items,
             },
+            "rbac": {"count": len(rbac_items), "items": rbac_items},
         },
     }
 
@@ -152,10 +158,14 @@ def added_lines(root: Path, base: str, staged: bool, path: str) -> list[tuple[st
 
 
 def max_overlap(payload: Mapping[str, Any]) -> tuple[float, str | None, str | None]:
-    """Largest Jaccard similarity of any dev question with any held-out question."""
+    """Largest Jaccard similarity of any dev or RBAC dev question with any held-out question."""
     best: tuple[float, str | None, str | None] = (0.0, None, None)
     sources = payload["sources"]
-    for dev_id, dev_hashes in sources["dev"]["items"].items():
+    development = {
+        **sources["dev"]["items"],
+        **sources.get("rbac", {}).get("items", {}),
+    }
+    for dev_id, dev_hashes in development.items():
         left = set(dev_hashes)
         for heldout_id, heldout_hashes in sources["heldout"]["items"].items():
             right = set(heldout_hashes)
@@ -177,9 +187,11 @@ def _build(output: Path) -> int:
     dev = [(row[0], row[2]) for row in runpy.run_path(str(DEV_SOURCE))["CORE"]]
     items = yaml.safe_load(HELDOUT.read_text(encoding="utf-8"))["items"]
     heldout = [(item["id"], item["question"]) for item in items]
-    payload = build_payload(dev, heldout, lock_sha)
+    rbac_items = yaml.safe_load(RBAC_SOURCE.read_text(encoding="utf-8"))["items"]
+    rbac = [(item["id"], item["question"]) for item in rbac_items]
+    payload = build_payload(dev, heldout, lock_sha, rbac)
     output.write_text(json.dumps(payload, indent=0, sort_keys=True) + "\n", encoding="utf-8")
-    print(f"dev questions: {len(dev)}; held-out questions: {len(heldout)}")
+    print(f"dev: {len(dev)}; held-out: {len(heldout)}; rbac dev: {len(rbac)}")
     return 0
 
 

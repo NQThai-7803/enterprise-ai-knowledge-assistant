@@ -4,6 +4,7 @@ usage (repo root, project venv):
   python scripts/eval/metrics.py heldout <run dir>... --grading <grading.csv>
       --stack-manifest <runtime-manifest.json> [--out score.json] [--markdown score.md]
   python scripts/eval/metrics.py proxy <grade_proxy output.json>... [--out ...] [--markdown ...]
+  python scripts/eval/metrics.py rbac <run_rbac_dev output.json> [--out ...] [--markdown ...]
 
 Each run is scored on its own and its grade source is recorded: `manual` (the owner's labels) or
 `proxy` (grade_proxy.py: status plus cited document codes, not a semantic grade).
@@ -223,6 +224,46 @@ def proxy_records(graded: Mapping[str, Any]) -> list[CaseRecord]:
     return records
 
 
+def rbac_results(run: Mapping[str, Any]) -> dict[str, Any]:
+    """Score the RBAC dev set: negatives and their controls apart. Graded by proxy, not by hand."""
+    negatives = []
+    controls = []
+    for case in run["cases"]:
+        document = frozenset({case["document"]})
+        status = case["status"]
+        infra = status == INFRA_ERROR or case.get("execution_status") == INFRA_ERROR
+        if case["kind"] == "negative":
+            clean = status == NO_ANSWER and not case["leak_reasons"]
+            negatives.append(
+                CaseRecord(
+                    id=case["id"],
+                    gold_status=NO_ANSWER,
+                    run_status=INFRA_ERROR if infra else status,
+                    grade=PASS if clean else FAIL,
+                    cited_docs=frozenset(case["cited_codes"]),
+                    leak_reasons=tuple(case["leak_reasons"]),
+                )
+            )
+        else:
+            controls.append(
+                CaseRecord(
+                    id=case["id"],
+                    gold_status=ANSWERED,
+                    run_status=INFRA_ERROR if infra else status,
+                    grade=PASS if case["control_passed"] else FAIL,
+                    cited_docs=frozenset(case["cited_codes"]),
+                    required_docs=document,
+                    allowed_docs=document,
+                )
+            )
+    failed = {c.id for c in controls if c.grade != PASS}
+    return {
+        "negative": score(negatives, grade_source=PROXY, leak_measured=True),
+        "control": score(controls, grade_source=PROXY, leak_measured=True),
+        "inconclusive_negatives": sorted(failed & {c.id for c in negatives}),
+    }
+
+
 def _fmt_rate(rate: Mapping[str, Any]) -> str:
     if rate["value"] is None:
         return f"null ({rate['numerator']}/{rate['denominator']})"
@@ -317,16 +358,28 @@ def main(argv: Sequence[str] | None = None) -> int:
     heldout.add_argument("--stack-manifest", type=Path, required=True)
     proxy = sub.add_parser("proxy")
     proxy.add_argument("graded", type=Path, nargs="+")
-    for command in (heldout, proxy):
+    rbac = sub.add_parser("rbac")
+    rbac.add_argument("run", type=Path)
+    for command in (heldout, proxy, rbac):
         command.add_argument("--out", type=Path)
         command.add_argument("--markdown", type=Path)
     args = parser.parse_args(argv)
     try:
-        results = _heldout_results(args) if args.mode == "heldout" else _proxy_results(args)
+        if args.mode == "rbac":
+            results = rbac_results(_load_json(args.run))
+            inconclusive = results.pop("inconclusive_negatives")
+        else:
+            inconclusive = None
+            results = _heldout_results(args) if args.mode == "heldout" else _proxy_results(args)
     except LabelError as exc:
         print(f"[error] {exc}", file=sys.stderr)
         return 2
     markdown = render_markdown(results)
+    if inconclusive is not None:
+        results["inconclusive_negatives"] = inconclusive
+        markdown += (
+            f"\nInconclusive negatives (control failed): {', '.join(inconclusive) or 'none'}"
+        )
     if args.out:
         args.out.write_text(json.dumps(results, indent=2) + "\n", encoding="utf-8")
     if args.markdown:

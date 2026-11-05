@@ -14,6 +14,7 @@ It never touches the V2, AUTH-02 or main stacks.
 | `compare_before_after.py` | Splits cases into (a) identical in every run and (b) changed; (b) is split again into b1 (baseline already varied) and b2 (new change). |
 | `reranker_check.py` | Reads `reranker_mode` from `GET /health/ready` and refuses a run whose mode differs from `--expected-reranker-mode` (or `EVAL_EXPECTED_RERANKER_MODE`), unless `--allow-reranker-fallback` accepts `lexical_fallback`. `run_uat.sh` and `run_heldout.sh` expect `lexical_fallback` on the current stacks and write the mode to the metadata. |
 | `metrics.py` | Per-run `permission_leak_count`, `false_answer_rate`, `false_refusal_rate`, `answer_accuracy`, `citation_accuracy`. Held-out uses the owner's labels and refuses blank ones; dev uses `grade_proxy.py` output, is marked `proxy` and reports the leak count as null (not measured). |
+| `run_rbac_dev.py` | RBAC dev set from `tests/acceptance/rbac_dev_v1.yaml` on the isolated stack `eaka-rbac-dev`: 18 questions from accounts without access, each with a control from an account with access. Controls run first, then the grant is revoked, then the negatives. Score with `metrics.py rbac`. |
 | `question_leak.py` | Hashed word 4-grams of dev and held-out questions in `question_fingerprints.json`, no question text. `check` compares added `app/` lines, `overlap` compares the two sets; both exit 2 when the source is missing, empty or stale. |
 
 The questions, reference grade and manifests live under the git-ignored `artifacts/` directory.
