@@ -6,7 +6,8 @@
 - **Official held-out v1 score (2 runs):** accuracy 27.5 %, with partial 30.0 %, false refusals 53.8 %, false answers 35.7 %, citations 41.7 % / 50.0 %, 0 leaks at RBAC smoke level. Graded by Claude, delegated by the owner.
 - **Held-out v1 is now used for diagnosis, not a test set (DEC-008).**
 - **Of the 11 PASS, 9 are correct refusals:** answerable accuracy 7.7 % (2/26), refusal accuracy 64.3 % (9/14).
-- **Next:** PROMPT 4b diagnosis, 4.5c.
+- **PROMPT 4b done:** `diagnosis.md`. Of 14 false refusals, gold reached the prompt in 9; none failed at retrieval. The deterministic route caused 6 FAILs. The cross-encoder fell back to alignment scoring.
+- **Next:** owner review of the diagnosis, then 4.5c.
 
 ## PROMPT 4 -- 2026-10-31 (in progress)
 

@@ -8,7 +8,7 @@
 - Done: 4.5a `scripts/eval/metrics.py`; 4.5b `scripts/eval/question_leak.py`, `question_fingerprints.json`, guard checker exits 2 without a source.
 - **Done 2026-11-05: official PROMPT 4 score** in `docs/eval/runs/heldout-v1-f3cdbf3/score.md`: accuracy 27.5 % (11/40) in both runs, false refusals 14/26, false answers 5/14, 0 leaks at RBAC smoke level. Graded by Claude, delegated by the owner.
 - **Held-out v1 is USED FOR DIAGNOSIS, not a test set any more (DEC-008). Held-out v2 is required before release.**
-- Next: PROMPT 4b diagnosis. Owner's hint, check it first: HO-004, 008, 020, 023, 026, 039 answer in about 1.3-1.5 s with text copied from UAT-LEAVE-AUTHORITY-001 p.3 and `|` in the evidence, probably a deterministic route matching wrongly.
+- **Done 2026-11-05: PROMPT 4b diagnosis** in `docs/eval/runs/heldout-v1-f3cdbf3/diagnosis.md`. Retrieval is not the bottleneck (gold in hybrid 25/26). Dev 75/100 deterministic vs held-out 6/40, all 6 FAIL. **The cross-encoder never ran: `BAAI/bge-reranker-v2-m3` is missing from the stack cache, so PROMPT 6 has no reranker signal until that is decided.**
 - Then: 4.5c RBAC dev set on stack `eaka-rbac-dev`.
 - Decided: dev is graded with `grade_proxy` and marked `proxy`; dev does not measure permission leaks until 4.5c.
 - **Low: 31 existing `app/` lines share a 4-gram with Q001-Q100** (19 in `grounded_answer_service.py`), 0 with held-out v1. Existing code, not reviewed line by line; `check` only looks at added lines.

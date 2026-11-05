@@ -8,6 +8,7 @@ Format follows a simplified Keep a Changelog style.
 
 ### PROMPT 4.5 -- 2026-11-05
 
+- PROMPT 4b: `scripts/diagnostics/` traces answers from outside `app/`; results in `docs/eval/runs/heldout-v1-f3cdbf3/diagnosis.md`.
 - `metrics.py`: `answerable_accuracy` and `refusal_accuracy`. `eaka-rag-change-guard` and `HANDOFF.md`: held-out v1 is diagnostic; published numbers need held-out v2.
 - Official held-out v1 score in `docs/eval/runs/heldout-v1-f3cdbf3/score.md`; held-out v1 is now used for diagnosis (DEC-008).
 - `scripts/eval/metrics.py`: per-run gate metrics; manual labels for held-out, `proxy` for dev; null when unmeasured.
