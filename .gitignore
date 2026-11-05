@@ -64,3 +64,8 @@ artifacts/
 node_modules/
 .cache/
 .verify/
+
+# Handover 2026-11-05: junk kept locally, removed from git
+/tore package.json package-lock.json
+/enterprise_ai_md_updates_2026-08-19_v6.zip
+/files-for-chat/
