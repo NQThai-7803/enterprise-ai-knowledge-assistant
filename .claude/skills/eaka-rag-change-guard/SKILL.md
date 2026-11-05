@@ -20,9 +20,10 @@ Lõi RAG là nơi rủi ro cao nhất của EAKA: sai một chỗ là lộ tài 
 1. Đọc phần liên quan, xác định module bị đụng.
 2. Ghi baseline trên split **dev**:
    ```bash
-   python run_heldout.py --split dev --out .eval/before.json   # chỉnh tham số theo repo
+   python tests/acceptance/rag_h5_2_exact_100.py --output .eval/before.json
    ```
-   **Không bao giờ chạy split `test`** trong quá trình phát triển. Split test chỉ chạy ở mốc release và phải có người duyệt.
+   Split dev = Q001-Q100; chạy theo stack và biến môi trường trong `scripts/eval/README.md`.
+   **Không bao giờ chạy split `test`** (held-out v1, `scripts/eval/run_heldout.py`) trong quá trình phát triển. Split test chỉ chạy ở mốc release và phải có người duyệt.
 
 ### Khi sửa
 3. Đặt mọi thay đổi hành vi sau một setting flag (ví dụ `EAKA_RAG_<FEATURE>_ENABLED`), **mặc định giữ hành vi cũ**.
@@ -39,7 +40,7 @@ Lõi RAG là nơi rủi ro cao nhất của EAKA: sai một chỗ là lộ tài 
 6. Chạy các file test bắt buộc theo bảng ánh xạ bên dưới (dùng skill `eaka-verify` để chạy trong môi trường chuẩn).
 7. Chạy lại held-out với flag **bật**:
    ```bash
-   python run_heldout.py --split dev --out .eval/after.json
+   python tests/acceptance/rag_h5_2_exact_100.py --output .eval/after.json
    ```
 8. Áp cổng quyết định (gate) dưới đây.
 
@@ -53,22 +54,22 @@ Chỉ được đề xuất đổi mặc định của flag khi **đồng thời
 | `false_answer_rate` | không tăng quá dung sai |
 | `answer_accuracy` | không giảm quá dung sai |
 
-Dung sai (tolerance): split dev nhỏ nên lệch 1 câu là nhiễu. Mặc định dung sai = **1 câu** (tức `1 / n_dev`). TODO: ghi `n_dev` thực tế của repo vào đây: `n_dev = ___`.
+Dung sai (tolerance): split dev nhỏ nên lệch 1 câu là nhiễu. Mặc định dung sai = **1 câu** (tức `1 / n_dev`). `n_dev = 100`.
 
 Nếu chênh lệch nằm trong dung sai mà không có cải thiện rõ ràng → giữ mặc định cũ, ghi nhận trong báo cáo.
 
 ## Bảng ánh xạ module → test bắt buộc
 
-TODO: điền đường dẫn test thực tế của repo.
+Mọi file nằm dưới `tests/`. Ghi tắt: `unit/` = `tests/unit/`, `integration/` = `tests/integration/`, `api/` = `tests/api/`.
 
 | Sửa ở | Phải chạy |
 |---|---|
-| `app/retrieval/` | `tests/...retrieval...`, test phân quyền |
-| `app/chat/` | `tests/...chat...` |
-| `app/citations/` | `tests/...citation...`, test phân quyền |
-| `grounded_answer_service` | `tests/...grounded...`, acceptance liên quan |
-| validators | `tests/...validator...` |
-| Bất kỳ chỗ nào chạm permission | **toàn bộ** test permission leak |
+| `app/retrieval/` | `unit/test_hybrid_retrieval_service.py`, `unit/test_hybrid_retrieval_models.py`, `unit/test_keyword_retrieval_service.py`, `unit/test_keyword_retrieval_models.py`, `unit/test_semantic_retrieval_service.py`, `unit/test_semantic_exact_knn_flag.py`, `unit/test_retrieval_models.py`, `unit/test_retrieval_subclaims.py`, `unit/test_rrf_fusion.py`, `unit/test_rag_accuracy_components.py`, `integration/test_keyword_retrieval_repository.py`, `integration/test_semantic_retrieval_exact_knn.py`, `integration/test_semantic_retrieval_hnsw_recall.py`, và toàn bộ test phân quyền |
+| `app/chat/` | `unit/test_chat_context_builder.py`, `unit/test_conversation_context_builder.py`, `unit/test_follow_up_resolver.py`, `unit/test_grounded_prompt_builder.py`, `unit/test_llm_prompt_truncation_guard.py`, `unit/test_sse.py`, `unit/test_task0353e_context_admission_contract.py`, `integration/test_conversation_memory.py` |
+| `app/citations/` | `unit/test_citation_mapping.py`, `unit/test_citation_marker_parser.py`, `unit/test_citation_source_registry.py`, `unit/test_citation_validation_service.py`, `unit/test_grounded_output.py`, `integration/test_grounded_answer_citations.py`, và toàn bộ test phân quyền |
+| `grounded_answer_service` | `unit/test_grounded_answer_service.py`, `unit/test_rag_accuracy_components.py`, `api/test_chat_messages.py`, `api/test_chat_streaming.py`, `integration/test_grounded_answer_persistence.py`, `integration/test_grounded_answer_citations.py`, `tests/acceptance/rag_h5_2_exact_100.py` |
+| validators | `unit/test_citation_validation_service.py`, `unit/test_answer_responsiveness_diagnostic.py`, `unit/test_multilingual_answer_responsiveness_contract.py`, `unit/test_task0353e_context_admission_contract.py` |
+| Bất kỳ chỗ nào chạm permission | **Toàn bộ** test permission leak: `unit/test_permissions.py`, `unit/test_document_access_policies.py`, `unit/test_document_permission_mapping.py`, `api/test_rbac_dependencies.py`, `api/test_documents_api.py`, `integration/test_document_access_control.py`, `integration/test_permission_aware_retrieval.py`, `integration/test_permission_aware_keyword_retrieval.py`, `integration/test_hybrid_retrieval.py`, `integration/test_semantic_retrieval_repository.py`, `integration/test_citation_revalidation.py`, `integration/test_grounded_answer_persistence.py` |
 
 ## Báo cáo cuối task
 

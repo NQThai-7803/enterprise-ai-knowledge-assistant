@@ -8,6 +8,7 @@ Format follows a simplified Keep a Changelog style.
 
 ### PROMPT 4 -- 2026-10-31
 
+- `eaka-rag-change-guard`: real dev runner path, `--output`, `n_dev = 100` and the module-to-test map. Thresholds and rules unchanged.
 - Held-out v1 runs:
   - `run_heldout.py --monitor` with the new `scripts/eval/host_monitor.py` records Available MB, pagefile % and Ollama PID per item;
   - `scripts/eval/run_heldout.sh` handles metadata, warm-up and halves;

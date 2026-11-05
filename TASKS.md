@@ -27,7 +27,10 @@
   - ND-CORP-001's document list gives codes that differ from the corpus (ND-HR-002 is listed as the attendance policy).
   - ND-CORP-001 and ND-HR-002 give different HR and security contact addresses.
   These are corpus facts, not app bugs; record them for corpus v3.
-- **Low: `eaka-rag-change-guard` still assumes `run_heldout.py` and `n_dev`.** Fill them in once held-out v1 is frozen (dev = Q001-Q100, test = held-out v1, n_test = 40).
+- **DONE 2026-11-05: `eaka-rag-change-guard` paths.** Dev runner `tests/acceptance/rag_h5_2_exact_100.py --output`, `n_dev = 100`, real test map; held-out v1 stays the test split. Thresholds and rules unchanged.
+- **Medium: the guard's `check_no_question_leak.py` currently finds no questions.** It reads `tests/acceptance`, `uat`, `eval`, while Q001-Q100 live in the git-ignored `artifacts/` and held-out v1 in `docs/eval/`; it warns and exits 0. Its clean result proves nothing until the owner decides how to give it sources without letting a skill read `docs/eval/`.
+- **Medium: no dev tool computes the guard's gate metrics.** `scripts/eval/` has no `permission_leak_count`, `false_answer_rate` or `answer_accuracy`; `grade_proxy.py` is a proxy grade. Decide this before PROMPT 5.
+- **Low: `.eval/`, the guard's output folder, is not in `.gitignore`.**
 
 ## PROMPT 3g prompt truncation -- 2026-10-31
 

@@ -2,6 +2,7 @@
 
 ## PROMPT 4 -- 2026-10-31 (in progress)
 
+- **Handover 2026-11-05.** Branch `handover/2026-11-05`, `HANDOFF.md` rewritten, `eaka-rag-change-guard` paths corrected. Locked image: unit 1496 pass / 1 fail (image has no `docs/eval/`) / 17 xfail / 5 skip; API 296 pass; integration 404 pass / 3 xfail; Celery 4 pass.
 - **Item 0a.** Eval runner:
   - transport, timeout and 5xx failures are `INFRA_ERROR` and are retried once at the end of the run;
   - the proxy grade excludes them.
