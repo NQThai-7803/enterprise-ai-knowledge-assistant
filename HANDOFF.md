@@ -1,98 +1,57 @@
-# HANDOFF — Enterprise AI Knowledge Assistant (EAKA)
+# HANDOFF: Enterprise AI Knowledge Assistant (EAKA)
 
-**Checkpoint:** 2026-10-30, dừng tại **R27**. **PAUSED**: không bắt đầu R28 hay task phát triển nào khi chưa có phê duyệt mới. `AUTH-02I.1` vẫn **BLOCKED**.
+Cập nhật 2026-11-05, nhánh `handover/2026-11-05`. Thiết kế và quy tắc nằm trong `CLAUDE.md`; lịch sử việc nằm trong `TASKS.md` và `PROJECT_STATUS.md`. Bản HANDOFF cũ (có phần workspace AUTH-02 nằm ngoài repo): `git show 09e15cf:HANDOFF.md`.
 
-Repo có **2 phạm vi** khác nhau, đừng lẫn số liệu giữa hai phạm vi:
-- **(A) Repo EAKA** — thư mục này, nhánh `wip/codex-handoff`. Gồm backend, frontend và RAG.
-- **(B) Workspace AUTH-02 candidate (R13–R27)** — nằm **ngoài repo**, tại `%LOCALAPPDATA%\Temp\eaka-auth02\20261023t080222z-2608a685\auth02-local-transport-work`. Workspace này **không có trong commit**: tìm trong repo không thấy `AUTH02`/`eaka-auth02` (chỉ có ID yêu cầu AUTH-02 trong `FUNCTIONAL_REQUIREMENTS.md`). Thư mục Temp có thể bị Windows dọn bất cứ lúc nào, nên **cần sao lưu riêng trước khi làm tiếp**.
-  - **Đã xác nhận tồn tại (30/10, review tiếp nhận):** `%LOCALAPPDATA%\Temp\eaka-auth02\`, gồm 27.299 file, khoảng 397 MiB. Dưới `20261023t080222z-2608a685\` có `auth02-local-transport-work\`, `auth02b-work\`, `candidate\`, `infra\` và `manifest.json`. Khi sao lưu phải lấy toàn bộ `eaka-auth02\`.
-  - **Chưa sao lưu.** Nội dung file chưa được mở hay kiểm tra.
+## Clone và chạy
 
-## Trạng thái hiện tại (2026-11-01, sau khi chạy held-out)
-- **PROMPT 4, mục 3: đã chạy xong.**
-  - Đã chạy 2 lượt held-out v1 trên image `4f8152b4` (commit `f3cdbf3`), cả 2 lượt VALID.
-  - Bảng chấm ở `docs/eval/runs/heldout-v1-f3cdbf3/`.
-  - **Đang chờ owner chấm tay. Không tự gán nhãn.**
-- **Held-out v1 đã đóng băng:** SHA256 `e4dd3c69445c443d337699bd2639afd17112221f5b6e6baf3018911a44272346` (file `docs/eval/heldout-v1.lock`, commit `7efc4f0`).
-- **Ba stack vẫn đang `stop`, giữ tắt cho tới khi owner bảo bật lại:**
-  - `enterprise-ai-uat-v2`
-  - `enterprise-ai-knowledge-assistant`
-  - `eaka-auth02-20261023t080222z-2608a685`
-  - `eaka-p3d-uat` cũng đã `stop` sau khi chạy.
-  - Đủ 23 volume.
-- **Cấu hình máy:**
-  - `%USERPROFILE%\.wslconfig` đặt `memory=4GB`, `swap=8GB`.
-  - Ollama: biến môi trường user `OLLAMA_CONTEXT_LENGTH=8192`.
-  - Owner đã tắt SQL Server, các dịch vụ CEIP và VSS Writer để có RAM.
+```powershell
+git clone https://github.com/NQThai-7803/enterprise-ai-knowledge-assistant.git
+cd enterprise-ai-knowledge-assistant
+git switch handover/2026-11-05
+Copy-Item .env.example .env      # sửa SECRET_KEY và các giá trị local, xem SETUP.md mục 5
+docker compose up -d             # postgres, redis, migrate, api, worker; Swagger ở :8000/docs
+docker compose --profile frontend up -d frontend
+```
 
-## 1. Công việc dở và bước tiếp theo
-**(B) AUTH-02**
-- **R27 xong:** baseline offline `AUTH02-LOCAL-R25-BOOTSTRAP-METADATA-CORRECTED-OFFLINE-V1`; admission/post-check PASS. Admission record SHA256 `dd3f8dfc96770b1fbbaec2a9d737ec78c1634b58c2f8ab7a04383df29cac644f`.
-- **R28 (Windows native identity collector): chưa bắt đầu.**
-- **Blocker:** trusted bootstrap/approved SID; dedicated DPAPI provider (R22 báo `PathNotFound`); asyncpg tương thích với candidate; PostgreSQL auth method; chính sách transport/TLS. Ngân sách TCP probe đã dùng **1/1**.
+- Thêm LLM giả và tài khoản seed: `docker compose -f compose.yaml -f compose.uat.yaml up -d`.
+- **Không có trong git, phải xin chủ dự án:** `artifacts/` (câu hỏi Q001-Q100, baseline v2, manifest), `data/models`. Thiếu `artifacts/` thì không đo được split dev và 5 unit test bị skip.
 
-**(A) Repo EAKA**
-- TASK-035 (Release Candidate) ở trạng thái **NO-GO**:
-  - **S01:** Staff hỏi về tài liệu không có quyền thì nhận câu trả lời không liên quan nhưng có citation, thay vì NO_ANSWER. Nguyên nhân gốc chưa xác định.
-  - **R05:** image API và worker build lệch source/package; backend chưa có lock file.
-- Thứ tự đề xuất (chi tiết trong `docs/review/bao-cao-kiem-thu-2026-10-28.md`):
-  1. Sửa fixture test.
-  2. Đánh dấu `xfail(strict)` cho các contract S01.
-  3. Xây bộ đánh giá held-out, xong rồi mới sửa logic xếp hạng và ngữ cảnh.
-- **Vấn đề đã đối chiếu code (c908a05):**
-  - **Ranking:** `_rank_hits_for_prompt` sắp xếp theo `alignment_score`; điểm reranker không có trong sort key, chỉ còn tác dụng qua `index` (tiêu chí cuối). Các bộ lọc theo chủ đề và `_filter_low_alignment_documents` có thể bỏ hit đúng. Khi bật reranker, `grounded_answer_service.py:1664` nối hit reranker vào **cuối** danh sách, nên hit đúng không bị loại hẳn mà bị đẩy xuống cuối, rồi bị `group_hits[:2]` (`:746`) cắt. Tác động trên toàn pipeline: NOT_VERIFIED.
-  - **Citation page:** `app/citations/mapper.py:73/105/120` luôn cite `start_page` của chunk (dòng 73 bắt buộc `page_numbers[0] == start_page`). Chunk trải nhiều trang luôn trỏ về trang đầu, dù evidence có thể nằm ở trang sau.
+## Trạng thái
 
-## 2. Test FAIL hiện tại và nguyên nhân
-**(B):** báo cáo R26 ghi independent 100 PASS, replay R24 43 PASS, combined 768 PASS, 3 historical deselected. R27 ghi `REGRESSION_NOT_RERUN`. **Lỗi lịch sử đã sửa, không phải lỗi hiện hành:** 10 failures ở R24 (reserved Windows path alias, SID uint32 overflow, type-insensitive mutation), đã sửa ở R25, R26 kiểm lại không còn tái hiện.
+- **Sửa lõi RAG đang tạm dừng cho tới khi chốt PROMPT 4.** Thứ tự: đo bằng held-out trước, sửa logic lõi sau, đặt sau feature flag (`docs/review/claude-code-prompts.md`, PROMPT 5-7).
+- **Dev** = Q001-Q100, baseline v2 đạt 99/100 theo proxy; Q096 lệch giữa các lượt là nhiễu đã biết.
+- **Test** = held-out v1, 40 câu, đã đóng băng (`docs/eval/heldout-v1.lock`). Chỉ chạy ở mốc release, không dùng để tinh chỉnh.
+- TASK-035 (release candidate) vẫn NO-GO vì lỗi S01 chưa đóng.
 
-**(A):** chạy ngày 28/10 trên **bản sao Linux**, Python 3.12, deps mới nhất, PostgreSQL 16 + pgvector 0.6.2, nên **khác máy Windows**:
-- **Unit/API: 1.690 PASS / 16 FAIL.**
-  - 14 FAIL là contract **S01 cố ý để đỏ** — đây là blocker runtime thật: `tests/unit/test_multilingual_answer_responsiveness_contract.py` (8) và `test_task0353e_context_admission_contract.py` (6).
-  - 2 FAIL do môi trường: font `C:/Windows/Fonts/arial.ttf`, và test cần `.env` riêng (`test_default_compose_keeps_llm_local_safe`).
-- **Integration + API có DB: 606 PASS / 40 FAIL.** Đây là lỗi fixture, không phải lỗi logic:
-  - 25 test FAIL vì `RERANKER_CANDIDATE_K` > `HYBRID_RETRIEVAL_MAX_TOP_K` trong `make_settings` của test. Con số "25/28 PASS" là tổng của 3 file: `test_hybrid_retrieval.py` (20), `test_grounded_answer_persistence.py` (5), `test_grounded_answer_citations.py` (3), chạy với `RERANKER_CANDIDATE_K=10` trên bản sao Linux ngày 28/10. 3 test còn fail: hybrid Vietnamese fallback (tự đặt `max_top_k` thấp), internal system messages, invalid citation. Trên Windows: NOT_VERIFIED.
-  - 10 test chat/SSE nhận NO_ANSWER do fixture không vượt qua lớp kiểm chứng mới.
-  - 1 test hard-code migration head `0010` (thực tế là `0011`).
-  - 4 test conversation memory, trong đó "Are there exceptions?" bị mất chủ đề — **có thể là hồi quy thật**.
-- tiktoken tải `cl100k_base` từ Internet khi chạy, nên máy không có mạng sẽ fail chunking.
+## Test (2026-11-05, image build từ `requirements.lock`, pgvector/Redis tạm)
 
-## 3. Lệnh (chỉ ghi những lệnh có evidence)
-- **Đã chạy trên bản sao Linux ngày 28/10** (Windows: NOT_VERIFIED):
-  - Backend: `python -m pytest -q` với `TIKTOKEN_CACHE_DIR` đã có file `cl100k_base`.
-  - Integration: `DATABASE_URL=postgresql+asyncpg://...` cộng với marker string trong `.github/workflows/ci.yml`.
-  - Frontend: `npm ci`, `npm run lint`, `npm run typecheck`, `npx vitest run`, `npx vite build`, `CI=1 npx playwright test`.
-- **Khởi động backend/worker (`docker compose up`, uvicorn): NOT_VERIFIED.** Frontend dev server: NOT_VERIFIED.
-- Lệnh (B): NOT_VERIFIED. Thiếu exact command, interpreter và working directory.
+| Lane | Pass | Fail | Xfail | Skip |
+|---|---:|---:|---:|---:|
+| `tests/unit` | 1496 | 1 | 17 | 5 |
+| `tests/api` không integration | 51 | 0 | 0 | 0 |
+| `tests/api` integration | 245 | 0 | 0 | 0 |
+| `tests/integration` | 404 | 0 | 3 | 0 |
+| Celery | 4 | 0 | 0 | 0 |
 
-## 4. Biến môi trường (chỉ tên, không giá trị)
-Danh sách đầy đủ nằm trong `.env.example`, `.env.production.example`, `frontend/.env.example`. Các nhóm chính:
-- **Bảo mật:** `SECRET_KEY` (prod ≥ 32 ký tự, hoặc dùng `SECRET_KEY_FILE`).
-- **Hạ tầng:** `DATABASE_URL`, `REDIS_URL`, `CELERY_BROKER_URL`, `CELERY_RESULT_BACKEND`, `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`.
-- **Model:** `EMBEDDING_MODEL_CACHE_PATH`, `RERANKER_*`.
-- **LLM:** `LLM_ENABLED`, `LLM_PROVIDER`, `LLM_MODEL`, `LLM_OLLAMA_BASE_URL`, `LLM_OLLAMA_MODEL`.
-- **UAT:** `UAT_SEED_ENABLED`, `UAT_*_PASSWORD`.
-- **Frontend:** `VITE_API_BASE_URL`.
+- **Fail:** `test_heldout_runner.py::test_repository_lock_matches_the_frozen_file`. Image không có `docs/eval/`; không phải lỗi logic. Test pass khi chạy trên host (venv).
+- **Xfail, đều là lỗi thật còn mở:**
+  - 14 ca S01 trong `test_multilingual_answer_responsiveness_contract.py` (8) và `test_task0353e_context_admission_contract.py` (6): câu trả lời không liên quan nhưng vẫn có citation.
+  - 3 ca `test_answer_responsiveness_diagnostic.py`: bằng chứng trích nguyên văn chưa chứng minh là trả lời đúng câu hỏi; validator có thể loại mệnh đề điều kiện tiếng Việt.
+  - 2 ca `test_semantic_retrieval_hnsw_recall.py`: bộ lọc quyền chạy sau khi HNSW đã lấy kết quả, làm giảm recall.
+  - 1 ca `test_conversation_memory.py`: câu nối tiếp bị mất chủ đề.
+- **Skip:** 5 ca thiếu manifest trong `artifacts/`.
+- **Chưa chạy:** các lane cần model thật (embedding, processing, semantic, hybrid), LLM thật, frontend.
 
-(B) dùng **dedicated Windows CurrentUser DPAPI** (chưa provision). Không truyền password qua `DATABASE_URL`, argv, env, `PGPASSWORD`, `.pgpass`, log hay Git.
+## Việc đang dở
 
-## 5. Quyết định đã chốt và vùng không được đụng
-- Giữ nguyên các thành phần sau:
-  - EAKA gốc và UAT-v2 (`uat/corpus-v2`).
-  - PostgreSQL AUTH-02 named volume, network, identity pins, containment guard (`tests/containment*`).
-  - Models, migrations, protected/immutable sources.
-- R13, R18, R25 là **approved OFFLINE baselines**, không phải trusted runtime token. Không sửa manifest, admission hay evidence lịch sử. Không hạ assertion để tạo PASS.
-- Không làm các việc sau khi chưa có phê duyệt riêng: Docker start/stop, TCP/SQL, DPAPI unprotect, credential provisioning, thay đổi TLS, migration/seed/restore. **Không `docker compose down -v`.**
-- Không viết logic riêng cho từng câu hỏi UAT. Retrieval phải lọc quyền trước LLM. Mọi thay đổi schema đều phải có migration.
+**PROMPT 4 đang chờ chủ dự án chấm tay `docs/eval/runs/heldout-v1-f3cdbf3/grading.csv`** (cột `label_run1`, `label_run2`: PASS, PARTIAL, FAIL, LEAK). Không tự gán nhãn thay. Có nhãn rồi mới tính điểm và sang PROMPT 5.
 
-## 6. Test phụ thuộc `artifacts/` (thư mục bị `.gitignore`)
-Quét bằng `rg -n 'artifacts' tests`, sau đó kiểm tra import `scripts.release.*`:
-- `artifacts/task-035-3c2e-20261014/synthetic-manifest.json` ← `tests/unit/test_task0353c2e_eval_harness.py` và `tests/unit/test_task0353c2f_eval_harness.py` (qua `scripts/release/task0353c2e_eval.py`, `MANIFEST`).
-- `artifacts/task-035-3c2f-20261014/synthetic-manifest.json` ← `tests/unit/test_task0353c2f_eval_harness.py` (qua `scripts/release/task0353c2f_eval.py`, `MANIFEST`).
-- **Không phải dependency của pytest:** các file `tests/acceptance/rag_h5_2_exact_100.py`, `rag_h5_2_model_ab.py`, `task_034_1_2_runtime_acceptance.py` không có tiền tố `test_` nên pytest không thu thập. Chúng chỉ trỏ tới `artifacts/rag-h5-1-stress-uat.py`, `artifacts/rag-h5-2-exact-100/`, `artifacts/rag-h5-2-model-ab.json`, `artifacts/task-034-1-2/`. `results.json` của 3c2f là output, không được test đọc.
+Báo cáo kiểm thử 28/10: [`docs/review/bao-cao-kiem-thu-2026-10-28.md`](docs/review/bao-cao-kiem-thu-2026-10-28.md).
 
-## 7. Git checkpoint
-- Nhánh `wip/codex-handoff`. Commit gồm: đổi `.gitignore` từ `data/` thành `/data/` (để theo dõi được `frontend/src/components/data/DataTable.tsx`), thêm `HANDOFF.md`, và toàn bộ thay đổi trước đó chưa commit.
-- Commit với `core.autocrlf=input`: index giữ LF, working tree không đổi.
-- Commit có kèm file nháp `tmp_*_trace.py` và `.cache/huggingface/.agent_harnesses.json` (không chứa secret). Nên dọn ở một commit sau.
-- File rác khác đang được track (chỉ ghi lại, **chưa xóa**): `tore package.json package-lock.json`, `enterprise_ai_md_updates_2026-08-19_v6.zip`, `files-for-chat/` (38 file), gitlink `vite-monorepo` (mode 160000, không có `.gitmodules`).
+## Lưu ý bắt buộc
+
+- **Không commit `.env`, `.env.*` (trừ file mẫu) hay `.backups/`.** Repo đang public; kiểm tra `git status` trước khi add.
+- **Không cho skill hay công cụ nào đọc hoặc quét `docs/eval/`**, vì đó là gold của held-out. Công cụ quét cả repo phải loại thư mục này.
+- **Không chạy `docker compose down -v`**, vì lệnh này xoá volume corpus.
+- Không viết logic riêng cho từng câu hỏi test. Không lấy hoặc cite tài liệu ngoài quyền của người dùng.
+- Sửa `app/retrieval`, `app/chat`, `app/citations`, validator hoặc phân quyền: dùng `.claude/skills/eaka-rag-change-guard`. Trước khi báo xong: dùng `.claude/skills/eaka-verify`.

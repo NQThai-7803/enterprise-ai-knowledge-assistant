@@ -69,3 +69,6 @@ node_modules/
 /tore package.json package-lock.json
 /enterprise_ai_md_updates_2026-08-19_v6.zip
 /files-for-chat/
+
+# Knowledge graph output: never commit without asking the owner
+graphify-out/
