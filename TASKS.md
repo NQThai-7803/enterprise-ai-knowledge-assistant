@@ -1,11 +1,17 @@
 
 # Implementation Tasks
 
+## FIX 2 false answers -- 2026-11-06
+
+- **DONE: diagnosis in `docs/eval/runs/fix2-diagnosis.md`.**
+- **WAITING FOR OWNER: approve the proposed fixes, flags and `answer_relevance_dev_v1`.**
+- **OPEN: find out why results differ between runs with the same seed** (92/100 UAT answers identical; RBD-03, Q033 and Q071 change status).
+
 ## FIX 1 deterministic route -- 2026-11-06
 
 - **DONE: mode chosen under DEC-010, default `strict`, rollback through `RAG_DETERMINISTIC_ROUTE_MODE=legacy`.**
 - **DONE: owner accepted the 10 proposed held-out labels at diagnostic level** (`docs/eval/runs/fix1-route-mode/heldout-strict.md`).
-- **OPEN: HO-008, 020, 023 still answer wrongly under `strict`;** their route has not been traced.
+- **DONE: HO-008, 020, 023 traced in FIX 2.**
 
 ## PROMPT 4.5 eval tooling before PROMPT 5 -- 2026-11-05
 

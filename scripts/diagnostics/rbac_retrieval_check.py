@@ -76,7 +76,9 @@ def verdicts(
     }
 
 
-def _trace(container: str, items: list[dict[str, Any]], codes: dict[str, str]) -> list[dict]:
+def _trace(
+    container: str, items: list[dict[str, Any]], codes: dict[str, str], mode: str = "route"
+) -> list[dict]:
     with tempfile.TemporaryDirectory() as folder:
         path = Path(folder) / "in.json"
         out = Path(folder) / "out.json"
@@ -101,7 +103,7 @@ def _trace(container: str, items: list[dict[str, Any]], codes: dict[str, str]) -
                 "--output",
                 "/tmp/rbac_out.json",
                 "--mode",
-                "route",
+                mode,
             ],
             check=True,
             env=ENV,
@@ -118,6 +120,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--container", required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--mode", choices=("route", "full"), default="route")
+    parser.add_argument("--raw-output", type=Path, help="also write the traces; holds answer text")
     args = parser.parse_args()
     data = load_set()
     base_url = os.environ.get("RAG_ACCEPTANCE_BASE_URL", "http://127.0.0.1:18190")
@@ -140,9 +144,9 @@ def main() -> int:
         ]
 
     admin.grant(ids[revocable["code"]], role)
-    control = _trace(args.container, items("control"), codes)
+    control = _trace(args.container, items("control"), codes, args.mode)
     admin.revoke(ids[revocable["code"]], role)
-    negative = _trace(args.container, items("account"), codes)
+    negative = _trace(args.container, items("account"), codes, args.mode)
     result = verdicts(
         {row["id"]: seen_at(row) for row in control},
         {row["id"]: seen_at(row) for row in negative},
@@ -150,6 +154,11 @@ def main() -> int:
     for key, rows in (("control", control), ("negative", negative)):
         for row in rows:
             result[row["id"]][f"{key}_route"] = route_of(row)
+    if args.raw_output:
+        args.raw_output.write_text(
+            json.dumps({"control": control, "negative": negative}, ensure_ascii=False),
+            encoding="utf-8",
+        )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=1), encoding="utf-8")
     conclusive = sum(row["conclusive"] for row in result.values())

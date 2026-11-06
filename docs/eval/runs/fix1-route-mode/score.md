@@ -26,6 +26,6 @@ Lượt UAT của `off` bị ngắt sau Q092 và chạy tiếp từ Q093, chủ 
 
 ## Giới hạn
 
-- RBAC chỉ có 18 câu mỗi phía và mỗi mode chạy 1 lượt, nên `strict` hơn `off` 1 câu trả lời sai là chênh lệch nhỏ. Quy tắc vẫn cho cùng kết quả nếu bỏ RBD-03, vì `strict` đạt 5 đối chứng so với 3.
+- RBAC chỉ có 18 câu mỗi phía và mỗi mode chạy 1 lượt. **Đính chính 2026-11-06:** RBD-03 cũng trả lời sai dưới `strict` trong trace của FIX 2, nên số câu sai của `strict` nên đọc là 0 đến 1 (`docs/eval/runs/fix2-diagnosis.md`). Lựa chọn không đổi, vì `strict` đạt 5 đối chứng so với 3 của `off`.
 - Tầng trả lời vẫn yếu: `strict` còn 12/18 đối chứng bị từ chối sai, và RBD-06 trả lời đúng thông tin nhưng cite sai tài liệu ở cả 3 mode.
 - Đây không phải con số công bố. Con số công bố phải đo trên held-out v2.

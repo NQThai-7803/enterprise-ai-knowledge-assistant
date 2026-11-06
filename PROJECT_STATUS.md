@@ -1,5 +1,11 @@
 # Project Status
 
+## FIX 2 -- 2026-11-06 (diagnosis, awaiting owner review)
+
+- **The 5 held-out false answers come from 4 mechanisms:** a deterministic repair overriding an LLM refusal, a wrong value type with no unit check, off-topic clauses copied verbatim by the LLM, and rejected claims rescued by a weak signal. See `docs/eval/runs/fix2-diagnosis.md`.
+- **Correction to FIX 1:** RBAC false answers under `strict` read as 0 to 1, because RBD-03 varies between runs. The choice of `strict` stands.
+- **Next:** owner approves the fixes and the new dev set. No `app/` change yet.
+
 ## FIX 1 -- 2026-11-06
 
 - **`strict` is the default for `RAG_DETERMINISTIC_ROUTE_MODE` (DEC-010).** RBAC false answers: 0 (`legacy` 5, `off` 1). Correct controls: 5 (`legacy` 4, `off` 3). 0 leaks and 99/100 proxy on Q001-Q100 in all three modes.

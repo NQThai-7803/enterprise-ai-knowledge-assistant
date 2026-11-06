@@ -20,6 +20,7 @@ import inspect
 import json
 import logging
 import re
+import sys
 from pathlib import Path
 from time import perf_counter
 from types import SimpleNamespace
@@ -27,6 +28,7 @@ from typing import Any
 
 from sqlalchemy import select
 
+import app.services.claim_evidence_validation_service as cev
 import app.services.grounded_answer_service as gas
 from app.core.config import get_settings
 from app.db.session import async_session_factory
@@ -84,6 +86,11 @@ class Recorder:
             "generation_errors": [],
             "retry_checks": [],
             "deterministic_repair": [],
+            "validator_rules": [],
+            "completeness": [],
+            "citation_ok": [],
+            "repair_generations": [],
+            "generation_drafts": [],
         }
 
     def hit(self, hit: Any, rank: int | None = None) -> dict[str, Any]:
@@ -146,6 +153,80 @@ def _wrap_sync(obj: Any, name: str, after: Any) -> None:
         return result
 
     setattr(obj, name, wrapper)
+
+
+def _with_child_checks(fn: Any, after: Any) -> Any:
+    """Call fn and report each helper it called directly that returned a bool, None or status."""
+
+    @functools.wraps(fn)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        checks: list[dict[str, Any]] = []
+        exit_line: list[int] = []
+
+        def profile(frame: Any, event: str, value: Any) -> None:
+            if event != "return":
+                return
+            if frame.f_code is fn.__code__:
+                exit_line.append(frame.f_lineno)
+            elif (
+                frame.f_back is not None
+                and frame.f_back.f_code is fn.__code__
+                and not frame.f_code.co_name.startswith("<")
+                and (value is None or isinstance(value, bool | cev.ClaimEvidenceStatus))
+            ):
+                checks.append(
+                    {
+                        "check": frame.f_code.co_name,
+                        "line": frame.f_back.f_lineno,
+                        "result": getattr(value, "value", value),
+                    }
+                )
+
+        previous = sys.getprofile()
+        sys.setprofile(profile)
+        try:
+            result = fn(*args, **kwargs)
+        finally:
+            sys.setprofile(previous)
+        after(result, kwargs, checks, exit_line[-1] if exit_line else None)
+        return result
+
+    return wrapper
+
+
+def _patch_validator_checks() -> None:
+    """Show which rule decided: the exit line of each validator and every check it ran."""
+
+    def after_rules(result: Any, kwargs: Any, checks: list, line: int | None) -> None:
+        if REC.trace:
+            REC.trace["validator_rules"].append(
+                {
+                    "status": result.value,
+                    "exit_line": line,
+                    "answer": str(kwargs.get("answer"))[:300],
+                    "evidence_chars": len(kwargs.get("evidence") or ""),
+                    "caller": sys._getframe(2).f_code.co_name,
+                    "checks": checks,
+                }
+            )
+
+    cev._validate_answer_against_evidence = _with_child_checks(
+        cev._validate_answer_against_evidence, after_rules
+    )
+
+    def after_completeness(result: Any, kwargs: Any, checks: list, line: int | None) -> None:
+        REC.trace["completeness"].append(
+            {
+                "retry": bool(result),
+                "exit_line": line,
+                "answer": str(kwargs.get("answer"))[:300],
+                "checks": checks,
+            }
+        )
+
+    gas._should_retry_incomplete_answer = _with_child_checks(
+        gas._should_retry_incomplete_answer, after_completeness
+    )
 
 
 def _caller() -> str:
@@ -213,7 +294,7 @@ def _patch_module() -> None:
                 "pages": list(source.page_numbers),
                 "gold": str(source.chunk_id) in REC.gold,
                 "reranker_score": source.reranker_score,
-                "preview": source.text[:240],
+                "preview": source.text[:1200],
             }
             for source in result.sources
         ]
@@ -250,6 +331,18 @@ def _patch_module() -> None:
                     )
 
             _wrap_sync(gas, name, after_structured)
+        elif name.startswith("_structured_") and name.endswith("_generation") and callable(value):
+
+            def after_generation(result: Any, args: Any, kwargs: Any, name: str = name) -> None:
+                REC.trace["repair_generations"].append(
+                    {
+                        "function": name,
+                        "caller": _caller(),
+                        "content": None if result is None else str(result.content)[:400],
+                    }
+                )
+
+            _wrap_sync(gas, name, after_generation)
 
 
 class TracedProvider:
@@ -367,7 +460,16 @@ def _patch_service(service: Any) -> None:
     @functools.wraps(original_generation)
     async def traced_generation(*args: Any, **kwargs: Any) -> Any:
         try:
-            return await original_generation(*args, **kwargs)
+            draft = await original_generation(*args, **kwargs)
+            REC.trace["generation_drafts"].append(
+                {
+                    "caller": _caller(),
+                    "input": str(args[0].content)[:600] if args else None,
+                    "status": draft.grounding_status.value,
+                    "output": draft.content[:600],
+                }
+            )
+            return draft
         except Exception as exc:
             REC.trace["generation_errors"].append(type(exc).__name__)
             raise
@@ -379,7 +481,11 @@ def _patch_service(service: Any) -> None:
     @functools.wraps(original_map)
     async def traced_map(*args: Any, **kwargs: Any) -> Any:
         try:
-            return await original_map(*args, **kwargs)
+            validated = await original_map(*args, **kwargs)
+            REC.trace["citation_ok"].append(
+                {"answer": str(kwargs.get("answer"))[:300], "cited": len(validated.citations)}
+            )
+            return validated
         except Exception as exc:
             REC.trace["citation_errors"].append(type(exc).__name__)
             raise
@@ -549,6 +655,7 @@ async def main_async(args: argparse.Namespace) -> None:
         close_llm_provider_after_generate=False,
         token_counter=TiktokenTokenCounter(settings.tokenizer_encoding_name),
     )
+    _patch_validator_checks()
     _patch_module()
     _patch_service(service)
     output = Path(args.output)

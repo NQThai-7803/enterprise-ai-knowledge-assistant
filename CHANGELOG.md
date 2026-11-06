@@ -6,6 +6,11 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### FIX 2 diagnosis -- 2026-11-06
+
+- `docs/eval/runs/fix2-diagnosis.md`: traces of the 5 held-out false answers under `strict`, cause groups and proposed fixes. No `app/` change.
+- `heldout_trace.py` records the validator rule that decided, each completeness check and the generation behind the final answer. `rbac_retrieval_check.py` gains `--mode` and `--raw-output`.
+
 ### FIX 1 -- 2026-11-06
 
 - `RAG_DETERMINISTIC_ROUTE_MODE` (`legacy`, `strict`, `off`) controls `_structured_condition_value_answer`. The default is now `strict` (DEC-010); `legacy` rolls back. Results in `docs/eval/runs/fix1-route-mode/`.
