@@ -1,0 +1,60 @@
+{
+ "started_at": "2026-11-05T16:46:31Z",
+ "repo_head": "20a6848d77a6e2e734020abdb64f5d88968f4f4f",
+ "repo_dirty": "0",
+ "api_image": "sha256:37f0370568b1625279be3942d2f3ee76150010698c67f33668fae2f37e987dff",
+ "api_image_commit": "89417e70f6059a49902d0c09b22864a258f7acaa",
+ "postgres_image": "sha256:cf134a767f474095eeba57e0117be8e568e011a63f33fbf252f14c9b760f8e6f",
+ "pgvector_extversion": "0.8.6",
+ "postgres_server_version": "17.11 (Debian 17.11-1.pgdg12+2)",
+ "llm": {
+  "provider": "ollama",
+  "model": "qwen2.5:3b",
+  "num_ctx": "8192",
+  "keep_alive": "10m",
+  "seed": "20261031",
+  "temperature": "0"
+ },
+ "rag_deterministic_route_mode": "off",
+ "reranker_mode": "lexical_fallback",
+ "expected_reranker_mode": "lexical_fallback",
+ "allow_reranker_fallback": "",
+ "compose_project": "eaka-p3d-uat",
+ "runner": "tests/acceptance/rag_h5_2_exact_100.py",
+ "run_note": "l\u01b0\u1ee3t b\u1ecb ng\u1eaft v\u00e0 ch\u1ea1y ti\u1ebfp",
+ "interruption": {
+  "interrupted_after": "Q092",
+  "resumed_from": "Q093",
+  "resumed_at": "2026-11-06T06:06:04Z",
+  "resume_repo_head": "20a6848d77a6e2e734020abdb64f5d88968f4f4f",
+  "same_api_image": true,
+  "api_container_recreated": true,
+  "resume_warmup": "warmup_resume.json",
+  "owner_accepted": true
+ },
+ "warmup": {
+  "at": "2026-11-05T16:46:44.905086+00:00",
+  "model": "qwen2.5:3b",
+  "num_ctx": 8192,
+  "keep_alive": "10m",
+  "seed": 20261031,
+  "http_status": 200,
+  "elapsed_ms": 9693,
+  "model_was_loaded_before": false,
+  "loaded_before": [],
+  "loaded_after": [
+   {
+    "name": "qwen2.5:3b",
+    "digest": "357c53fb659c5076de1d65ccb0b397446227b71a42be9d1603d46168015c9e4b",
+    "size_vram": 2318758051,
+    "expires_at": "2026-11-05T23:56:44.9040788+07:00"
+   }
+  ],
+  "completion_tokens": 2
+ },
+ "runner_status": "COMPLETE",
+ "infra_error_cases": 0,
+ "infra_error_retried_cases": 0,
+ "infra_error_ids": [],
+ "finished_at": "2026-11-06T06:08:42Z"
+}

@@ -22,7 +22,7 @@ Kiểm tra ở tầng retrieval cho cả 3 mode: 18/18 cặp kết luận đư�
 
 ## Lượt `off`: bị ngắt và chạy tiếp
 
-Lượt UAT của `off` bị ngắt sau Q092 và chạy tiếp từ Q093, chủ dự án đã chấp nhận. Giữa hai đoạn, container API được tạo lại từ cùng image, và model được warm-up lại trước Q093. Q093 mất 48 giây. `artifacts/fix1/off/run1/metadata.json` ghi `run_note` và `interruption`.
+Lượt UAT của `off` bị ngắt sau Q092 và chạy tiếp từ Q093, chủ dự án đã chấp nhận. Giữa hai đoạn, container API được tạo lại từ cùng image, và model được warm-up lại trước Q093. Q093 mất 48 giây. `off-uat-metadata.json` ghi `run_note` và `interruption`.
 
 ## Giới hạn
 

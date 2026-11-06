@@ -6695,7 +6695,7 @@ def test_topic_check_ignores_generic_words() -> None:
     )
 
 
-def test_route_mode_defaults_to_legacy_and_rejects_unknown_values() -> None:
+def test_route_mode_defaults_to_strict_and_rejects_unknown_values() -> None:
     assert Settings(_env_file=None).rag_deterministic_route_mode == "strict"
     with pytest.raises(ValueError):
         Settings(_env_file=None, rag_deterministic_route_mode="other")
