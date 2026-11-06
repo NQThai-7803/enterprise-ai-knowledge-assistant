@@ -25,8 +25,8 @@ services:
       # Eval runs are reproducible: greedy decoding and a fixed seed (PROMPT 3f).
       LLM_TEMPERATURE: "0"
       RAG_DETERMINISTIC_ROUTE_MODE: ${EVAL_DETERMINISTIC_ROUTE_MODE:-strict}
-      RAG_REPAIR_AFTER_LLM_REFUSAL_ENABLED: ${EVAL_REPAIR_AFTER_LLM_REFUSAL:-true}
-      RAG_ANSWER_UNIT_GUARD_ENABLED: ${EVAL_ANSWER_UNIT_GUARD:-false}
+      RAG_REPAIR_AFTER_LLM_REFUSAL_ENABLED: ${EVAL_REPAIR_AFTER_LLM_REFUSAL:-false}
+      RAG_ANSWER_UNIT_GUARD_ENABLED: ${EVAL_ANSWER_UNIT_GUARD:-true}
       RAG_RESELECT_REQUIRES_STRONG_SUPPORT_ENABLED: ${EVAL_RESELECT_STRONG_SUPPORT:-false}
       LLM_SEED: ${EVAL_LLM_SEED:-20261031}
       # Point at scripts/eval/ollama_usage_proxy.py to record token usage per call.

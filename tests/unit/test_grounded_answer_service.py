@@ -35,6 +35,7 @@ from app.models import (
 )
 from app.observability.metrics import GLOBAL_METRICS
 from app.repositories.chat_message_repository import ConversationMemoryMessageRow
+from app.retrieval import question_analysis
 from app.retrieval.errors import RetrievalError, RetrievalFailureCode
 from app.retrieval.models import HybridRetrievalHit, HybridRetrievalResult
 from app.services.grounded_answer_service import (
@@ -3618,9 +3619,9 @@ def _refusal_service(*generations: str, **overrides: Any) -> tuple[Any, Any]:
     return service, resolved_llm
 
 
-def test_deterministic_repair_runs_after_a_refusal_by_default() -> None:
+def test_deterministic_repair_runs_after_a_refusal_when_the_flag_is_on() -> None:
     async def scenario() -> None:
-        service, _ = _refusal_service("__NO_ANSWER__")
+        service, _ = _refusal_service("__NO_ANSWER__", rag_repair_after_llm_refusal_enabled=True)
 
         result = await service.answer_question(
             current_user=user(), session_id=chat_session().id, question=REFUSAL_QUESTION
@@ -3693,9 +3694,18 @@ def _unit_service(content: str = "__NO_ANSWER__", **overrides: Any) -> Any:
     return service
 
 
-def test_money_value_answers_a_question_about_days_when_the_guard_is_off() -> None:
+def test_money_value_answers_a_question_about_days_when_the_guard_is_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        question_analysis,
+        "get_settings",
+        lambda: SimpleNamespace(rag_answer_unit_guard_enabled=False),
+    )
+
     async def scenario() -> None:
-        result = await _unit_service().answer_question(
+        service = _unit_service(rag_answer_unit_guard_enabled=False)
+        result = await service.answer_question(
             current_user=user(), session_id=chat_session().id, question=UNIT_QUESTION
         )
 

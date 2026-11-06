@@ -90,3 +90,12 @@ Written before measuring groups 1 + 2 together (2026-11-06).
 - A case that gets worse on either set is reported by id, even when the sum improves.
 
 `RAG_RESELECT_REQUIRES_STRONG_SUPPORT_ENABLED` is not part of this choice and stays off.
+
+**Result (2026-11-07): groups 1 + 2 are the default.** `RAG_REPAIR_AFTER_LLM_REFUSAL_ENABLED=false` and `RAG_ANSWER_UNIT_GUARD_ENABLED=true`; both flags stay available for rollback. Scores: `docs/eval/runs/fix2a-defaults.md`.
+
+| Side | Leak (API + retrieval) | Q001-Q100 proxy match | False answers (relevance + RBAC) | Correct answers (relevance + RBAC) |
+|---|---:|---:|---:|---:|
+| Baseline | 0 | 99/100 | 8 + 1 = 9 | 13 + 22 = 35 |
+| Groups 1 + 2 | 0 | 99/100 | 4 + 1 = 5 | 18 + 22 = 40 |
+
+Both requirements are met and (a) decides. No case got worse on either set.
