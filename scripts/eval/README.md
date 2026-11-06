@@ -20,6 +20,8 @@ It never touches the V2, AUTH-02 or main stacks.
 | `branch_counters.py` | Reads `enterprise_ai_rag_answer_branch_total` from `GET /metrics`. The relevance, RBAC and UAT runners record the change over the run as `branch_counters`; `null` means not measured. |
 | `compare_flag_runs.py` | Compares two baseline runs with two runs of a flag on the relevance, RBAC or UAT set. A case counts as changed only when both sides agree within themselves and differ from each other. |
 
+Compare a flag only with a baseline from the same batch: same image, same session, Ollama not restarted, runs interleaved (DEC-011).
+
 RBAC dev stack (never add these documents to the main corpus):
 
 ```bash
