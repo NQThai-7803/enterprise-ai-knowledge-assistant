@@ -553,6 +553,7 @@ class _AnswerDraft:
     completion_tokens: int | None
     citations: tuple[object, ...] = ()
     citation_failure: _CitationFailure | None = None
+    llm_refused: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -919,6 +920,7 @@ class GroundedAnswerService:
                             provider=provider,
                             messages=messages,
                             grounding_question=grounding_question,
+                            llm_already_refused=draft.llm_refused,
                         )
                     except CitationValidationFailedApplicationError as citation_error:
                         return _no_answer_draft(
@@ -1118,6 +1120,7 @@ class GroundedAnswerService:
                                 provider=provider,
                                 messages=messages,
                                 grounding_question=grounding_question,
+                                llm_already_refused=retry_draft.llm_refused,
                             )
                         )
                     except CitationValidationFailedApplicationError as citation_error:
@@ -1575,7 +1578,11 @@ class GroundedAnswerService:
         provider: LLMProvider,
         messages: tuple[LLMMessage, ...],
         grounding_question: str,
+        llm_already_refused: bool = False,
     ) -> _AnswerDraft:
+        repair_allowed = (
+            self.settings.rag_repair_after_llm_refusal_enabled or not llm_already_refused
+        )
         try:
             draft = await self._draft_from_generation(
                 generation,
@@ -1584,6 +1591,8 @@ class GroundedAnswerService:
                 grounding_question=grounding_question,
             )
             if draft.grounding_status == GroundingStatus.NO_ANSWER:
+                if not self._deterministic_repair_allowed(draft, repair_allowed):
+                    return draft
                 structured_draft = await self._draft_from_deterministic_repair(
                     source_registry=source_registry,
                     current_user=current_user,
@@ -1609,6 +1618,8 @@ class GroundedAnswerService:
                     grounding_question=grounding_question,
                 )
                 if draft.grounding_status == GroundingStatus.NO_ANSWER:
+                    if not self._deterministic_repair_allowed(draft, repair_allowed):
+                        return draft
                     structured_draft = await self._draft_from_deterministic_repair(
                         source_registry=source_registry,
                         current_user=current_user,
@@ -1617,6 +1628,8 @@ class GroundedAnswerService:
                     return structured_draft or draft
                 return draft
             except CitationValidationFailedApplicationError:
+                if not repair_allowed:
+                    raise
                 structured_draft = await self._draft_from_deterministic_repair(
                     source_registry=source_registry,
                     current_user=current_user,
@@ -1625,6 +1638,11 @@ class GroundedAnswerService:
                 if structured_draft is None:
                     raise
                 return structured_draft
+
+    def _deterministic_repair_allowed(self, draft: _AnswerDraft, repair_allowed: bool) -> bool:
+        if not repair_allowed:
+            return False
+        return self.settings.rag_repair_after_llm_refusal_enabled or not draft.llm_refused
 
     async def _draft_from_deterministic_repair(
         self,
@@ -2151,6 +2169,7 @@ class GroundedAnswerService:
                 response_time_ms=generation.response_time_ms,
                 prompt_tokens=generation.prompt_tokens,
                 completion_tokens=generation.completion_tokens,
+                llm_refused=True,
             )
 
         try:
@@ -2206,6 +2225,7 @@ class GroundedAnswerService:
                 response_time_ms=generation.response_time_ms,
                 prompt_tokens=generation.prompt_tokens,
                 completion_tokens=generation.completion_tokens,
+                llm_refused=True,
             )
         if _is_placeholder_like_json_answer(grounded_output.answer):
             raise CitationValidationFailedApplicationError()
@@ -10826,6 +10846,7 @@ def _no_answer_draft(
     prompt_tokens: int | None = None,
     completion_tokens: int | None = None,
     citation_failure: _CitationFailure | None = None,
+    llm_refused: bool = False,
 ) -> _AnswerDraft:
     return _AnswerDraft(
         content=content,
@@ -10836,6 +10857,7 @@ def _no_answer_draft(
         completion_tokens=completion_tokens,
         citations=(),
         citation_failure=citation_failure,
+        llm_refused=llm_refused,
     )
 
 

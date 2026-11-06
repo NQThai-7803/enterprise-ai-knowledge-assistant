@@ -3586,3 +3586,93 @@ def test_prompt_source_order_uses_answer_quality_after_reranker_sample_hit() -> 
         assert result.assistant_message.content.startswith("Có.")
 
     run_async(scenario())
+
+
+def _fake_generation(content: str) -> LLMGenerationResult:
+    return LLMGenerationResult(
+        content=content,
+        model="fake",
+        finish_reason="stop",
+        prompt_tokens=1,
+        completion_tokens=1,
+        response_time_ms=1,
+    )
+
+
+REFUSAL_SOURCE = (
+    "Quy trinh van hanh noi hoi.\n"
+    "Nhat ky van hanh bat thuong phai duoc ky su truong doi chieu truoc khi ket luan su co.\n"
+)
+REFUSAL_QUESTION = "Quy trinh ban giao noi hoi yeu cau ky su lam gi truoc khi nghi ca?"
+
+
+def _refusal_service(*generations: str, **overrides: Any) -> tuple[Any, Any]:
+    llm = SequentialFakeLLMProvider(*(_fake_generation(content) for content in generations))
+    service, _, _, _, resolved_llm, _, _ = make_service(
+        retrieval=FakeRetrievalService(retrieval_result(hit(REFUSAL_SOURCE))),
+        llm=llm,
+        settings_obj=settings(**overrides),
+    )
+    return service, resolved_llm
+
+
+def test_deterministic_repair_runs_after_a_refusal_by_default() -> None:
+    async def scenario() -> None:
+        service, _ = _refusal_service("__NO_ANSWER__")
+
+        result = await service.answer_question(
+            current_user=user(), session_id=chat_session().id, question=REFUSAL_QUESTION
+        )
+
+        assert result.grounding_status == GroundingStatus.ANSWERED
+        assert "doi chieu" in result.assistant_message.content
+
+    run_async(scenario())
+
+
+def test_refusal_stops_the_deterministic_repair_when_the_flag_is_off() -> None:
+    async def scenario() -> None:
+        service, llm = _refusal_service("__NO_ANSWER__", rag_repair_after_llm_refusal_enabled=False)
+
+        result = await service.answer_question(
+            current_user=user(), session_id=chat_session().id, question=REFUSAL_QUESTION
+        )
+
+        assert result.grounding_status == GroundingStatus.NO_ANSWER
+        assert llm.calls == 2
+
+    run_async(scenario())
+
+
+def test_rejected_llm_answer_keeps_the_deterministic_repair_when_the_flag_is_off() -> None:
+    async def scenario() -> None:
+        service, _ = _refusal_service(
+            '{"answer":"Khong co quy dinh nao ve viec nay ca.","citations":["SOURCE_9"]}',
+            rag_repair_after_llm_refusal_enabled=False,
+        )
+
+        result = await service.answer_question(
+            current_user=user(), session_id=chat_session().id, question=REFUSAL_QUESTION
+        )
+
+        assert result.grounding_status == GroundingStatus.ANSWERED
+        assert "doi chieu" in result.assistant_message.content
+
+    run_async(scenario())
+
+
+def test_refusal_on_an_earlier_attempt_also_blocks_the_repair_when_the_flag_is_off() -> None:
+    async def scenario() -> None:
+        service, _ = _refusal_service(
+            "__NO_ANSWER__",
+            '{"answer":"Khong co quy dinh nao ve viec nay ca.","citations":["SOURCE_9"]}',
+            rag_repair_after_llm_refusal_enabled=False,
+        )
+
+        result = await service.answer_question(
+            current_user=user(), session_id=chat_session().id, question=REFUSAL_QUESTION
+        )
+
+        assert result.grounding_status == GroundingStatus.NO_ANSWER
+
+    run_async(scenario())
