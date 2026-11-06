@@ -1,3 +1,6 @@
 # Held-out files are hashed byte for byte (docs/eval/heldout-v1.lock); keep LF on every OS.
 docs/eval/heldout-v1.yaml text eol=lf
 docs/eval/heldout-v1.lock text eol=lf
+# The relevance dev set is also hashed byte for byte.
+tests/acceptance/answer_relevance_dev_v1.yaml text eol=lf
+tests/acceptance/answer_relevance_dev_v1.lock text eol=lf

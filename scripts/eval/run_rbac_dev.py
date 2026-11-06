@@ -217,7 +217,13 @@ class _Admin:
         users = self.get("/api/v1/users?page_size=100")
         return next(user["id"] for user in users if user["email"] == ACCOUNTS[role])
 
-    def ensure_document(self, document: Mapping[str, Any], folder: Path, department_id: str) -> str:
+    def ensure_document(
+        self,
+        document: Mapping[str, Any],
+        folder: Path,
+        department_id: str,
+        version: str = "rbac-dev-v1",
+    ) -> str:
         existing = {d.get("document_code"): d for d in self.get("/api/v1/documents?page_size=100")}
         runtime = existing.get(document["code"])
         if runtime is None:
@@ -225,8 +231,8 @@ class _Admin:
                 "title": document["title"],
                 "access_scope": document["scope"],
                 "document_code": document["code"],
-                "document_version": "rbac-dev-v1",
-                "description": "RBAC dev fixture",
+                "document_version": version,
+                "description": f"{version} fixture",
             }
             if document["scope"] == "DEPARTMENT":
                 fields["department_id"] = department_id

@@ -1,0 +1,91 @@
+# Answer relevance dev set (FIX 2). Synthetic documents and questions, uploaded only to the isolated
+# stack eaka-relevance-dev, never to the main corpus or the RBAC stack.
+# Each group has questions the documents do not answer (expect: refuse) and similar questions they
+# do answer (expect: answer), so a fix that only refuses more shows up as lost answers.
+# Frozen by answer_relevance_dev_v1.lock: any edit needs a new version and a new lock.
+version: answer_relevance_dev_v1
+documents:
+  - code: RELDEV-XE-001
+    title: Quy che van hanh doi xe
+    scope: ORGANIZATION
+    text: |
+      CÔNG TY VẬN TẢI MINH TÂM JSC - TÀI LIỆU NỘI BỘ - Trang 1
+      Quy chế vận hành đội xe.
+      Tài xế phải kiểm tra áp suất lốp và mức dầu trước khi rời bãi xe.
+      Nhật ký hành trình bất thường phải được đội trưởng đối chiếu trước khi kết luận lỗi của tài xế.
+      Xe tải trên 5 tấn phải đăng kiểm mỗi 6 tháng.
+      Xe chở quá tải bị phạt 4 triệu đồng mỗi chuyến.
+      Đội trưởng đội xe ký lệnh điều xe cho các chuyến liên tỉnh.
+      Tài xế được nghỉ giữa ca 30 phút sau mỗi 4 giờ lái xe.
+      Thẻ nhiên liệu có hạn mức 8 triệu đồng mỗi tháng.
+  - code: RELDEV-TB-001
+    title: Quy dinh muon tra thiet bi do
+    scope: ORGANIZATION
+    text: |
+      CÔNG TY VẬN TẢI MINH TÂM JSC - TÀI LIỆU NỘI BỘ - Trang 1
+      Quy định mượn trả thiết bị đo.
+      Kỹ thuật viên phải hiệu chuẩn máy đo trước khi mang ra công trường.
+      Phiếu mượn quá hạn phải được thủ kho xác minh trước khi khóa tài khoản mượn.
+      Trưởng ca kiểm tra nhật ký và ký xác nhận hoàn thành ca trực.
+      Trưởng kho thiết bị ký phiếu mượn máy đo cho kỹ thuật viên.
+      Máy đo được mượn tối đa 14 ngày cho mỗi lần mượn.
+      Phí làm mất máy đo là 12 triệu đồng mỗi thiết bị.
+      Mỗi kỹ thuật viên được mượn cùng lúc tối đa 3 thiết bị.
+  - code: RELDEV-NT-001
+    title: Quy trinh nghiem thu nha thau
+    scope: ORGANIZATION
+    text: |
+      CÔNG TY VẬN TẢI MINH TÂM JSC - TÀI LIỆU NỘI BỘ - Trang 1
+      Quy trình nghiệm thu nhà thầu.
+      Hồ sơ thiếu phải được giám sát trưởng ghi nhận trước khi chuyển sang phòng kế toán.
+      Nhà thầu có 7 ngày để bổ sung hồ sơ thiếu.
+      Phí thẩm định lại hạng mục là 2 triệu đồng mỗi lần.
+      Giám sát trưởng ký biên bản nghiệm thu hạng mục kết cấu.
+      Giám đốc dự án duyệt thanh toán đợt cuối cho nhà thầu.
+      Khoản giữ lại để bảo hành là 5 phần trăm giá trị hợp đồng.
+  - code: RELDEV-PM-001
+    title: Danh muc phan mem kho thiet bi
+    scope: ORGANIZATION
+    text: |
+      CÔNG TY VẬN TẢI MINH TÂM JSC - TÀI LIỆU NỘI BỘ - Trang 1
+      Danh mục phần mềm kho thiết bị.
+      Phần mềm KhoNhanh dùng để theo dõi tồn kho thiết bị theo mã vạch.
+      Phần mềm ĐiềuXe do Công ty Viễn Thông Sao Mai cung cấp và bảo hành đến năm 2028.
+      Công ty Bảo An Data cung cấp dịch vụ sao lưu dữ liệu kho hằng đêm.
+      Phần mềm CânĐo được cài trên 6 máy trạm tại kho.
+items:
+  # Group 1: asks what comes before an action; a similar "before" sentence is about something else.
+  - {id: REL-101, group: 1, expect: refuse, question: "Thủ kho phải làm gì trước khi thanh lý thiết bị hỏng?"}
+  - {id: REL-102, group: 1, expect: refuse, question: "Đội trưởng làm gì trước khi bán xe cũ?"}
+  - {id: REL-103, group: 1, expect: refuse, question: "Giám sát trưởng làm gì trước khi dừng thi công?"}
+  - {id: REL-104, group: 1, expect: answer, document: RELDEV-XE-001, fact: "áp suất lốp", question: "Tài xế làm gì trước khi rời bãi xe?"}
+  - {id: REL-105, group: 1, expect: answer, document: RELDEV-TB-001, fact: "hiệu chuẩn", question: "Kỹ thuật viên làm gì trước khi mang máy đo ra công trường?"}
+  - {id: REL-106, group: 1, expect: answer, document: RELDEV-TB-001, fact: "xác minh", question: "Thủ kho làm gì trước khi khóa tài khoản mượn?"}
+  # Group 2: the unit asked for is not the unit in the document; "đồng ý" is not money.
+  - {id: REL-201, group: 2, expect: refuse, question: "Không đồng ý với phí thẩm định thì nhà thầu có bao nhiêu ngày để khiếu nại?"}
+  - {id: REL-202, group: 2, expect: refuse, question: "Xe tải trên 5 tấn được chở tối đa bao nhiêu kg mỗi chuyến?"}
+  - {id: REL-203, group: 2, expect: refuse, question: "Thẻ nhiên liệu được dùng trong bao nhiêu ngày?"}
+  - {id: REL-204, group: 2, expect: answer, document: RELDEV-NT-001, fact: "7 ngày", question: "Nhà thầu đã đồng ý với biên bản thì có bao nhiêu ngày để bổ sung hồ sơ thiếu?"}
+  - {id: REL-205, group: 2, expect: answer, document: RELDEV-TB-001, fact: "14 ngày", question: "Máy đo được mượn tối đa bao nhiêu ngày?"}
+  - {id: REL-206, group: 2, expect: answer, document: RELDEV-XE-001, fact: "4 giờ", question: "Tài xế lái bao nhiêu giờ thì được nghỉ giữa ca?"}
+  - {id: REL-207, group: 2, expect: answer, document: RELDEV-TB-001, fact: "12 triệu", question: "Phí làm mất máy đo là bao nhiêu tiền?"}
+  # Group 3: asks who approves one thing; the document names who approves another.
+  - {id: REL-301, group: 3, expect: refuse, question: "Ai duyệt kế hoạch mua xe mới?"}
+  - {id: REL-302, group: 3, expect: refuse, question: "Kỹ thuật viên cần ai ký khi thanh lý máy đo?"}
+  - {id: REL-303, group: 3, expect: refuse, question: "Người nào phê duyệt tạm ứng cho nhà thầu?"}
+  - {id: REL-304, group: 3, expect: answer, document: RELDEV-XE-001, fact: "Đội trưởng", question: "Ai ký lệnh điều xe cho chuyến liên tỉnh?"}
+  - {id: REL-305, group: 3, expect: answer, document: RELDEV-TB-001, fact: "Trưởng kho", question: "Kỹ thuật viên cần ai ký phiếu mượn máy đo?"}
+  - {id: REL-306, group: 3, expect: answer, document: RELDEV-NT-001, fact: "Giám sát trưởng", question: "Hạng mục kết cấu do người nào xác nhận nghiệm thu?"}
+  # Group 4: asks for a relation; the document has both names but never states it.
+  - {id: REL-401, group: 4, expect: refuse, question: "Đơn vị nào cung cấp phần mềm KhoNhanh?"}
+  - {id: REL-402, group: 4, expect: refuse, question: "Phần mềm CânĐo do hãng nào phát triển?"}
+  - {id: REL-403, group: 4, expect: refuse, question: "Ai là nhà cung cấp thẻ nhiên liệu của đội xe?"}
+  - {id: REL-404, group: 4, expect: answer, document: RELDEV-PM-001, fact: "Sao Mai", question: "Đơn vị nào cung cấp phần mềm ĐiềuXe?"}
+  - {id: REL-405, group: 4, expect: answer, document: RELDEV-PM-001, fact: "Bảo An Data", question: "Dịch vụ sao lưu dữ liệu kho do công ty nào cung cấp?"}
+  - {id: REL-406, group: 4, expect: answer, document: RELDEV-PM-001, fact: "6 máy trạm", question: "Phần mềm CânĐo được cài trên bao nhiêu máy trạm?"}
+# For group 4b, not used by app/ yet. Written from grammar classes only, without reading any answer:
+# folded syllables of 4+ letters that carry no topic in Vietnamese policy text.
+group_4b_generic_terms:
+  function_words: [khong, duoc, phai, trong, nhung, hoac, cung, theo, nhieu, tren, duoi, giua, ngoai, truoc, dang, rang, nhat, tung, bang, cach, khac, them]
+  generic_verbs: [dung, thuc, hien, biet, nhan, dinh]
+  generic_nouns: [cong, nguoi, vien, phong, viec, nhom, loai, truong]

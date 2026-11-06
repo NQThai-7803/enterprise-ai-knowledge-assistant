@@ -32,9 +32,10 @@ DEV_SOURCE = ROOT / "artifacts" / "rag-h5-1-stress-uat.py"
 LOCK = ROOT / "docs" / "eval" / "heldout-v1.lock"
 HELDOUT = ROOT / "docs" / "eval" / "heldout-v1.yaml"
 RBAC_SOURCE = ROOT / "tests" / "acceptance" / "rbac_dev_v1.yaml"
+RELEVANCE_SOURCE = ROOT / "tests" / "acceptance" / "answer_relevance_dev_v1.yaml"
 SALT = b"eaka-question-fingerprint-v1"
 GRAM_SIZE = 4
-EXPECTED_COUNTS = {"dev": 100, "heldout": 40, "rbac": 18}
+EXPECTED_COUNTS = {"dev": 100, "heldout": 40, "rbac": 18, "relevance": 25}
 OVERLAP_LIMIT = 0.60
 ESCAPE = re.compile(r"\\u([0-9a-fA-F]{4})")
 WORD = re.compile(r"\w+")
@@ -70,10 +71,12 @@ def build_payload(
     heldout: Iterable[tuple[str, str]],
     lock_sha256: str,
     rbac: Iterable[tuple[str, str]] = (),
+    relevance: Iterable[tuple[str, str]] = (),
 ) -> dict[str, Any]:
     dev_items = {case_id: fingerprint(question) for case_id, question in dev}
     heldout_items = {case_id: fingerprint(question) for case_id, question in heldout}
     rbac_items = {case_id: fingerprint(question) for case_id, question in rbac}
+    relevance_items = {case_id: fingerprint(question) for case_id, question in relevance}
     return {
         "version": 1,
         "gram_size": GRAM_SIZE,
@@ -85,6 +88,7 @@ def build_payload(
                 "items": heldout_items,
             },
             "rbac": {"count": len(rbac_items), "items": rbac_items},
+            "relevance": {"count": len(relevance_items), "items": relevance_items},
         },
     }
 
@@ -158,12 +162,13 @@ def added_lines(root: Path, base: str, staged: bool, path: str) -> list[tuple[st
 
 
 def max_overlap(payload: Mapping[str, Any]) -> tuple[float, str | None, str | None]:
-    """Largest Jaccard similarity of any dev or RBAC dev question with any held-out question."""
+    """Largest Jaccard similarity of any dev question with any held-out question."""
     best: tuple[float, str | None, str | None] = (0.0, None, None)
     sources = payload["sources"]
     development = {
         **sources["dev"]["items"],
         **sources.get("rbac", {}).get("items", {}),
+        **sources.get("relevance", {}).get("items", {}),
     }
     for dev_id, dev_hashes in development.items():
         left = set(dev_hashes)
@@ -173,6 +178,21 @@ def max_overlap(payload: Mapping[str, Any]) -> tuple[float, str | None, str | No
             value = len(left & right) / len(union) if union else 0.0
             if value > best[0]:
                 best = (value, dev_id, heldout_id)
+    return best
+
+
+def relevance_uat_overlap(payload: Mapping[str, Any]) -> tuple[float, str | None, str | None]:
+    """Largest Jaccard similarity of a relevance dev question with a Q001-Q100 question."""
+    best: tuple[float, str | None, str | None] = (0.0, None, None)
+    sources = payload["sources"]
+    for left_id, left_hashes in sources.get("relevance", {}).get("items", {}).items():
+        left = set(left_hashes)
+        for right_id, right_hashes in sources["dev"]["items"].items():
+            right = set(right_hashes)
+            union = left | right
+            value = len(left & right) / len(union) if union else 0.0
+            if value > best[0]:
+                best = (value, left_id, right_id)
     return best
 
 
@@ -189,9 +209,14 @@ def _build(output: Path) -> int:
     heldout = [(item["id"], item["question"]) for item in items]
     rbac_items = yaml.safe_load(RBAC_SOURCE.read_text(encoding="utf-8"))["items"]
     rbac = [(item["id"], item["question"]) for item in rbac_items]
-    payload = build_payload(dev, heldout, lock_sha, rbac)
+    relevance_items = yaml.safe_load(RELEVANCE_SOURCE.read_text(encoding="utf-8"))["items"]
+    relevance = [(item["id"], item["question"]) for item in relevance_items]
+    payload = build_payload(dev, heldout, lock_sha, rbac, relevance)
     output.write_text(json.dumps(payload, indent=0, sort_keys=True) + "\n", encoding="utf-8")
-    print(f"dev: {len(dev)}; held-out: {len(heldout)}; rbac dev: {len(rbac)}")
+    print(
+        f"dev: {len(dev)}; held-out: {len(heldout)}; rbac dev: {len(rbac)}; "
+        f"relevance dev: {len(relevance)}"
+    )
     return 0
 
 
@@ -211,9 +236,12 @@ def _check(args: argparse.Namespace) -> int:
 
 
 def _overlap() -> int:
-    value, dev_id, heldout_id = max_overlap(load_fingerprints())
+    payload = load_fingerprints()
+    value, dev_id, heldout_id = max_overlap(payload)
     print(f"max dev/held-out Jaccard: {value:.3f} ({dev_id}, {heldout_id}); limit {OVERLAP_LIMIT}")
-    return 1 if value >= OVERLAP_LIMIT else 0
+    uat_value, relevance_id, uat_id = relevance_uat_overlap(payload)
+    print(f"max relevance/Q001-Q100 Jaccard: {uat_value:.3f} ({relevance_id}, {uat_id})")
+    return 1 if max(value, uat_value) >= OVERLAP_LIMIT else 0
 
 
 def main(argv: Sequence[str] | None = None) -> int:
