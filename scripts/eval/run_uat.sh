@@ -24,6 +24,12 @@ COMPOSE=(docker compose -p "$PROJECT" -f compose.yaml -f compose.uat-corpus-v2.y
 mkdir -p "$OUT"
 
 API_CID=$("${COMPOSE[@]}" ps -q api)
+API_URL_FOR_CHECK="$API"
+# Refuse the run before anything starts when the stack ranks with something unexpected.
+# The current eval stacks have no cross-encoder weights, so they expect lexical_fallback.
+export EVAL_EXPECTED_RERANKER_MODE="${EVAL_EXPECTED_RERANKER_MODE:-lexical_fallback}"
+RERANKER_ARGS=(); [ -n "${EVAL_ALLOW_RERANKER_FALLBACK:-}" ] && RERANKER_ARGS=(--allow-reranker-fallback)
+RERANKER_MODE=$(python scripts/eval/reranker_check.py --base-url "$API_URL_FOR_CHECK" ${RERANKER_ARGS[@]+"${RERANKER_ARGS[@]}"})
 psql_value() {
   "${COMPOSE[@]}" exec -T postgres psql -U app_user -d enterprise_ai -tAc "$1" | tr -d '\r'
 }
@@ -39,7 +45,8 @@ LLM_SEED=$(docker inspect "$API_CID" --format '{{range .Config.Env}}{{println .}
 LLM_TEMPERATURE=$(docker inspect "$API_CID" --format '{{range .Config.Env}}{{println .}}{{end}}' \
   | sed -n 's/^LLM_TEMPERATURE=//p')
 RUNNER=(env RAG_ACCEPTANCE_BASE_URL="$API" PYTHONIOENCODING=utf-8
-  python tests/acceptance/rag_h5_2_exact_100.py --output "$OUT/runtime_results.json")
+  python tests/acceptance/rag_h5_2_exact_100.py --output "$OUT/runtime_results.json"
+  ${RERANKER_ARGS[@]+"${RERANKER_ARGS[@]}"})
 
 if [ "$PHASE" != "part2" ]; then
 python - "$OUT/metadata.json" <<EOF
@@ -55,6 +62,9 @@ json.dump({
     "postgres_server_version": "$(psql_value 'SHOW server_version')",
     "llm": {"provider": "ollama", "model": "$LLM_MODEL", "num_ctx": "$NUM_CTX",
             "keep_alive": "$KEEP_ALIVE", "seed": "$LLM_SEED", "temperature": "$LLM_TEMPERATURE"},
+    "reranker_mode": "$RERANKER_MODE",
+    "expected_reranker_mode": "$EVAL_EXPECTED_RERANKER_MODE",
+    "allow_reranker_fallback": "${EVAL_ALLOW_RERANKER_FALLBACK:-}",
     "compose_project": "$PROJECT",
     "runner": "tests/acceptance/rag_h5_2_exact_100.py",
 }, open(sys.argv[1], "w", encoding="utf-8"), indent=1)

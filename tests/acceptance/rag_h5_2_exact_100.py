@@ -18,6 +18,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from scripts.eval import reranker_check  # noqa: E402
 from scripts.eval.eval_client import (  # noqa: E402
     INFRA_ERROR,
     OK,
@@ -51,6 +52,7 @@ def _write_checkpoint(
     cases: list[dict[str, Any]],
     planned_cases: int,
     status: str,
+    run_metadata: dict[str, Any] | None = None,
 ) -> None:
     latencies = [int(case["latency_ms"]) for case in cases if case.get("latency_ms") is not None]
     payload = {
@@ -61,6 +63,7 @@ def _write_checkpoint(
         "model": "qwen2.5:3b",
         "benchmark_source": str(BENCHMARK_SOURCE),
         "benchmark_identity": "Q001-Q100",
+        **(run_metadata or {}),
         "planned_cases": planned_cases,
         "completed_cases": len(cases),
         "infra_error_cases": sum(case.get("execution_status") == INFRA_ERROR for case in cases),
@@ -129,6 +132,7 @@ def run(
     benchmark_loader: Callable[[], tuple[tuple[str, str], tuple[tuple[str, str, str], ...]]] = (
         _load_benchmark
     ),
+    run_metadata: dict[str, Any] | None = None,
 ) -> int:
     credentials, benchmark = benchmark_loader()
     selected = tuple(row for row in benchmark if not selected_ids or row[0] in selected_ids)
@@ -152,6 +156,7 @@ def run(
             cases=cases,
             planned_cases=len(selected),
             status=status,
+            run_metadata=run_metadata,
         )
 
     results: list[dict[str, Any]] = []
@@ -200,17 +205,26 @@ def run(
 
 def main() -> int:
     parser = argparse.ArgumentParser()
+    reranker_check.add_arguments(parser)
     parser.add_argument("--case", action="append", dest="case_ids", default=[])
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--delay-seconds", type=float, default=0.5)
     args = parser.parse_args()
-    return run(
+    base_url = os.environ.get("RAG_ACCEPTANCE_BASE_URL", "http://127.0.0.1:8000")
+    try:
+        reranker = reranker_check.guard(args, base_url)
+    except reranker_check.RerankerModeRefusedError as exc:
+        print(f"REFUSED: {exc}", file=sys.stderr)
+        return 2
+    code = run(
         selected_ids=set(args.case_ids),
         output=args.output,
         resume=args.resume,
         delay_seconds=max(0.0, args.delay_seconds),
+        run_metadata=reranker,
     )
+    return reranker_check.finish(args.output, reranker, base_url, code)
 
 
 if __name__ == "__main__":

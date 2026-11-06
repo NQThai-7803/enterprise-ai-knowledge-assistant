@@ -6,6 +6,16 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### PROMPT 4.5 -- 2026-11-05
+
+- RBAC dev set: `tests/acceptance/rbac_dev_v1.yaml`, `scripts/eval/run_rbac_dev.py`, `scripts/diagnostics/rbac_retrieval_check.py`; results in `docs/eval/runs/rbac-dev-v1/score.md`.
+- `reranker_mode` in `/health/ready`, `RERANKER_FALLBACK_ACTIVE` warnings, and eval runners that refuse a mode mismatch. A rerank timeout or error falls back for that request only; only a failed load keeps the fallback on.
+- PROMPT 4b: `scripts/diagnostics/` traces answers from outside `app/`; results in `docs/eval/runs/heldout-v1-f3cdbf3/diagnosis.md`.
+- `metrics.py`: `answerable_accuracy` and `refusal_accuracy`. `eaka-rag-change-guard` and `HANDOFF.md`: held-out v1 is diagnostic; published numbers need held-out v2.
+- Official held-out v1 score in `docs/eval/runs/heldout-v1-f3cdbf3/score.md`; held-out v1 is now used for diagnosis (DEC-008).
+- `scripts/eval/metrics.py`: per-run gate metrics; manual labels for held-out, `proxy` for dev; null when unmeasured.
+- `scripts/eval/question_leak.py` and `question_fingerprints.json`: question checks through hashed 4-grams; a missing or stale source now fails with exit 2.
+
 ### PROMPT 4 -- 2026-10-31
 
 - `eaka-rag-change-guard`: real dev runner path, `--output`, `n_dev = 100` and the module-to-test map. Thresholds and rules unchanged.

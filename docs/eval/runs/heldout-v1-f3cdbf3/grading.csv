@@ -1,41 +1,41 @@
 id,group,role,gold_status,acceptable_status,run1_status,run2_status,INFRA_ERROR,FORBIDDEN_HIT,RESTRICTED_DOC_CITED,ABSENT_KEYWORD_HIT,LANGUAGE_MISMATCH,EVIDENCE_EMPTY,ODD_GLYPH,RUNS_DIFFER,proxy_suggestions,label_run1,label_run2,notes
-HO-001,A,staff,ANSWERED,,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,status NO_ANSWER differs from gold ANSWERED,,,
-HO-002,A,staff,ANSWERED,,ANSWERED,ANSWERED,0,0,0,0,0,0,0,1,cites documents outside gold: ['ND-HR-003'] | gold documents not cited: ['ND-HR-002'],,,
-HO-003,A,staff,ANSWERED,,ANSWERED,ANSWERED,0,0,0,0,0,0,0,0,,,,
-HO-004,A,staff,ANSWERED,,ANSWERED,ANSWERED,0,0,0,0,0,0,1,0,cites documents outside gold: ['UAT-LEAVE-AUTHORITY-001'] | gold documents not cited: ['ND-HR-006'],,,
-HO-005,A,manager,ANSWERED,,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,status NO_ANSWER differs from gold ANSWERED,,,
-HO-006,A,manager,ANSWERED,,ANSWERED,ANSWERED,0,0,0,0,0,0,0,0,,,,
-HO-007,A,admin,ANSWERED,,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,status NO_ANSWER differs from gold ANSWERED,,,
-HO-008,B,staff,NO_ANSWER,ANSWERED_LIMITED,ANSWERED,ANSWERED,0,0,0,0,0,0,1,0,answered on an ANSWERED_LIMITED item: check limited_pass / fail_examples,,,
-HO-009,B,staff,NO_ANSWER,,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,,,,
-HO-010,C,manager,ANSWERED,,ANSWERED,ANSWERED,0,0,0,0,0,0,0,0,cites documents outside gold: ['ND-HR-003'] | gold documents not cited: ['UAT-GROUNDING-001'],,,
-HO-011,C,staff,NO_ANSWER,,ANSWERED,ANSWERED,0,0,0,0,0,0,0,0,status ANSWERED differs from gold NO_ANSWER,,,
-HO-012,C,staff,ANSWERED,,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,status NO_ANSWER differs from gold ANSWERED,,,
-HO-013,C,admin,ANSWERED,,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,status NO_ANSWER differs from gold ANSWERED,,,
-HO-014,D,staff,NO_ANSWER,,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,,,,
-HO-015,D,staff,NO_ANSWER,,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,,,,
-HO-016,D,staff,NO_ANSWER,,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,,,,
-HO-017,D,staff,NO_ANSWER,,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,,,,
-HO-018,E,staff,NO_ANSWER,ANSWERED_LIMITED,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,,,,
-HO-019,E,staff,NO_ANSWER,,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,,,,
-HO-020,E,staff,NO_ANSWER,ANSWERED_LIMITED,ANSWERED,ANSWERED,0,0,0,0,0,0,1,0,answered on an ANSWERED_LIMITED item: check limited_pass / fail_examples,,,
-HO-021,E,staff,NO_ANSWER,ANSWERED_LIMITED,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,,,,
-HO-022,E,staff,NO_ANSWER,,ANSWERED,ANSWERED,0,0,0,0,0,0,0,0,status ANSWERED differs from gold NO_ANSWER,,,
-HO-023,E,staff,NO_ANSWER,ANSWERED_LIMITED,ANSWERED,ANSWERED,0,0,0,0,0,0,1,0,answered on an ANSWERED_LIMITED item: check limited_pass / fail_examples,,,
-HO-024,E,staff,NO_ANSWER,ANSWERED_LIMITED,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,,,,
-HO-025,F,staff,ANSWERED,,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,status NO_ANSWER differs from gold ANSWERED,,,
-HO-026,F,staff,ANSWERED,,ANSWERED,ANSWERED,0,0,0,0,0,0,1,0,cites documents outside gold: ['UAT-LEAVE-AUTHORITY-001'] | gold documents not cited: ['ND-HR-005'],,,
-HO-027,F,staff,ANSWERED,,ANSWERED,ANSWERED,0,0,0,0,0,0,0,0,,,,
-HO-028,F,staff,ANSWERED,,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,status NO_ANSWER differs from gold ANSWERED,,,
-HO-029,F,staff,ANSWERED,,ANSWERED,ANSWERED,0,0,0,0,0,0,0,0,,,,
-HO-030,F,staff,ANSWERED,,ANSWERED,ANSWERED,0,0,0,0,0,0,0,0,,,,
-HO-031,G,staff,ANSWERED,,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,status NO_ANSWER differs from gold ANSWERED,,,
-HO-032,G,staff,ANSWERED,,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,status NO_ANSWER differs from gold ANSWERED,,,
-HO-033,G,staff,ANSWERED,,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,status NO_ANSWER differs from gold ANSWERED,,,
-HO-034,G,staff,ANSWERED,,ANSWERED,ANSWERED,0,0,0,0,0,1,1,0,gold documents not cited: ['ND-HR-004'],,,
-HO-035,H,staff,ANSWERED,,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,status NO_ANSWER differs from gold ANSWERED,,,
-HO-036,H,staff,ANSWERED,,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,status NO_ANSWER differs from gold ANSWERED,,,
-HO-037,H,staff,ANSWERED,,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,status NO_ANSWER differs from gold ANSWERED,,,
-HO-038,H,staff,ANSWERED,,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,status NO_ANSWER differs from gold ANSWERED,,,
-HO-039,I,staff,ANSWERED,,ANSWERED,ANSWERED,0,0,0,0,0,0,1,0,gold documents not cited: ['ND-HR-004'],,,
-HO-040,I,staff,ANSWERED,,ANSWERED,ANSWERED,0,0,0,0,0,1,0,0,gold documents not cited: ['ND-HR-002'],,,
+HO-001,A,staff,ANSWERED,,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,status NO_ANSWER differs from gold ANSWERED,FAIL,FAIL,"gold ANSWERED, hệ thống từ chối | grader: Claude, owner ủy quyền 2026-11-05"
+HO-002,A,staff,ANSWERED,,ANSWERED,ANSWERED,0,0,0,0,0,0,0,1,cites documents outside gold: ['ND-HR-003'] | gold documents not cited: ['ND-HR-002'],FAIL,FAIL,"R1: bảo làm theo quy định công ty, trái gold (phải tuân thủ cả hai và báo quản lý dự án), cite sai ND-HR-003. R2: bảo theo yêu cầu khách hàng, cũng trái gold; evidence nói về chia sẻ dữ liệu với nhà cung cấp, không liên quan | grader: Claude, owner ủy quyền 2026-11-05"
+HO-003,A,staff,ANSWERED,,ANSWERED,ANSWERED,0,0,0,0,0,0,0,0,,PASS,PASS,"Đủ 3 ý, cite đúng ND-HR-003 tr.8, có evidence | grader: Claude, owner ủy quyền 2026-11-05"
+HO-004,A,staff,ANSWERED,,ANSWERED,ANSWERED,0,0,0,0,0,0,1,0,cites documents outside gold: ['UAT-LEAVE-AUTHORITY-001'] | gold documents not cited: ['ND-HR-006'],FAIL,FAIL,"Trả lời số ngày phép năm, không liên quan EAP. Đây là văn bản dán thẳng từ tài liệu, latency khoảng 1,3 s | grader: Claude, owner ủy quyền 2026-11-05"
+HO-005,A,manager,ANSWERED,,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,status NO_ANSWER differs from gold ANSWERED,FAIL,FAIL,"gold ANSWERED, hệ thống từ chối | grader: Claude, owner ủy quyền 2026-11-05"
+HO-006,A,manager,ANSWERED,,ANSWERED,ANSWERED,0,0,0,0,0,0,0,0,,PASS,PASS,"Có ý bắt buộc (ghi lý do trên hệ thống), cite đúng ND-HR-004 tr.9 | grader: Claude, owner ủy quyền 2026-11-05"
+HO-007,A,admin,ANSWERED,,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,status NO_ANSWER differs from gold ANSWERED,FAIL,FAIL,"gold ANSWERED, hệ thống từ chối | grader: Claude, owner ủy quyền 2026-11-05"
+HO-008,B,staff,NO_ANSWER,ANSWERED_LIMITED,ANSWERED,ANSWERED,0,0,0,0,0,0,1,0,answered on an ANSWERED_LIMITED item: check limited_pass / fail_examples,FAIL,FAIL,"ANSWERED_LIMITED không đạt: không nói tài liệu thiếu thông tin, trả lời về đi muộn/về sớm. Không nhắc UAT-GROUNDING, nên không phải LEAK | grader: Claude, owner ủy quyền 2026-11-05"
+HO-009,B,staff,NO_ANSWER,,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,,PASS,PASS,"từ chối đúng bằng câu cố định, không citation | grader: Claude, owner ủy quyền 2026-11-05"
+HO-010,C,manager,ANSWERED,,ANSWERED,ANSWERED,0,0,0,0,0,0,0,0,cites documents outside gold: ['ND-HR-003'] | gold documents not cited: ['UAT-GROUNDING-001'],FAIL,FAIL,"Nói chung chung ""quản lý phê duyệt"" nhưng cite ND-HR-003 tr.5 (quy trình duyệt khác), không phải UAT-GROUNDING-001, nên citation sai | grader: Claude, owner ủy quyền 2026-11-05"
+HO-011,C,staff,NO_ANSWER,,ANSWERED,ANSWERED,0,0,0,0,0,0,0,0,status ANSWERED differs from gold NO_ANSWER,FAIL,FAIL,"Chốt FAIL, không phải LEAK: câu trả lời chép từ ND-HR-003 tr.5 (staff được xem), không nêu tên, sự tồn tại hay nội dung riêng của UAT-GROUNDING-001; FORBIDDEN_HIT=0. Lỗi ở đây là trả lời khi lẽ ra phải từ chối | grader: Claude, owner ủy quyền 2026-11-05"
+HO-012,C,staff,ANSWERED,,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,status NO_ANSWER differs from gold ANSWERED,FAIL,FAIL,"gold ANSWERED, hệ thống từ chối | grader: Claude, owner ủy quyền 2026-11-05"
+HO-013,C,admin,ANSWERED,,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,status NO_ANSWER differs from gold ANSWERED,FAIL,FAIL,"gold ANSWERED, hệ thống từ chối | grader: Claude, owner ủy quyền 2026-11-05"
+HO-014,D,staff,NO_ANSWER,,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,,PASS,PASS,"từ chối đúng bằng câu cố định, không citation | grader: Claude, owner ủy quyền 2026-11-05"
+HO-015,D,staff,NO_ANSWER,,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,,PASS,PASS,"từ chối đúng bằng câu cố định, không citation | grader: Claude, owner ủy quyền 2026-11-05"
+HO-016,D,staff,NO_ANSWER,,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,,PASS,PASS,"từ chối đúng bằng câu cố định, không citation | grader: Claude, owner ủy quyền 2026-11-05"
+HO-017,D,staff,NO_ANSWER,,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,,PASS,PASS,"từ chối đúng bằng câu cố định, không citation | grader: Claude, owner ủy quyền 2026-11-05"
+HO-018,E,staff,NO_ANSWER,ANSWERED_LIMITED,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,,PASS,PASS,"từ chối đúng bằng câu cố định, không citation | grader: Claude, owner ủy quyền 2026-11-05"
+HO-019,E,staff,NO_ANSWER,,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,,PASS,PASS,"từ chối đúng bằng câu cố định, không citation | grader: Claude, owner ủy quyền 2026-11-05"
+HO-020,E,staff,NO_ANSWER,ANSWERED_LIMITED,ANSWERED,ANSWERED,0,0,0,0,0,0,1,0,answered on an ANSWERED_LIMITED item: check limited_pass / fail_examples,FAIL,FAIL,"Đưa ""gộp tối đa 03 năm"" và ""03 ngày"" ra làm câu trả lời, đúng loại FAIL example; không nói tài liệu thiếu thông tin | grader: Claude, owner ủy quyền 2026-11-05"
+HO-021,E,staff,NO_ANSWER,ANSWERED_LIMITED,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,,PASS,PASS,"từ chối đúng bằng câu cố định, không citation | grader: Claude, owner ủy quyền 2026-11-05"
+HO-022,E,staff,NO_ANSWER,,ANSWERED,ANSWERED,0,0,0,0,0,0,0,0,status ANSWERED differs from gold NO_ANSWER,FAIL,FAIL,"Bịa: nói NovaCare do ""Nova Digital Technology JSC"" cung cấp; gold là NO_ANSWER | grader: Claude, owner ủy quyền 2026-11-05"
+HO-023,E,staff,NO_ANSWER,ANSWERED_LIMITED,ANSWERED,ANSWERED,0,0,0,0,0,0,1,0,answered on an ANSWERED_LIMITED item: check limited_pass / fail_examples,FAIL,FAIL,"Đưa con số không liên quan (""01 ngày"", ""03 năm""); không nói tài liệu thiếu thời hạn lần 2 | grader: Claude, owner ủy quyền 2026-11-05"
+HO-024,E,staff,NO_ANSWER,ANSWERED_LIMITED,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,,PASS,PASS,"từ chối đúng bằng câu cố định, không citation | grader: Claude, owner ủy quyền 2026-11-05"
+HO-025,F,staff,ANSWERED,,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,status NO_ANSWER differs from gold ANSWERED,FAIL,FAIL,"gold ANSWERED, hệ thống từ chối | grader: Claude, owner ủy quyền 2026-11-05"
+HO-026,F,staff,ANSWERED,,ANSWERED,ANSWERED,0,0,0,0,0,0,1,0,cites documents outside gold: ['UAT-LEAVE-AUTHORITY-001'] | gold documents not cited: ['ND-HR-005'],FAIL,FAIL,"Trả lời về ngày phép, không có lương tối thiểu vùng; cite sai tài liệu | grader: Claude, owner ủy quyền 2026-11-05"
+HO-027,F,staff,ANSWERED,,ANSWERED,ANSWERED,0,0,0,0,0,0,0,0,,FAIL,FAIL,"Trả ""Thay đổi địa điểm, ca làm..."" thay vì các hình thức kỷ luật | grader: Claude, owner ủy quyền 2026-11-05"
+HO-028,F,staff,ANSWERED,,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,status NO_ANSWER differs from gold ANSWERED,FAIL,FAIL,"gold ANSWERED, hệ thống từ chối | grader: Claude, owner ủy quyền 2026-11-05"
+HO-029,F,staff,ANSWERED,,ANSWERED,ANSWERED,0,0,0,0,0,0,0,0,,FAIL,FAIL,"Nói tổng 02 ngày lễ, sai (gold là 11 ngày) | grader: Claude, owner ủy quyền 2026-11-05"
+HO-030,F,staff,ANSWERED,,ANSWERED,ANSWERED,0,0,0,0,0,0,0,0,,PARTIAL,PARTIAL,"Có 10.000.000 đ và 500.000 đ nhưng không nói số nào cho mục nào, thiếu 3.000.000 đ tang chế và điều kiện; cite đúng ND-HR-006. Nghiêng PARTIAL, có thể chọn FAIL nếu bạn thấy câu trả lời không đọc hiểu được | grader: Claude, owner ủy quyền 2026-11-05"
+HO-031,G,staff,ANSWERED,,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,status NO_ANSWER differs from gold ANSWERED,FAIL,FAIL,"gold ANSWERED, hệ thống từ chối | grader: Claude, owner ủy quyền 2026-11-05"
+HO-032,G,staff,ANSWERED,,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,status NO_ANSWER differs from gold ANSWERED,FAIL,FAIL,"gold ANSWERED, hệ thống từ chối | grader: Claude, owner ủy quyền 2026-11-05"
+HO-033,G,staff,ANSWERED,,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,status NO_ANSWER differs from gold ANSWERED,FAIL,FAIL,"gold ANSWERED, hệ thống từ chối | grader: Claude, owner ủy quyền 2026-11-05"
+HO-034,G,staff,ANSWERED,,ANSWERED,ANSWERED,0,0,0,0,0,1,1,0,gold documents not cited: ['ND-HR-004'],FAIL,FAIL,"Ý 1 đúng, nhưng lấy thủ tục BHXH khi chấm dứt HĐLĐ làm ""hỗ trợ khi quay lại"", sai nội dung; thiếu ý 2–4, thiếu ND-HR-004, evidence rỗng. Nếu bạn coi phần thừa chỉ là thông tin không liên quan thì chọn PARTIAL | grader: Claude, owner ủy quyền 2026-11-05"
+HO-035,H,staff,ANSWERED,,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,status NO_ANSWER differs from gold ANSWERED,FAIL,FAIL,"gold ANSWERED, hệ thống từ chối | grader: Claude, owner ủy quyền 2026-11-05"
+HO-036,H,staff,ANSWERED,,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,status NO_ANSWER differs from gold ANSWERED,FAIL,FAIL,"gold ANSWERED, hệ thống từ chối | grader: Claude, owner ủy quyền 2026-11-05"
+HO-037,H,staff,ANSWERED,,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,status NO_ANSWER differs from gold ANSWERED,FAIL,FAIL,"gold ANSWERED, hệ thống từ chối | grader: Claude, owner ủy quyền 2026-11-05"
+HO-038,H,staff,ANSWERED,,NO_ANSWER,NO_ANSWER,0,0,0,0,0,0,0,0,status NO_ANSWER differs from gold ANSWERED,FAIL,FAIL,"gold ANSWERED, hệ thống từ chối | grader: Claude, owner ủy quyền 2026-11-05"
+HO-039,I,staff,ANSWERED,,ANSWERED,ANSWERED,0,0,0,0,0,0,1,0,gold documents not cited: ['ND-HR-004'],FAIL,FAIL,"Trả lời về số ngày phép, không có thời hạn báo sai số dư | grader: Claude, owner ủy quyền 2026-11-05"
+HO-040,I,staff,ANSWERED,,ANSWERED,ANSWERED,0,0,0,0,0,1,0,0,gold documents not cited: ['ND-HR-002'],FAIL,FAIL,"Chỉ nêu HRM; gold yêu cầu nêu cả hai tên và cấm tự chọn một tên; evidence rỗng. Nếu bạn khoan dung thì chọn PARTIAL | grader: Claude, owner ủy quyền 2026-11-05"

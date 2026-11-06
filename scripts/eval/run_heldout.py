@@ -25,6 +25,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from scripts.eval import reranker_check  # noqa: E402
 from scripts.eval.eval_client import INFRA_ERROR, OK, EvalClient, EvalInfraError, extract  # noqa: E402
 
 HELDOUT = ROOT / "docs" / "eval" / "heldout-v1.yaml"
@@ -102,6 +103,7 @@ def run(
     delay_seconds: float = 0.5,
     client_factory=None,  # noqa: ANN001 - tests inject a fake
     monitor=None,  # noqa: ANN001 - callable returning a host resource sample
+    run_metadata: dict[str, Any] | None = None,
 ) -> int:
     lock = verify_frozen()
     items = [i for i in load_items() if not selected or i["id"] in selected]
@@ -129,6 +131,7 @@ def run(
             "status": status,
             "heldout_sha256": lock["sha256"],
             "heldout_version": lock["version"],
+            **(run_metadata or {}),
             "started_at": started_at,
             "updated_at": datetime.now(UTC).isoformat(),
             "planned_cases": len(items),
@@ -193,6 +196,7 @@ def _host_monitor():  # noqa: ANN202
 
 def main() -> int:
     parser = argparse.ArgumentParser()
+    reranker_check.add_arguments(parser)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--case", action="append", default=[])
     parser.add_argument("--resume", action="store_true")
@@ -209,17 +213,21 @@ def main() -> int:
         if not value:
             parser.error(f"set EVAL_PASSWORD_{role.upper()}")
         passwords[role] = value
+    base_url = os.environ.get("RAG_ACCEPTANCE_BASE_URL", "http://127.0.0.1:18190")
     try:
-        return run(
+        reranker = reranker_check.guard(args, base_url)
+        code = run(
             output=args.output,
             selected=set(args.case),
             resume=args.resume,
-            base_url=os.environ.get("RAG_ACCEPTANCE_BASE_URL", "http://127.0.0.1:18190"),
+            base_url=base_url,
             passwords=passwords,
             delay_seconds=max(0.0, args.delay_seconds),
             monitor=_host_monitor() if args.monitor else None,
+            run_metadata=reranker,
         )
-    except HeldoutHashMismatchError as exc:
+        return reranker_check.finish(args.output, reranker, base_url, code)
+    except (HeldoutHashMismatchError, reranker_check.RerankerModeRefusedError) as exc:
         print(f"REFUSED: {exc}", file=sys.stderr)
         return 2
 

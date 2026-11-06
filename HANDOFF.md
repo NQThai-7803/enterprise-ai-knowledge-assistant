@@ -18,9 +18,11 @@ docker compose --profile frontend up -d frontend
 
 ## Trạng thái
 
-- **Sửa lõi RAG đang tạm dừng cho tới khi chốt PROMPT 4.** Thứ tự: đo bằng held-out trước, sửa logic lõi sau, đặt sau feature flag (`docs/review/claude-code-prompts.md`, PROMPT 5-7).
+- **Sửa lõi RAG vẫn tạm dừng cho tới khi xong PROMPT 4b và 4.5c.** Thứ tự: đo trước, sửa logic lõi sau, đặt sau feature flag (`docs/review/claude-code-prompts.md`, PROMPT 5-7).
 - **Dev** = Q001-Q100, baseline v2 đạt 99/100 theo proxy; Q096 lệch giữa các lượt là nhiễu đã biết.
-- **Test** = held-out v1, 40 câu, đã đóng băng (`docs/eval/heldout-v1.lock`). Chỉ chạy ở mốc release, không dùng để tinh chỉnh.
+- **Held-out v1 đã chấm** (2026-11-05, Claude chấm theo ủy quyền của chủ dự án; [`score.md`](docs/eval/runs/heldout-v1-f3cdbf3/score.md)): `answer_accuracy` 27,5% (11/40). Trong 11 PASS có 9 câu là từ chối đúng: `answerable_accuracy` 7,7% (2/26), `refusal_accuracy` 64,3% (9/14). Từ chối sai 14/26, trả lời sai 5/14, 0 rò rỉ ở mức kiểm tra sơ.
+- **Held-out v1 giờ là bộ diagnostic** (DEC-008), không còn là tập test. Con số công bố ra ngoài phải đo trên held-out v2, chưa có.
+- **Reranker:** hệ thống đang xếp hạng bằng `lexical_fallback`. Cross-encoder chưa từng chạy trong các lần đo đã xác minh (đã kiểm 2 volume: `eaka-p3d-uat`, `enterprise-ai-uat-v2`). Xem chế độ hiện tại ở `GET /health/ready`.
 - TASK-035 (release candidate) vẫn NO-GO vì lỗi S01 chưa đóng.
 
 ## Test (2026-11-05, image build từ `requirements.lock`, pgvector/Redis tạm)
@@ -44,7 +46,7 @@ docker compose --profile frontend up -d frontend
 
 ## Việc đang dở
 
-**PROMPT 4 đang chờ chủ dự án chấm tay `docs/eval/runs/heldout-v1-f3cdbf3/grading.csv`** (cột `label_run1`, `label_run2`: PASS, PARTIAL, FAIL, LEAK). Không tự gán nhãn thay. Có nhãn rồi mới tính điểm và sang PROMPT 5.
+**PROMPT 4b và 4.5 đã xong** (`docs/eval/runs/heldout-v1-f3cdbf3/diagnosis.md`, `docs/eval/runs/rbac-dev-v1/score.md`). **Bước tiếp theo:** chờ chủ dự án quyết định PROMPT 5 và thứ tự sửa route deterministic, alignment filter, validator. PROMPT 6 lùi lại sau các sửa đó (DEC-009).
 
 Báo cáo kiểm thử 28/10: [`docs/review/bao-cao-kiem-thu-2026-10-28.md`](docs/review/bao-cao-kiem-thu-2026-10-28.md).
 

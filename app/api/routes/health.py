@@ -5,6 +5,7 @@ from redis.asyncio import Redis
 
 from app.core.config import get_settings
 from app.db.session import check_database_connection
+from app.retrieval.reranker_factory import resolve_reranker_mode
 
 router = APIRouter(prefix="/health", tags=["health"])
 
@@ -16,6 +17,7 @@ class HealthLiveResponse(BaseModel):
 class HealthReadyResponse(BaseModel):
     status: str
     checks: dict[str, str]
+    reranker_mode: str
 
 
 @router.get("/live", response_model=HealthLiveResponse)
@@ -36,12 +38,15 @@ async def ready() -> HealthReadyResponse | JSONResponse:
         "redis": "ok" if redis_ready else "unavailable",
     }
 
+    reranker_mode = resolve_reranker_mode(get_settings())
+
     if database_ready and redis_ready:
-        return HealthReadyResponse(status="ready", checks=checks)
+        return HealthReadyResponse(status="ready", checks=checks, reranker_mode=reranker_mode)
 
     response = HealthReadyResponse(
         status="not_ready",
         checks=checks,
+        reranker_mode=reranker_mode,
     )
     return JSONResponse(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

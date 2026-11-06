@@ -250,6 +250,9 @@ Retrieval variable rules:
 - `RERANKER_PROVIDER` accepts `sentence_transformers` or `heuristic`; `sentence_transformers` is the default local cross-encoder provider and falls back safely to heuristic alignment if the local model is unavailable.
 - `RERANKER_MODEL` defaults to `BAAI/bge-reranker-v2-m3` when `RERANKER_PROVIDER=sentence_transformers`; keep `RERANKER_LOCAL_FILES_ONLY=true` unless the model has been intentionally provisioned.
 - `RERANKER_CANDIDATE_K` controls how many hybrid candidates are reranked; `RERANKER_TOP_K` controls the final high-confidence source count. `RERANKER_TIMEOUT_SECONDS` bounds reranker latency before fallback.
+- `RERANKER_TIMEOUT_SECONDS`: a rerank over this limit falls back for that request only (`RERANKER_TIMEOUT`). Only a failed model load keeps the fallback on.
+- `EVAL_EXPECTED_RERANKER_MODE` (eval scripts only): the `reranker_mode` a run expects. `scripts/eval/reranker_check.py` defaults to `cross_encoder`; `run_uat.sh` and `run_heldout.sh` default to `lexical_fallback`.
+- `EVAL_ALLOW_RERANKER_FALLBACK` (eval scripts only): when set, they pass `--allow-reranker-fallback`.
 - `RERANKER_TOP_K <= RERANKER_CANDIDATE_K <= HYBRID_RETRIEVAL_MAX_TOP_K`.
 - `CLAIM_VALIDATION_ENABLED` enables local claim/evidence consistency checks after citation validation.
 - `RAG_DIAGNOSTICS_ENABLED` enables safe development diagnostics without full prompts, full documents, or chat histories; keep disabled in production unless explicitly debugging.

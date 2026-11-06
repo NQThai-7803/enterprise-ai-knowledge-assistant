@@ -1,9 +1,29 @@
 
 # Implementation Tasks
 
+## PROMPT 4.5 eval tooling before PROMPT 5 -- 2026-11-05
+
+**Reranker deferred by the owner (2026-11-05, option C; DEC-009):**
+- PROMPT 6 moves after the fixes to the deterministic route, the alignment filter and the validator.
+- Later, compare `BAAI/bge-reranker-v2-m3` with `cross-encoder/mmarco-mMiniLMv2-L12-H384-v1` on GitHub Actions, since `bge-reranker-v2-m3` (2271 MB of weights) does not fit this 8 GB host.
+- No baseline v3. Baseline v2 stays the dev baseline, measured with `lexical_fallback`.
+- **Low, for when a real reranker runs:** a run reporting `cross_encoder` can still have requests that fell back on a timeout; count `RERANKER_TIMEOUT` in the log or expose a counter. A timed-out rerank thread keeps running until it ends, so repeated timeouts can pile up CPU work.
+
+**IN PROGRESS. Approved by the owner; no `app/` change.**
+
+- Done: 4.5a `scripts/eval/metrics.py`; 4.5b `scripts/eval/question_leak.py`, `question_fingerprints.json`, guard checker exits 2 without a source.
+- **Done 2026-11-05: official PROMPT 4 score** in `docs/eval/runs/heldout-v1-f3cdbf3/score.md`: accuracy 27.5 % (11/40) in both runs, false refusals 14/26, false answers 5/14, 0 leaks at RBAC smoke level. Graded by Claude, delegated by the owner.
+- **Held-out v1 is USED FOR DIAGNOSIS, not a test set any more (DEC-008). Held-out v2 is required before release.**
+- **Done 2026-11-05: PROMPT 4b diagnosis** in `docs/eval/runs/heldout-v1-f3cdbf3/diagnosis.md`. Retrieval is not the bottleneck (gold in hybrid 25/26). Dev 75/100 deterministic vs held-out 6/40, all 6 FAIL. **The cross-encoder never ran: `BAAI/bge-reranker-v2-m3` is missing from the stack cache, so PROMPT 6 has no reranker signal until that is decided.**
+- **Done 2026-11-05: 4.5c RBAC dev set** (`docs/eval/runs/rbac-dev-v1/score.md`). Retrieval: 18/18 pairs filtered correctly, 0 leaks. Answer layer: 4/18 controls pass, 5/18 negatives get an unrelated answer from a visible document.
+- **Medium, new from 4.5c, not fixed:** answers can start with the internal prefix `Answer-focused evidence:` (RBD-04, 05); an answer can cite a document that does not hold its fact (RBD-06). Fix together with the deterministic route.
+- **Dev check after the reranker changes:** Q001-Q100 on `eaka-backend:prompt45` (`dec733a`, `artifacts/prompt45/dev-after`, resumed after a host reboot at Q038): 99/100 proxy as in baseline v2, same statuses. Q055, Q073, Q094 and Q097 differ in wording. Baseline v2 was on an older image, so this is not attributed.
+- Decided: dev is graded with `grade_proxy` and marked `proxy`; dev does not measure permission leaks until 4.5c.
+- **Low: 31 existing `app/` lines share a 4-gram with Q001-Q100** (19 in `grounded_answer_service.py`), 0 with held-out v1. Existing code, not reviewed line by line; `check` only looks at added lines.
+
 ## PROMPT 4 held-out v1 -- 2026-10-31
 
-**IN PROGRESS: gold waiting for owner review.**
+**Runs and score done; see PROMPT 4.5 above.**
 
 - Done:
   - item 0a: runner INFRA_ERROR handling (`5eadd72`);
@@ -13,7 +33,7 @@
 - **Frozen 2026-11-01:** gold approved by the owner. SHA256 `e4dd3c69…2346` of `docs/eval/heldout-v1.yaml` is in `docs/eval/heldout-v1.lock` (frozen commit `7efc4f0`). `scripts/eval/run_heldout.py` refuses to run on a mismatch.
 - **Runs done 2026-11-01:** 2 runs of image `4f8152b4` (commit `f3cdbf3`) with the baseline v2 config and every guard off. Both runs are VALID: 0 INFRA_ERROR, the same Ollama PID throughout, max latency 49.7 s and 22.2 s.
   - Grading sheet: `docs/eval/runs/heldout-v1-f3cdbf3/`.
-  - **Waiting for the owner's manual labels.**
+  - Labelled 40/40 on 2026-11-05 by Claude, delegated by the owner.
 - **Medium (found by held-out, not fixed): PDF bullet glyphs leak into answers.**
   - 7 of 40 answers in each run contain U+F0B7 copied from chunk text.
   - HO-008 starts with U+FFFD.
@@ -28,9 +48,9 @@
   - ND-CORP-001 and ND-HR-002 give different HR and security contact addresses.
   These are corpus facts, not app bugs; record them for corpus v3.
 - **DONE 2026-11-05: `eaka-rag-change-guard` paths.** Dev runner `tests/acceptance/rag_h5_2_exact_100.py --output`, `n_dev = 100`, real test map; held-out v1 stays the test split. Thresholds and rules unchanged.
-- **Medium: the guard's `check_no_question_leak.py` currently finds no questions.** It reads `tests/acceptance`, `uat`, `eval`, while Q001-Q100 live in the git-ignored `artifacts/` and held-out v1 in `docs/eval/`; it warns and exits 0. Its clean result proves nothing until the owner decides how to give it sources without letting a skill read `docs/eval/`.
-- **Medium: no dev tool computes the guard's gate metrics.** `scripts/eval/` has no `permission_leak_count`, `false_answer_rate` or `answer_accuracy`; `grade_proxy.py` is a proxy grade. Decide this before PROMPT 5.
-- **Low: `.eval/`, the guard's output folder, is not in `.gitignore`.**
+- **DONE 2026-11-05 (PROMPT 4.5b): `check_no_question_leak.py` compares fingerprints and exits 2 without a usable source.**
+- **DONE 2026-11-05 (PROMPT 4.5a): `scripts/eval/metrics.py` computes the guard's gate metrics.** Permission leaks on dev stay unmeasured until 4.5c.
+- **DONE 2026-11-05 (`943526a`): `.eval/` is in `.gitignore`.**
 
 ## PROMPT 3g prompt truncation -- 2026-10-31
 

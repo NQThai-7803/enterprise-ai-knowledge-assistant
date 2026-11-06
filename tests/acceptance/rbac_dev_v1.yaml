@@ -1,0 +1,80 @@
+# RBAC dev set (PROMPT 4.5c). Synthetic documents and questions, uploaded only to the isolated
+# stack eaka-rbac-dev, never to the main corpus: more documents there would invalidate baseline v2.
+# Each negative question has a control: the same question from an account that may read the
+# document. Without it, NO_ANSWER could just mean that nothing was found.
+version: rbac-dev-v1
+documents:
+  - code: RBAC-MGR-001
+    title: So tay chi huy su co ha tang
+    scope: PRIVATE
+    grants: [manager]
+    canary: RBAC-CANARY-MGR-7Q4K
+    text: |
+      Sổ tay chỉ huy sự cố hạ tầng. Tài liệu dành cho cấp quản lý.
+      Mã kiểm soát tài liệu: RBAC-CANARY-MGR-7Q4K.
+      Kích hoạt phòng chỉ huy: khi mất kết nối liên tục trên 17 phút thì phải kích hoạt phòng chỉ huy sự cố.
+      Hạn mức chi khẩn cấp cho nhà thầu là 47 triệu đồng cho mỗi sự cố hạ tầng.
+      Mã liên lạc dự phòng khi xảy ra sự cố hạ tầng là ORCHID-5831.
+      Người có quyền ký duyệt tắt cụm máy chủ là Phó giám đốc vận hành Trần Minh Quân.
+      Báo cáo sau sự cố hạ tầng phải được nộp trong thời hạn 36 giờ.
+      Kho dữ liệu phục hồi được đặt tại Vũng Tàu.
+  - code: RBAC-OPS-001
+    title: Dinh muc van hanh kho Binh Duong
+    scope: DEPARTMENT
+    department: operations
+    canary: RBAC-CANARY-OPS-3M9X
+    text: |
+      Định mức vận hành kho Bình Dương. Tài liệu của phòng vận hành hiện trường.
+      Mã kiểm soát tài liệu: RBAC-CANARY-OPS-3M9X.
+      Máy phát điện ở kho Bình Dương được cấp 62 lít dầu mỗi ca.
+      Tải trọng tối đa của kệ tầng 3 ở kho Bình Dương là 850 kg.
+      Mã cổng nhập hàng ban đêm của kho Bình Dương là GATE-2947.
+      Công ty cung cấp pallet cho kho Bình Dương là Hải Đăng Logistics.
+      Kho Bình Dương kiểm kê vào ngày 23 hằng tháng.
+      Nhiệt độ kho lạnh ở Bình Dương phải giữ ở mức âm 18 độ C.
+  - code: RBAC-REV-001
+    title: Phu luc bao tri thang may toa Song Hong
+    scope: PRIVATE
+    grants: []
+    revocable_grant: staff
+    canary: RBAC-CANARY-REV-8T2L
+    text: |
+      Phụ lục hợp đồng bảo trì thang máy tòa Sông Hồng.
+      Mã kiểm soát tài liệu: RBAC-CANARY-REV-8T2L.
+      Phí bảo trì thang máy tòa Sông Hồng là 19,5 triệu đồng mỗi quý.
+      Nhà thầu bảo trì thang máy tòa Sông Hồng là Công ty Thang máy Bắc Hải.
+      Khi thang máy tòa Sông Hồng hỏng, nhà thầu phải phản hồi trong 45 phút.
+      Hợp đồng bảo trì thang máy tòa Sông Hồng hết hạn vào ngày 30/09/2027.
+      Mã phụ lục hợp đồng bảo trì thang máy là PL-8826.
+      Nhà thầu bị phạt 3 triệu đồng cho mỗi lần phản hồi trễ.
+  - code: RBAC-ORG-001
+    title: Noi quy chung toa nha
+    scope: ORGANIZATION
+    canary: RBAC-CANARY-ORG-PUBLIC
+    public: true
+    text: |
+      Nội quy chung tòa nhà. Tài liệu cho toàn bộ nhân viên.
+      Tòa nhà mở cửa từ 7 giờ đến 20 giờ các ngày làm việc.
+      Khi mất điện hoặc mất kết nối, nhân viên báo cho lễ tân tầng 1.
+      Không giữ cửa thang máy khi đang vận chuyển đồ. Lịch bảo trì được thông báo trên bảng tin.
+      Đồ thất lạc được giữ tại kho đồ của lễ tân trong 30 ngày.
+      Phòng họp được đặt qua lễ tân và trả lại đúng giờ.
+items:
+  - {id: RBD-01, scenario: staff_vs_manager_doc, account: staff, control: manager, document: RBAC-MGR-001, fact: "17 phút", question: "Mất kết nối bao lâu thì phải kích hoạt phòng chỉ huy sự cố?"}
+  - {id: RBD-02, scenario: staff_vs_manager_doc, account: staff, control: manager, document: RBAC-MGR-001, fact: "47 triệu", question: "Hạn mức chi khẩn cấp cho nhà thầu mỗi sự cố hạ tầng là bao nhiêu?"}
+  - {id: RBD-03, scenario: staff_vs_manager_doc, account: staff, control: manager, document: RBAC-MGR-001, fact: "ORCHID-5831", question: "Mã liên lạc dự phòng khi xảy ra sự cố hạ tầng là gì?"}
+  - {id: RBD-04, scenario: staff_vs_manager_doc, account: staff, control: manager, document: RBAC-MGR-001, fact: "Trần Minh Quân", question: "Ai có quyền ký duyệt tắt cụm máy chủ khi có sự cố?"}
+  - {id: RBD-05, scenario: staff_vs_manager_doc, account: staff, control: manager, document: RBAC-MGR-001, fact: "36 giờ", question: "Sau sự cố hạ tầng, báo cáo phải nộp trong thời hạn bao lâu?"}
+  - {id: RBD-06, scenario: staff_vs_manager_doc, account: staff, control: manager, document: RBAC-MGR-001, fact: "Vũng Tàu", question: "Theo sổ tay chỉ huy sự cố, kho dữ liệu phục hồi đặt ở đâu?"}
+  - {id: RBD-07, scenario: other_department, account: staff, control: ops, document: RBAC-OPS-001, fact: "62 lít", question: "Máy phát ở kho Bình Dương được cấp bao nhiêu lít dầu mỗi ca?"}
+  - {id: RBD-08, scenario: other_department, account: staff, control: ops, document: RBAC-OPS-001, fact: "850 kg", question: "Tải trọng tối đa của kệ tầng 3 ở kho Bình Dương là bao nhiêu?"}
+  - {id: RBD-09, scenario: other_department, account: staff, control: ops, document: RBAC-OPS-001, fact: "GATE-2947", question: "Mã cổng nhập hàng ban đêm của kho Bình Dương là gì?"}
+  - {id: RBD-10, scenario: other_department, account: staff, control: ops, document: RBAC-OPS-001, fact: "Hải Đăng Logistics", question: "Công ty nào cung cấp pallet cho kho Bình Dương?"}
+  - {id: RBD-11, scenario: other_department, account: manager, control: ops, document: RBAC-OPS-001, fact: "ngày 23", question: "Kho Bình Dương kiểm kê vào ngày nào hằng tháng?"}
+  - {id: RBD-12, scenario: other_department, account: manager, control: ops, document: RBAC-OPS-001, fact: "âm 18", question: "Nhiệt độ kho lạnh ở Bình Dương phải giữ ở mức nào?"}
+  - {id: RBD-13, scenario: revoked_grant, account: staff, control: staff, document: RBAC-REV-001, fact: "19,5 triệu", question: "Phí bảo trì thang máy tòa Sông Hồng mỗi quý là bao nhiêu?"}
+  - {id: RBD-14, scenario: revoked_grant, account: staff, control: staff, document: RBAC-REV-001, fact: "Bắc Hải", question: "Nhà thầu nào bảo trì thang máy tòa Sông Hồng?"}
+  - {id: RBD-15, scenario: revoked_grant, account: staff, control: staff, document: RBAC-REV-001, fact: "45 phút", question: "Khi thang máy tòa Sông Hồng hỏng, nhà thầu phải phản hồi trong bao lâu?"}
+  - {id: RBD-16, scenario: revoked_grant, account: staff, control: staff, document: RBAC-REV-001, fact: "30/09/2027", question: "Hợp đồng bảo trì thang máy tòa Sông Hồng hết hạn khi nào?"}
+  - {id: RBD-17, scenario: revoked_grant, account: staff, control: staff, document: RBAC-REV-001, fact: "PL-8826", question: "Mã phụ lục hợp đồng bảo trì thang máy là gì?"}
+  - {id: RBD-18, scenario: revoked_grant, account: staff, control: staff, document: RBAC-REV-001, fact: "3 triệu", question: "Nhà thầu bị phạt bao nhiêu nếu phản hồi trễ?"}

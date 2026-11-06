@@ -1,5 +1,17 @@
 # Project Status
 
+## PROMPT 4.5 -- 2026-11-05 (in progress)
+
+- **Reranker.** The configured cross-encoder `BAAI/bge-reranker-v2-m3` has not run in any measurement we have verified. On 2026-11-05 the model caches of `eaka-p3d-uat` and `enterprise-ai-uat-v2` held no weights for it, and the `eaka-p3d-uat` API log shows the fallback. Baseline v2 and held-out v1 ran on `eaka-p3d-uat`, so they ranked with `lexical_fallback`: the `reranker_score` values there are alignment scores. The five other model cache volumes were not checked. Baseline v2 stays the dev baseline, labelled `lexical_fallback`; there is no baseline v3.
+- **Fallback is visible.** `reranker_mode` in `/health/ready`, `RERANKER_FALLBACK_ACTIVE` in the log, eval runners refuse a mismatch. A timeout now falls back for that request only.
+- **4.5a, 4.5b done.** Gate metrics and fingerprint question check; baseline v2 reproduces 99/100 proxy through `metrics.py`. Max dev/held-out Jaccard 0.190 (limit 0.60).
+- **Official held-out v1 score (2 runs):** accuracy 27.5 %, with partial 30.0 %, false refusals 53.8 %, false answers 35.7 %, citations 41.7 % / 50.0 %, 0 leaks at RBAC smoke level. Graded by Claude, delegated by the owner.
+- **Held-out v1 is now used for diagnosis, not a test set (DEC-008).**
+- **Of the 11 PASS, 9 are correct refusals:** answerable accuracy 7.7 % (2/26), refusal accuracy 64.3 % (9/14).
+- **PROMPT 4b done:** `diagnosis.md`. Of 14 false refusals, gold reached the prompt in 9; none failed at retrieval. The deterministic route caused 6 FAILs. The cross-encoder fell back to alignment scoring.
+- **4.5c done:** RBAC dev set. Permission filtering held on 18/18 pairs with 0 leaks at retrieval and API level. Answers are weak: 4/18 controls pass and 5/18 negatives get an unrelated answer from a visible document.
+- **Next:** owner decision on PROMPT 5 and the fixes to the deterministic route, the alignment filter and the validator.
+
 ## PROMPT 4 -- 2026-10-31 (in progress)
 
 - **Handover 2026-11-05.** Branch `handover/2026-11-05`, `HANDOFF.md` rewritten, `eaka-rag-change-guard` paths corrected. Locked image: unit 1496 pass / 1 fail (image has no `docs/eval/`) / 17 xfail / 5 skip; API 296 pass; integration 404 pass / 3 xfail; Celery 4 pass.
@@ -18,7 +30,7 @@
   - No held-out 4-gram appears in `app/`.
   - The gold is approved and the set is frozen (SHA256 `e4dd3c69…`).
   - 2 VALID runs are done; the grading sheet is in `docs/eval/runs/heldout-v1-f3cdbf3/`.
-  - **Waiting for the owner's labels.**
+  - Labelled and scored 2026-11-05 (`score.md`).
 - Groups B/C are RBAC smoke-level (one tiny restricted document).
 
 ## PROMPT 3g -- 2026-10-31
