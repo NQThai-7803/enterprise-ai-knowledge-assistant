@@ -51,6 +51,8 @@ RUNNER=(env RAG_ACCEPTANCE_BASE_URL="$API" PYTHONIOENCODING=utf-8
 if [ "$PHASE" != "part2" ]; then
 python - "$OUT/metadata.json" <<EOF
 import json, sys
+sys.path.insert(0, "scripts/eval")
+import branch_counters
 json.dump({
     "started_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
     "repo_head": "$(git rev-parse HEAD)",
@@ -67,6 +69,7 @@ json.dump({
     "expected_reranker_mode": "$EVAL_EXPECTED_RERANKER_MODE",
     "allow_reranker_fallback": "${EVAL_ALLOW_RERANKER_FALLBACK:-}",
     "compose_project": "$PROJECT",
+    "branch_counters_start": branch_counters.read("$API"),
     "runner": "tests/acceptance/rag_h5_2_exact_100.py",
 }, open(sys.argv[1], "w", encoding="utf-8"), indent=1)
 EOF
@@ -89,13 +92,18 @@ case "$PHASE" in
     "${RUNNER[@]}" > "$OUT/runner.log" 2>&1 || echo "runner exit $?" >> "$OUT/runner.log" ;;
 esac
 
-python - "$OUT" <<'EOF'
+python - "$OUT" "$API" <<'EOF'
 import json, sys
+sys.path.insert(0, "scripts/eval")
+import branch_counters
 from datetime import UTC, datetime
 out = sys.argv[1]
 meta = json.load(open(f"{out}/metadata.json", encoding="utf-8"))
 meta["warmup"] = json.load(open(f"{out}/warmup.json", encoding="utf-8"))
 results = json.load(open(f"{out}/runtime_results.json", encoding="utf-8"))
+meta["branch_counters"] = branch_counters.delta(
+    meta.get("branch_counters_start"), branch_counters.read(sys.argv[2])
+)
 meta["runner_status"] = results.get("status")
 meta["infra_error_cases"] = results.get("infra_error_cases", 0)
 meta["infra_error_retried_cases"] = results.get("infra_error_retried_cases", 0)

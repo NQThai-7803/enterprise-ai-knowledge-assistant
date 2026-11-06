@@ -27,7 +27,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.eval import reranker_check, run_rbac_dev  # noqa: E402
+from scripts.eval import branch_counters, reranker_check, run_rbac_dev  # noqa: E402
 
 SOURCE = ROOT / "tests" / "acceptance" / "answer_relevance_dev_v1.yaml"
 LOCK = ROOT / "tests" / "acceptance" / "answer_relevance_dev_v1.lock"
@@ -124,6 +124,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     codes = {document_id: code for code, document_id in ids.items()}
     ask = run_rbac_dev._asker(base_url, passwords)
     started_at = datetime.now(UTC).isoformat()
+    counters_start = branch_counters.read(base_url)
     cases = [grade_case(ask(ROLE, item["question"]), item, codes) for item in data["items"]]
     payload = {
         "version": data["version"],
@@ -131,6 +132,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "started_at": started_at,
         "finished_at": datetime.now(UTC).isoformat(),
         **reranker,
+        "branch_counters": branch_counters.delta(counters_start, branch_counters.read(base_url)),
         "summary": summarize(cases),
         "cases": cases,
     }

@@ -33,7 +33,9 @@ from app.models import (
     User,
     UserRole,
 )
+from app.observability.metrics import GLOBAL_METRICS
 from app.repositories.chat_message_repository import ConversationMemoryMessageRow
+from app.retrieval import question_analysis
 from app.retrieval.errors import RetrievalError, RetrievalFailureCode
 from app.retrieval.models import HybridRetrievalHit, HybridRetrievalResult
 from app.services.grounded_answer_service import (
@@ -3617,9 +3619,9 @@ def _refusal_service(*generations: str, **overrides: Any) -> tuple[Any, Any]:
     return service, resolved_llm
 
 
-def test_deterministic_repair_runs_after_a_refusal_by_default() -> None:
+def test_deterministic_repair_runs_after_a_refusal_when_the_flag_is_on() -> None:
     async def scenario() -> None:
-        service, _ = _refusal_service("__NO_ANSWER__")
+        service, _ = _refusal_service("__NO_ANSWER__", rag_repair_after_llm_refusal_enabled=True)
 
         result = await service.answer_question(
             current_user=user(), session_id=chat_session().id, question=REFUSAL_QUESTION
@@ -3692,9 +3694,18 @@ def _unit_service(content: str = "__NO_ANSWER__", **overrides: Any) -> Any:
     return service
 
 
-def test_money_value_answers_a_question_about_days_when_the_guard_is_off() -> None:
+def test_money_value_answers_a_question_about_days_when_the_guard_is_off(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        question_analysis,
+        "get_settings",
+        lambda: SimpleNamespace(rag_answer_unit_guard_enabled=False),
+    )
+
     async def scenario() -> None:
-        result = await _unit_service().answer_question(
+        service = _unit_service(rag_answer_unit_guard_enabled=False)
+        result = await service.answer_question(
             current_user=user(), session_id=chat_session().id, question=UNIT_QUESTION
         )
 
@@ -3792,3 +3803,45 @@ def test_rejected_answer_moves_to_a_source_with_a_weak_signal_by_default() -> No
 def test_rejected_answer_needs_strong_support_to_move_when_the_flag_is_on() -> None:
     with pytest.raises(CitationValidationFailedApplicationError):
         asyncio.run(_draft_for_rejected_answer(rag_reselect_requires_strong_support_enabled=True))
+
+
+def test_reselection_is_counted_with_the_strong_support_flag_off() -> None:
+    GLOBAL_METRICS.reset()
+
+    asyncio.run(_draft_for_rejected_answer())
+
+    assert GLOBAL_METRICS.answer_branch_counts() == {
+        "reselect_after_rejection": 1,
+        "reselect_guard_would_change": 1,
+    }
+    GLOBAL_METRICS.reset()
+
+
+def test_reselection_guard_is_not_counted_when_the_source_holds_the_answer() -> None:
+    GLOBAL_METRICS.reset()
+    first, second = _reselect_registry().sources
+    registry = PromptSourceRegistry(
+        sources=(
+            first,
+            replace(
+                second, text="Phan mem Luu Tru do cong ty Hoang Minh Digital Technology cung cap."
+            ),
+        )
+    )
+
+    async def scenario() -> None:
+        service, _, _, _, _, _, _ = make_service(settings_obj=settings())
+        await service._draft_from_generation(
+            _fake_generation(RESELECT_OUTPUT),
+            source_registry=registry,
+            current_user=user(),
+            grounding_question=RESELECT_QUESTION,
+        )
+
+    asyncio.run(scenario())
+
+    assert GLOBAL_METRICS.answer_branch_counts() == {
+        "reselect_after_rejection": 1,
+        "reselect_guard_would_change": 0,
+    }
+    GLOBAL_METRICS.reset()

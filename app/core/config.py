@@ -132,10 +132,11 @@ class Settings(BaseSettings):
     rag_semantic_exact_permitted_knn_enabled: bool = True
     # legacy, strict or off for _structured_condition_value_answer (DEC-010).
     rag_deterministic_route_mode: Literal["legacy", "strict", "off"] = "strict"
+    # FIX 2 groups 1 and 2 are on by default (DEC-011); set these to roll back.
     # FIX 2 group 1: false stops the deterministic repair once the LLM has refused.
-    rag_repair_after_llm_refusal_enabled: bool = True
+    rag_repair_after_llm_refusal_enabled: bool = False
     # FIX 2 group 2: "dong y" is not money, and an answer must carry the unit asked for.
-    rag_answer_unit_guard_enabled: bool = False
+    rag_answer_unit_guard_enabled: bool = True
     # FIX 2 group 4a: a rejected answer moves to another source only on strong support.
     rag_reselect_requires_strong_support_enabled: bool = False
     reranker_enabled: bool = True

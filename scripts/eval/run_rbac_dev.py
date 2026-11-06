@@ -30,7 +30,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.eval import reranker_check  # noqa: E402
+from scripts.eval import branch_counters, reranker_check  # noqa: E402
 from scripts.eval.eval_client import INFRA_ERROR, EvalClient, EvalInfraError, extract  # noqa: E402
 
 SOURCE = ROOT / "tests" / "acceptance" / "rbac_dev_v1.yaml"
@@ -332,6 +332,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     codes = {document_id: code for code, document_id in ids.items()}
 
     started_at = datetime.now(UTC).isoformat()
+    counters_start = branch_counters.read(base_url)
     cases = run_cases(
         data["items"],
         _asker(base_url, passwords),
@@ -343,6 +344,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "started_at": started_at,
         "finished_at": datetime.now(UTC).isoformat(),
         **reranker,
+        "branch_counters": branch_counters.delta(counters_start, branch_counters.read(base_url)),
         "cases": graded,
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)

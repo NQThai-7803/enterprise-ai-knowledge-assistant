@@ -6700,6 +6700,9 @@ def test_topic_check_ignores_generic_words() -> None:
 
 def test_route_mode_defaults_to_strict_and_rejects_unknown_values() -> None:
     assert Settings(_env_file=None).rag_deterministic_route_mode == "strict"
+    assert Settings(_env_file=None).rag_repair_after_llm_refusal_enabled is False
+    assert Settings(_env_file=None).rag_answer_unit_guard_enabled is True
+    assert Settings(_env_file=None).rag_reselect_requires_strong_support_enabled is False
     with pytest.raises(ValueError):
         Settings(_env_file=None, rag_deterministic_route_mode="other")
 
@@ -6744,6 +6747,11 @@ def test_answer_missing_requested_unit(question: str, answer: str, missing: bool
 def test_agreement_is_not_money_only_when_the_guard_is_on(monkeypatch: pytest.MonkeyPatch) -> None:
     question = "Neu khong dong y voi bien ban thi co bao nhieu ngay de phan doi?"
     money = "Tien phat khi khong dong y voi bien ban la bao nhieu?"
+    monkeypatch.setattr(
+        question_analysis,
+        "get_settings",
+        lambda: SimpleNamespace(rag_answer_unit_guard_enabled=False),
+    )
     assert analyze_question(question).asks_for_amount
     monkeypatch.setattr(
         question_analysis,

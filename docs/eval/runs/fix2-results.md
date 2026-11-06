@@ -58,6 +58,10 @@ REL-103 trả về trong chưa tới 0,5 giây nên nhiều khả năng đi nhá
 - **Lượt bỏ:** một lượt của bộ dev mới (`run0`) chạy khi chưa warm-up và không tính. Một lượt UAT baseline dừng ở Q085 khi Docker tắt cũng không tính.
 - **Bộ nhớ:** Available trước mỗi đoạn từ 1007 đến 2083 MB khi stack dừng, xuống khoảng 420-700 MB khi đang chạy. 0 INFRA_ERROR, câu chậm nhất 74,6 giây.
 
+## Đính chính sau FIX 2a
+
+`docs/eval/runs/fix2a-defaults.md` đo lại trong một đợt theo DEC-011. Bộ đếm cho thấy nhánh 4a chạy 11-32 lần mỗi lượt, không phải ít khi chạy như mục Giới hạn dưới đây phỏng đoán, nhưng flag gần như không có gì để đổi. Thay đổi của RBD-03 không phải công của nhóm 1.
+
 ## Giới hạn
 
 - **Chưa đo các flag bật cùng lúc.** Nên đo tổ hợp nhóm 1 + 2 trước khi đổi mặc định.
