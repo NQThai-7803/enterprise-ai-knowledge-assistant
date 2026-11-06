@@ -114,6 +114,7 @@ from app.services.claim_evidence_validation_service import (
     ClaimEvidenceStatus,
     ClaimEvidenceValidationService,
     ClaimRepairFeedback,
+    answer_missing_requested_unit,
     infer_yes_no_polarity,
 )
 from app.web_search.errors import WebSearchError
@@ -2254,6 +2255,18 @@ class GroundedAnswerService:
         if not validated.citations:
             raise CitationValidationFailedApplicationError()
         validated_yes_no_polarity: str | None = None
+
+        if (
+            self.settings.rag_answer_unit_guard_enabled
+            and not claims_already_validated
+            and len(information_need_queries(grounding_question)) <= 1
+            and answer_missing_requested_unit(
+                question=grounding_question, answer=grounded_output.answer
+            )
+        ):
+            if self.settings.rag_diagnostics_enabled:
+                _log_no_answer_diagnostics(reason="answer_missing_requested_unit")
+            raise _ClaimValidationRepairRequired(None)
 
         if self.settings.claim_validation_enabled and not claims_already_validated:
             claim_validation = await self.claim_validation_service.validate(

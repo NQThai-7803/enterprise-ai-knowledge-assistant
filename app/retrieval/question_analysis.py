@@ -4,6 +4,8 @@ import re
 import unicodedata
 from dataclasses import dataclass
 
+from app.core.config import get_settings
+
 _WORD_RE = re.compile(r"\w+", re.UNICODE)
 
 _VIETNAMESE_BASE_TRANSLATION = str.maketrans(
@@ -535,6 +537,9 @@ def _asks_for_amount(folded: str) -> bool:
         "support",
         "amount",
     )
+    # "đồng ý" folds to "dong y", which reads as the currency "đồng".
+    if "dong y" in folded and get_settings().rag_answer_unit_guard_enabled:
+        folded = re.sub(r"\bdong y\b", " ", folded)
     return asks_quantity and any(
         re.search(rf"(?<!\w){re.escape(term)}(?!\w)", folded) is not None for term in money_terms
     )

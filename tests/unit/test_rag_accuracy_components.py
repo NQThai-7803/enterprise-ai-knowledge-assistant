@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import Coroutine
+from types import SimpleNamespace
 from typing import Any
 from uuid import UUID
 
@@ -13,6 +14,7 @@ from app.citations.grounded_output import GroundedLLMOutput
 from app.citations.models import PromptSource, PromptSourceRegistry
 from app.core.config import Settings
 from app.models import CitationSourceType
+from app.retrieval import question_analysis
 from app.retrieval.evidence_quality import EvidenceContextKind, classify_evidence_context
 from app.retrieval.models import HybridRetrievalHit
 from app.retrieval.question_analysis import analyze_question, retrieval_query_variants
@@ -33,6 +35,7 @@ from app.services.claim_evidence_validation_service import (
     ClaimEvidenceStatus,
     ClaimEvidenceValidationService,
     _validate_answer_against_evidence,
+    answer_missing_requested_unit,
 )
 from app.services.grounded_answer_service import (
     _MONEY_VALUE_PATTERN,
@@ -6718,3 +6721,35 @@ def test_answer_without_labels_is_unchanged() -> None:
         gas._strip_internal_evidence_labels("Evidence: Phí là 5 đồng.")
         == "Evidence: Phí là 5 đồng."
     )
+
+
+@pytest.mark.parametrize(
+    ("question", "answer", "missing"),
+    [
+        ("Hop dong co bao nhieu ngay de bo sung?", "Phi la 2 trieu dong.", True),
+        ("Hop dong co bao nhieu ngay de bo sung?", "Gop toi da 03 nam mot lan.", True),
+        ("Hop dong có bao nhiêu ngày để bổ sung?", "Trong 10 ngày làm việc.", False),
+        ("Hop dong co bao nhieu ngay de bo sung?", "Tu 3 - 5 ngay.", False),
+        ("Hop dong co bao nhieu ngay de bo sung?", "Trong hai ngay.", False),
+        ("Hop dong co bao nhieu ngay de bo sung?", "Tai lieu khong quy dinh so ngay.", False),
+        ("Thuong bao nhieu thang luong?", "Tuong duong 2 thang luong.", False),
+        ("Phi kiem dinh la bao nhieu?", "Phi la 2 trieu dong.", False),
+        ("Toi da bao nhieu kg moi chuyen?", "Xe tren 5 tan.", True),
+    ],
+)
+def test_answer_missing_requested_unit(question: str, answer: str, missing: bool) -> None:
+    assert answer_missing_requested_unit(question=question, answer=answer) is missing
+
+
+def test_agreement_is_not_money_only_when_the_guard_is_on(monkeypatch: pytest.MonkeyPatch) -> None:
+    question = "Neu khong dong y voi bien ban thi co bao nhieu ngay de phan doi?"
+    money = "Tien phat khi khong dong y voi bien ban la bao nhieu?"
+    assert analyze_question(question).asks_for_amount
+    monkeypatch.setattr(
+        question_analysis,
+        "get_settings",
+        lambda: SimpleNamespace(rag_answer_unit_guard_enabled=True),
+    )
+    assert not analyze_question(question).asks_for_amount
+    assert analyze_question(question).asks_for_duration
+    assert analyze_question(money).asks_for_amount

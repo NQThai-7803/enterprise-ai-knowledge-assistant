@@ -134,6 +134,8 @@ class Settings(BaseSettings):
     rag_deterministic_route_mode: Literal["legacy", "strict", "off"] = "strict"
     # FIX 2 group 1: false stops the deterministic repair once the LLM has refused.
     rag_repair_after_llm_refusal_enabled: bool = True
+    # FIX 2 group 2: "dong y" is not money, and an answer must carry the unit asked for.
+    rag_answer_unit_guard_enabled: bool = False
     reranker_enabled: bool = True
     reranker_provider: Literal["sentence_transformers", "heuristic"] = "sentence_transformers"
     reranker_model: str = Field(default="BAAI/bge-reranker-v2-m3", min_length=1)

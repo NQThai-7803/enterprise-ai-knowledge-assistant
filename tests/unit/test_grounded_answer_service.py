@@ -3676,3 +3676,65 @@ def test_refusal_on_an_earlier_attempt_also_blocks_the_repair_when_the_flag_is_o
         assert result.grounding_status == GroundingStatus.NO_ANSWER
 
     run_async(scenario())
+
+
+UNIT_SOURCE = "Quy dinh kiem dinh. Phi kiem dinh lai la 3 trieu dong moi lan."
+UNIT_QUESTION = "Khong dong y voi ket luan kiem dinh thi don vi co bao nhieu ngay de phan doi?"
+
+
+def _unit_service(content: str = "__NO_ANSWER__", **overrides: Any) -> Any:
+    service, _, _, _, _, _, _ = make_service(
+        retrieval=FakeRetrievalService(retrieval_result(hit(UNIT_SOURCE))),
+        llm=FakeLLMProvider(_fake_generation(content)),
+        settings_obj=settings(**overrides),
+    )
+    return service
+
+
+def test_money_value_answers_a_question_about_days_when_the_guard_is_off() -> None:
+    async def scenario() -> None:
+        result = await _unit_service().answer_question(
+            current_user=user(), session_id=chat_session().id, question=UNIT_QUESTION
+        )
+
+        assert result.grounding_status == GroundingStatus.ANSWERED
+        assert "3 trieu" in result.assistant_message.content
+
+    run_async(scenario())
+
+
+def test_unit_guard_rejects_a_money_value_for_a_question_about_days() -> None:
+    async def scenario() -> None:
+        service = _unit_service(rag_answer_unit_guard_enabled=True)
+
+        result = await service.answer_question(
+            current_user=user(), session_id=chat_session().id, question=UNIT_QUESTION
+        )
+
+        assert result.grounding_status == GroundingStatus.NO_ANSWER
+
+    run_async(scenario())
+
+
+def test_unit_guard_keeps_an_answer_with_the_unit_asked_for() -> None:
+    async def scenario() -> None:
+        service, _, _, _, _, _, _ = make_service(
+            retrieval=FakeRetrievalService(
+                retrieval_result(hit("Don vi co 10 ngay de phan doi ket luan kiem dinh."))
+            ),
+            llm=FakeLLMProvider(
+                _fake_generation(
+                    '{"answer":"Don vi co 10 ngay de phan doi.","citations":["SOURCE_1"]}'
+                )
+            ),
+            settings_obj=settings(rag_answer_unit_guard_enabled=True),
+        )
+
+        result = await service.answer_question(
+            current_user=user(), session_id=chat_session().id, question=UNIT_QUESTION
+        )
+
+        assert result.grounding_status == GroundingStatus.ANSWERED
+        assert "10 ngay" in result.assistant_message.content
+
+    run_async(scenario())
