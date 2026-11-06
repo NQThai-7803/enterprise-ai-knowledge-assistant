@@ -1178,6 +1178,27 @@ class ClaimEvidenceValidationService:
             repair_feedback=repair_feedback,
         )
 
+    def source_label_has_strong_support(
+        self,
+        *,
+        answer: str,
+        source_registry: PromptSourceRegistry,
+        label: str,
+    ) -> bool:
+        """True when the source holds the answer word for word or its exact number and unit."""
+        folded_answer = fold_text(answer)
+        folded_evidence = fold_text(
+            _evidence_for_labels(source_registry=source_registry, cited_source_labels=(label,))
+        )
+        if _answer_is_verbatim_supported(
+            answer=folded_answer, evidence=folded_evidence
+        ) or _low_substance_answer_is_verbatim_supported(
+            answer=folded_answer, evidence=folded_evidence
+        ):
+            return True
+        pairs = set(_number_unit_pairs(folded_answer))
+        return bool(pairs) and pairs.issubset(_number_unit_pairs(folded_evidence))
+
     def select_supporting_source_labels(
         self,
         *,
@@ -2959,6 +2980,25 @@ def _answer_has_grounded_signal(*, answer: str, evidence: str) -> bool:
         return False
     matched = {term for term in substantive_terms if term in evidence}
     return len(matched) >= min(3, len(substantive_terms))
+
+
+# shortcut: Vietnamese units only, extend when English value questions show the same failure.
+_REQUESTED_UNIT_RE = re.compile(
+    r"\bbao nhieu (ngay|gio|phut|tuan|thang|nam|lan|nguoi|kg|tan|km|lit)\b"
+)
+_NUMBER_BEFORE_UNIT = r"(?:\d[\d.,]*|mot|hai|ba|bon|nam|sau|bay|tam|chin|muoi)\s*"
+
+
+def answer_missing_requested_unit(*, question: str, answer: str) -> bool:
+    """True when the question asks "how many <unit>" and the answer gives no number with it."""
+    requested = _REQUESTED_UNIT_RE.search(fold_text(question))
+    if requested is None:
+        return False
+    folded_answer = fold_text(answer)
+    if _answer_mentions_unspecified(folded_answer):
+        return False
+    pattern = rf"(?<!\w){_NUMBER_BEFORE_UNIT}{requested.group(1)}(?!\w)"
+    return re.search(pattern, folded_answer) is None
 
 
 def _answer_is_low_substance(answer: str) -> bool:

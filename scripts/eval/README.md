@@ -16,6 +16,9 @@ It never touches the V2, AUTH-02 or main stacks.
 | `metrics.py` | Per-run `permission_leak_count`, `false_answer_rate`, `false_refusal_rate`, `answer_accuracy`, `citation_accuracy`. Held-out uses the owner's labels and refuses blank ones; dev uses `grade_proxy.py` output, is marked `proxy` and reports the leak count as null (not measured). |
 | `run_rbac_dev.py` | RBAC dev set from `tests/acceptance/rbac_dev_v1.yaml` on the isolated stack `eaka-rbac-dev`: 18 questions from accounts without access, each with a control from an account with access. Controls run first, then the grant is revoked, then the negatives. Score with `metrics.py rbac`. |
 
+| `run_answer_relevance_dev.py` | Frozen relevance dev set from `tests/acceptance/answer_relevance_dev_v1.yaml` on the isolated stack `eaka-relevance-dev`: questions the documents do not answer, with similar ones they do. Refuses a set that differs from its lock. |
+| `compare_flag_runs.py` | Compares two baseline runs with two runs of a flag on the relevance, RBAC or UAT set. A case counts as changed only when both sides agree within themselves and differ from each other. |
+
 RBAC dev stack (never add these documents to the main corpus):
 
 ```bash

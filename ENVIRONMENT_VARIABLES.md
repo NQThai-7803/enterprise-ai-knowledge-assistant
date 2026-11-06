@@ -223,6 +223,9 @@ HYBRID_KEYWORD_WEIGHT=1.0
 HYBRID_SEMANTIC_MIN_RELEVANCE_SCORE=0.30
 RAG_SEMANTIC_EXACT_PERMITTED_KNN_ENABLED=true
 RAG_DETERMINISTIC_ROUTE_MODE=strict
+RAG_REPAIR_AFTER_LLM_REFUSAL_ENABLED=true
+RAG_ANSWER_UNIT_GUARD_ENABLED=false
+RAG_RESELECT_REQUIRES_STRONG_SUPPORT_ENABLED=false
 ```
 
 Retrieval variable rules:
@@ -246,6 +249,9 @@ Retrieval variable rules:
 - `HYBRID_SEMANTIC_MIN_RELEVANCE_SCORE` is a finite number in `[0.0, 1.0]`.
 - `RAG_SEMANTIC_EXACT_PERMITTED_KNN_ENABLED` (boolean, default `true` since PROMPT 3f, added in PROMPT 3e): semantic retrieval ranks every chunk the user may read exactly. Set `false` only to roll back to the statement the planner can serve through the HNSW index; that path applies permission and visibility after `hnsw.ef_search` candidates and can lose permitted chunks. See `docs/design/hnsw-permission-recall.md`, including the latency budget and the cells that are not verified yet.
 - `RAG_DETERMINISTIC_ROUTE_MODE` (`legacy`, `strict` or `off`; default `strict` since FIX 1, DEC-010; set `legacy` to roll back): the condition copier `_structured_condition_value_answer`, before and after the LLM. `strict` matches cues as whole words on text that keeps its diacritics and requires the chosen source span to share the question's topic. `off` removes this branch. The other deterministic branches are not affected.
+- `RAG_REPAIR_AFTER_LLM_REFUSAL_ENABLED` (boolean, default `true`; FIX 2 group 1): `false` stops the deterministic repair once the LLM has refused in the request. A repair after the validator rejects an LLM answer still runs.
+- `RAG_ANSWER_UNIT_GUARD_ENABLED` (boolean, default `false`; FIX 2 group 2): "đồng ý" no longer makes a question a money question, and an answer to "bao nhiêu <unit>" must hold a number with that unit, on every route. An answer saying the documents do not specify the value is exempt.
+- `RAG_RESELECT_REQUIRES_STRONG_SUPPORT_ENABLED` (boolean, default `false`; FIX 2 group 4a): when the validator rejects an answer on its cited source, the answer may move to another source only if that source holds it word for word or holds its exact number and unit.
 - Hybrid RRF scores are ranking scores, not probabilities.
 - These retrieval values are not secrets.
 - `RERANKER_ENABLED` enables the document/chunk reranking layer after hybrid retrieval and before final context packing.

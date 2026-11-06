@@ -1,0 +1,9 @@
+{
+ "version": "answer_relevance_dev_v1",
+ "file": "tests/acceptance/answer_relevance_dev_v1.yaml",
+ "sha256": "08f095ba3ed716a7674d463c99a9a000617e66aaf5b19967a9bd585bbe2b9896",
+ "frozen_at": "2026-11-06",
+ "items": 25,
+ "approved_by": "owner (FIX 2 item A)",
+ "rule": "scripts/eval/run_answer_relevance_dev.py refuses to run when the file hash differs; any edit needs a new version with a new lock"
+}

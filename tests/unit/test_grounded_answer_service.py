@@ -18,6 +18,7 @@ from app.core.config import Settings
 from app.core.exceptions import (
     ChatRetrievalFailedError,
     ChatSessionNotFoundError,
+    CitationValidationFailedApplicationError,
     LLMProviderTimeoutStandardApplicationError,
     LLMTimeoutApplicationError,
 )
@@ -3586,3 +3587,208 @@ def test_prompt_source_order_uses_answer_quality_after_reranker_sample_hit() -> 
         assert result.assistant_message.content.startswith("Có.")
 
     run_async(scenario())
+
+
+def _fake_generation(content: str) -> LLMGenerationResult:
+    return LLMGenerationResult(
+        content=content,
+        model="fake",
+        finish_reason="stop",
+        prompt_tokens=1,
+        completion_tokens=1,
+        response_time_ms=1,
+    )
+
+
+REFUSAL_SOURCE = (
+    "Quy trinh van hanh noi hoi.\n"
+    "Nhat ky van hanh bat thuong phai duoc ky su truong doi chieu truoc khi ket luan su co.\n"
+)
+REFUSAL_QUESTION = "Quy trinh ban giao noi hoi yeu cau ky su lam gi truoc khi nghi ca?"
+
+
+def _refusal_service(*generations: str, **overrides: Any) -> tuple[Any, Any]:
+    llm = SequentialFakeLLMProvider(*(_fake_generation(content) for content in generations))
+    service, _, _, _, resolved_llm, _, _ = make_service(
+        retrieval=FakeRetrievalService(retrieval_result(hit(REFUSAL_SOURCE))),
+        llm=llm,
+        settings_obj=settings(**overrides),
+    )
+    return service, resolved_llm
+
+
+def test_deterministic_repair_runs_after_a_refusal_by_default() -> None:
+    async def scenario() -> None:
+        service, _ = _refusal_service("__NO_ANSWER__")
+
+        result = await service.answer_question(
+            current_user=user(), session_id=chat_session().id, question=REFUSAL_QUESTION
+        )
+
+        assert result.grounding_status == GroundingStatus.ANSWERED
+        assert "doi chieu" in result.assistant_message.content
+
+    run_async(scenario())
+
+
+def test_refusal_stops_the_deterministic_repair_when_the_flag_is_off() -> None:
+    async def scenario() -> None:
+        service, llm = _refusal_service("__NO_ANSWER__", rag_repair_after_llm_refusal_enabled=False)
+
+        result = await service.answer_question(
+            current_user=user(), session_id=chat_session().id, question=REFUSAL_QUESTION
+        )
+
+        assert result.grounding_status == GroundingStatus.NO_ANSWER
+        assert llm.calls == 2
+
+    run_async(scenario())
+
+
+def test_rejected_llm_answer_keeps_the_deterministic_repair_when_the_flag_is_off() -> None:
+    async def scenario() -> None:
+        service, _ = _refusal_service(
+            '{"answer":"Khong co quy dinh nao ve viec nay ca.","citations":["SOURCE_9"]}',
+            rag_repair_after_llm_refusal_enabled=False,
+        )
+
+        result = await service.answer_question(
+            current_user=user(), session_id=chat_session().id, question=REFUSAL_QUESTION
+        )
+
+        assert result.grounding_status == GroundingStatus.ANSWERED
+        assert "doi chieu" in result.assistant_message.content
+
+    run_async(scenario())
+
+
+def test_refusal_on_an_earlier_attempt_also_blocks_the_repair_when_the_flag_is_off() -> None:
+    async def scenario() -> None:
+        service, _ = _refusal_service(
+            "__NO_ANSWER__",
+            '{"answer":"Khong co quy dinh nao ve viec nay ca.","citations":["SOURCE_9"]}',
+            rag_repair_after_llm_refusal_enabled=False,
+        )
+
+        result = await service.answer_question(
+            current_user=user(), session_id=chat_session().id, question=REFUSAL_QUESTION
+        )
+
+        assert result.grounding_status == GroundingStatus.NO_ANSWER
+
+    run_async(scenario())
+
+
+UNIT_SOURCE = "Quy dinh kiem dinh. Phi kiem dinh lai la 3 trieu dong moi lan."
+UNIT_QUESTION = "Khong dong y voi ket luan kiem dinh thi don vi co bao nhieu ngay de phan doi?"
+
+
+def _unit_service(content: str = "__NO_ANSWER__", **overrides: Any) -> Any:
+    service, _, _, _, _, _, _ = make_service(
+        retrieval=FakeRetrievalService(retrieval_result(hit(UNIT_SOURCE))),
+        llm=FakeLLMProvider(_fake_generation(content)),
+        settings_obj=settings(**overrides),
+    )
+    return service
+
+
+def test_money_value_answers_a_question_about_days_when_the_guard_is_off() -> None:
+    async def scenario() -> None:
+        result = await _unit_service().answer_question(
+            current_user=user(), session_id=chat_session().id, question=UNIT_QUESTION
+        )
+
+        assert result.grounding_status == GroundingStatus.ANSWERED
+        assert "3 trieu" in result.assistant_message.content
+
+    run_async(scenario())
+
+
+def test_unit_guard_rejects_a_money_value_for_a_question_about_days() -> None:
+    async def scenario() -> None:
+        service = _unit_service(rag_answer_unit_guard_enabled=True)
+
+        result = await service.answer_question(
+            current_user=user(), session_id=chat_session().id, question=UNIT_QUESTION
+        )
+
+        assert result.grounding_status == GroundingStatus.NO_ANSWER
+
+    run_async(scenario())
+
+
+def test_unit_guard_keeps_an_answer_with_the_unit_asked_for() -> None:
+    async def scenario() -> None:
+        service, _, _, _, _, _, _ = make_service(
+            retrieval=FakeRetrievalService(
+                retrieval_result(hit("Don vi co 10 ngay de phan doi ket luan kiem dinh."))
+            ),
+            llm=FakeLLMProvider(
+                _fake_generation(
+                    '{"answer":"Don vi co 10 ngay de phan doi.","citations":["SOURCE_1"]}'
+                )
+            ),
+            settings_obj=settings(rag_answer_unit_guard_enabled=True),
+        )
+
+        result = await service.answer_question(
+            current_user=user(), session_id=chat_session().id, question=UNIT_QUESTION
+        )
+
+        assert result.grounding_status == GroundingStatus.ANSWERED
+        assert "10 ngay" in result.assistant_message.content
+
+    run_async(scenario())
+
+
+def _reselect_registry() -> PromptSourceRegistry:
+    def prompt_source(index: int, text: str) -> PromptSource:
+        return PromptSource(
+            marker=f"[SOURCE_{index}]",
+            source_type=CitationSourceType.INTERNAL,
+            document_title="Document",
+            text=text,
+            page_numbers=(1,),
+            start_page=1,
+            end_page=1,
+            hybrid_score=1.0,
+            chunk_id=UUID(int=100 + index),
+            document_id=UUID(int=200 + index),
+        )
+
+    return PromptSourceRegistry(
+        sources=(
+            prompt_source(1, "Muc luc phan mem cua kho thiet bi."),
+            prompt_source(
+                2, "Phan mem Luu Tru dung de ghi ton kho. Cong ty Hoang Minh Digital Technology."
+            ),
+        )
+    )
+
+
+RESELECT_QUESTION = "Don vi nao cung cap phan mem Luu Tru?"
+RESELECT_OUTPUT = (
+    '{"answer":"Phan mem Luu Tru do cong ty Hoang Minh Digital Technology cung cap.",'
+    '"citations":["SOURCE_1"]}'
+)
+
+
+async def _draft_for_rejected_answer(**overrides: Any) -> Any:
+    service, _, _, _, _, _, _ = make_service(settings_obj=settings(**overrides))
+    return await service._draft_from_generation(
+        _fake_generation(RESELECT_OUTPUT),
+        source_registry=_reselect_registry(),
+        current_user=user(),
+        grounding_question=RESELECT_QUESTION,
+    )
+
+
+def test_rejected_answer_moves_to_a_source_with_a_weak_signal_by_default() -> None:
+    draft = asyncio.run(_draft_for_rejected_answer())
+
+    assert draft.grounding_status == GroundingStatus.ANSWERED
+
+
+def test_rejected_answer_needs_strong_support_to_move_when_the_flag_is_on() -> None:
+    with pytest.raises(CitationValidationFailedApplicationError):
+        asyncio.run(_draft_for_rejected_answer(rag_reselect_requires_strong_support_enabled=True))

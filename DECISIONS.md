@@ -74,4 +74,4 @@ This replaces every comparison above, including the first addition and the tie-b
 | `strict` | 0 | 99/100 | 0/18 | 5/18 |
 | `off` | 0 | 99/100 | 1/18 | 3/18 |
 
-All three modes meet both requirements, and `strict` has the fewest false answers on RBAC, so (a) decides. (b) points the same way. The `off` UAT run was interrupted after Q092 and resumed from Q093, which the owner accepted; its metadata records this.
+All three modes meet both requirements, and `strict` has the fewest false answers on RBAC, so (a) decides. (b) points the same way. Correction (2026-11-06): RBD-03 also answered falsely under `strict` in the FIX 2 trace, so read its count as 0 to 1. The choice stands, because a tie on (a) goes to (b). The `off` UAT run was interrupted after Q092 and resumed from Q093, which the owner accepted; its metadata records this.

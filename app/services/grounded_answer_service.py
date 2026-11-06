@@ -114,6 +114,7 @@ from app.services.claim_evidence_validation_service import (
     ClaimEvidenceStatus,
     ClaimEvidenceValidationService,
     ClaimRepairFeedback,
+    answer_missing_requested_unit,
     infer_yes_no_polarity,
 )
 from app.web_search.errors import WebSearchError
@@ -553,6 +554,7 @@ class _AnswerDraft:
     completion_tokens: int | None
     citations: tuple[object, ...] = ()
     citation_failure: _CitationFailure | None = None
+    llm_refused: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -919,6 +921,7 @@ class GroundedAnswerService:
                             provider=provider,
                             messages=messages,
                             grounding_question=grounding_question,
+                            llm_already_refused=draft.llm_refused,
                         )
                     except CitationValidationFailedApplicationError as citation_error:
                         return _no_answer_draft(
@@ -1118,6 +1121,7 @@ class GroundedAnswerService:
                                 provider=provider,
                                 messages=messages,
                                 grounding_question=grounding_question,
+                                llm_already_refused=retry_draft.llm_refused,
                             )
                         )
                     except CitationValidationFailedApplicationError as citation_error:
@@ -1575,7 +1579,11 @@ class GroundedAnswerService:
         provider: LLMProvider,
         messages: tuple[LLMMessage, ...],
         grounding_question: str,
+        llm_already_refused: bool = False,
     ) -> _AnswerDraft:
+        repair_allowed = (
+            self.settings.rag_repair_after_llm_refusal_enabled or not llm_already_refused
+        )
         try:
             draft = await self._draft_from_generation(
                 generation,
@@ -1584,6 +1592,8 @@ class GroundedAnswerService:
                 grounding_question=grounding_question,
             )
             if draft.grounding_status == GroundingStatus.NO_ANSWER:
+                if not self._deterministic_repair_allowed(draft, repair_allowed):
+                    return draft
                 structured_draft = await self._draft_from_deterministic_repair(
                     source_registry=source_registry,
                     current_user=current_user,
@@ -1609,6 +1619,8 @@ class GroundedAnswerService:
                     grounding_question=grounding_question,
                 )
                 if draft.grounding_status == GroundingStatus.NO_ANSWER:
+                    if not self._deterministic_repair_allowed(draft, repair_allowed):
+                        return draft
                     structured_draft = await self._draft_from_deterministic_repair(
                         source_registry=source_registry,
                         current_user=current_user,
@@ -1617,6 +1629,8 @@ class GroundedAnswerService:
                     return structured_draft or draft
                 return draft
             except CitationValidationFailedApplicationError:
+                if not repair_allowed:
+                    raise
                 structured_draft = await self._draft_from_deterministic_repair(
                     source_registry=source_registry,
                     current_user=current_user,
@@ -1625,6 +1639,11 @@ class GroundedAnswerService:
                 if structured_draft is None:
                     raise
                 return structured_draft
+
+    def _deterministic_repair_allowed(self, draft: _AnswerDraft, repair_allowed: bool) -> bool:
+        if not repair_allowed:
+            return False
+        return self.settings.rag_repair_after_llm_refusal_enabled or not draft.llm_refused
 
     async def _draft_from_deterministic_repair(
         self,
@@ -2151,6 +2170,7 @@ class GroundedAnswerService:
                 response_time_ms=generation.response_time_ms,
                 prompt_tokens=generation.prompt_tokens,
                 completion_tokens=generation.completion_tokens,
+                llm_refused=True,
             )
 
         try:
@@ -2206,6 +2226,7 @@ class GroundedAnswerService:
                 response_time_ms=generation.response_time_ms,
                 prompt_tokens=generation.prompt_tokens,
                 completion_tokens=generation.completion_tokens,
+                llm_refused=True,
             )
         if _is_placeholder_like_json_answer(grounded_output.answer):
             raise CitationValidationFailedApplicationError()
@@ -2234,6 +2255,18 @@ class GroundedAnswerService:
         if not validated.citations:
             raise CitationValidationFailedApplicationError()
         validated_yes_no_polarity: str | None = None
+
+        if (
+            self.settings.rag_answer_unit_guard_enabled
+            and not claims_already_validated
+            and len(information_need_queries(grounding_question)) <= 1
+            and answer_missing_requested_unit(
+                question=grounding_question, answer=grounded_output.answer
+            )
+        ):
+            if self.settings.rag_diagnostics_enabled:
+                _log_no_answer_diagnostics(reason="answer_missing_requested_unit")
+            raise _ClaimValidationRepairRequired(None)
 
         if self.settings.claim_validation_enabled and not claims_already_validated:
             claim_validation = await self.claim_validation_service.validate(
@@ -2266,6 +2299,19 @@ class GroundedAnswerService:
                     preferred_source_labels=tuple(grounded_output.citations),
                     max_sources=min(2, self.settings.citation_max_sources_per_answer),
                 )
+                if (
+                    self.settings.rag_reselect_requires_strong_support_enabled
+                    and claim_validation.status != ClaimEvidenceStatus.SUPPORTED
+                ):
+                    supporting_labels = tuple(
+                        label
+                        for label in supporting_labels
+                        if self.claim_validation_service.source_label_has_strong_support(
+                            answer=grounded_output.answer,
+                            source_registry=source_registry,
+                            label=label,
+                        )
+                    )
                 if supporting_labels and supporting_labels != grounded_output.citations:
                     repaired_output = GroundedLLMOutput(
                         answer=grounded_output.answer,
@@ -10826,6 +10872,7 @@ def _no_answer_draft(
     prompt_tokens: int | None = None,
     completion_tokens: int | None = None,
     citation_failure: _CitationFailure | None = None,
+    llm_refused: bool = False,
 ) -> _AnswerDraft:
     return _AnswerDraft(
         content=content,
@@ -10836,6 +10883,7 @@ def _no_answer_draft(
         completion_tokens=completion_tokens,
         citations=(),
         citation_failure=citation_failure,
+        llm_refused=llm_refused,
     )
 
 

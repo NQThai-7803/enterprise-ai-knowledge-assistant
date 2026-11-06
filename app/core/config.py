@@ -132,6 +132,12 @@ class Settings(BaseSettings):
     rag_semantic_exact_permitted_knn_enabled: bool = True
     # legacy, strict or off for _structured_condition_value_answer (DEC-010).
     rag_deterministic_route_mode: Literal["legacy", "strict", "off"] = "strict"
+    # FIX 2 group 1: false stops the deterministic repair once the LLM has refused.
+    rag_repair_after_llm_refusal_enabled: bool = True
+    # FIX 2 group 2: "dong y" is not money, and an answer must carry the unit asked for.
+    rag_answer_unit_guard_enabled: bool = False
+    # FIX 2 group 4a: a rejected answer moves to another source only on strong support.
+    rag_reselect_requires_strong_support_enabled: bool = False
     reranker_enabled: bool = True
     reranker_provider: Literal["sentence_transformers", "heuristic"] = "sentence_transformers"
     reranker_model: str = Field(default="BAAI/bge-reranker-v2-m3", min_length=1)
