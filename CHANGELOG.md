@@ -6,6 +6,12 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### FIX 1 -- 2026-11-06
+
+- `RAG_DETERMINISTIC_ROUTE_MODE` (`legacy`, `strict`, `off`) controls `_structured_condition_value_answer`. The default is now `strict` (DEC-010); `legacy` rolls back. Results in `docs/eval/runs/fix1-route-mode/`.
+- Internal evidence labels no longer reach answers.
+- `run_heldout.sh` records the route mode in the run metadata.
+
 ### PROMPT 4.5 -- 2026-11-05
 
 - RBAC dev set: `tests/acceptance/rbac_dev_v1.yaml`, `scripts/eval/run_rbac_dev.py`, `scripts/diagnostics/rbac_retrieval_check.py`; results in `docs/eval/runs/rbac-dev-v1/score.md`.

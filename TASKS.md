@@ -1,6 +1,13 @@
 
 # Implementation Tasks
 
+## FIX 1 deterministic route -- 2026-11-06
+
+- **DONE: mode chosen under DEC-010, default `strict`, rollback through `RAG_DETERMINISTIC_ROUTE_MODE=legacy`.**
+- **OPEN: owner confirms the 10 proposed held-out labels** in `docs/eval/runs/fix1-route-mode/heldout-strict.md`.
+- **OPEN: HO-008, 020, 023 still answer wrongly under `strict`;** their route has not been traced.
+- **BLOCKED: PR for this branch waits for PR #2 to merge.**
+
 ## PROMPT 4.5 eval tooling before PROMPT 5 -- 2026-11-05
 
 **Reranker deferred by the owner (2026-11-05, option C; DEC-009):**
