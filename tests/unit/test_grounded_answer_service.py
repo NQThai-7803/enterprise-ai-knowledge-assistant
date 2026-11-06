@@ -33,6 +33,7 @@ from app.models import (
     User,
     UserRole,
 )
+from app.observability.metrics import GLOBAL_METRICS
 from app.repositories.chat_message_repository import ConversationMemoryMessageRow
 from app.retrieval.errors import RetrievalError, RetrievalFailureCode
 from app.retrieval.models import HybridRetrievalHit, HybridRetrievalResult
@@ -3792,3 +3793,45 @@ def test_rejected_answer_moves_to_a_source_with_a_weak_signal_by_default() -> No
 def test_rejected_answer_needs_strong_support_to_move_when_the_flag_is_on() -> None:
     with pytest.raises(CitationValidationFailedApplicationError):
         asyncio.run(_draft_for_rejected_answer(rag_reselect_requires_strong_support_enabled=True))
+
+
+def test_reselection_is_counted_with_the_strong_support_flag_off() -> None:
+    GLOBAL_METRICS.reset()
+
+    asyncio.run(_draft_for_rejected_answer())
+
+    assert GLOBAL_METRICS.answer_branch_counts() == {
+        "reselect_after_rejection": 1,
+        "reselect_guard_would_change": 1,
+    }
+    GLOBAL_METRICS.reset()
+
+
+def test_reselection_guard_is_not_counted_when_the_source_holds_the_answer() -> None:
+    GLOBAL_METRICS.reset()
+    first, second = _reselect_registry().sources
+    registry = PromptSourceRegistry(
+        sources=(
+            first,
+            replace(
+                second, text="Phan mem Luu Tru do cong ty Hoang Minh Digital Technology cung cap."
+            ),
+        )
+    )
+
+    async def scenario() -> None:
+        service, _, _, _, _, _, _ = make_service(settings_obj=settings())
+        await service._draft_from_generation(
+            _fake_generation(RESELECT_OUTPUT),
+            source_registry=registry,
+            current_user=user(),
+            grounding_question=RESELECT_QUESTION,
+        )
+
+    asyncio.run(scenario())
+
+    assert GLOBAL_METRICS.answer_branch_counts() == {
+        "reselect_after_rejection": 1,
+        "reselect_guard_would_change": 0,
+    }
+    GLOBAL_METRICS.reset()
