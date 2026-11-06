@@ -65,3 +65,13 @@ This replaces every comparison above, including the first addition and the tie-b
 - Required: `permission_leak_count = 0` and no regression on Q001-Q100 (tolerance of 1 question under `eaka-rag-change-guard`).
 - Among the modes that meet both, compare in order: (a) lowest `false_answer` on RBAC, then (b) most correct answers on RBAC.
 - Modes still equal after (b) are not decided by this rule. The owner decides.
+
+**Result (2026-11-06): `strict` is the default.** `legacy` stays available through `RAG_DETERMINISTIC_ROUTE_MODE` for rollback. Scores: `docs/eval/runs/fix1-route-mode/score.md`.
+
+| Mode | `permission_leak_count` | Q001-Q100 proxy match | RBAC false answers | RBAC correct answers |
+|---|---:|---:|---:|---:|
+| `legacy` | 0 | 99/100 | 5/18 | 4/18 |
+| `strict` | 0 | 99/100 | 0/18 | 5/18 |
+| `off` | 0 | 99/100 | 1/18 | 3/18 |
+
+All three modes meet both requirements, and `strict` has the fewest false answers on RBAC, so (a) decides. (b) points the same way. The `off` UAT run was interrupted after Q092 and resumed from Q093, which the owner accepted; its metadata records this.
