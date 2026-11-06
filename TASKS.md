@@ -4,8 +4,10 @@
 ## FIX 2 false answers -- 2026-11-06
 
 - **DONE: diagnosis in `docs/eval/runs/fix2-diagnosis.md`.**
-- **WAITING FOR OWNER: approve the proposed fixes, flags and `answer_relevance_dev_v1`.**
-- **OPEN: find out why results differ between runs with the same seed** (92/100 UAT answers identical; RBD-03, Q033 and Q071 change status).
+- **DONE: `answer_relevance_dev_v1` frozen; flags for groups 1, 2 and 4a added and measured** (`docs/eval/runs/fix2-results.md`). Defaults unchanged.
+- **DONE: diacritics audit, report only** (`docs/eval/runs/diacritics-audit.md`).
+- **WAITING FOR OWNER: which flags to turn on; groups 3 and 4b come after that.**
+- **OPEN: find the root cause of why only 92/100 UAT answers are identical with the same seed and temperature 0.** RBD-03, Q033 and Q071 also change status between runs. Not known yet: whether it comes from the API and trace paths differing, or from Ollama not repeating exactly. Clue from FIX 2: two runs in one session match on all 100 questions, while runs on different days match on 90, so look at what changes between sessions (Ollama restart, loaded state, image) before looking at sampling.
 
 ## FIX 1 deterministic route -- 2026-11-06
 
