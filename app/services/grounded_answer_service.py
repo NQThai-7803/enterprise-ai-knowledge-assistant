@@ -2299,6 +2299,19 @@ class GroundedAnswerService:
                     preferred_source_labels=tuple(grounded_output.citations),
                     max_sources=min(2, self.settings.citation_max_sources_per_answer),
                 )
+                if (
+                    self.settings.rag_reselect_requires_strong_support_enabled
+                    and claim_validation.status != ClaimEvidenceStatus.SUPPORTED
+                ):
+                    supporting_labels = tuple(
+                        label
+                        for label in supporting_labels
+                        if self.claim_validation_service.source_label_has_strong_support(
+                            answer=grounded_output.answer,
+                            source_registry=source_registry,
+                            label=label,
+                        )
+                    )
                 if supporting_labels and supporting_labels != grounded_output.citations:
                     repaired_output = GroundedLLMOutput(
                         answer=grounded_output.answer,

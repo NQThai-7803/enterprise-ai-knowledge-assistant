@@ -1178,6 +1178,27 @@ class ClaimEvidenceValidationService:
             repair_feedback=repair_feedback,
         )
 
+    def source_label_has_strong_support(
+        self,
+        *,
+        answer: str,
+        source_registry: PromptSourceRegistry,
+        label: str,
+    ) -> bool:
+        """True when the source holds the answer word for word or its exact number and unit."""
+        folded_answer = fold_text(answer)
+        folded_evidence = fold_text(
+            _evidence_for_labels(source_registry=source_registry, cited_source_labels=(label,))
+        )
+        if _answer_is_verbatim_supported(
+            answer=folded_answer, evidence=folded_evidence
+        ) or _low_substance_answer_is_verbatim_supported(
+            answer=folded_answer, evidence=folded_evidence
+        ):
+            return True
+        pairs = set(_number_unit_pairs(folded_answer))
+        return bool(pairs) and pairs.issubset(_number_unit_pairs(folded_evidence))
+
     def select_supporting_source_labels(
         self,
         *,

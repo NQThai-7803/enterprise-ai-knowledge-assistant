@@ -6753,3 +6753,29 @@ def test_agreement_is_not_money_only_when_the_guard_is_on(monkeypatch: pytest.Mo
     assert not analyze_question(question).asks_for_amount
     assert analyze_question(question).asks_for_duration
     assert analyze_question(money).asks_for_amount
+
+
+@pytest.mark.parametrize(
+    ("answer", "source_text", "strong"),
+    [
+        (
+            "Phan mem Luu Tru do cong ty Hoang Minh cung cap.",
+            "Phan mem Luu Tru. CONG TY HOANG MINH",
+            False,
+        ),
+        ("Thoi han la 7 ngay.", "Nha thau co 7 ngay de bo sung.", True),
+        ("Thoi han la 7 ngay.", "Nha thau co 7 thang de bo sung.", False),
+        (
+            "Cong ty Binh An cung cap dich vu sao luu.",
+            "Cong ty Binh An cung cap dich vu sao luu hang dem.",
+            True,
+        ),
+    ],
+)
+def test_strong_support_needs_the_exact_text_or_number_and_unit(
+    answer: str, source_text: str, strong: bool
+) -> None:
+    result = ClaimEvidenceValidationService().source_label_has_strong_support(
+        answer=answer, source_registry=source(source_text), label="SOURCE_1"
+    )
+    assert result is strong

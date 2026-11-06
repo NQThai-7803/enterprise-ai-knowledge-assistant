@@ -18,6 +18,7 @@ from app.core.config import Settings
 from app.core.exceptions import (
     ChatRetrievalFailedError,
     ChatSessionNotFoundError,
+    CitationValidationFailedApplicationError,
     LLMProviderTimeoutStandardApplicationError,
     LLMTimeoutApplicationError,
 )
@@ -3738,3 +3739,56 @@ def test_unit_guard_keeps_an_answer_with_the_unit_asked_for() -> None:
         assert "10 ngay" in result.assistant_message.content
 
     run_async(scenario())
+
+
+def _reselect_registry() -> PromptSourceRegistry:
+    def prompt_source(index: int, text: str) -> PromptSource:
+        return PromptSource(
+            marker=f"[SOURCE_{index}]",
+            source_type=CitationSourceType.INTERNAL,
+            document_title="Document",
+            text=text,
+            page_numbers=(1,),
+            start_page=1,
+            end_page=1,
+            hybrid_score=1.0,
+            chunk_id=UUID(int=100 + index),
+            document_id=UUID(int=200 + index),
+        )
+
+    return PromptSourceRegistry(
+        sources=(
+            prompt_source(1, "Muc luc phan mem cua kho thiet bi."),
+            prompt_source(
+                2, "Phan mem Luu Tru dung de ghi ton kho. Cong ty Hoang Minh Digital Technology."
+            ),
+        )
+    )
+
+
+RESELECT_QUESTION = "Don vi nao cung cap phan mem Luu Tru?"
+RESELECT_OUTPUT = (
+    '{"answer":"Phan mem Luu Tru do cong ty Hoang Minh Digital Technology cung cap.",'
+    '"citations":["SOURCE_1"]}'
+)
+
+
+async def _draft_for_rejected_answer(**overrides: Any) -> Any:
+    service, _, _, _, _, _, _ = make_service(settings_obj=settings(**overrides))
+    return await service._draft_from_generation(
+        _fake_generation(RESELECT_OUTPUT),
+        source_registry=_reselect_registry(),
+        current_user=user(),
+        grounding_question=RESELECT_QUESTION,
+    )
+
+
+def test_rejected_answer_moves_to_a_source_with_a_weak_signal_by_default() -> None:
+    draft = asyncio.run(_draft_for_rejected_answer())
+
+    assert draft.grounding_status == GroundingStatus.ANSWERED
+
+
+def test_rejected_answer_needs_strong_support_to_move_when_the_flag_is_on() -> None:
+    with pytest.raises(CitationValidationFailedApplicationError):
+        asyncio.run(_draft_for_rejected_answer(rag_reselect_requires_strong_support_enabled=True))
