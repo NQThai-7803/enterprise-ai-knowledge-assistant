@@ -1,5 +1,11 @@
 # Project Status
 
+## FIX 1 -- 2026-11-06
+
+- **`strict` is the default for `RAG_DETERMINISTIC_ROUTE_MODE` (DEC-010).** RBAC false answers: 0 (`legacy` 5, `off` 1). Correct controls: 5 (`legacy` 4, `off` 3). 0 leaks and 99/100 proxy on Q001-Q100 in all three modes.
+- **Held-out v1 diagnostic with `strict`:** false answers unchanged at 5/14, false refusals 15/26 (was 14/26), 12 PASS (was 11). The owner accepted the labels for the 10 changed answers at diagnostic level.
+- **Next:** FIX 2 diagnosis of the 5 remaining held-out false answers.
+
 ## PROMPT 4.5 -- 2026-11-05 (in progress)
 
 - **Reranker.** The configured cross-encoder `BAAI/bge-reranker-v2-m3` has not run in any measurement we have verified. On 2026-11-05 the model caches of `eaka-p3d-uat` and `enterprise-ai-uat-v2` held no weights for it, and the `eaka-p3d-uat` API log shows the fallback. Baseline v2 and held-out v1 ran on `eaka-p3d-uat`, so they ranked with `lexical_fallback`: the `reranker_score` values there are alignment scores. The five other model cache volumes were not checked. Baseline v2 stays the dev baseline, labelled `lexical_fallback`; there is no baseline v3.

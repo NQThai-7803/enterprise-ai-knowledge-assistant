@@ -6,6 +6,8 @@ from collections.abc import Coroutine
 from typing import Any
 from uuid import UUID
 
+import pytest
+
 from app.chat.context_builder import query_focused_excerpt, select_context_for_prompt
 from app.citations.grounded_output import GroundedLLMOutput
 from app.citations.models import PromptSource, PromptSourceRegistry
@@ -26,6 +28,7 @@ from app.retrieval.structured import (
     monetary_value_period_pairs,
     requested_monetary_period,
 )
+from app.services import grounded_answer_service as gas
 from app.services.claim_evidence_validation_service import (
     ClaimEvidenceStatus,
     ClaimEvidenceValidationService,
@@ -6625,4 +6628,93 @@ def test_non_answer_filter_preserves_wrapped_query_matched_salary_row() -> None:
             question="Platform Lead thi salary range bao nhieu?",
         )[0].chunk_id
         == target.chunk_id
+    )
+
+
+def _condition(question: str, text: str, mode: str) -> tuple[str, str] | None:
+    return gas._structured_condition_value_answer(
+        question=question, source_registry=source(text), mode=mode
+    )
+
+
+PRINTER_CLAUSE = "Nếu máy in hỏng, nhà thầu phải đến trong 4 giờ và sửa xong trong 2 ngày."
+PARKING_CLAUSE = "Nếu xe gửi quá 12 giờ, phí tăng thêm và phải báo trước 2 ngày."
+
+
+def test_strict_cue_nêu_is_not_the_condition_word_nếu() -> None:
+    question = "Mức phí được nêu trong tài liệu máy in hỏng là bao lâu?"
+    assert gas._exact_condition_cues(question) == set()
+    assert _condition(question, PRINTER_CLAUSE, "strict") is None
+    assert _condition(question, PRINTER_CLAUSE, "legacy") is not None
+
+
+def test_strict_cue_chưa_dùng_does_not_match_chưa_đủ() -> None:
+    question = "Máy in hỏng chưa dùng thì sửa trong bao lâu?"
+    assert gas._exact_condition_cues("Số ngày chưa dùng") == set()
+    assert "chưa đủ" in gas._exact_condition_cues("Nhân viên chưa đủ 12 tháng")
+    assert "chua du" not in gas._exact_condition_cues("Nhân viên chua du 12 tháng")
+    assert (
+        _condition(question, "Chưa đủ 2 ngày thì máy in hỏng được đổi trong 4 giờ.", "strict")
+        is None
+    )
+
+
+def test_strict_needs_a_shared_topic_between_question_and_span() -> None:
+    question = "Nếu máy in hỏng thì nhà thầu phải đến trong bao lâu?"
+    assert _condition(question, PARKING_CLAUSE, "strict") is None
+    assert _condition(question, PARKING_CLAUSE, "legacy") is not None
+
+
+def test_strict_keeps_the_route_when_cue_and_topic_both_match() -> None:
+    question = "Nếu máy in hỏng thì nhà thầu phải đến trong bao lâu?"
+    answer = _condition(question, PRINTER_CLAUSE, "strict")
+    assert answer is not None
+    assert "4 giờ" in answer[0]
+
+
+def test_off_removes_the_route_and_the_chain_passes_the_mode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    question = "Nếu máy in hỏng thì nhà thầu phải đến trong bao lâu?"
+    assert _condition(question, PRINTER_CLAUSE, "off") is None
+    seen: list[str] = []
+
+    def spy(*, question: str, source_registry: PromptSourceRegistry, mode: str) -> None:
+        seen.append(mode)
+
+    monkeypatch.setattr(gas, "_structured_condition_value_answer", spy)
+    gas._structured_value_repair_generation(
+        question=question, source_registry=source(PARKING_CLAUSE), condition_route_mode="strict"
+    )
+    assert seen == ["strict"]
+
+
+def test_topic_check_ignores_generic_words() -> None:
+    assert not gas._span_shares_question_topic(
+        question="Tôi được tối đa bao nhiêu?", span="Tôi được tối đa bao nhiêu ngày."
+    )
+
+
+def test_route_mode_defaults_to_strict_and_rejects_unknown_values() -> None:
+    assert Settings(_env_file=None).rag_deterministic_route_mode == "strict"
+    with pytest.raises(ValueError):
+        Settings(_env_file=None, rag_deterministic_route_mode="other")
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [
+        "Answer-focused evidence: Phí là 5 đồng. [1]",
+        "Answer-focused evidence:\nPhí là 5 đồng. [1]",
+        "Claim-focused evidence: CLAIM_1 evidence: Phí là 5 đồng. [1]",
+    ],
+)
+def test_internal_evidence_labels_do_not_reach_the_answer(answer: str) -> None:
+    assert gas._strip_internal_evidence_labels(answer) == "Phí là 5 đồng. [1]"
+
+
+def test_answer_without_labels_is_unchanged() -> None:
+    assert (
+        gas._strip_internal_evidence_labels("Evidence: Phí là 5 đồng.")
+        == "Evidence: Phí là 5 đồng."
     )

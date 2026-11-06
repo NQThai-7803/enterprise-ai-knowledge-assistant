@@ -47,6 +47,7 @@ json.dump({
     "flags_set_on_api": {
         "LLM_PROMPT_TRUNCATION_GUARD_ENABLED": "$(env_of LLM_PROMPT_TRUNCATION_GUARD_ENABLED)",
         "RAG_SEMANTIC_EXACT_PERMITTED_KNN_ENABLED": "$(env_of RAG_SEMANTIC_EXACT_PERMITTED_KNN_ENABLED)",
+        "RAG_DETERMINISTIC_ROUTE_MODE": "$(env_of RAG_DETERMINISTIC_ROUTE_MODE | tr -d '\r')",
         "WEB_SEARCH_ENABLED": "$(env_of WEB_SEARCH_ENABLED)",
     },
     "reranker_mode": "$RERANKER_MODE",

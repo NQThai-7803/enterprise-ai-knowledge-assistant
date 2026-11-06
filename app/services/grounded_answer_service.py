@@ -1552,6 +1552,7 @@ class GroundedAnswerService:
         generation = _structured_value_repair_generation(
             question=question,
             source_registry=source_registry,
+            condition_route_mode=self.settings.rag_deterministic_route_mode,
         )
         if generation is None:
             return None
@@ -1635,6 +1636,7 @@ class GroundedAnswerService:
         structured_generation = _structured_value_repair_generation(
             question=grounding_question,
             source_registry=source_registry,
+            condition_route_mode=self.settings.rag_deterministic_route_mode,
         )
         if structured_generation is None:
             structured_generation = _structured_policy_clause_repair_generation(
@@ -2339,7 +2341,7 @@ class GroundedAnswerService:
             final_answer = f"{prefix} {final_answer}"
 
         return _AnswerDraft(
-            content=final_answer,
+            content=_strip_internal_evidence_labels(final_answer),
             grounding_status=GroundingStatus.ANSWERED,
             retrieved_chunk_count=selected_chunk_count,
             response_time_ms=generation.response_time_ms,
@@ -4594,6 +4596,11 @@ def _source_units_for_number(
 
 def _contains_person_name_sequence(text: str) -> bool:
     return bool(_person_name_sequence_spans(text))
+
+
+def _strip_internal_evidence_labels(answer: str) -> str:
+    """Prompt-only labels on source text must never reach the user."""
+    return _INTERNAL_EVIDENCE_LABEL_PATTERN.sub("", answer).strip()
 
 
 def _strip_public_citation_markers(answer: str) -> str:
@@ -7318,6 +7325,7 @@ def _structured_value_repair_generation(
     *,
     question: str,
     source_registry: PromptSourceRegistry,
+    condition_route_mode: str = "legacy",
 ) -> LLMGenerationResult | None:
     structured_answer = _structured_overtime_rate_answer(
         question=question,
@@ -7454,6 +7462,7 @@ def _structured_value_repair_generation(
         structured_answer = _structured_condition_value_answer(
             question=question,
             source_registry=source_registry,
+            mode=condition_route_mode,
         )
     if structured_answer is None:
         structured_answer = _structured_grouped_duration_answer(
@@ -8873,12 +8882,145 @@ def _structured_annual_leave_relation_answer(
     return f"{prefix}{clause}", source_label
 
 
+_INTERNAL_EVIDENCE_LABEL_PATTERN = re.compile(
+    r"(?:Answer|Claim)-focused evidence:\s*|CLAIM_\d+ evidence:\s*"
+)
+_CONDITION_CUE_PATTERN = re.compile(
+    r"(?<!\w)(sau|nếu|khi|chưa đủ|cứ đủ|ít hơn|nhiều hơn"
+    r"|after|if|when|before|at least|less than|more than)(?!\w)"
+)
+_TOPIC_WORD_PATTERN = re.compile(r"[^\W\d_]+")
+_TOPIC_STOPWORDS = frozenset(
+    [
+        "sau",
+        "nếu",
+        "khi",
+        "chưa",
+        "đủ",
+        "cứ",
+        "ít",
+        "hơn",
+        "nhiều",
+        "tôi",
+        "bạn",
+        "mình",
+        "được",
+        "có",
+        "không",
+        "là",
+        "gì",
+        "nào",
+        "đâu",
+        "bao",
+        "lâu",
+        "mấy",
+        "thì",
+        "và",
+        "hay",
+        "hoặc",
+        "của",
+        "cho",
+        "các",
+        "những",
+        "một",
+        "phải",
+        "cần",
+        "trong",
+        "với",
+        "theo",
+        "về",
+        "ở",
+        "tại",
+        "đã",
+        "sẽ",
+        "còn",
+        "thêm",
+        "ai",
+        "này",
+        "đó",
+        "nêu",
+        "tối",
+        "đa",
+        "thiểu",
+        "after",
+        "if",
+        "when",
+        "before",
+        "at",
+        "least",
+        "less",
+        "than",
+        "more",
+        "the",
+        "a",
+        "an",
+        "of",
+        "to",
+        "in",
+        "on",
+        "for",
+        "and",
+        "or",
+        "is",
+        "are",
+        "was",
+        "be",
+        "do",
+        "does",
+        "did",
+        "how",
+        "what",
+        "which",
+        "who",
+        "where",
+        "i",
+        "my",
+        "we",
+        "our",
+        "can",
+        "must",
+        "should",
+    ]
+)
+
+
+def _exact_text(text: str) -> str:
+    return unicodedata.normalize("NFC", text).casefold()
+
+
+def _exact_condition_cues(text: str) -> set[str]:
+    """Condition cues as whole words on text that keeps its diacritics."""
+    return {match.group(1) for match in _CONDITION_CUE_PATTERN.finditer(_exact_text(text))}
+
+
+def _span_shares_question_topic(*, question: str, span: str) -> bool:
+    """Require a shared two-word anchor and most of the question's content words in the span."""
+    question_words = [
+        word
+        for word in _TOPIC_WORD_PATTERN.findall(_exact_text(question))
+        if word not in _TOPIC_STOPWORDS
+    ]
+    span_words = _TOPIC_WORD_PATTERN.findall(_exact_text(span))
+    if len(question_words) < 2:
+        return False
+    if not set(zip(question_words, question_words[1:], strict=False)) & set(
+        zip(span_words, span_words[1:], strict=False)
+    ):
+        return False
+    covered = sum(word in set(span_words) for word in question_words)
+    return covered * 2 >= len(question_words)
+
+
 def _structured_condition_value_answer(
     *,
     question: str,
     source_registry: PromptSourceRegistry,
+    mode: str = "legacy",
 ) -> tuple[str, str] | None:
     """Return a source clause only when its condition and outcome stay bound."""
+    if mode == "off":
+        return None
+    strict = mode == "strict"
     folded_question = _fold_for_person_match(question)
     condition_cues = (
         "sau ",
@@ -8896,11 +9038,16 @@ def _structured_condition_value_answer(
         "less than",
         "more than",
     )
-    if not any(cue in f" {folded_question} " for cue in condition_cues):
-        return None
-    requested_condition_cues = tuple(
-        cue.strip() for cue in condition_cues if cue.strip() in folded_question
-    )
+    if strict:
+        requested_condition_cues = tuple(_exact_condition_cues(question))
+        if not requested_condition_cues:
+            return None
+    else:
+        if not any(cue in f" {folded_question} " for cue in condition_cues):
+            return None
+        requested_condition_cues = tuple(
+            cue.strip() for cue in condition_cues if cue.strip() in folded_question
+        )
 
     _, query_terms, _ = _prompt_query_needles(question)
     focus_terms = tuple(
@@ -8948,7 +9095,15 @@ def _structured_condition_value_answer(
             start = max(0, index - 1)
             end = min(len(lines), index + 2)
             folded_window = " ".join(folded_lines[start:end])
-            if not any(cue.strip() in folded_window for cue in condition_cues):
+            exact_window = " ".join(lines[start:end])
+            window_cues = (
+                _exact_condition_cues(exact_window)
+                if strict
+                else {cue.strip() for cue in condition_cues if cue.strip() in folded_window}
+            )
+            if not window_cues:
+                continue
+            if strict and not _span_shares_question_topic(question=question, span=exact_window):
                 continue
             window_numbers = {
                 str(int(number)) for number in re.findall(r"(?<!\d)\d{1,4}(?!\d)", folded_window)
@@ -8970,12 +9125,8 @@ def _structured_condition_value_answer(
             score = matched_terms * 8.0 + number_unit_count * 20.0
             score += len(question_numbers.intersection(window_numbers)) * 40.0
             score += sum(15.0 for cue in outcome_cues if cue in folded_window)
-            score += sum(80.0 for cue in requested_condition_cues if cue in folded_window)
-            score -= sum(
-                120.0
-                for cue in condition_cues
-                if cue.strip() not in requested_condition_cues and cue.strip() in folded_window
-            )
+            score += sum(80.0 for cue in requested_condition_cues if cue in window_cues)
+            score -= sum(120.0 for cue in window_cues if cue not in requested_condition_cues)
             answer = " ".join(lines[start:end]).strip(" -•")
             if answer and answer[-1] not in ".!?":
                 answer = f"{answer}."

@@ -130,6 +130,8 @@ class Settings(BaseSettings):
     # Exact KNN over permitted chunks instead of the HNSW-capable statement
     # (docs/design/hnsw-permission-recall.md). On by default since PROMPT 3f; false rolls back.
     rag_semantic_exact_permitted_knn_enabled: bool = True
+    # legacy, strict or off for _structured_condition_value_answer (DEC-010).
+    rag_deterministic_route_mode: Literal["legacy", "strict", "off"] = "strict"
     reranker_enabled: bool = True
     reranker_provider: Literal["sentence_transformers", "heuristic"] = "sentence_transformers"
     reranker_model: str = Field(default="BAAI/bge-reranker-v2-m3", min_length=1)

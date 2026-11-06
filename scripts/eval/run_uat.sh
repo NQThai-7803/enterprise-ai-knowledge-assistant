@@ -62,6 +62,7 @@ json.dump({
     "postgres_server_version": "$(psql_value 'SHOW server_version')",
     "llm": {"provider": "ollama", "model": "$LLM_MODEL", "num_ctx": "$NUM_CTX",
             "keep_alive": "$KEEP_ALIVE", "seed": "$LLM_SEED", "temperature": "$LLM_TEMPERATURE"},
+    "rag_deterministic_route_mode": "$(docker inspect "$API_CID" --format '{{range .Config.Env}}{{println .}}{{end}}' | sed -n 's/^RAG_DETERMINISTIC_ROUTE_MODE=//p' | tr -d '\r')",
     "reranker_mode": "$RERANKER_MODE",
     "expected_reranker_mode": "$EVAL_EXPECTED_RERANKER_MODE",
     "allow_reranker_fallback": "${EVAL_ALLOW_RERANKER_FALLBACK:-}",

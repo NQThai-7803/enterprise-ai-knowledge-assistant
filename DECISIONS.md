@@ -37,3 +37,41 @@ Since the official score (2026-11-05, `docs/eval/runs/heldout-v1-f3cdbf3/score.m
 ## DEC-009 — Reranker deferred; RAM limits for eval
 
 Stay on the lexical fallback for now. PROMPT 6 comes after the fixes to the deterministic route, the alignment filter and the validator. The 1000 MB Available limit applies only when loading or measuring a model alone, with Ollama not loaded. During eval runs the held-out validity rules apply: no INFRA_ERROR, no Ollama restart, no item above 120 s.
+
+## DEC-010 — Rule for choosing RAG_DETERMINISTIC_ROUTE_MODE
+
+Written before any measurement of `legacy`, `strict` or `off` (FIX 1, 2026-11-05).
+
+The route is `_structured_condition_value_answer`. The other deterministic branches are not part of this choice.
+
+Compare each mode with `legacy`, on the RBAC dev set:
+
+1. `false_answer` must not increase.
+2. The number of correct answers must increase. A correct answer is a control that passes `control_passed` (right status, right document cited, fact present).
+
+Then:
+
+3. Q001-Q100 only detects regressions and never picks a mode. A regression beyond the guard's tolerance of 1 question, a change of `false_answer_rate` beyond it, or any permission leak blocks the default change under `eaka-rag-change-guard`, and the owner is told.
+4. Held-out v1 runs once at the end, as a diagnostic, and does not influence the choice or any further change.
+
+**Addition by the owner, written before measuring `strict` or `off`.** The branch `_structured_condition_value_answer` answers 0 of the dev questions, so dev cannot show its value. A branch not used on dev but with evidence of harm (held-out v1: 6/6 FAIL) takes `off`, provided UAT and RBAC show no regression. This addition replaces rule 2 for this branch: `off` does not need more correct answers than `legacy`. A regression means more than the guard's tolerance of 1 question on UAT, more false answers or fewer correct answers on RBAC, or any permission leak.
+
+If both `strict` and `off` pass, take the one with more correct answers, then fewer false answers, then `strict` because it keeps the route. (The owner set rules 1 to 4; this tie-break was added by the implementer before measuring.) If neither passes, the default stays `legacy`.
+
+**Second addition by the owner, written before measuring `strict` or `off`.** It is based on the branch breakdown of `legacy` (`condition_value`: 2 correct, 13 wrong on RBAC plus held-out v1), not on any `strict` or `off` result. Reason: the old rule 2 stood level with rule 1, against the priority that a wrong answer is worse than a refusal.
+
+This replaces every comparison above, including the first addition and the tie-break:
+
+- Required: `permission_leak_count = 0` and no regression on Q001-Q100 (tolerance of 1 question under `eaka-rag-change-guard`).
+- Among the modes that meet both, compare in order: (a) lowest `false_answer` on RBAC, then (b) most correct answers on RBAC.
+- Modes still equal after (b) are not decided by this rule. The owner decides.
+
+**Result (2026-11-06): `strict` is the default.** `legacy` stays available through `RAG_DETERMINISTIC_ROUTE_MODE` for rollback. Scores: `docs/eval/runs/fix1-route-mode/score.md`.
+
+| Mode | `permission_leak_count` | Q001-Q100 proxy match | RBAC false answers | RBAC correct answers |
+|---|---:|---:|---:|---:|
+| `legacy` | 0 | 99/100 | 5/18 | 4/18 |
+| `strict` | 0 | 99/100 | 0/18 | 5/18 |
+| `off` | 0 | 99/100 | 1/18 | 3/18 |
+
+All three modes meet both requirements, and `strict` has the fewest false answers on RBAC, so (a) decides. (b) points the same way. The `off` UAT run was interrupted after Q092 and resumed from Q093, which the owner accepted; its metadata records this.
