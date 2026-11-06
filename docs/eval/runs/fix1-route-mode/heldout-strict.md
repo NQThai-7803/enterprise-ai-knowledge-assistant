@@ -4,7 +4,7 @@ Chạy ngày 2026-11-06, sau khi đã chọn mode. Theo DEC-010, kết quả nà
 
 - **Hệ thống:** image `eaka-backend:fix1` (commit `89417e7`), `RAG_DETERMINISTIC_ROUTE_MODE=strict`, `reranker_mode = lexical_fallback`.
 - **Hiệu lực lượt chạy:** 40/40 câu, 0 INFRA_ERROR, chậm nhất 42,8 giây, Ollama không khởi động lại. Available thấp nhất 292 MB. Chạy 2 đoạn foreground, mỗi đoạn khoảng 4 phút.
-- **Cách chấm:** 30 câu có câu trả lời và citation giống hệt baseline `f3cdbf3` lượt 1 nên giữ nhãn cũ. 10 câu đổi câu trả lời do Claude chấm đề xuất theo rubric, **chủ dự án chưa xác nhận**.
+- **Cách chấm:** 30 câu có câu trả lời và citation giống hệt baseline `f3cdbf3` lượt 1 nên giữ nhãn cũ. 10 câu đổi câu trả lời do Claude chấm đề xuất theo rubric; owner chấp nhận ở mức diagnostic, đã xem HO-026/HO-037.
 
 ## Kết quả
 
@@ -37,4 +37,3 @@ Các câu đổi còn lại: HO-037 chuyển từ từ chối sai sang PASS. HO-
 ## Chưa kiểm chứng
 
 - Chưa trace route của lượt này, nên chưa biết HO-008, 020, 023 sai vì nhánh `strict` vẫn chạy, vì nhánh deterministic khác, hay vì LLM.
-- Nhãn của 10 câu đổi câu trả lời cần chủ dự án xác nhận.

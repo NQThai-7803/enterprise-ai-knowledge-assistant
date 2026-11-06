@@ -3,8 +3,8 @@
 ## FIX 1 -- 2026-11-06
 
 - **`strict` is the default for `RAG_DETERMINISTIC_ROUTE_MODE` (DEC-010).** RBAC false answers: 0 (`legacy` 5, `off` 1). Correct controls: 5 (`legacy` 4, `off` 3). 0 leaks and 99/100 proxy on Q001-Q100 in all three modes.
-- **Held-out v1 diagnostic with `strict`:** false answers unchanged at 5/14, false refusals 15/26 (was 14/26), 12 PASS (was 11). Labels for the 10 changed answers are proposed and await the owner.
-- **Next:** owner review of PR #2, then a PR for this branch.
+- **Held-out v1 diagnostic with `strict`:** false answers unchanged at 5/14, false refusals 15/26 (was 14/26), 12 PASS (was 11). The owner accepted the labels for the 10 changed answers at diagnostic level.
+- **Next:** FIX 2 diagnosis of the 5 remaining held-out false answers.
 
 ## PROMPT 4.5 -- 2026-11-05 (in progress)
 
