@@ -75,3 +75,18 @@ This replaces every comparison above, including the first addition and the tie-b
 | `off` | 0 | 99/100 | 1/18 | 3/18 |
 
 All three modes meet both requirements, and `strict` has the fewest false answers on RBAC, so (a) decides. (b) points the same way. Correction (2026-11-06): RBD-03 also answered falsely under `strict` in the FIX 2 trace, so read its count as 0 to 1. The choice stands, because a tie on (a) goes to (b). The `off` UAT run was interrupted after Q092 and resumed from Q093, which the owner accepted; its metadata records this.
+
+## DEC-011 — Baseline and candidate run in one batch; rule for the FIX 2 defaults
+
+Written before measuring groups 1 + 2 together (2026-11-06).
+
+**Batch rule, for every flag measurement from now on.** A baseline and a candidate are compared only when they ran in the same batch: same image, same session, Ollama not restarted, the API recreated only to switch flags, runs interleaved (baseline, candidate, baseline, candidate). A baseline from another batch does not count. Reason: UAT runs in one session were identical on all 100 questions, while runs on different days matched on 90 (`docs/eval/runs/fix2-results.md`).
+
+**Rule for turning on groups 1 + 2** (`RAG_REPAIR_AFTER_LLM_REFUSAL_ENABLED=false` with `RAG_ANSWER_UNIT_GUARD_ENABLED=true`), 2 runs per side on `answer_relevance_dev_v1`, RBAC dev and UAT. Only changes seen in both runs count (`scripts/eval/compare_flag_runs.py`).
+
+- Required: no permission leak, in the RBAC API runs and in the retrieval check, and no regression on Q001-Q100 (tolerance of 1 question under `eaka-rag-change-guard`).
+- If both are met, compare in order: (a) fewer false answers, then (b) more correct answers, each as the sum over `answer_relevance_dev_v1` and RBAC dev.
+- The defaults change only if the combination wins on (a), or ties on (a) and wins on (b). Otherwise they stay and the owner is told. The flags stay available for rollback.
+- A case that gets worse on either set is reported by id, even when the sum improves.
+
+`RAG_RESELECT_REQUIRES_STRONG_SUPPORT_ENABLED` is not part of this choice and stays off.
