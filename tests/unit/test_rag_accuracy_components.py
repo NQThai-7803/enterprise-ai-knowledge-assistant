@@ -6840,10 +6840,16 @@ def test_short_answer_needs_the_question_terms_around_it(
     assert (status == ClaimEvidenceStatus.SUPPORTED) is supported
 
 
-def test_short_answer_check_skips_what_it_cannot_locate() -> None:
-    assert not claim_validation_module._short_answer_misses_question_terms(
+def test_short_answer_not_in_the_source_misses_the_question() -> None:
+    assert claim_validation_module._short_answer_misses_question_terms(
         question="Người nào phê duyệt tạm ứng?", answer="truong kho", evidence="giam doc ky"
     )
+
+
+def test_short_answer_check_skips_too_little_to_compare() -> None:
     assert not claim_validation_module._short_answer_misses_question_terms(
         question="Ai ký?", answer="giam doc", evidence="giam doc duyet"
+    )
+    assert not claim_validation_module._short_answer_misses_question_terms(
+        question="Người nào phê duyệt tạm ứng?", answer="kho", evidence="giam doc ky"
     )

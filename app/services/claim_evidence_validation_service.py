@@ -3045,7 +3045,7 @@ def question_content_terms(text: str) -> set[str]:
 
 
 def _short_answer_misses_question_terms(*, question: str, answer: str, evidence: str) -> bool:
-    """True when the text around a short answer lacks most of what the question asks."""
+    """True when a short answer is not in the source, or the text around it lacks the ask."""
     asked = question_content_terms(question) - question_content_terms(answer)
     answer_words = re.findall(r"\w+", answer)
     if len(asked) < 2 or len(answer_words) < 2:
@@ -3053,8 +3053,6 @@ def _short_answer_misses_question_terms(*, question: str, answer: str, evidence:
     words = re.findall(r"\w+", evidence)
     size = len(answer_words)
     starts = [i for i in range(len(words) - size + 1) if words[i : i + size] == answer_words]
-    if not starts:
-        return False
     return not any(
         len(
             asked
