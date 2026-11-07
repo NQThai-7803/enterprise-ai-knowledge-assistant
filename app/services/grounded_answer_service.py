@@ -8942,6 +8942,10 @@ _CONDITION_CUE_PATTERN = re.compile(
     r"(?<!\w)(sau|nếu|khi|chưa đủ|cứ đủ|ít hơn|nhiều hơn"
     r"|after|if|when|before|at least|less than|more than)(?!\w)"
 )
+_OUTCOME_CUE_PATTERN = re.compile(
+    r"(?<!\w)(tăng thêm|giảm|tỷ lệ|tỉ lệ|tương ứng|được tính|không được"
+    r"|additional|increase\w*|decrease\w*|proportion\w*|prorated|eligible|entitled)(?!\w)"
+)
 _TOPIC_WORD_PATTERN = re.compile(r"[^\W\d_]+")
 _TOPIC_STOPWORDS = frozenset(
     [
@@ -9046,6 +9050,11 @@ def _exact_condition_cues(text: str) -> set[str]:
     return {match.group(1) for match in _CONDITION_CUE_PATTERN.finditer(_exact_text(text))}
 
 
+def _exact_outcome_cues(text: str) -> set[str]:
+    """Outcome cues as whole words on text that keeps its diacritics."""
+    return {match.group(1) for match in _OUTCOME_CUE_PATTERN.finditer(_exact_text(text))}
+
+
 def _span_shares_question_topic(*, question: str, span: str) -> bool:
     """Require a shared two-word anchor and most of the question's content words in the span."""
     question_words = [
@@ -9140,6 +9149,7 @@ def _structured_condition_value_answer(
         "eligible",
         "entitled",
     )
+    exact_outcomes = strict and get_settings().rag_strict_outcome_cues_exact_enabled
     candidates: list[tuple[float, int, int, str, str]] = []
     for source_index, source in enumerate(source_registry.sources):
         lines = tuple(line.strip() for line in source.text.splitlines() if line.strip())
@@ -9169,15 +9179,18 @@ def _structured_condition_value_answer(
                     folded_window,
                 )
             )
-            has_outcome = number_unit_count >= 2 or any(
-                cue in folded_window for cue in outcome_cues
+            window_outcomes = (
+                _exact_outcome_cues(exact_window)
+                if exact_outcomes
+                else {cue for cue in outcome_cues if cue in folded_window}
             )
+            has_outcome = number_unit_count >= 2 or bool(window_outcomes)
             if not has_outcome:
                 continue
             matched_terms = sum(1 for term in focus_terms if term in folded_window)
             score = matched_terms * 8.0 + number_unit_count * 20.0
             score += len(question_numbers.intersection(window_numbers)) * 40.0
-            score += sum(15.0 for cue in outcome_cues if cue in folded_window)
+            score += 15.0 * len(window_outcomes)
             score += sum(80.0 for cue in requested_condition_cues if cue in window_cues)
             score -= sum(120.0 for cue in window_cues if cue not in requested_condition_cues)
             answer = " ".join(lines[start:end]).strip(" -•")

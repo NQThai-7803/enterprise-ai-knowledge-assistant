@@ -6692,6 +6692,31 @@ def test_off_removes_the_route_and_the_chain_passes_the_mode(
     assert seen == ["strict"]
 
 
+ROLE_QUESTION = "Giám đốc kho làm gì trước khi đóng kho?"
+ROLE_CLAUSE = "Giám đốc kho ghi nhận sổ trước khi chuyển hồ sơ. Nhà cung cấp có 7 ngày bổ sung."
+
+
+def test_role_giám_counts_as_outcome_giảm_unless_the_flag_is_on(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert _condition(ROLE_QUESTION, ROLE_CLAUSE, "strict") is not None
+    monkeypatch.setattr(
+        gas, "get_settings", lambda: SimpleNamespace(rag_strict_outcome_cues_exact_enabled=True)
+    )
+    assert _condition(ROLE_QUESTION, ROLE_CLAUSE, "strict") is None
+
+
+def test_exact_outcome_cue_keeps_a_real_outcome(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        gas, "get_settings", lambda: SimpleNamespace(rag_strict_outcome_cues_exact_enabled=True)
+    )
+    assert gas._exact_outcome_cues("Phí giảm một nửa, giám đốc ký") == {"giảm"}
+    assert gas._exact_outcome_cues("Giám đốc kho ký") == set()
+    question = "Nếu máy in hỏng thì nhà thầu được giảm phí bao nhiêu?"
+    answer = _condition(question, "Nếu máy in hỏng, nhà thầu được giảm phí một nửa.", "strict")
+    assert answer is not None
+
+
 def test_topic_check_ignores_generic_words() -> None:
     assert not gas._span_shares_question_topic(
         question="Tôi được tối đa bao nhiêu?", span="Tôi được tối đa bao nhiêu ngày."
