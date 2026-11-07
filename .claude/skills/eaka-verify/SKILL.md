@@ -18,9 +18,8 @@ description: Use before reporting any EAKA task as done, and when running or re-
 
 ## Hạ tầng tạm cho test
 
-- DB pgvector tạm: `127.0.0.1:55499`.
-- Redis: chọn cổng trống (kiểm tra trước, không đoán).
-- Đặt tên container/project có tiền tố riêng (ví dụ `eaka-verify-`) để dọn đúng thứ mình tạo.
+- `scripts/test/compose.integration.yaml` dựng pgvector và Redis tạm trên mạng riêng, không publish cổng, dữ liệu nằm trên tmpfs.
+- Đặt tên project có tiền tố riêng (ví dụ `eaka-verify-`) để dọn đúng thứ mình tạo.
 - Sau khi xong: dừng container tạm, liệt kê anonymous volume do mình tạo, **hỏi** rồi mới xóa.
 
 ## Quy trình
