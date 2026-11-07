@@ -1,0 +1,9 @@
+{
+ "version": "heldout-v2-batch1",
+ "file": "docs/eval/heldout-v2-questions.yaml",
+ "sha256": "dae7f8818a015d43a00d09fbeff9cc63f41c75d005e11f465e77617a0e86cd5a",
+ "frozen_at": "2026-11-07",
+ "items": 20,
+ "approved_by": "owner (questions from team members, kept word for word)",
+ "rule": "any edit needs a new version with a new lock"
+}

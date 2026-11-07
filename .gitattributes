@@ -4,3 +4,6 @@ docs/eval/heldout-v1.lock text eol=lf
 # The relevance dev set is also hashed byte for byte.
 tests/acceptance/answer_relevance_dev_v1.yaml text eol=lf
 tests/acceptance/answer_relevance_dev_v1.lock text eol=lf
+# Held-out v2 questions are hashed byte for byte too.
+docs/eval/heldout-v2-questions.yaml text eol=lf
+docs/eval/heldout-v2-questions.lock text eol=lf

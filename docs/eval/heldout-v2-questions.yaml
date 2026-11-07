@@ -1,0 +1,27 @@
+# Held-out evaluation set v2, batch 1. Questions from team members, kept word for word.
+# Status: FROZEN. SHA256 in docs/eval/heldout-v2-questions.lock; any edit needs a new version.
+# The system must not run on this set and it must not inform any fix (DEC-012).
+version: heldout-v2-batch1
+status: FROZEN
+default_role: staff
+items:
+  - {id: HO2-001, question: "Thời gian bắt đầu làm việc là bao nhiêu? Nghỉ trưa được mấy tiếng? Và mấy giờ tan làm?"}
+  - {id: HO2-002, question: "Có cần phải tăng ca không và tăng ca thì phải báo với ai để duyệt?"}
+  - {id: HO2-003, question: "Tiền OT sẽ tính như nào nếu tôi làm sau giờ làm hành chính?"}
+  - {id: HO2-004, question: "Quy trình đăng ký nghỉ có phép?"}
+  - {id: HO2-005, question: "Phụ nữ mang thai thì được nghỉ 3 tháng có phép phải không?"}
+  - {id: HO2-006, question: "Lương của Middle Developer thì sẽ khoảng bao nhiêu?"}
+  - {id: HO2-007, question: "Tiền thưởng hằng năm như nào?"}
+  - {id: HO2-008, question: "Ngày nào là ngày trả lương cho nhân viên?"}
+  - {id: HO2-009, question: "Công ty có phạt tiền nếu làm sai hay không?"}
+  - {id: HO2-010, question: "Thử việc sẽ bao lâu và có lương hay không?"}
+  - {id: HO2-011, question: "Có lịch khám sức khỏe định kỳ hay không?"}
+  - {id: HO2-012, question: "Làm việc remote được tối đa mấy ngày trong tháng?"}
+  - {id: HO2-013, question: "Ai là giám đốc bộ phận Nhân sự?"}
+  - {id: HO2-014, question: "Nếu tôi cần hỗ trợ CNTT thì liên hệ email nào?"}
+  - {id: HO2-015, question: "NovaSecure là gì?"}
+  - {id: HO2-016, question: "Địa chỉ trụ sở chính ở đâu? Tôi nên liên lạc với ai khi tới phỏng vấn?"}
+  - {id: HO2-017, question: "Tổng ngày nghỉ lễ, Tết trong năm?"}
+  - {id: HO2-018, question: "Bao lâu thì review lương / lần?"}
+  - {id: HO2-019, question: "Làm bao lâu thì phép năm tăng lên và tăng như thế nào?"}
+  - {id: HO2-020, question: "Nhân viên đang nghỉ phép có bắt buộc phải xử lý sự cố production không?"}
