@@ -58,6 +58,24 @@ def test_short_question_still_gets_a_fingerprint() -> None:
     assert leak.fingerprint("!!!") == []
 
 
+def test_a_line_holding_a_whole_short_question_is_a_hit() -> None:
+    payload = _payload(heldout=[("T2", "Omega là gì?")])
+    lines = [("app/a.py", 1, 'x = "Omega la gi?"'), ("app/a.py", 2, 'y = "Omega la')]
+    assert leak.find_hits(payload, lines) == [("app/a.py", 1, "heldout", "T2")]
+
+
+def test_stale_held_out_v2_lock_fails(tmp_path: Path) -> None:
+    payload = leak.build_payload(DEV, HELDOUT, "abc", heldout_v2=HELDOUT, lock_v2_sha256="v2")
+    path, lock = _files(tmp_path, payload)
+    lock_v2 = tmp_path / "lock_v2.json"
+    lock_v2.write_text(json.dumps({"sha256": "other"}), encoding="utf-8")
+    expected = {**EXPECTED, "heldout_v2": 1}
+    with pytest.raises(QuestionSourceError, match="held-out v2"):
+        leak.load_fingerprints(path, lock, expected, lock_v2)
+    lock_v2.write_text(json.dumps({"sha256": "v2"}), encoding="utf-8")
+    assert leak.load_fingerprints(path, lock, expected, lock_v2)
+
+
 @pytest.mark.parametrize(
     "payload",
     [

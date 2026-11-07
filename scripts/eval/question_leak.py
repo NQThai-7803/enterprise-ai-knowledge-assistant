@@ -31,11 +31,13 @@ FINGERPRINTS = ROOT / "scripts" / "eval" / "question_fingerprints.json"
 DEV_SOURCE = ROOT / "artifacts" / "rag-h5-1-stress-uat.py"
 LOCK = ROOT / "docs" / "eval" / "heldout-v1.lock"
 HELDOUT = ROOT / "docs" / "eval" / "heldout-v1.yaml"
+LOCK_V2 = ROOT / "docs" / "eval" / "heldout-v2-questions.lock"
+HELDOUT_V2 = ROOT / "docs" / "eval" / "heldout-v2-questions.yaml"
 RBAC_SOURCE = ROOT / "tests" / "acceptance" / "rbac_dev_v1.yaml"
 RELEVANCE_SOURCE = ROOT / "tests" / "acceptance" / "answer_relevance_dev_v1.yaml"
 SALT = b"eaka-question-fingerprint-v1"
 GRAM_SIZE = 4
-EXPECTED_COUNTS = {"dev": 100, "heldout": 40, "rbac": 18, "relevance": 25}
+EXPECTED_COUNTS = {"dev": 100, "heldout": 40, "rbac": 18, "relevance": 25, "heldout_v2": 20}
 OVERLAP_LIMIT = 0.60
 ESCAPE = re.compile(r"\\u([0-9a-fA-F]{4})")
 WORD = re.compile(r"\w+")
@@ -72,11 +74,14 @@ def build_payload(
     lock_sha256: str,
     rbac: Iterable[tuple[str, str]] = (),
     relevance: Iterable[tuple[str, str]] = (),
+    heldout_v2: Iterable[tuple[str, str]] = (),
+    lock_v2_sha256: str = "",
 ) -> dict[str, Any]:
     dev_items = {case_id: fingerprint(question) for case_id, question in dev}
     heldout_items = {case_id: fingerprint(question) for case_id, question in heldout}
     rbac_items = {case_id: fingerprint(question) for case_id, question in rbac}
     relevance_items = {case_id: fingerprint(question) for case_id, question in relevance}
+    v2_items = {case_id: fingerprint(question) for case_id, question in heldout_v2}
     return {
         "version": 1,
         "gram_size": GRAM_SIZE,
@@ -89,6 +94,11 @@ def build_payload(
             },
             "rbac": {"count": len(rbac_items), "items": rbac_items},
             "relevance": {"count": len(relevance_items), "items": relevance_items},
+            "heldout_v2": {
+                "count": len(v2_items),
+                "lock_sha256": lock_v2_sha256,
+                "items": v2_items,
+            },
         },
     }
 
@@ -97,6 +107,7 @@ def load_fingerprints(
     path: Path = FINGERPRINTS,
     lock: Path = LOCK,
     expected: Mapping[str, int] = EXPECTED_COUNTS,
+    lock_v2: Path = LOCK_V2,
 ) -> dict[str, Any]:
     """Return the fingerprints, or refuse when they cannot stand for the question sets."""
     if not path.is_file():
@@ -116,6 +127,12 @@ def load_fingerprints(
         raise QuestionSourceError(f"held-out lock missing: {lock}")
     if json.loads(lock.read_text(encoding="utf-8"))["sha256"] != sources["heldout"]["lock_sha256"]:
         raise QuestionSourceError("fingerprints were built from another held-out file; rebuild")
+    if "heldout_v2" in expected and (
+        not lock_v2.is_file()
+        or json.loads(lock_v2.read_text(encoding="utf-8"))["sha256"]
+        != sources["heldout_v2"]["lock_sha256"]
+    ):
+        raise QuestionSourceError("fingerprints do not match the held-out v2 lock; rebuild")
     return payload
 
 
@@ -131,7 +148,12 @@ def find_hits(
     hits = []
     for file, number, text in lines:
         tokens = words(text)
-        grams = (" ".join(tokens[i : i + GRAM_SIZE]) for i in range(len(tokens) - GRAM_SIZE + 1))
+        # A question shorter than GRAM_SIZE is fingerprinted whole, so look for shorter runs too.
+        grams = (
+            " ".join(tokens[i : i + size])
+            for size in range(GRAM_SIZE, 0, -1)
+            for i in range(len(tokens) - size + 1)
+        )
         for gram in grams:
             match = index.get(_hash(gram))
             if match:
@@ -196,6 +218,25 @@ def relevance_uat_overlap(payload: Mapping[str, Any]) -> tuple[float, str | None
     return best
 
 
+def source_overlap(
+    payload: Mapping[str, Any], name: str, others: Iterable[str]
+) -> dict[str, tuple[float, str | None, str | None]]:
+    """Largest Jaccard similarity of one source with each of the others."""
+    sources = payload["sources"]
+    result = {}
+    for other in others:
+        best: tuple[float, str | None, str | None] = (0.0, None, None)
+        for left_id, left_hashes in sources.get(name, {}).get("items", {}).items():
+            left = set(left_hashes)
+            for right_id, right_hashes in sources[other]["items"].items():
+                union = left | set(right_hashes)
+                value = len(left & set(right_hashes)) / len(union) if union else 0.0
+                if value > best[0]:
+                    best = (value, left_id, right_id)
+        result[other] = best
+    return result
+
+
 def _build(output: Path) -> int:
     import yaml
 
@@ -211,11 +252,18 @@ def _build(output: Path) -> int:
     rbac = [(item["id"], item["question"]) for item in rbac_items]
     relevance_items = yaml.safe_load(RELEVANCE_SOURCE.read_text(encoding="utf-8"))["items"]
     relevance = [(item["id"], item["question"]) for item in relevance_items]
-    payload = build_payload(dev, heldout, lock_sha, rbac, relevance)
+    if not HELDOUT_V2.is_file() or not LOCK_V2.is_file():
+        raise QuestionSourceError("build needs the frozen held-out v2 questions")
+    lock_v2_sha = json.loads(LOCK_V2.read_text(encoding="utf-8"))["sha256"]
+    if hashlib.sha256(HELDOUT_V2.read_bytes()).hexdigest() != lock_v2_sha:
+        raise QuestionSourceError("held-out v2 questions do not match their lock")
+    v2_items = yaml.safe_load(HELDOUT_V2.read_text(encoding="utf-8"))["items"]
+    v2 = [(item["id"], item["question"]) for item in v2_items]
+    payload = build_payload(dev, heldout, lock_sha, rbac, relevance, v2, lock_v2_sha)
     output.write_text(json.dumps(payload, indent=0, sort_keys=True) + "\n", encoding="utf-8")
     print(
         f"dev: {len(dev)}; held-out: {len(heldout)}; rbac dev: {len(rbac)}; "
-        f"relevance dev: {len(relevance)}"
+        f"relevance dev: {len(relevance)}; held-out v2: {len(v2)}"
     )
     return 0
 
@@ -241,6 +289,10 @@ def _overlap() -> int:
     print(f"max dev/held-out Jaccard: {value:.3f} ({dev_id}, {heldout_id}); limit {OVERLAP_LIMIT}")
     uat_value, relevance_id, uat_id = relevance_uat_overlap(payload)
     print(f"max relevance/Q001-Q100 Jaccard: {uat_value:.3f} ({relevance_id}, {uat_id})")
+    # Reported only: the owner reviews these numbers, they block nothing.
+    others = ("dev", "heldout", "relevance", "rbac")
+    for other, (found, left, right) in source_overlap(payload, "heldout_v2", others).items():
+        print(f"held-out v2/{other} word 4-gram Jaccard: {found:.3f} ({left}, {right})")
     return 1 if max(value, uat_value) >= OVERLAP_LIMIT else 0
 
 
