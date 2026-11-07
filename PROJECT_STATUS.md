@@ -5,14 +5,22 @@
 - **20 questions from team members frozen word for word.** Gold drafted from the PDFs only, and every excerpt checked against its page. The system has not run on this set (DEC-012).
 - **Next:** owner approves `docs/eval/heldout-v2-review.md`, then the gold is frozen.
 
-## FIX 2 -- 2026-11-07 (groups 1 + 2 on by default, awaiting owner decision on the remaining causes)
+## FIX 2b -- 2026-11-08 (3 flags measured, all off, awaiting owner decision)
+
+- **Same batch, 2 runs each, on the current defaults.** Baseline: 4 false and 18 correct on the relevance set, 1 false and 22 correct on RBAC, 99/100 proxy on UAT, 0 leaks.
+- **REL-402 flag:** 3 false, 19 correct, nothing else changed. It meets the rule.
+- **REL-303 flag:** 3 false, 19 correct, but it wrongly refuses Q004 (98/100).
+- **REL-103 flag:** no fewer false answers, and 2 RBAC controls lost. It stays off.
+- See `docs/eval/runs/fix2b-cues.md`.
+
+## FIX 2 -- 2026-11-07 (groups 1 + 2 on by default)
 
 - **The 5 held-out false answers come from 4 mechanisms:** a deterministic repair overriding an LLM refusal, a wrong value type with no unit check, off-topic clauses copied verbatim by the LLM, and rejected claims rescued by a weak signal. See `docs/eval/runs/fix2-diagnosis.md`.
 - **Correction to FIX 1:** RBAC false answers under `strict` read as 0 to 1, because RBD-03 varies between runs. The choice of `strict` stands.
 - **Measured with `answer_relevance_dev_v1`, 2 runs each:** baseline 8 false answers and 13 correct of 25. Group 1: 7 and 14. Group 2: 6 and 16. Group 4a: 8 and 13. All with 0 leaks and 99/100 proxy on Q001-Q100. See `docs/eval/runs/fix2-results.md`.
 - **Groups 1 + 2 together, in one interleaved batch (DEC-011):** false answers 9 to 5 and correct answers 35 to 40 over the relevance and RBAC sets, 0 leaks in API and retrieval, all 100 UAT answers unchanged. They are now the default, and the flags roll them back. See `docs/eval/runs/fix2a-defaults.md`.
 - **Group 4a stays off.** Its branch ran 11 to 32 times per run, but the flag would change the sources at most once.
-- **Next:** owner decides on the four remaining causes. Groups 3 and 4b as designed fix none of them.
+- **Next:** continued in FIX 2b above.
 
 ## FIX 1 -- 2026-11-06
 
