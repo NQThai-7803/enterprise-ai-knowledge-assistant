@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import re
 from collections.abc import Coroutine
@@ -44,6 +45,7 @@ from app.services.grounded_answer_service import (
     _person_name_sequences_near_terms,
     _preserve_reranked_hit_order,
     _rank_hits_for_prompt,
+    _refusal_names_what_the_answer_omits,
     _role_terms_for_prompt_question,
     _short_explicit_topic_phrases,
     _shortest_source_clause_for_groups,
@@ -3845,3 +3847,43 @@ def test_reselection_guard_is_not_counted_when_the_source_holds_the_answer() -> 
         "reselect_guard_would_change": 0,
     }
     GLOBAL_METRICS.reset()
+
+
+SIDE_FACT_ANSWER = (
+    "Máy in được đặt ở 3 tầng của tòa nhà văn phòng chính. "
+    "Không có thông tin về hãng sản xuất máy in."
+)
+SIDE_FACT_QUESTION = "Máy in do hãng nào sản xuất?"
+
+
+async def _draft_for_side_fact(**overrides: Any) -> Any:
+    service, _, _, _, _, _, _ = make_service(settings_obj=settings(**overrides))
+    return await service._draft_from_generation(
+        _fake_generation(
+            json.dumps({"answer": SIDE_FACT_ANSWER, "citations": ["SOURCE_2"]}, ensure_ascii=False)
+        ),
+        source_registry=_reselect_registry(),
+        current_user=user(),
+        grounding_question=SIDE_FACT_QUESTION,
+    )
+
+
+def test_refusal_with_a_side_fact_becomes_no_answer_when_the_flag_is_on() -> None:
+    draft = asyncio.run(_draft_for_side_fact(rag_partial_refusal_no_answer_enabled=True))
+
+    assert draft.grounding_status == GroundingStatus.NO_ANSWER
+    assert draft.llm_refused is True
+
+
+@pytest.mark.parametrize(
+    ("question", "answer", "omits"),
+    [
+        (SIDE_FACT_QUESTION, SIDE_FACT_ANSWER, True),
+        ("Phí đổi thẻ là bao nhiêu?", "Phí đổi thẻ là 2 triệu đồng. Không nêu hạn nộp.", False),
+        ("Phí đổi thẻ là bao nhiêu?", "Phí đổi thẻ là 2 triệu đồng.", False),
+    ],
+)
+def test_refusal_is_only_counted_when_it_names_what_the_answer_omits(
+    question: str, answer: str, omits: bool
+) -> None:
+    assert _refusal_names_what_the_answer_omits(question=question, answer=answer) is omits

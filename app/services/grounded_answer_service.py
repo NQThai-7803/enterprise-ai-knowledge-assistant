@@ -121,6 +121,7 @@ from app.services.claim_evidence_validation_service import (
     ClaimRepairFeedback,
     answer_missing_requested_unit,
     infer_yes_no_polarity,
+    question_content_terms,
 )
 from app.web_search.errors import WebSearchError
 from app.web_search.intent import WebSearchIntentClassifier
@@ -2222,7 +2223,12 @@ class GroundedAnswerService:
             raise CitationValidationFailedApplicationError() from exc
         if grounded_output.answer.strip() == self.settings.llm_no_answer_sentinel:
             raise CitationValidationFailedApplicationError()
-        if _is_no_answer_like_json_answer(grounded_output.answer):
+        if _is_no_answer_like_json_answer(grounded_output.answer) or (
+            self.settings.rag_partial_refusal_no_answer_enabled
+            and _refusal_names_what_the_answer_omits(
+                question=grounding_question, answer=grounded_output.answer
+            )
+        ):
             if self.settings.rag_diagnostics_enabled:
                 _log_no_answer_diagnostics(reason="llm_no_answer_like_json")
             return _no_answer_draft(
@@ -7042,6 +7048,23 @@ def _is_no_answer_like_json_answer(answer: str) -> bool:
     if min(phrase_positions) <= 40:
         return True
     return not _answer_has_grounded_substance(answer)
+
+
+def _refusal_names_what_the_answer_omits(*, question: str, answer: str) -> bool:
+    """True when the answer refuses the asked point and only adds a side fact."""
+    if len(information_need_queries(question)) > 1:
+        return False
+    sentences = re.split(r"(?<=[.!?;])\s+", answer.strip())
+    refusals = [
+        sentence
+        for sentence in sentences
+        if any(phrase in sentence.casefold() for phrase in _NO_ANSWER_LIKE_ANSWER_PHRASES)
+    ]
+    if not refusals:
+        return False
+    rest = " ".join(sentence for sentence in sentences if sentence not in refusals)
+    named = question_content_terms(question) & question_content_terms(" ".join(refusals))
+    return bool(named - question_content_terms(rest))
 
 
 def _answer_has_grounded_substance(answer: str) -> bool:
