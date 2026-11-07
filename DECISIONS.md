@@ -99,3 +99,15 @@ Written before measuring groups 1 + 2 together (2026-11-06).
 | Groups 1 + 2 | 0 | 99/100 | 4 + 1 = 5 | 18 + 22 = 40 |
 
 Both requirements are met and (a) decides. No case got worse on either set.
+
+## DEC-012 — Held-out v2 rules
+
+Set by the owner on 2026-11-07, for batch 1 (`docs/eval/heldout-v2-questions.yaml`, 20 questions from team members, kept word for word, frozen by hash and lock before any other work).
+
+- The system does not run on this set until the owner says so. That covers the API, the trace tools and the eval runners. Comparing question text and embedding similarity to other question sets is allowed.
+- This set does not inform any fix: no change to code, thresholds, cues, prompts or dev sets may be based on its questions or gold.
+- Gold comes only from the source PDFs of `uat/corpus-v2/manifest.json`, and every excerpt is checked against its PDF page. A compound question has one required point per asked point. A false premise must be corrected in the gold.
+- Gold is frozen only after the owner approves `docs/eval/heldout-v2-review.md`. Any edit after that needs a new version and a new lock.
+- `scripts/eval/question_fingerprints.json` includes these questions, so `check_no_question_leak.py` blocks them in `app/`.
+
+Known limit: the implementer wrote this gold and also works on fixes in the same session. The fixes approved next (REL-103, REL-303, REL-402) were set by the owner from the relevance dev traces before this set existed.

@@ -6,6 +6,12 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### Held-out v2 batch 1 -- 2026-11-07
+
+- `docs/eval/heldout-v2-questions.yaml`: 20 frozen questions. `docs/eval/heldout-v2-gold.yaml`: gold draft from the PDFs, reviewed in `docs/eval/heldout-v2-review.md`. `scripts/eval/heldout_v2_check.py` checks them.
+- `scripts/eval/question_leak.py` covers these questions and now also finds questions shorter than four words.
+- DEC-012: rules for this set.
+
 ### FIX 2a -- 2026-11-07
 
 - **Changed defaults:** `RAG_REPAIR_AFTER_LLM_REFUSAL_ENABLED=false` and `RAG_ANSWER_UNIT_GUARD_ENABLED=true` (DEC-011). Set the old values to roll back. Results in `docs/eval/runs/fix2a-defaults.md`.

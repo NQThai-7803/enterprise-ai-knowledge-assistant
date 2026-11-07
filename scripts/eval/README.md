@@ -37,6 +37,7 @@ python scripts/diagnostics/rbac_retrieval_check.py --container eaka-rbac-dev-api
 
 The runner needs `EVAL_PASSWORD_ADMIN`, `_MANAGER`, `_STAFF` and `_OPS` in the environment and `EVAL_EXPECTED_RERANKER_MODE=lexical_fallback` on a stack without cross-encoder weights. Keep the same `_OPS` value between runs: it is set when the account is created.
 
+| `heldout_v2_check.py` | Checks held-out v2 against its frozen questions and the PDF pages, reports overlap numbers and writes the gold review. Never runs the system (DEC-012). |
 | `question_leak.py` | Hashed word 4-grams of dev and held-out questions in `question_fingerprints.json`, no question text. `check` compares added `app/` lines, `overlap` compares the two sets; both exit 2 when the source is missing, empty or stale. |
 
 The questions, reference grade and manifests live under the git-ignored `artifacts/` directory.
