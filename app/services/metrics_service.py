@@ -127,6 +127,15 @@ class PrometheusMetricsService:
                     "enterprise_ai_tracing_hooks_enabled",
                     int(self.settings.tracing_hooks_enabled),
                 ),
+                "# HELP enterprise_ai_rag_answer_branch_total "
+                "Times a grounded answer took a measured branch.",
+                "# TYPE enterprise_ai_rag_answer_branch_total counter",
+                *(
+                    prometheus_sample(
+                        "enterprise_ai_rag_answer_branch_total", count, {"branch": branch}
+                    )
+                    for branch, count in self.registry.answer_branch_counts().items()
+                ),
             ]
         )
 

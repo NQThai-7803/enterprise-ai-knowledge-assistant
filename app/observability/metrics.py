@@ -10,6 +10,11 @@ from starlette.types import Scope
 
 METRIC_PREFIX = "enterprise_ai"
 MAX_ROUTE_LABEL_LENGTH = 160
+# FIX 2 group 4a: a rejected answer entered reselection, and the strong-support flag would
+# change the sources it can move to. Counted with the flag on or off.
+BRANCH_RESELECT_AFTER_REJECTION = "reselect_after_rejection"
+BRANCH_RESELECT_GUARD_WOULD_CHANGE = "reselect_guard_would_change"
+ANSWER_BRANCHES = (BRANCH_RESELECT_AFTER_REJECTION, BRANCH_RESELECT_GUARD_WOULD_CHANGE)
 _UUID_SEGMENT_PATTERN = re.compile(
     r"(?<=/)[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
     r"[0-9a-fA-F]{4}-[0-9a-fA-F]{12}(?=/|$)"
@@ -42,6 +47,7 @@ class MetricsRegistry:
         self._http_counts: defaultdict[HTTPMetricKey, int] = defaultdict(int)
         self._http_latency_sum: defaultdict[HTTPMetricKey, float] = defaultdict(float)
         self._http_latency_max: defaultdict[HTTPMetricKey, float] = defaultdict(float)
+        self._answer_branch_counts: defaultdict[str, int] = defaultdict(int)
 
     def record_http_request(
         self,
@@ -61,6 +67,15 @@ class MetricsRegistry:
             self._http_counts[key] += 1
             self._http_latency_sum[key] += latency
             self._http_latency_max[key] = max(self._http_latency_max[key], latency)
+
+    def record_answer_branch(self, branch: str) -> None:
+        with self._lock:
+            self._answer_branch_counts[branch] += 1
+
+    def answer_branch_counts(self) -> dict[str, int]:
+        """Every known branch, at 0 when unused, so a missing line means an older stack."""
+        with self._lock:
+            return {branch: self._answer_branch_counts[branch] for branch in ANSWER_BRANCHES}
 
     def http_snapshots(self) -> list[HTTPMetricSnapshot]:
         with self._lock:
@@ -84,6 +99,7 @@ class MetricsRegistry:
             self._http_counts.clear()
             self._http_latency_sum.clear()
             self._http_latency_max.clear()
+            self._answer_branch_counts.clear()
 
 
 GLOBAL_METRICS = MetricsRegistry()

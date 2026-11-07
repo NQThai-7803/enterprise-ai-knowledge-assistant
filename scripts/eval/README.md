@@ -17,7 +17,10 @@ It never touches the V2, AUTH-02 or main stacks.
 | `run_rbac_dev.py` | RBAC dev set from `tests/acceptance/rbac_dev_v1.yaml` on the isolated stack `eaka-rbac-dev`: 18 questions from accounts without access, each with a control from an account with access. Controls run first, then the grant is revoked, then the negatives. Score with `metrics.py rbac`. |
 
 | `run_answer_relevance_dev.py` | Frozen relevance dev set from `tests/acceptance/answer_relevance_dev_v1.yaml` on the isolated stack `eaka-relevance-dev`: questions the documents do not answer, with similar ones they do. Refuses a set that differs from its lock. |
+| `branch_counters.py` | Reads `enterprise_ai_rag_answer_branch_total` from `GET /metrics`. The relevance, RBAC and UAT runners record the change over the run as `branch_counters`; `null` means not measured. |
 | `compare_flag_runs.py` | Compares two baseline runs with two runs of a flag on the relevance, RBAC or UAT set. A case counts as changed only when both sides agree within themselves and differ from each other. |
+
+Compare a flag only with a baseline from the same batch: same image, same session, Ollama not restarted, runs interleaved (DEC-011).
 
 RBAC dev stack (never add these documents to the main corpus):
 

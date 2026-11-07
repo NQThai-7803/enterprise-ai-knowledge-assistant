@@ -6,6 +6,12 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### FIX 2a -- 2026-11-07
+
+- **Changed defaults:** `RAG_REPAIR_AFTER_LLM_REFUSAL_ENABLED=false` and `RAG_ANSWER_UNIT_GUARD_ENABLED=true` (DEC-011). Set the old values to roll back. Results in `docs/eval/runs/fix2a-defaults.md`.
+- `enterprise_ai_rag_answer_branch_total` on `GET /metrics` counts reselection of a rejected answer. The relevance, RBAC and UAT runners record it as `branch_counters`.
+- DEC-011: a baseline and its candidate must run in one batch.
+
 ### FIX 2 -- 2026-11-06
 
 - New flags, all keeping the old behaviour by default: `RAG_REPAIR_AFTER_LLM_REFUSAL_ENABLED`, `RAG_ANSWER_UNIT_GUARD_ENABLED`, `RAG_RESELECT_REQUIRES_STRONG_SUPPORT_ENABLED`. Results in `docs/eval/runs/fix2-results.md`.

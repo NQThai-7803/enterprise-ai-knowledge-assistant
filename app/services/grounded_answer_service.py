@@ -71,6 +71,11 @@ from app.llm.base import LLMProvider
 from app.llm.errors import LLMError, LLMFailureCode
 from app.llm.models import LLMGenerationResult, LLMMessage
 from app.models import ChatMessage, ChatMessageRole, Document, DocumentChunk, DocumentStatus, User
+from app.observability.metrics import (
+    BRANCH_RESELECT_AFTER_REJECTION,
+    BRANCH_RESELECT_GUARD_WOULD_CHANGE,
+    GLOBAL_METRICS,
+)
 from app.repositories import (
     chat_message_repository,
     chat_session_repository,
@@ -2299,11 +2304,8 @@ class GroundedAnswerService:
                     preferred_source_labels=tuple(grounded_output.citations),
                     max_sources=min(2, self.settings.citation_max_sources_per_answer),
                 )
-                if (
-                    self.settings.rag_reselect_requires_strong_support_enabled
-                    and claim_validation.status != ClaimEvidenceStatus.SUPPORTED
-                ):
-                    supporting_labels = tuple(
+                if claim_validation.status != ClaimEvidenceStatus.SUPPORTED:
+                    strong_labels = tuple(
                         label
                         for label in supporting_labels
                         if self.claim_validation_service.source_label_has_strong_support(
@@ -2312,6 +2314,11 @@ class GroundedAnswerService:
                             label=label,
                         )
                     )
+                    GLOBAL_METRICS.record_answer_branch(BRANCH_RESELECT_AFTER_REJECTION)
+                    if strong_labels != supporting_labels:
+                        GLOBAL_METRICS.record_answer_branch(BRANCH_RESELECT_GUARD_WOULD_CHANGE)
+                    if self.settings.rag_reselect_requires_strong_support_enabled:
+                        supporting_labels = strong_labels
                 if supporting_labels and supporting_labels != grounded_output.citations:
                     repaired_output = GroundedLLMOutput(
                         answer=grounded_output.answer,

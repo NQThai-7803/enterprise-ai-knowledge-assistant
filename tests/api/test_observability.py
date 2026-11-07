@@ -153,6 +153,8 @@ def test_metrics_endpoint_exposes_safe_runtime_metrics(
     assert 'enterprise_ai_queue_pending{kind="document",queue="documents"} 3' in body
     assert 'provider_type="llm"' in body
     assert 'provider_type="web_search"' in body
+    assert 'enterprise_ai_rag_answer_branch_total{branch="reselect_after_rejection"} 0' in body
+    assert 'enterprise_ai_rag_answer_branch_total{branch="reselect_guard_would_change"} 0' in body
 
 
 @pytest.mark.integration
