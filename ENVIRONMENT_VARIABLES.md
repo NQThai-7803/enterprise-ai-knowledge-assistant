@@ -226,6 +226,7 @@ RAG_DETERMINISTIC_ROUTE_MODE=strict
 RAG_REPAIR_AFTER_LLM_REFUSAL_ENABLED=false
 RAG_ANSWER_UNIT_GUARD_ENABLED=true
 RAG_RESELECT_REQUIRES_STRONG_SUPPORT_ENABLED=false
+RAG_SHORT_ANSWER_QUESTION_TERMS_ENABLED=false
 RAG_STRICT_OUTCOME_CUES_EXACT_ENABLED=false
 ```
 
@@ -253,6 +254,7 @@ Retrieval variable rules:
 - `RAG_REPAIR_AFTER_LLM_REFUSAL_ENABLED` (boolean, default `false` since DEC-011; FIX 2 group 1): `true` restores the old behaviour. `false` stops the deterministic repair once the LLM has refused in the request. A repair after the validator rejects an LLM answer still runs.
 - `RAG_ANSWER_UNIT_GUARD_ENABLED` (boolean, default `true` since DEC-011; FIX 2 group 2): `false` restores the old behaviour. With `true`, "đồng ý" no longer makes a question a money question, and an answer to "bao nhiêu <unit>" must hold a number with that unit, on every route. An answer saying the documents do not specify the value is exempt.
 - `RAG_RESELECT_REQUIRES_STRONG_SUPPORT_ENABLED` (boolean, default `false`; FIX 2 group 4a): when the validator rejects an answer on its cited source, the answer may move to another source only if that source holds it word for word or holds its exact number and unit. `enterprise_ai_rag_answer_branch_total` on `GET /metrics` counts, with the flag on or off, how often reselection ran on a rejected answer (`reselect_after_rejection`) and how often this flag would change its sources (`reselect_guard_would_change`).
+- `RAG_SHORT_ANSWER_QUESTION_TERMS_ENABLED` (boolean, default `false`; FIX 2b): a short answer that the validator would accept for having little substance is rejected when the 15 words on each side of it cover less than 60% of the question's content words. An answer that cannot be located in the source keeps the old behaviour.
 - `RAG_STRICT_OUTCOME_CUES_EXACT_ENABLED` (boolean, default `false`; FIX 2b): in `strict` mode, the outcome cues of `_structured_condition_value_answer` match as whole words on text that keeps its diacritics, so "giám" no longer counts as "giảm".
 - Hybrid RRF scores are ranking scores, not probabilities.
 - These retrieval values are not secrets.

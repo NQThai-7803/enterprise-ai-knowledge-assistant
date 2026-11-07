@@ -30,6 +30,7 @@ from app.retrieval.structured import (
     monetary_value_period_pairs,
     requested_monetary_period,
 )
+from app.services import claim_evidence_validation_service as claim_validation_module
 from app.services import grounded_answer_service as gas
 from app.services.claim_evidence_validation_service import (
     ClaimEvidenceStatus,
@@ -6812,3 +6813,37 @@ def test_strong_support_needs_the_exact_text_or_number_and_unit(
         answer=answer, source_registry=source(source_text), label="SOURCE_1"
     )
     assert result is strong
+
+
+SHORT_SOURCE = "Giám đốc kho duyệt thanh toán đợt cuối cho nhà cung cấp."
+
+
+@pytest.mark.parametrize(
+    ("question", "flag", "supported"),
+    [
+        ("Người nào phê duyệt tạm ứng cho nhà cung cấp?", False, True),
+        ("Người nào phê duyệt tạm ứng cho nhà cung cấp?", True, False),
+        ("Người nào duyệt thanh toán đợt cuối cho nhà cung cấp?", True, True),
+    ],
+)
+def test_short_answer_needs_the_question_terms_around_it(
+    question: str, flag: bool, supported: bool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        claim_validation_module,
+        "get_settings",
+        lambda: SimpleNamespace(rag_short_answer_question_terms_enabled=flag),
+    )
+    status = claim_validation_module._validate_answer_against_evidence(
+        answer="Giám đốc kho", evidence=SHORT_SOURCE, question=question
+    )
+    assert (status == ClaimEvidenceStatus.SUPPORTED) is supported
+
+
+def test_short_answer_check_skips_what_it_cannot_locate() -> None:
+    assert not claim_validation_module._short_answer_misses_question_terms(
+        question="Người nào phê duyệt tạm ứng?", answer="truong kho", evidence="giam doc ky"
+    )
+    assert not claim_validation_module._short_answer_misses_question_terms(
+        question="Ai ký?", answer="giam doc", evidence="giam doc duyet"
+    )

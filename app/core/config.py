@@ -139,6 +139,8 @@ class Settings(BaseSettings):
     rag_answer_unit_guard_enabled: bool = True
     # FIX 2 group 4a: a rejected answer moves to another source only on strong support.
     rag_reselect_requires_strong_support_enabled: bool = False
+    # FIX 2b: a short answer needs the text around it to cover what the question asks.
+    rag_short_answer_question_terms_enabled: bool = False
     # FIX 2b: in strict mode, outcome cues keep their diacritics, so giám is not giảm.
     rag_strict_outcome_cues_exact_enabled: bool = False
     reranker_enabled: bool = True

@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from app.citations.models import PromptSourceRegistry
+from app.core.config import get_settings
 from app.retrieval.evidence_quality import is_non_answer_context
 from app.retrieval.leave_relations import (
     annual_leave_relation_intent,
@@ -1660,7 +1661,16 @@ def _validate_answer_against_evidence(
     ):
         return ClaimEvidenceStatus.SUPPORTED
 
-    if _answer_is_low_substance(folded_answer) and (
+    if (
+        _answer_is_low_substance(folded_answer)
+        and not (
+            question is not None
+            and get_settings().rag_short_answer_question_terms_enabled
+            and _short_answer_misses_question_terms(
+                question=question, answer=folded_answer, evidence=folded_evidence
+            )
+        )
+    ) and (
         (
             analysis is not None
             and not analysis.asks_for_explicit_value
@@ -2999,6 +3009,66 @@ def answer_missing_requested_unit(*, question: str, answer: str) -> bool:
         return False
     pattern = rf"(?<!\w){_NUMBER_BEFORE_UNIT}{requested.group(1)}(?!\w)"
     return re.search(pattern, folded_answer) is None
+
+
+_QUESTION_STOPWORDS = frozenset(
+    [
+        "ai",
+        "bao",
+        "cho",
+        "cua",
+        "duoc",
+        "gia",
+        "khong",
+        "nao",
+        "nguoi",
+        "nhieu",
+        "the",
+        "theo",
+        "toi",
+        "trong",
+        "tren",
+        "voi",
+    ]
+)
+_SHORT_ANSWER_WINDOW_WORDS = 15
+_SHORT_ANSWER_MIN_COVERAGE = 0.6
+
+
+def question_content_terms(text: str) -> set[str]:
+    """Folded words of three or more letters, without question and function words."""
+    return {
+        term
+        for term in re.findall(r"\w+", fold_text(text))
+        if len(term) >= 3 and term not in _QUESTION_STOPWORDS
+    }
+
+
+def _short_answer_misses_question_terms(*, question: str, answer: str, evidence: str) -> bool:
+    """True when the text around a short answer lacks most of what the question asks."""
+    asked = question_content_terms(question) - question_content_terms(answer)
+    answer_words = re.findall(r"\w+", answer)
+    if len(asked) < 2 or len(answer_words) < 2:
+        return False
+    words = re.findall(r"\w+", evidence)
+    size = len(answer_words)
+    starts = [i for i in range(len(words) - size + 1) if words[i : i + size] == answer_words]
+    if not starts:
+        return False
+    return not any(
+        len(
+            asked
+            & set(
+                words[
+                    max(0, start - _SHORT_ANSWER_WINDOW_WORDS) : start
+                    + size
+                    + _SHORT_ANSWER_WINDOW_WORDS
+                ]
+            )
+        )
+        >= _SHORT_ANSWER_MIN_COVERAGE * len(asked)
+        for start in starts
+    )
 
 
 def _answer_is_low_substance(answer: str) -> bool:
