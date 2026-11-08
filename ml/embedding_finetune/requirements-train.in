@@ -1,0 +1,6 @@
+# Training only. Never installed into the app image (Dockerfile reads requirements.lock).
+# Same versions as the app's requirements.lock, so the tokenizer and model code match.
+sentence-transformers==6.1.0
+torch==2.14.1
+transformers==5.19.0
+numpy==2.5.4

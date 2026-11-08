@@ -121,3 +121,13 @@ Set by the owner on 2026-11-08, written before the next measurement. Replaces th
 - Only changes seen in both runs count, and every case that gets worse is reported by id.
 
 Note on the RBAC score: RBD-04 and RBD-05 are correct at baseline only because, without diacritics, "giám" (in "Phó giám đốc") matches the outcome cue for "giảm", so the condition route answers them. A fix that removes that match can lose these two controls without being worse in substance (`docs/eval/runs/fix2b-cues.md`).
+
+## DEC-015 — Embedding fine-tune data rule
+
+Set by the owner on 2026-11-08, before any training (`docs/design/embedding-finetune.md`).
+
+- **Forbidden as training data:** every question of UAT Q001-Q100, held-out v1, held-out v2, RBAC dev, `answer_relevance_dev_v1` and `false_refusal_dev_v1`, including their variants.
+- **Allowed:** synthetic questions generated from corpus chunks (`ml/embedding_finetune/generate_queries.py`) and their variants without diacritics, with partial diacritics, with typos, and in English.
+- **Checked before every training run:** each training question is compared with `scripts/eval/question_fingerprints.json` (word 4-gram hashes of all six sets). A match is dropped at generation and augmentation, and `train.py` refuses to start while one remains. A missing or stale fingerprint file stops the run.
+- **Dev questions may evaluate a model, never train it.** Held-out sets do neither until the final held-out v2 measurement, which runs once after the choice is made.
+- **The app's embedding model does not change** until a candidate meets the acceptance criteria of the design doc and the owner approves the switch.
