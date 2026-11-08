@@ -6,6 +6,12 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### Embedding fine-tune environment -- 2026-11-08
+
+- `ml/embedding_finetune/requirements-train.lock` is now the freeze of `.venv-nlp` without torch, which is installed per host (`torch==2.14.1+cu126` locally, `torch==2.14.1+cpu` on Actions); `requirements-train.in` is removed.
+- `train.py`: CachedMultipleNegativesRankingLoss with `--batch-size` (effective, default 128) and `--mini-batch-size` (default 16); `--max-seq-length` defaults to 256; fp16 on CUDA by default (`--no-fp16` to skip) with a restart in fp32 on a non-finite loss; `--gradient-checkpointing`; `training_config.json` adds GPU, CUDA, precision, fallback reason, more library versions and `examples_sha256`.
+- DEC-017: where embedding models are trained, evaluated and published.
+
 ### FIX 2d and eval environment -- 2026-11-08
 
 - **Eval runners refuse another Ollama version or backend** than the pinned 0.40.15 on CUDA (`scripts/eval/ollama_check.py`, DEC-014), and record both at the start and end of each run. `EVAL_OLLAMA_EXPECTED_VERSION`, `EVAL_OLLAMA_EXPECTED_BACKEND` and `EVAL_OLLAMA_LOG` adapt it to another host.

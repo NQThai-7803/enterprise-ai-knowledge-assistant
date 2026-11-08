@@ -9,13 +9,16 @@ name: Eval
 # against eval-data/uat/reference-grade.json), `rbac` (tests/acceptance/rbac_dev_v1.yaml, with the
 # retrieval-level leak check), `relevance` (answer_relevance_dev_v1) and `false_refusal`
 # (false_refusal_dev_v1). Never runs held-out sets.
+# `ml` (ml/embedding_finetune, DEC-015): the embedding baseline on corpus V2 chunks by question
+# form, then a smoke run of the whole pipeline on 10 chunks and about 50 pairs. The smoke model
+# is deleted in the job and never uploaded; `configs`, `runs` and `cases` are ignored.
 on:
   workflow_dispatch:
     inputs:
       set:
         description: "Question set"
         type: choice
-        options: [uat, rbac, relevance, false_refusal]
+        options: [uat, rbac, relevance, false_refusal, ml]
         default: relevance
       configs:
         description: "Configurations, ';'-separated, baseline first: name or name:EVAL_VAR=value,..."
@@ -170,12 +173,13 @@ jobs:
           docker inspect "$PROJECT-api-1" --format '{{.State.Health.Status}}' | grep -q healthy
 
       - name: Load corpus V2
-        if: inputs.set == 'uat'
+        if: inputs.set == 'uat' || inputs.set == 'ml'
         run: >
           python scripts/eval/bootstrap_corpus_v2.py . http://127.0.0.1:18190
           "$OUT/runtime-manifest.json"
 
       - name: Run the batch
+        if: inputs.set != 'ml'
         env:
           SET: ${{ inputs.set }}
           CONFIGS: ${{ inputs.configs }}
@@ -191,6 +195,43 @@ jobs:
             > "$OUT/memory.log" &
           bash scripts/eval/ci_batch.sh "$SET" "$CONFIGS" "$RUNS" "$OUT" ${CASES[@]+"${CASES[@]}"}
           cat "$OUT/summary.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Embedding baseline and pipeline smoke run
+        if: inputs.set == 'ml'
+        run: |
+          set -euo pipefail
+          ML="$OUT/ml"; mkdir -p "$ML"
+          python -m pip install -q -r ml/embedding_finetune/requirements-train.lock \
+            torch==2.14.1+cpu --extra-index-url https://download.pytorch.org/whl/cpu
+          ( while true; do free -m | awk 'NR==2 {print strftime("%T"), $3, $7}'; sleep 30; done ) \
+            > "$OUT/memory.log" &
+          start=$(date +%s)
+          F=ml/embedding_finetune
+          # Chunks of all of corpus V2, and questions for the first 10 chunks only (smoke).
+          python $F/generate_queries.py --container "$PROJECT-api-1" --chunks-out "$ML/chunks.jsonl" \
+            --out "$ML/queries.jsonl" --limit 10 | tee "$ML/generate.json"
+          # C9: base model on UAT dev questions, as written and without diacritics.
+          python $F/eval_retrieval.py --chunks "$ML/chunks.jsonl" \
+            --models intfloat/multilingual-e5-small --out "$ML/baseline.json"
+          echo "baseline_seconds=$(( $(date +%s) - start ))" > "$ML/timing.txt"
+          # C10: the rest of the pipeline end to end, on CPU, then delete the model.
+          python $F/augment.py --queries "$ML/queries.jsonl" --out "$ML/augmented.jsonl" --english \
+            | tee "$ML/augment.json"
+          python $F/mine_negatives.py --container "$PROJECT-api-1" --queries "$ML/augmented.jsonl" \
+            --chunks "$ML/chunks.jsonl" --out "$ML/triples.jsonl" | tee "$ML/mine.json"
+          python $F/train.py --triples "$ML/triples.jsonl" --chunks "$ML/chunks.jsonl" \
+            --out "$RUNNER_TEMP/smoke-model" --epochs 1 --max-pairs 50 --batch-size 8 \
+            --max-seq-length 128 --device cpu | tee "$ML/train.json"
+          cp "$RUNNER_TEMP/smoke-model/training_config.json" "$ML/smoke-training-config.json"
+          python $F/eval_retrieval.py --chunks "$ML/chunks.jsonl" \
+            --models intfloat/multilingual-e5-small "$RUNNER_TEMP/smoke-model" --out "$ML/smoke-eval.json"
+          rm -rf "$RUNNER_TEMP/smoke-model"
+          echo "total_seconds=$(( $(date +%s) - start ))" >> "$ML/timing.txt"
+          # Corpus text stays out of the uploaded results: keep counts, metrics and ids only.
+          rm -f "$ML/chunks.jsonl" "$ML/augmented.jsonl" "$ML/triples.jsonl"
+          { echo "## Embedding baseline"; echo '```'; cat "$ML/baseline.json"; echo '```'; \
+            echo "## Smoke run"; echo '```'; cat "$ML/generate.json" "$ML/augment.json" \
+            "$ML/mine.json" "$ML/train.json" "$ML/timing.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Collect logs
         if: always()

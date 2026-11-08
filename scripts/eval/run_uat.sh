@@ -46,7 +46,7 @@ LLM_TEMPERATURE=$(docker inspect "$API_CID" --format '{{range .Config.Env}}{{pri
   | sed -n 's/^LLM_TEMPERATURE=//p')
 RUNNER=(env RAG_ACCEPTANCE_BASE_URL="$API" PYTHONIOENCODING=utf-8
   python tests/acceptance/rag_h5_2_exact_100.py --output "$OUT/runtime_results.json"
-  ${RERANKER_ARGS[@]+"${RERANKER_ARGS[@]}"})
+  ${RERANKER_ARGS[@]+"${RERANKER_ARGS[@]}"} ${EVAL_UAT_UNACCENTED:+--unaccented})
 
 if [ "$PHASE" != "part2" ]; then
 python - "$OUT/metadata.json" <<EOF

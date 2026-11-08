@@ -189,3 +189,9 @@ def test_proxy_grade_excludes_infra_error_and_reports_the_count() -> None:
     assert summary["excluded_infra_error"] == 1
     assert summary["excluded_infra_error_ids"] == ["Q002"]
     assert summary["retried_cases"] == 1
+
+
+def test_unaccented_mode_drops_diacritics_only() -> None:
+    assert runner.unaccent("Đơn nghỉ phép của CTO được duyệt chưa?") == (
+        "Don nghi phep cua CTO duoc duyet chua?"
+    )

@@ -132,6 +132,16 @@ Set by the owner on 2026-11-08, after `docs/eval/runs/nondeterminism.md` found t
 - Every run records `ollama_version`, `ollama_backend` and `ollama_auto_update` at the start and the version and backend at the end. A change during the run invalidates it.
 - Changing the pinned version or backend is a new baseline: re-run the baseline in the same batch as the candidate (DEC-011) before comparing anything.
 
+## DEC-015 — Embedding fine-tune data rule
+
+Set by the owner on 2026-11-08, before any training (`docs/design/embedding-finetune.md`).
+
+- **Forbidden as training data:** every question of UAT Q001-Q100, held-out v1, held-out v2, RBAC dev, `answer_relevance_dev_v1` and `false_refusal_dev_v1`, including their variants.
+- **Allowed:** synthetic questions generated from corpus chunks (`ml/embedding_finetune/generate_queries.py`) and their variants without diacritics, with partial diacritics, with typos, and in English.
+- **Checked before every training run:** each training question is compared with `scripts/eval/question_fingerprints.json` (word 4-gram hashes of all six sets). A match is dropped at generation and augmentation, and `train.py` refuses to start while one remains. A missing or stale fingerprint file stops the run.
+- **Dev questions may evaluate a model, never train it.** Held-out sets do neither until the final held-out v2 measurement, which runs once after the choice is made.
+- **The app's embedding model does not change** until a candidate meets the acceptance criteria of the design doc and the owner approves the switch.
+
 ## DEC-016 — Temporary: CI replaces local verification and measurement
 
 Set by the owner on 2026-11-08, because the local host stays below the 1000 MB start gate. Temporary; it ends when the repository moves out of OneDrive and local runs are possible again.
@@ -140,3 +150,13 @@ Set by the owner on 2026-11-08, because the local host stays below the 1000 MB s
 - **Measurement:** every batch runs on GitHub Actions (`eval.yml`, `workflow_dispatch`) through `scripts/eval/ci_batch.sh`. The baseline and every candidate configuration run in the same job, interleaved (run 1 of each, then run 2), on one image and one Ollama (0.40.15, CPU). DEC-011 and DEC-013 apply unchanged.
 - **Metadata:** each batch records the Ollama version and backend (`batch.json`), and every runner records them per run (DEC-014).
 - **No comparison with local runs:** CPU and CUDA runs are not comparable. A decision uses only runs from one Actions job.
+
+## DEC-017 — Where embedding models are trained and evaluated
+
+Set by the owner on 2026-11-08, before any training. Extends DEC-015 and DEC-016 to the embedding fine-tune.
+
+- **Evaluation runs on GitHub Actions, on CPU:** end-to-end runs, flag comparisons and model comparisons.
+- **Real training runs locally on the GTX 1650 (4 GB) or on Colab,** in the training environment of `ml/embedding_finetune/requirements-train.lock` (torch cu126 locally, CPU on Actions).
+- **A trained model is published as a GitHub Release asset with its SHA256.** The eval workflow downloads it, checks the hash, and evaluates retrieval in the same job as the base model.
+- **No comparison across environments:** numbers from local GPU, Colab and Actions are never compared with each other.
+- **No model file is committed to the repository.**

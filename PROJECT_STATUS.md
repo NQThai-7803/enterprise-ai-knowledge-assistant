@@ -1,5 +1,10 @@
 # Project Status
 
+## Embedding fine-tune environment -- 2026-11-08 (branch only, not merged)
+
+- **`.venv-nlp`** (Python 3.12.10, torch 2.14.1+cu126, sentence-transformers 6.2.0, transformers 5.22.2) sees the GTX 1650 (4 GiB, CUDA 12.6). Its freeze, without torch, is `ml/embedding_finetune/requirements-train.lock`.
+- **`train.py`** uses CachedMultipleNegativesRankingLoss and fp16 with an fp32 fallback on NaN; nothing trained yet. **DEC-017:** train locally or on Colab, evaluate on Actions on CPU, never compare across hosts, never commit a model.
+
 ## FIX 2d -- 2026-11-08 (REL-303 on by default after an Actions batch)
 
 - **Ollama pinned (DEC-014):** version 0.40.15 on CUDA, auto-update off, checked by every eval runner.

@@ -8,6 +8,7 @@ import os
 import statistics
 import sys
 import time
+import unicodedata
 from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
@@ -31,6 +32,13 @@ BENCHMARK_SOURCE = PROJECT_ROOT / "eval-data" / "uat" / "questions.json"
 # The compose.uat-corpus-v2.yaml fixture default, overridable like the stack's own value.
 DEFAULT_STAFF_PASSWORD = "LocalUatStaff!2026"
 DEFAULT_OUTPUT = PROJECT_ROOT / "artifacts" / "rag-h5-2-exact-100" / "runtime_results.json"
+
+
+def unaccent(text: str) -> str:
+    """Drop Vietnamese diacritics, keeping case and spacing ("Nghỉ phép" -> "Nghi phep")."""
+    decomposed = unicodedata.normalize("NFD", text.replace("đ", "d").replace("Đ", "D"))
+    stripped = "".join(ch for ch in decomposed if unicodedata.category(ch) != "Mn")
+    return unicodedata.normalize("NFC", stripped)
 
 
 def _load_benchmark() -> tuple[tuple[str, str], tuple[tuple[str, str, str], ...]]:
@@ -214,6 +222,11 @@ def main() -> int:
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT)
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--delay-seconds", type=float, default=0.5)
+    parser.add_argument(
+        "--unaccented",
+        action="store_true",
+        help="ask every question with its Vietnamese diacritics removed (same ids and grading)",
+    )
     args = parser.parse_args()
     base_url = os.environ.get("RAG_ACCEPTANCE_BASE_URL", "http://127.0.0.1:8000")
     try:
@@ -221,12 +234,23 @@ def main() -> int:
     except reranker_check.RerankerModeRefusedError as exc:
         print(f"REFUSED: {exc}", file=sys.stderr)
         return 2
+    loader = _load_benchmark
+    if args.unaccented:
+
+        def loader() -> tuple[tuple[str, str], tuple[tuple[str, str, str], ...]]:
+            credentials, rows = _load_benchmark()
+            return credentials, tuple((i, g, unaccent(q)) for i, g, q in rows)
+
     code = run(
         selected_ids=set(args.case_ids),
         output=args.output,
         resume=args.resume,
         delay_seconds=max(0.0, args.delay_seconds),
-        run_metadata=reranker,
+        benchmark_loader=loader,
+        run_metadata={
+            **reranker,
+            "question_form": "unaccented" if args.unaccented else "as_written",
+        },
     )
     return reranker_check.finish(args.output, reranker, base_url, code)
 

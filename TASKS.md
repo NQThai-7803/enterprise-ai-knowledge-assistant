@@ -8,6 +8,13 @@
 3. **Embedding fine-tune** (`docs/design/embedding-finetune.md` and DEC-015 on branch `feat/embedding-finetune-infra`): infrastructure only so far; the baseline measurement and training come after FIX 3.
 4. The final held-out v2 measurement, once, after the choices above are made (DEC-012).
 
+## Embedding fine-tune environment -- 2026-11-08 (branch `feat/embedding-finetune-infra`, PR #14, not merged)
+
+- **DONE: training environment `.venv-nlp`** (owner-built; torch 2.14.1+cu126 on the GTX 1650) recorded in `ml/embedding_finetune/requirements-train.lock`, torch installed per host (cu126 locally, CPU on Actions). `fsspec` is pinned to 2026.7.0 because `.venv-nlp` holds 2026.9.0, which `datasets 5.1.0` does not allow.
+- **DONE: `train.py` for a 4 GB GPU:** CachedMultipleNegativesRankingLoss (effective batch 128, mini batch 16), `max_seq_length` 256, fp16 on CUDA with an automatic fp32 restart on a non-finite loss, optional gradient checkpointing, fixed seed, device/GPU/versions and data hashes in `training_config.json`. No training run yet.
+- **DONE: DEC-017** (train locally or on Colab, evaluate on Actions on CPU, models as Release assets with SHA256).
+- **TODO:** a short GPU smoke run of `train.py` (fp16 path not exercised yet); the eval-workflow step that downloads a Release model and checks its hash.
+
 ## FIX 2d and eval environment -- 2026-11-08
 
 - **DONE: Ollama version and backend pinned (DEC-014).** Every eval runner refuses another version or backend than 0.40.15 on CUDA (`scripts/eval/ollama_check.py`) and records both at the start and the end of a run. The Windows app's auto-update is off.
