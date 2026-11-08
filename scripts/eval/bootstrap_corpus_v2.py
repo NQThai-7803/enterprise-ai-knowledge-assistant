@@ -78,7 +78,10 @@ def main():
     existing = {d.get("document_code"): d for d in body["data"]}
     runtime_docs = []
     for doc in manifest["documents"]:
-        source = ROOT / doc["source"]
+        # eval-data/ holds the same PDFs (hash-checked below) in git, for CI.
+        source = ROOT / "eval-data/corpus-v2" / Path(doc["source"]).name
+        if not source.is_file():
+            source = ROOT / doc["source"]
         digest = hashlib.sha256(source.read_bytes()).hexdigest()
         if digest != doc["sha256"]:
             raise SystemExit(f"hash mismatch {doc['code']}: {digest}")

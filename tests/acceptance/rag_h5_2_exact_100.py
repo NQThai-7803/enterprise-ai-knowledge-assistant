@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import runpy
 import statistics
 import sys
 import time
@@ -27,13 +26,18 @@ from scripts.eval.eval_client import (  # noqa: E402
     extract,
 )
 
-BENCHMARK_SOURCE = PROJECT_ROOT / "artifacts" / "rag-h5-1-stress-uat.py"
+# Copied word for word from artifacts/rag-h5-1-stress-uat.py (CORE); the password is not stored.
+BENCHMARK_SOURCE = PROJECT_ROOT / "eval-data" / "uat" / "questions.json"
+# The compose.uat-corpus-v2.yaml fixture default, overridable like the stack's own value.
+DEFAULT_STAFF_PASSWORD = "LocalUatStaff!2026"
 DEFAULT_OUTPUT = PROJECT_ROOT / "artifacts" / "rag-h5-2-exact-100" / "runtime_results.json"
 
 
 def _load_benchmark() -> tuple[tuple[str, str], tuple[tuple[str, str, str], ...]]:
-    namespace = runpy.run_path(str(BENCHMARK_SOURCE))
-    return (namespace["EMAIL"], namespace["PASSWORD"]), tuple(namespace["CORE"])
+    data = json.loads(BENCHMARK_SOURCE.read_text(encoding="utf-8"))
+    password = os.environ.get(data["password_env"], DEFAULT_STAFF_PASSWORD)
+    items = tuple((item["id"], item["group"], item["question"]) for item in data["items"])
+    return (data["account"], password), items
 
 
 def _default_client(credentials: tuple[str, str]) -> EvalClient:
