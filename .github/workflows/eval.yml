@@ -1,22 +1,31 @@
 name: Eval
 
-# Manual only. Runs a frozen dev set against the eval stack with a local Ollama, using the same
-# eval settings as the local machine (scripts/eval/compose.uat-eval.yaml: temperature 0, fixed
-# seed, warm-up, num_ctx 8192, lexical_fallback reranker). Never runs held-out sets.
+# Manual only. One measurement batch per run (DEC-011, DEC-013, DEC-016): every flag configuration
+# in `configs` runs `runs` times in this one job, on the same image and the same Ollama, interleaved,
+# and each later configuration is compared with the first. Ollama runs on CPU here, so these runs
+# are compared only with each other, never with local runs (DEC-014, DEC-016).
 #
-# Sets: `relevance` (tests/acceptance/answer_relevance_dev_v1.yaml) and `rbac`
-# (tests/acceptance/rbac_dev_v1.yaml) build their documents from the YAML in the repo. `uat` loads
-# the fictional corpus V2 from eval-data/corpus-v2 (hash-checked against uat/corpus-v2/manifest.json)
-# and asks eval-data/uat/questions.json, all of Q001-Q100 or the ids in `cases`.
-# Runs here are on CPU, so they are not comparable with local CUDA runs (DEC-014).
+# Sets: `uat` (Q001-Q100 from eval-data/, corpus V2 PDFs from eval-data/corpus-v2, proxy grade
+# against eval-data/uat/reference-grade.json), `rbac` (tests/acceptance/rbac_dev_v1.yaml, with the
+# retrieval-level leak check), `relevance` (answer_relevance_dev_v1) and `false_refusal`
+# (false_refusal_dev_v1). Never runs held-out sets.
 on:
   workflow_dispatch:
     inputs:
       set:
-        description: "Dev set to run"
+        description: "Question set"
         type: choice
-        options: [relevance, rbac, uat]
+        options: [uat, rbac, relevance, false_refusal]
         default: relevance
+      configs:
+        description: "Configurations, ';'-separated, baseline first: name or name:EVAL_VAR=value,..."
+        type: string
+        default: "base"
+      runs:
+        description: "Runs per configuration (2 for a DEC-013 comparison)"
+        type: choice
+        options: ["1", "2"]
+        default: "1"
       cases:
         description: "uat only: space-separated ids (e.g. Q001 Q021); empty runs all 100"
         type: string
@@ -26,20 +35,21 @@ permissions:
   contents: read
 
 concurrency:
-  group: eval-${{ github.ref }}
+  group: eval-${{ github.ref }}-${{ inputs.set }}
   cancel-in-progress: false
 
 jobs:
   eval:
     name: Eval ${{ inputs.set }}
     runs-on: ubuntu-latest
-    timeout-minutes: 120
+    timeout-minutes: 340
     env:
       PROJECT: eaka-${{ inputs.set }}-dev
       OUT: eval-out
       P3D_BACKEND_IMAGE: eaka-backend:ci-eval
       EVAL_BACKEND_IMAGE: eaka-backend:ci-eval
       EVAL_EXPECTED_RERANKER_MODE: lexical_fallback
+      COMPOSE_FILES: "-f compose.yaml -f compose.uat-corpus-v2.yaml -f scripts/eval/compose.uat-eval.yaml -f ci-host.yaml"
       # DEC-014: the runners refuse another Ollama version or backend than these.
       OLLAMA_VERSION: 0.40.15
       EVAL_OLLAMA_EXPECTED_VERSION: 0.40.15
@@ -120,12 +130,17 @@ jobs:
 
       - name: Install Ollama and pull the model
         run: |
-          curl -fsSL https://ollama.com/install.sh | OLLAMA_VERSION="$OLLAMA_VERSION" sh
+          set -euo pipefail
+          curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors -o "$RUNNER_TEMP/ollama-install.sh" \
+            https://ollama.com/install.sh
+          OLLAMA_VERSION="$OLLAMA_VERSION" sh "$RUNNER_TEMP/ollama-install.sh"
           sudo systemctl stop ollama || true
           echo "EVAL_OLLAMA_LOG=$RUNNER_TEMP/ollama.log" >> "$GITHUB_ENV"
-          OLLAMA_HOST=0.0.0.0:11434 OLLAMA_CONTEXT_LENGTH=8192 OLLAMA_NUM_PARALLEL=1             nohup ollama serve > "$RUNNER_TEMP/ollama.log" 2>&1 &
+          OLLAMA_HOST=0.0.0.0:11434 OLLAMA_CONTEXT_LENGTH=8192 OLLAMA_NUM_PARALLEL=1 \
+            nohup ollama serve > "$RUNNER_TEMP/ollama.log" 2>&1 &
           for _ in $(seq 1 30); do curl -sf http://127.0.0.1:11434/api/version && break; sleep 2; done
-          ollama pull qwen2.5:3b
+          for attempt in 1 2 3; do ollama pull qwen2.5:3b && break; sleep 15; done
+          ollama list | grep -q '^qwen2.5:3b'
           mkdir -p "$OUT"
           { ollama --version; env | grep '^OLLAMA_' || true; nproc; free -m; } > "$OUT/ollama-config.txt"
 
@@ -134,15 +149,16 @@ jobs:
 
       - name: Start the eval stack
         run: |
+          set -euo pipefail
           # The API reaches Ollama on the host, as on Docker Desktop.
-          cat > "$RUNNER_TEMP/ci-host.yaml" <<'EOF'
+          cat > ci-host.yaml <<'EOF'
           services:
             api:
               extra_hosts: ["host.docker.internal:host-gateway"]
             worker:
               extra_hosts: ["host.docker.internal:host-gateway"]
           EOF
-          FILES=(-f compose.yaml -f compose.uat-corpus-v2.yaml -f scripts/eval/compose.uat-eval.yaml -f "$RUNNER_TEMP/ci-host.yaml")
+          read -r -a FILES <<< "$COMPOSE_FILES"
           docker compose -p "$PROJECT" "${FILES[@]}" up -d --no-build postgres redis
           docker compose -p "$PROJECT" "${FILES[@]}" run --rm --no-deps migration
           docker compose -p "$PROJECT" "${FILES[@]}" run --rm --no-deps uat-v2-accounts
@@ -151,8 +167,7 @@ jobs:
             [ "$(docker inspect "$PROJECT-api-1" --format '{{.State.Health.Status}}')" = healthy ] && break
             sleep 5
           done
-          docker inspect "$PROJECT-api-1" --format '{{.State.Health.Status}}'
-          docker inspect "$PROJECT-api-1" --format '{{range .Config.Env}}{{println .}}{{end}}' | grep '^RAG_' | sort > "$OUT/flags.txt"
+          docker inspect "$PROJECT-api-1" --format '{{.State.Health.Status}}' | grep -q healthy
 
       - name: Load corpus V2
         if: inputs.set == 'uat'
@@ -160,31 +175,22 @@ jobs:
           python scripts/eval/bootstrap_corpus_v2.py . http://127.0.0.1:18190
           "$OUT/runtime-manifest.json"
 
-      - name: Warm up
-        run: >
-          python scripts/eval/ollama_warmup.py "$OUT/warmup.json" --base-url http://127.0.0.1:11434
-          --model qwen2.5:3b --num-ctx 8192 --keep-alive 10m --seed 20261031
-
-      - name: Run the dev set
+      - name: Run the batch
         env:
+          SET: ${{ inputs.set }}
+          CONFIGS: ${{ inputs.configs }}
+          RUNS: ${{ inputs.runs }}
           CASES_INPUT: ${{ inputs.cases }}
         run: |
-          free -m > "$OUT/memory-before.txt"
-          ( while true; do free -m | awk 'NR==2 {print strftime("%T"), $3, $7}'; sleep 15; done ) > "$OUT/memory.log" &
-          start=$(date +%s)
-          if [ "${{ inputs.set }}" = relevance ]; then
-            python scripts/eval/run_answer_relevance_dev.py --output "$OUT/results.json"
-          elif [ "${{ inputs.set }}" = uat ]; then
-            CASES=()
-            for id in $CASES_INPUT; do
-              [[ "$id" =~ ^Q[0-9]{3}$ ]] || { echo "bad case id: $id"; exit 1; }
-              CASES+=(--case "$id")
-            done
-            python tests/acceptance/rag_h5_2_exact_100.py --output "$OUT/results.json"               ${CASES[@]+"${CASES[@]}"}
-          else
-            python scripts/eval/run_rbac_dev.py --output "$OUT/results.json"
-          fi
-          echo "seconds=$(( $(date +%s) - start ))" > "$OUT/timing.txt"
+          CASES=()
+          for id in $CASES_INPUT; do
+            [[ "$id" =~ ^Q[0-9]{3}$ ]] || { echo "bad case id: $id"; exit 1; }
+            CASES+=("$id")
+          done
+          ( while true; do free -m | awk 'NR==2 {print strftime("%T"), $3, $7}'; sleep 30; done ) \
+            > "$OUT/memory.log" &
+          bash scripts/eval/ci_batch.sh "$SET" "$CONFIGS" "$RUNS" "$OUT" ${CASES[@]+"${CASES[@]}"}
+          cat "$OUT/summary.md" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Collect logs
         if: always()
