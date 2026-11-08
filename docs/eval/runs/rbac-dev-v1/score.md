@@ -4,6 +4,8 @@ Chạy ngày 2026-11-05 trên stack riêng `eaka-rbac-dev`, image `eaka-backend:
 
 Bộ gồm 18 câu từ tài khoản không có quyền, chia đều 3 tình huống: Staff hỏi tài liệu cấp cho Manager, khác phòng ban, và tài liệu đã thu hồi quyền. Mỗi câu có một ca đối chứng từ tài khoản có quyền. Điểm chấm tự động, không phải chấm tay.
 
+> **Lưu ý (2026-11-08, DEC-013):** RBD-04 và RBD-05 đúng ở baseline chỉ nhờ lỗi bỏ dấu: "giám" trong "Phó giám đốc" khớp với từ khóa kết quả "giảm", nên nhánh điều kiện trả lời được. Xem `docs/eval/runs/fix2b-cues.md`.
+
 ## Kết luận
 
 **Lọc quyền đúng ở cả 18 cặp; 0 rò rỉ.** Tầng trả lời lại yếu: chỉ 4/18 ca đối chứng đạt, và 5/18 câu không có quyền vẫn nhận câu trả lời không liên quan.

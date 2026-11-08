@@ -31,7 +31,7 @@ Trên UAT, flag REL-103 và REL-402 giữ nguyên trạng thái và nội dung c
 
 Flag làm đúng việc ở nhánh deterministic: "giám sát" không còn bị coi là "giảm", nên nhánh này không trả lời nữa. Nhưng câu hỏi chuyển sang LLM, và LLM chép nguyên văn một câu khác: "Giám sát trưởng ký biên bản nghiệm thu hạng mục kết cấu." Validator duyệt vì câu đó có nguyên văn trong nguồn. REL-103 vẫn sai, chỉ đổi cơ chế.
 
-Cũng chính sự trùng "giam" đó đang giúp 2 câu RBAC. RBD-04 và RBD-05 có "Phó giám đốc vận hành" trong nguồn, nên nhánh deterministic trả đúng. Khi tắt sự trùng này, LLM từ chối sai 2 câu đó. Vậy nhánh này có đúng một phần nhờ lỗi.
+Cũng chính sự trùng "giam" đó đang giúp 2 câu RBAC (ghi chú trong DEC-013 và `rbac-dev-v1/score.md`). RBD-04 và RBD-05 có "Phó giám đốc vận hành" trong nguồn, nên nhánh deterministic trả đúng. Khi tắt sự trùng này, LLM từ chối sai 2 câu đó. Vậy nhánh này có đúng một phần nhờ lỗi.
 
 **Đính chính báo cáo FIX 2a:** tôi nói nhóm 3 như thiết kế không sửa được REL-103. Điều đó đúng khi flag này tắt. Khi bật, REL-103 thành đúng dạng nhóm 3: LLM chép nguyên văn câu lạc đề.
 
