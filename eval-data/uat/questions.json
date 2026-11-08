@@ -1,0 +1,508 @@
+{
+ "set": "uat-q001-q100",
+ "source": "artifacts/rag-h5-1-stress-uat.py (CORE), copied 2026-11-08",
+ "account": "staff.uat@example.test",
+ "password_env": "UAT_STAFF_PASSWORD",
+ "items": [
+  {
+   "id": "Q001",
+   "group": "A",
+   "question": "CEO bên Nova Digital là ai vậy?"
+  },
+  {
+   "id": "Q002",
+   "group": "A",
+   "question": "Ai đang làm tổng giám đốc Nova Digital?"
+  },
+  {
+   "id": "Q003",
+   "group": "A",
+   "question": "CTO công ty là ai?"
+  },
+  {
+   "id": "Q004",
+   "group": "A",
+   "question": "Người phụ trách công nghệ của Nova Digital tên gì?"
+  },
+  {
+   "id": "Q005",
+   "group": "A",
+   "question": "COO là ai nhỉ?"
+  },
+  {
+   "id": "Q006",
+   "group": "A",
+   "question": "CFO bên công ty tên gì?"
+  },
+  {
+   "id": "Q007",
+   "group": "A",
+   "question": "CHRO Nova Digital là ai?"
+  },
+  {
+   "id": "Q008",
+   "group": "A",
+   "question": "Công ty này thành lập hồi năm nào vậy?"
+  },
+  {
+   "id": "Q009",
+   "group": "A",
+   "question": "Nova Digital có cỡ bao nhiêu nhân viên?"
+  },
+  {
+   "id": "Q010",
+   "group": "A",
+   "question": "Khoảng bao nhiêu phần trăm nhân sự làm kỹ thuật, data với security?"
+  },
+  {
+   "id": "Q011",
+   "group": "A",
+   "question": "Nova Digital có văn phòng ở đâu?"
+  },
+  {
+   "id": "Q012",
+   "group": "A",
+   "question": "Công ty đang làm những mảng gì?"
+  },
+  {
+   "id": "Q013",
+   "group": "A",
+   "question": "NovaAssist là cái gì vậy?"
+  },
+  {
+   "id": "Q014",
+   "group": "A",
+   "question": "NovaAssist dùng để làm gì?"
+  },
+  {
+   "id": "Q015",
+   "group": "A",
+   "question": "Bộ phận nào trực tiếp xây mấy hệ thống AI/RAG của công ty?"
+  },
+  {
+   "id": "Q016",
+   "group": "B",
+   "question": "Một tuần bình thường làm bao nhiêu tiếng?"
+  },
+  {
+   "id": "Q017",
+   "group": "B",
+   "question": "Mỗi ngày làm mấy tiếng vậy?"
+  },
+  {
+   "id": "Q018",
+   "group": "B",
+   "question": "Sáng mình được vào làm từ mấy giờ tới mấy giờ?"
+  },
+  {
+   "id": "Q019",
+   "group": "B",
+   "question": "Nếu vào lúc 9 giờ thì khoảng mấy giờ được về?"
+  },
+  {
+   "id": "Q020",
+   "group": "B",
+   "question": "Core hours của công ty là khung nào?"
+  },
+  {
+   "id": "Q021",
+   "group": "B",
+   "question": "Buổi chiều giờ cốt lõi bắt đầu lúc mấy giờ?"
+  },
+  {
+   "id": "Q022",
+   "group": "B",
+   "question": "Nghỉ trưa thường bao lâu?"
+  },
+  {
+   "id": "Q023",
+   "group": "B",
+   "question": "Mình quên check-out hôm qua thì giờ sửa sao?"
+  },
+  {
+   "id": "Q024",
+   "group": "B",
+   "question": "Quên chấm công thì trong bao lâu nên gửi yêu cầu chỉnh?"
+  },
+  {
+   "id": "Q025",
+   "group": "B",
+   "question": "Ai duyệt yêu cầu sửa chấm công của mình?"
+  },
+  {
+   "id": "Q026",
+   "group": "B",
+   "question": "Sau khi HR khóa kỳ công rồi còn sửa được nữa không?"
+  },
+  {
+   "id": "Q027",
+   "group": "B",
+   "question": "Remote được tối đa mấy ngày một tuần vậy?"
+  },
+  {
+   "id": "Q028",
+   "group": "B",
+   "question": "Muốn remote ngày mai thì hôm nay phải đăng ký trước mấy giờ?"
+  },
+  {
+   "id": "Q029",
+   "group": "B",
+   "question": "Làm remote thì có phải giữ core hours không?"
+  },
+  {
+   "id": "Q030",
+   "group": "B",
+   "question": "Trực on-call có mặc định tính hết thành OT không?"
+  },
+  {
+   "id": "Q031",
+   "group": "C",
+   "question": "remote dc may ngay/tuan vay?"
+  },
+  {
+   "id": "Q032",
+   "group": "C",
+   "question": "core hour may gio?"
+  },
+  {
+   "id": "Q033",
+   "group": "C",
+   "question": "quen checkout thi sao?"
+  },
+  {
+   "id": "Q034",
+   "group": "C",
+   "question": "1 tuan lam 40h dung ko?"
+  },
+  {
+   "id": "Q035",
+   "group": "C",
+   "question": "đi muộn thì bù sang ngày mai được không?"
+  },
+  {
+   "id": "Q036",
+   "group": "C",
+   "question": "Hôm nay tôi tới trễ, tối nay làm bù luôn được không?"
+  },
+  {
+   "id": "Q037",
+   "group": "C",
+   "question": "On call nhưng không có incident thì có tính OT hết thời gian trực không?"
+  },
+  {
+   "id": "Q038",
+   "group": "C",
+   "question": "Tôi làm ở nhà thì có cần chấm công như đi văn phòng không?"
+  },
+  {
+   "id": "Q039",
+   "group": "D",
+   "question": "Một năm nhân viên bình thường có bao nhiêu ngày phép?"
+  },
+  {
+   "id": "Q040",
+   "group": "D",
+   "question": "Tôi làm ở đây đủ 5 năm rồi thì được thêm ngày phép không?"
+  },
+  {
+   "id": "Q041",
+   "group": "D",
+   "question": "Làm 10 năm thì quy tắc tăng phép tính thế nào?"
+  },
+  {
+   "id": "Q042",
+   "group": "D",
+   "question": "Chưa làm đủ một năm thì phép tính sao?"
+  },
+  {
+   "id": "Q043",
+   "group": "D",
+   "question": "Tôi cưới thì được nghỉ mấy ngày?"
+  },
+  {
+   "id": "Q044",
+   "group": "D",
+   "question": "Con tôi cưới thì tôi được nghỉ mấy ngày?"
+  },
+  {
+   "id": "Q045",
+   "group": "D",
+   "question": "Ba mẹ mất thì được nghỉ hưởng lương bao lâu?"
+  },
+  {
+   "id": "Q046",
+   "group": "D",
+   "question": "Tôi xin nghỉ không lương 2 tuần thì cứ tạo đơn là được nghỉ luôn hả?"
+  },
+  {
+   "id": "Q047",
+   "group": "D",
+   "question": "Nghỉ không lương dài ngày nên báo trước bao lâu?"
+  },
+  {
+   "id": "Q048",
+   "group": "D",
+   "question": "Muốn nghỉ phép 2 ngày thì nên xin trước mấy ngày?"
+  },
+  {
+   "id": "Q049",
+   "group": "D",
+   "question": "Nếu nghỉ 4 ngày thì nên gửi đơn trước bao lâu?"
+  },
+  {
+   "id": "Q050",
+   "group": "D",
+   "question": "Nghỉ hơn 5 ngày thì báo trước bao lâu?"
+  },
+  {
+   "id": "Q051",
+   "group": "D",
+   "question": "Tôi bị sốt sáng nay thì phải làm gì trước?"
+  },
+  {
+   "id": "Q052",
+   "group": "D",
+   "question": "Đang nghỉ phép mà production P1 thì tôi có bắt buộc phải vào xử lý không?"
+  },
+  {
+   "id": "Q053",
+   "group": "D",
+   "question": "Nghỉ việc mà còn phép chưa dùng thì xử lý sao?"
+  },
+  {
+   "id": "Q054",
+   "group": "E",
+   "question": "Công ty trả lương ngày mấy?"
+  },
+  {
+   "id": "Q055",
+   "group": "E",
+   "question": "Nếu ngày trả lương rơi đúng ngày nghỉ thì sao?"
+  },
+  {
+   "id": "Q056",
+   "group": "E",
+   "question": "Senior Engineer bên Nova khoảng bao nhiêu tiền một tháng?"
+  },
+  {
+   "id": "Q057",
+   "group": "E",
+   "question": "Junior Developer thuộc dải lương nào?"
+  },
+  {
+   "id": "Q058",
+   "group": "E",
+   "question": "Middle Developer khoảng bao nhiêu?"
+  },
+  {
+   "id": "Q059",
+   "group": "E",
+   "question": "Tech Lead thì range lương bao nhiêu?"
+  },
+  {
+   "id": "Q060",
+   "group": "E",
+   "question": "Director có range lương cỡ nào?"
+  },
+  {
+   "id": "Q061",
+   "group": "E",
+   "question": "Phụ cấp ăn trưa là bao nhiêu?"
+  },
+  {
+   "id": "Q062",
+   "group": "E",
+   "question": "Tiền ăn trưa mỗi tháng được hỗ trợ bao nhiêu?"
+  },
+  {
+   "id": "Q063",
+   "group": "E",
+   "question": "Công ty có hỗ trợ tiền remote không?"
+  },
+  {
+   "id": "Q064",
+   "group": "E",
+   "question": "WFH đúng 1 hôm thì có được 500k remote allowance không?"
+  },
+  {
+   "id": "Q065",
+   "group": "E",
+   "question": "Phụ cấp điện thoại khoảng bao nhiêu?"
+  },
+  {
+   "id": "Q066",
+   "group": "E",
+   "question": "Đi làm Chủ nhật được tính ít nhất bao nhiêu %?"
+  },
+  {
+   "id": "Q067",
+   "group": "E",
+   "question": "OT ngày thường thì ít nhất bao nhiêu phần trăm?"
+  },
+  {
+   "id": "Q068",
+   "group": "E",
+   "question": "Làm ngày lễ thì OT tối thiểu bao nhiêu?"
+  },
+  {
+   "id": "Q069",
+   "group": "E",
+   "question": "Làm việc ban đêm được cộng thêm bao nhiêu?"
+  },
+  {
+   "id": "Q070",
+   "group": "E",
+   "question": "Salary review có nghĩa là chắc chắn tăng lương không?"
+  },
+  {
+   "id": "Q071",
+   "group": "E",
+   "question": "Thường salary review diễn ra khoảng thời gian nào?"
+  },
+  {
+   "id": "Q072",
+   "group": "E",
+   "question": "Meets Expectations thì bonus mục tiêu cỡ bao nhiêu tháng lương?"
+  },
+  {
+   "id": "Q073",
+   "group": "E",
+   "question": "Tôi có được nói cho đồng nghiệp biết lương của chính tôi không?"
+  },
+  {
+   "id": "Q074",
+   "group": "F",
+   "question": "Công ty đóng BHXH bao nhiêu phần trăm?"
+  },
+  {
+   "id": "Q075",
+   "group": "F",
+   "question": "Trong policy có ghi cố định tỷ lệ BHXH công ty đóng không?"
+  },
+  {
+   "id": "Q076",
+   "group": "F",
+   "question": "NovaCare có ngay từ ngày đầu vào làm không?"
+  },
+  {
+   "id": "Q077",
+   "group": "F",
+   "question": "NovaCare nội trú được tối đa bao nhiêu một năm?"
+  },
+  {
+   "id": "Q078",
+   "group": "F",
+   "question": "Ngoại trú được bao nhiêu?"
+  },
+  {
+   "id": "Q079",
+   "group": "F",
+   "question": "Một lần khám ngoại trú tối đa bao nhiêu?"
+  },
+  {
+   "id": "Q080",
+   "group": "F",
+   "question": "Nha khoa được hỗ trợ bao nhiêu?"
+  },
+  {
+   "id": "Q081",
+   "group": "F",
+   "question": "Thai sản bổ sung của NovaCare có hạn mức bao nhiêu?"
+  },
+  {
+   "id": "Q082",
+   "group": "F",
+   "question": "Bảo hiểm tai nạn cá nhân có hạn mức bao nhiêu?"
+  },
+  {
+   "id": "Q083",
+   "group": "F",
+   "question": "Mỗi năm được tư vấn EAP mấy buổi?"
+  },
+  {
+   "id": "Q084",
+   "group": "F",
+   "question": "Công ty hỗ trợ gym/yoga mỗi năm bao nhiêu?"
+  },
+  {
+   "id": "Q085",
+   "group": "F",
+   "question": "Tiền mua đồ ergonomic được hỗ trợ bao nhiêu và bao lâu được một lần?"
+  },
+  {
+   "id": "Q086",
+   "group": "F",
+   "question": "Nhân viên kết hôn có khoản hỗ trợ riêng của công ty không?"
+  },
+  {
+   "id": "Q087",
+   "group": "F",
+   "question": "Có con thì công ty hỗ trợ bao nhiêu tiền?"
+  },
+  {
+   "id": "Q088",
+   "group": "F",
+   "question": "Nếu có tai nạn trong lúc đang remote ở nhà thì mặc định là tai nạn lao động đúng không?"
+  },
+  {
+   "id": "Q089",
+   "group": "G",
+   "question": "Tôi đưa mật khẩu cho đồng nghiệp đăng nhập giúp được không?"
+  },
+  {
+   "id": "Q090",
+   "group": "G",
+   "question": "Có được gửi OTP cho teammate không?"
+  },
+  {
+   "id": "Q091",
+   "group": "G",
+   "question": "Tôi copy source code công ty lên GitHub cá nhân để làm ở nhà được không?"
+  },
+  {
+   "id": "Q092",
+   "group": "G",
+   "question": "Có được gửi file công việc sang Gmail cá nhân không?"
+  },
+  {
+   "id": "Q093",
+   "group": "G",
+   "question": "Tôi có thể paste source code nội bộ vào ChatGPT/public AI để hỏi lỗi không?"
+  },
+  {
+   "id": "Q094",
+   "group": "G",
+   "question": "AI tạo ra kết quả rồi thì có được dùng thẳng làm bằng chứng test không?"
+  },
+  {
+   "id": "Q095",
+   "group": "G",
+   "question": "Nếu nghi tài khoản bị lộ thì phải báo ai?"
+  },
+  {
+   "id": "Q096",
+   "group": "H",
+   "question": "Tôi là nhân viên hybrid, vậy vừa phải tuân thủ bảo mật gì khi làm ở nhà vừa được hưởng khoản hỗ trợ nào?"
+  },
+  {
+   "id": "Q097",
+   "group": "H",
+   "question": "Tôi on-call và phải xử lý incident vào Chủ nhật thì thời gian làm việc và tiền OT được xử lý thế nào?"
+  },
+  {
+   "id": "Q098",
+   "group": "H",
+   "question": "Tôi đang nghỉ phép mà phải hỗ trợ production incident thì công ty xử lý quyền nghỉ với thời gian phát sinh thế nào?"
+  },
+  {
+   "id": "Q099",
+   "group": "I",
+   "question": "CEO Nova Digital là Lê Thu Hà đúng không?"
+  },
+  {
+   "id": "Q100",
+   "group": "I",
+   "question": "Nova Digital dùng AWS cho toàn bộ production đúng không?"
+  }
+ ]
+}
