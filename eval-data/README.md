@@ -11,5 +11,9 @@ addresses use the reserved `.example` domain, and the PDF metadata says "Fiction
   `artifacts/rag-h5-1-stress-uat.py`. It names the account and the environment variable for its
   password (`UAT_STAFF_PASSWORD`); no password is stored.
 
+- `uat/reference-grade.json`: the manually reviewed TASK-035.3B grade of Q001-Q100 (status, answer and cited
+  documents per question), and `uat/reference-runtime-manifest.json`: the V2 document ids it cites. Both are
+  copies from `artifacts/`; `scripts/eval/grade_proxy.py` uses them to grade UAT runs on Actions.
+
 These are dev sets. Held-out sets never go here. Any edit to a file here changes what a
 measurement means: record it in DECISIONS.md and re-run the baseline in the same batch.
