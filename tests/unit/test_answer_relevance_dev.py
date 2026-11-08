@@ -55,6 +55,51 @@ def test_answer_item_needs_status_document_and_fact() -> None:
     assert not relevance.grade_case(_case("NO_ANSWER"), ITEM, CODES)["passed"]
 
 
+FR_ITEM = {
+    "id": "FR",
+    "group": "N",
+    "expect": "answer",
+    "document": "DOC-1",
+    "fact": "07 ngày",
+    "fact_alternatives": ["7 ngày", "bảy ngày"],
+}
+
+
+@pytest.mark.parametrize(
+    ("answer", "passed"),
+    [
+        ("Trong 07 ngày làm việc.", True),
+        ("Trong 7 ngày làm việc.", True),
+        ("Trong bảy ngày làm việc.", True),
+        ("Trong 17 ngày làm việc.", False),
+        ("Trong 70 ngày làm việc.", False),
+        ("Trong 5 ngày làm việc.", False),
+    ],
+)
+def test_answer_item_accepts_any_listed_form_of_the_fact(answer: str, passed: bool) -> None:
+    case = _case("ANSWERED", answer, True)
+    assert relevance.grade_case(case, FR_ITEM, CODES)["passed"] is passed
+
+
+def test_a_number_fact_does_not_match_inside_a_longer_number() -> None:
+    item = {**ITEM, "fact": "300.000", "fact_alternatives": ["300 nghìn"]}
+    assert relevance.states_fact(item, "300.000 đồng mỗi ngày")
+    assert relevance.states_fact(item, "300 nghìn đồng")
+    assert not relevance.states_fact(item, "1.300.000 đồng")
+    assert not relevance.states_fact(item, "3.300 nghìn đồng")
+
+
+def test_false_refusal_set_matches_its_lock_and_its_facts_are_in_the_documents() -> None:
+    source = relevance.ROOT / "tests" / "acceptance" / "false_refusal_dev_v1.yaml"
+    lock = relevance.verify_frozen(source, source.with_suffix(".lock"))
+    data = run_rbac_dev.load_set(source)
+    assert lock["items"] == len(data["items"]) == 20
+    documents = {doc["code"]: doc["text"] for doc in data["documents"]}
+    for item in data["items"]:
+        if item["expect"] == "answer":
+            assert relevance.states_fact(item, documents[item["document"]]), item["id"]
+
+
 def test_refuse_item_counts_any_answer_as_false() -> None:
     item = {"id": "R", "group": 1, "expect": "refuse"}
     refused = relevance.grade_case(_case("NO_ANSWER"), item, CODES)
