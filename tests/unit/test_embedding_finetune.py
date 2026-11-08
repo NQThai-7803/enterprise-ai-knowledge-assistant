@@ -14,7 +14,12 @@ if not (ROOT / "ml" / "embedding_finetune").is_dir():  # the backend image has n
 
 from ml.embedding_finetune import augment, common, eval_retrieval, mine_negatives  # noqa: E402
 from ml.embedding_finetune.generate_queries import parse_questions  # noqa: E402
-from ml.embedding_finetune.train import examples  # noqa: E402
+from ml.embedding_finetune.train import (  # noqa: E402
+    NonFiniteLoss,
+    examples,
+    examples_sha256,
+    fit_with_fp16_fallback,
+)
 
 
 def test_unaccent_drops_every_diacritic_and_keeps_case() -> None:
@@ -75,6 +80,35 @@ def test_training_examples_carry_the_e5_prefixes_and_skip_rows_without_negatives
         {"query": "q2", "positive_chunk_id": "p", "negative_chunk_ids": []},
     ]
     assert examples(rows, chunks) == [("query: q1", "passage: P", "passage: N")]
+
+
+def test_non_finite_loss_under_fp16_reruns_in_fp32_and_says_why() -> None:
+    calls: list[bool] = []
+
+    def attempt(fp16: bool) -> str:
+        calls.append(fp16)
+        if fp16:
+            raise NonFiniteLoss(epoch=0, step=7)
+        return "model"
+
+    result, reason = fit_with_fp16_fallback(attempt, fp16=True)
+    assert (result, calls) == ("model", [True, False])
+    assert reason is not None and "epoch 0 step 7" in reason and "fp32" in reason
+    assert fit_with_fp16_fallback(lambda fp16: "model", fp16=True) == ("model", None)
+
+
+def test_non_finite_loss_in_fp32_is_not_retried() -> None:
+    def attempt(fp16: bool) -> str:
+        raise NonFiniteLoss(epoch=1, step=0)
+
+    with pytest.raises(NonFiniteLoss):
+        fit_with_fp16_fallback(attempt, fp16=False)
+
+
+def test_examples_hash_follows_content_and_order() -> None:
+    a, b = ("query: q1", "passage: P", "passage: N"), ("query: q2", "passage: P", "passage: N")
+    assert examples_sha256([a, b]) == examples_sha256([a, b])
+    assert examples_sha256([a, b]) != examples_sha256([b, a])
 
 
 def test_scores_count_any_gold_chunk_in_the_top_k() -> None:

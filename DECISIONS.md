@@ -150,3 +150,13 @@ Set by the owner on 2026-11-08, because the local host stays below the 1000 MB s
 - **Measurement:** every batch runs on GitHub Actions (`eval.yml`, `workflow_dispatch`) through `scripts/eval/ci_batch.sh`. The baseline and every candidate configuration run in the same job, interleaved (run 1 of each, then run 2), on one image and one Ollama (0.40.15, CPU). DEC-011 and DEC-013 apply unchanged.
 - **Metadata:** each batch records the Ollama version and backend (`batch.json`), and every runner records them per run (DEC-014).
 - **No comparison with local runs:** CPU and CUDA runs are not comparable. A decision uses only runs from one Actions job.
+
+## DEC-017 — Where embedding models are trained and evaluated
+
+Set by the owner on 2026-11-08, before any training. Extends DEC-015 and DEC-016 to the embedding fine-tune.
+
+- **Evaluation runs on GitHub Actions, on CPU:** end-to-end runs, flag comparisons and model comparisons.
+- **Real training runs locally on the GTX 1650 (4 GB) or on Colab,** in the training environment of `ml/embedding_finetune/requirements-train.lock` (torch cu126 locally, CPU on Actions).
+- **A trained model is published as a GitHub Release asset with its SHA256.** The eval workflow downloads it, checks the hash, and evaluates retrieval in the same job as the base model.
+- **No comparison across environments:** numbers from local GPU, Colab and Actions are never compared with each other.
+- **No model file is committed to the repository.**

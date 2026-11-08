@@ -20,7 +20,8 @@ The hybrid retrieval (semantic + keyword + fusion) recovers part of this through
 Fine-tune the same base model; do not switch model family.
 - **Base:** `intfloat/multilingual-e5-small`. The output keeps 384 dimensions, so the `vector(384)` column, the HNSW index and the exact-KNN path stay as they are.
 - **Prefixes:** unchanged, `query: ` for questions and `passage: ` for chunks, in training and in the app.
-- **Loss:** `MultipleNegativesRankingLoss`. Each question is trained against its positive chunk, one hard negative, and the other passages of the batch.
+- **Loss:** `CachedMultipleNegativesRankingLoss`. Each question is trained against its positive chunk, one hard negative, and the other passages of the batch. The cache makes the effective batch (default 128) independent of the mini batch held in memory (default 16), so a 4 GB GPU still gets many in-batch negatives.
+- **Hardware (DEC-017):** real training runs locally on the GTX 1650 (4 GB) or on Colab; defaults are `max_seq_length` 256 and fp16 on CUDA. A non-finite loss under fp16 restarts the run from the base model in fp32, and `training_config.json` records why.
 - **Hard negatives:** taken from the app's current hybrid retrieval, run inside an eval stack (`mine_negatives.py`). These are the chunks the system confuses today. The positive, chunks with the same text, and the chunks next to the positive in the same document (they overlap by 100 tokens) are excluded.
 - **Training questions:** synthetic only. The local LLM writes 3-5 questions per chunk (`generate_queries.py`). `augment.py` then adds, per question, a version without diacritics, a version with about half of the diacritics, one light typo, and optionally an English translation.
 
@@ -41,7 +42,7 @@ No question from UAT Q001-Q100, held-out v1, held-out v2, RBAC dev, `answer_rele
 
 ## 5. How a fine-tuned model would reach the app (not done now)
 
-1. **Publish the model** as a pinned artifact: a local path or a private repository with a revision. Record `training_config.json`, which holds the data hashes, the arguments and the library versions.
+1. **Publish the model** as a GitHub Release asset with its SHA256 (DEC-017), never in the repository. Record `training_config.json`, which holds the data hashes, the arguments, the device and the library versions. The eval workflow is to download it, check the hash, and measure it in the same job as the base model (not built yet).
 2. **Configure it** through the existing settings `EMBEDDING_MODEL_NAME` and `EMBEDDING_MODEL_REVISION`. No new code path is needed to load it.
 3. **Re-embed the whole corpus before switching (blue-green).** The semantic query does not filter on `document_chunks.embedding_model`, so a half re-embedded corpus would silently compare new query vectors with old passage vectors.
    - Build a second stack: restore the corpus and reprocess every document through the normal pipeline with the new model.
@@ -66,5 +67,6 @@ A candidate model is proposed for the app only if all of these hold:
 - **Synthetic questions are cleaner than real ones.** The typo and diacritic variants help only partly. English questions translated by a 3B model can be literal.
 - **Protected-set contamination by paraphrase.** See section 3.
 - **Vector mixing during migration.** See section 5.3: never re-embed in place.
-- **Reproducibility.** Training on CPU and GPU gives slightly different weights. The config records the device and versions, and `requirements-train.lock` pins them (same versions as the app).
+- **Reproducibility.** Training on CPU and GPU, or in fp16 and fp32, gives slightly different weights. The config records the device, GPU, precision and versions, and `requirements-train.lock` pins every library except torch, whose build is chosen per host (cu126 locally, CPU on Actions). Numbers from different hosts are never compared (DEC-017).
+- **Library versions differ from the app.** The training lock follows `.venv-nlp` (sentence-transformers 6.2.0, transformers 5.22.2); the app image has 6.1.0 and 5.19.0. `eval_retrieval.py` scores the base model and the candidate in the same environment, but before a switch the candidate must also load and embed identically in the app image.
 - **Licence.** multilingual-e5-small is MIT-licensed. A fine-tuned copy stays internal.

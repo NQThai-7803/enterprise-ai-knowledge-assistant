@@ -202,7 +202,7 @@ jobs:
           set -euo pipefail
           ML="$OUT/ml"; mkdir -p "$ML"
           python -m pip install -q -r ml/embedding_finetune/requirements-train.lock \
-            --extra-index-url https://download.pytorch.org/whl/cpu
+            torch==2.14.1+cpu --extra-index-url https://download.pytorch.org/whl/cpu
           ( while true; do free -m | awk 'NR==2 {print strftime("%T"), $3, $7}'; sleep 30; done ) \
             > "$OUT/memory.log" &
           start=$(date +%s)
