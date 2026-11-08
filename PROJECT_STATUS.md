@@ -5,7 +5,14 @@
 - **20 questions from team members frozen word for word.** Gold drafted from the PDFs only, and every excerpt checked against its page. The system has not run on this set (DEC-012).
 - **Next:** owner approves `docs/eval/heldout-v2-review.md`, then the gold is frozen.
 
-## FIX 2b -- 2026-11-08 (3 flags measured, all off, awaiting owner decision)
+## FIX 2c -- 2026-11-08 (REL-402 on by default; REL-303 meets DEC-013, awaiting owner decision)
+
+- **REL-402 is on by default.** Its last retrieval check was re-run and is clean, 18/18.
+- **REL-303 with the question-word list, same batch, 2 runs each:** relevance set from 3 to 2 false answers and 19 to 20 correct, RBAC unchanged, UAT unchanged on all 100 answers (Q004 fixed), 0 leaks. It stays off until the owner decides.
+- **DEC-013** replaces the sum rule: false answers must not increase on any single set.
+- See `docs/eval/runs/fix2c-defaults.md`.
+
+## FIX 2b -- 2026-11-08 (3 flags measured)
 
 - **Same batch, 2 runs each, on the current defaults.** Baseline: 4 false and 18 correct on the relevance set, 1 false and 22 correct on RBAC, 99/100 proxy on UAT, 0 leaks.
 - **REL-402 flag:** 3 false, 19 correct, nothing else changed. It meets the rule.
