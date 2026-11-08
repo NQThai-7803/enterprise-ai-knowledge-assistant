@@ -6,6 +6,15 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### FIX 2d and eval environment -- 2026-11-08
+
+- **Eval runners refuse another Ollama version or backend** than the pinned 0.40.15 on CUDA (`scripts/eval/ollama_check.py`, DEC-014), and record both at the start and end of each run. `EVAL_OLLAMA_EXPECTED_VERSION`, `EVAL_OLLAMA_EXPECTED_BACKEND` and `EVAL_OLLAMA_LOG` adapt it to another host.
+- `RAG_SHORT_ANSWER_QUESTION_TERMS_ENABLED` (REL-303) now detects the question form (accented Vietnamese, unaccented Vietnamese, English) and strips that form's question and function words; the unaccented list is generated from the accented one. Text with no question word is not checked, and a restated question around the answer is trimmed before the answer is located.
+- **Changed default:** `RAG_SHORT_ANSWER_QUESTION_TERMS_ENABLED=true` (REL-303), after a DEC-013 batch on Actions. Set `false` to roll back.
+- `eval.yml` runs a measurement batch per set (`uat`, `rbac`, `relevance`, `false_refusal`) with several flag configurations in one job (`scripts/eval/ci_batch.sh`, DEC-016).
+- `false_refusal_dev_v1` approved and fingerprinted; `run_answer_relevance_dev.py --set false_refusal_dev_v1` grades it, accepting `fact_alternatives`, with no digit allowed next to a fact.
+- `eval-data/`: the fictional corpus V2 PDFs and the Q001-Q100 questions, so `eval.yml` can run `uat` on Actions.
+
 ### FIX 2c -- 2026-11-08
 
 - **Changed default:** `RAG_PARTIAL_REFUSAL_NO_ANSWER_ENABLED=true`. Set `false` to roll back.

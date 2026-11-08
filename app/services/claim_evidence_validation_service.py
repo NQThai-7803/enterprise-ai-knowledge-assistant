@@ -3032,22 +3032,109 @@ _QUESTION_STOPWORDS = frozenset(
         "voi",
     ]
 )
-# Vietnamese question words and frames, matched with their diacritics so that a content word
-# that folds to the same letters ("máy" and "mấy", "sao lưu" and "vì sao") survives. A particle
-# that also means "not" or "not yet" counts only at the end of the question.
-_QUESTION_WORD_PATTERN = re.compile(
-    r"(?<!\w)(?:như thế nào|thế nào|như nào|ra sao|làm sao|vì sao|tại sao|thì sao"
-    r"|bằng cách nào|cách nào|bao nhiêu|bao lâu|bao giờ|khi nào|lúc nào|hồi nào|nơi nào"
-    r"|chỗ nào|ở đâu|đâu|tên là gì|tên gì|là gì|là ai|cái gì|gì|ai|nào|mấy"
-    r"|có phải|phải không|đúng không|được không|hay không|hay chưa)(?!\w)"
+# Question words and frames per question form. Accented Vietnamese is matched with its diacritics,
+# so a content word that folds to the same letters ("máy" and "mấy", "sao lưu" and "vì sao")
+# survives. The unaccented list is generated from the accented one: without diacritics that
+# difference is gone anyway. A particle that also means "not" or "not yet" counts only at the
+# end of the question.
+_VI_QUESTION_PHRASES = (
+    "như thế nào", "thế nào", "như nào", "ra sao", "làm sao", "vì sao", "tại sao", "thì sao",
+    "bằng cách nào", "cách nào", "bao nhiêu", "bao lâu", "bao giờ", "khi nào", "lúc nào",
+    "hồi nào", "nơi nào", "chỗ nào", "ở đâu", "đâu", "tên là gì", "tên gì", "là gì", "là ai",
+    "cái gì", "gì", "ai", "nào", "mấy", "có phải", "phải không", "đúng không", "được không",
+    "hay không", "hay chưa",
+)  # fmt: skip
+_VI_QUESTION_TAILS = ("không", "chưa", "à", "hả", "nhỉ", "vậy")
+_VI_YES_NO_OPENERS = ("có",)
+_VI_FUNCTION_WORDS = (
+    "các", "cho", "của", "được", "không", "một", "này", "người", "những", "theo", "thì", "tôi",
+    "trong", "trên", "với", "là", "và",
+)  # fmt: skip
+_EN_QUESTION_PHRASES = (
+    "how many", "how much", "how long", "how often", "how far", "who", "whom", "whose", "what",
+    "which", "where", "when", "why", "how",
+)  # fmt: skip
+_EN_YES_NO_OPENERS = (
+    "is", "are", "was", "were", "do", "does", "did", "can", "could", "should", "will", "would",
+    "may", "must", "has", "have", "had",
+)  # fmt: skip
+_EN_FUNCTION_WORDS = (
+    *_EN_YES_NO_OPENERS, "the", "a", "an", "of", "to", "in", "on", "at", "for", "by", "with",
+    "from", "and", "or", "about", "this", "that", "these", "those", "it", "its", "there", "be",
+    "been", "i", "we", "you", "my", "our", "your",
+)  # fmt: skip
+
+
+def _unaccented(words: tuple[str, ...]) -> tuple[str, ...]:
+    return tuple(dict.fromkeys(fold_text(word) for word in words))
+
+
+def _any_of(words: tuple[str, ...]) -> str:
+    longest_first = sorted(words, key=len, reverse=True)
+    return "(?:" + "|".join(re.escape(word) for word in longest_first) + ")"
+
+
+@dataclass(frozen=True)
+class _QuestionForm:
+    name: str
+    question_words: re.Pattern[str]
+    tail: re.Pattern[str] | None
+    yes_no_opener: re.Pattern[str]
+    function_words: re.Pattern[str]
+
+
+def _vietnamese_form(name: str, phrases, tails, openers, function_words) -> _QuestionForm:
+    return _QuestionForm(
+        name=name,
+        question_words=re.compile(rf"(?<!\w){_any_of(phrases)}(?!\w)"),
+        tail=re.compile(rf"(?<!\w){_any_of(tails)}\W*$"),
+        yes_no_opener=re.compile(
+            rf"(?<!\w){_any_of(openers)}(?!\w)(?=.*(?<!\w){_any_of(tails[:2])}\W*$)"
+        ),
+        function_words=re.compile(rf"(?<!\w){_any_of(function_words)}(?!\w)"),
+    )
+
+
+_VI_FORM = _vietnamese_form(
+    "vi", _VI_QUESTION_PHRASES, _VI_QUESTION_TAILS, _VI_YES_NO_OPENERS, _VI_FUNCTION_WORDS
 )
-_QUESTION_TAIL_PATTERN = re.compile(r"(?<!\w)(?:không|chưa|à|hả|nhỉ|vậy)\W*$")
-_QUESTION_YES_NO_PATTERN = re.compile(r"(?<!\w)có(?!\w)(?=.*(?<!\w)(?:không|chưa)\W*$)")
-_ASKED_FUNCTION_WORD_PATTERN = re.compile(
-    r"(?<!\w)(?:các|cho|của|được|không|một|này|người|những|theo|thì|tôi|trong|trên|với)(?!\w)"
+_VI_UNACCENTED_FORM = _vietnamese_form(
+    "vi_unaccented",
+    _unaccented(_VI_QUESTION_PHRASES),
+    _unaccented(_VI_QUESTION_TAILS),
+    _unaccented(_VI_YES_NO_OPENERS),
+    _unaccented(_VI_FUNCTION_WORDS),
 )
+_EN_FORM = _QuestionForm(
+    name="en",
+    question_words=re.compile(rf"(?<!\w){_any_of(_EN_QUESTION_PHRASES)}(?!\w)"),
+    tail=None,
+    yes_no_opener=re.compile(rf"^\W*{_any_of(_EN_YES_NO_OPENERS)}(?!\w)"),
+    function_words=re.compile(rf"(?<!\w){_any_of(_EN_FUNCTION_WORDS)}(?!\w)"),
+)
+# Words an answer may wrap its value in ("CTO là ...", "The CTO is ..."), in every form.
+_ANSWER_FRAME_WORDS = frozenset(_unaccented(_VI_FUNCTION_WORDS) + _unaccented(_EN_FUNCTION_WORDS))
 _SHORT_ANSWER_WINDOW_WORDS = 15
 _SHORT_ANSWER_MIN_COVERAGE = 0.6
+
+
+def _has_diacritics(text: str) -> bool:
+    return fold_text(text) != text.casefold()
+
+
+def question_form(question: str) -> str | None:
+    """ "vi", "vi_unaccented" or "en" by the question words the text uses; None if it has none."""
+    text = unicodedata.normalize("NFC", question).casefold()
+    vietnamese = _VI_FORM if _has_diacritics(text) else _VI_UNACCENTED_FORM
+    best, best_score = None, 0
+    for form in (vietnamese, _EN_FORM):  # a tie keeps Vietnamese, the corpus language
+        signals = (form.question_words, form.yes_no_opener, form.tail)
+        asking = {m.start() for p in signals if p is not None for m in p.finditer(text.strip())}
+        asks = len(asking)
+        score = len(asking | {m.start() for m in form.function_words.finditer(text)})
+        if asks and score > best_score:
+            best, best_score = form.name, score
+    return best
 
 
 def question_content_terms(text: str) -> set[str]:
@@ -3060,22 +3147,41 @@ def question_content_terms(text: str) -> set[str]:
 
 
 def asked_terms(question: str) -> set[str]:
-    """Content words of a question once its question words and particles are removed."""
+    """Content words of a question once its question words and particles are removed.
+
+    Empty when the text has no question word in any form: then nothing in particular is asked.
+    """
+    name = question_form(question)
+    if name is None:
+        return set()
+    form = {"vi": _VI_FORM, "vi_unaccented": _VI_UNACCENTED_FORM, "en": _EN_FORM}[name]
     text = unicodedata.normalize("NFC", question).casefold()
-    text = _QUESTION_YES_NO_PATTERN.sub(" ", text, count=1)
-    text = _QUESTION_TAIL_PATTERN.sub(" ", text.strip())
-    text = _QUESTION_WORD_PATTERN.sub(" ", text)
-    text = _ASKED_FUNCTION_WORD_PATTERN.sub(" ", text)
+    text = form.yes_no_opener.sub(" ", text, count=1)
+    if form.tail is not None:
+        text = form.tail.sub(" ", text.strip())
+    text = form.question_words.sub(" ", text)
+    text = form.function_words.sub(" ", text)
     return {term for term in re.findall(r"\w+", fold_text(text)) if len(term) >= 3}
+
+
+def _answer_value_words(answer: str, question: str) -> list[str]:
+    """The answer's words without a leading or trailing restatement of the question."""
+    words = re.findall(r"\w+", fold_text(answer))
+    framing = _ANSWER_FRAME_WORDS | set(re.findall(r"\w+", fold_text(question)))
+    while words and words[0] in framing:
+        words.pop(0)
+    while words and words[-1] in framing:
+        words.pop()
+    return words
 
 
 def _short_answer_misses_question_terms(*, question: str, answer: str, evidence: str) -> bool:
     """True when a short answer is not in the source, or the text around it lacks the ask."""
     asked = asked_terms(question) - question_content_terms(answer)
-    answer_words = re.findall(r"\w+", answer)
+    answer_words = _answer_value_words(answer, question)
     if len(asked) < 2 or len(answer_words) < 2:
         return False
-    words = re.findall(r"\w+", evidence)
+    words = re.findall(r"\w+", fold_text(evidence))
     size = len(answer_words)
     starts = [i for i in range(len(words) - size + 1) if words[i : i + size] == answer_words]
     return not any(

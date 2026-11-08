@@ -35,9 +35,18 @@ LOCK_V2 = ROOT / "docs" / "eval" / "heldout-v2-questions.lock"
 HELDOUT_V2 = ROOT / "docs" / "eval" / "heldout-v2-questions.yaml"
 RBAC_SOURCE = ROOT / "tests" / "acceptance" / "rbac_dev_v1.yaml"
 RELEVANCE_SOURCE = ROOT / "tests" / "acceptance" / "answer_relevance_dev_v1.yaml"
+FALSE_REFUSAL_SOURCE = ROOT / "tests" / "acceptance" / "false_refusal_dev_v1.yaml"
+FALSE_REFUSAL_LOCK = ROOT / "tests" / "acceptance" / "false_refusal_dev_v1.lock"
 SALT = b"eaka-question-fingerprint-v1"
 GRAM_SIZE = 4
-EXPECTED_COUNTS = {"dev": 100, "heldout": 40, "rbac": 18, "relevance": 25, "heldout_v2": 20}
+EXPECTED_COUNTS = {
+    "dev": 100,
+    "heldout": 40,
+    "rbac": 18,
+    "relevance": 25,
+    "heldout_v2": 20,
+    "false_refusal": 20,
+}
 OVERLAP_LIMIT = 0.60
 ESCAPE = re.compile(r"\\u([0-9a-fA-F]{4})")
 WORD = re.compile(r"\w+")
@@ -76,12 +85,14 @@ def build_payload(
     relevance: Iterable[tuple[str, str]] = (),
     heldout_v2: Iterable[tuple[str, str]] = (),
     lock_v2_sha256: str = "",
+    false_refusal: Iterable[tuple[str, str]] = (),
 ) -> dict[str, Any]:
     dev_items = {case_id: fingerprint(question) for case_id, question in dev}
     heldout_items = {case_id: fingerprint(question) for case_id, question in heldout}
     rbac_items = {case_id: fingerprint(question) for case_id, question in rbac}
     relevance_items = {case_id: fingerprint(question) for case_id, question in relevance}
     v2_items = {case_id: fingerprint(question) for case_id, question in heldout_v2}
+    false_refusal_items = {case_id: fingerprint(question) for case_id, question in false_refusal}
     return {
         "version": 1,
         "gram_size": GRAM_SIZE,
@@ -94,6 +105,7 @@ def build_payload(
             },
             "rbac": {"count": len(rbac_items), "items": rbac_items},
             "relevance": {"count": len(relevance_items), "items": relevance_items},
+            "false_refusal": {"count": len(false_refusal_items), "items": false_refusal_items},
             "heldout_v2": {
                 "count": len(v2_items),
                 "lock_sha256": lock_v2_sha256,
@@ -191,6 +203,7 @@ def max_overlap(payload: Mapping[str, Any]) -> tuple[float, str | None, str | No
         **sources["dev"]["items"],
         **sources.get("rbac", {}).get("items", {}),
         **sources.get("relevance", {}).get("items", {}),
+        **sources.get("false_refusal", {}).get("items", {}),
     }
     for dev_id, dev_hashes in development.items():
         left = set(dev_hashes)
@@ -259,11 +272,17 @@ def _build(output: Path) -> int:
         raise QuestionSourceError("held-out v2 questions do not match their lock")
     v2_items = yaml.safe_load(HELDOUT_V2.read_text(encoding="utf-8"))["items"]
     v2 = [(item["id"], item["question"]) for item in v2_items]
-    payload = build_payload(dev, heldout, lock_sha, rbac, relevance, v2, lock_v2_sha)
+    fr_lock_sha = json.loads(FALSE_REFUSAL_LOCK.read_text(encoding="utf-8"))["sha256"]
+    if hashlib.sha256(FALSE_REFUSAL_SOURCE.read_bytes()).hexdigest() != fr_lock_sha:
+        raise QuestionSourceError("false-refusal dev set does not match its lock")
+    fr_items = yaml.safe_load(FALSE_REFUSAL_SOURCE.read_text(encoding="utf-8"))["items"]
+    false_refusal = [(item["id"], item["question"]) for item in fr_items]
+    payload = build_payload(dev, heldout, lock_sha, rbac, relevance, v2, lock_v2_sha, false_refusal)
     output.write_text(json.dumps(payload, indent=0, sort_keys=True) + "\n", encoding="utf-8")
     print(
         f"dev: {len(dev)}; held-out: {len(heldout)}; rbac dev: {len(rbac)}; "
-        f"relevance dev: {len(relevance)}; held-out v2: {len(v2)}"
+        f"relevance dev: {len(relevance)}; held-out v2: {len(v2)}; "
+        f"false-refusal dev: {len(false_refusal)}"
     )
     return 0
 
@@ -290,7 +309,7 @@ def _overlap() -> int:
     uat_value, relevance_id, uat_id = relevance_uat_overlap(payload)
     print(f"max relevance/Q001-Q100 Jaccard: {uat_value:.3f} ({relevance_id}, {uat_id})")
     # Reported only: the owner reviews these numbers, they block nothing.
-    others = ("dev", "heldout", "relevance", "rbac")
+    others = ("dev", "heldout", "relevance", "rbac", "false_refusal")
     for other, (found, left, right) in source_overlap(payload, "heldout_v2", others).items():
         print(f"held-out v2/{other} word 4-gram Jaccard: {found:.3f} ({left}, {right})")
     return 1 if max(value, uat_value) >= OVERLAP_LIMIT else 0
