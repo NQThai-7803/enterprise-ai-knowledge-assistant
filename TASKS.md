@@ -16,7 +16,7 @@
 
 - **DONE: batch 1 of 20 questions frozen, in the question fingerprints, gold drafted from the PDFs** (`docs/eval/heldout-v2-review.md`). The system has not run on it (DEC-012).
 - **WAITING FOR OWNER: approve the gold in `docs/eval/heldout-v2-review.md`, then freeze it.**
-- **OPEN: find the root cause of why only 92/100 UAT answers are identical with the same seed and temperature 0.** RBD-03, Q033 and Q071 also change status between runs. Not known yet: whether it comes from the API and trace paths differing, or from Ollama not repeating exactly. Clue from FIX 2: two runs in one session match on all 100 questions, while runs on different days match on 90, so look at what changes between sessions (Ollama restart, loaded state, image) before looking at sampling. Reproducer from FIX 2a: REL-101 got a false answer from the LLM in the FIX 2 batch and a refusal in the DEC-011 batch, with the same seed and temperature 0, on images that differ only by a counter.
+- **DONE (diagnosis): runs differ across batches when Ollama changes GPU backend (Vulkan before 2026-11-06 18:26, CUDA after) or version, not when it restarts** (`docs/eval/runs/nondeterminism.md`). Proposals there are not applied.
 
 ## FIX 1 deterministic route -- 2026-11-06
 
