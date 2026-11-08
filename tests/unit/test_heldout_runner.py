@@ -34,6 +34,7 @@ def _write_set(tmp_path: Path, *, lock_sha: str | None = None) -> tuple[Path, Pa
     return heldout, lock
 
 
+@pytest.mark.repo_layout("docs/eval/heldout-v1.yaml", "docs/eval/heldout-v1.lock")
 def test_repository_lock_matches_the_frozen_file() -> None:
     assert run_heldout.verify_frozen()["items"] == 40
 
