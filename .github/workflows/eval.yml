@@ -1,0 +1,177 @@
+name: Eval
+
+# Manual only. Runs a frozen dev set against the eval stack with a local Ollama, using the same
+# eval settings as the local machine (scripts/eval/compose.uat-eval.yaml: temperature 0, fixed
+# seed, warm-up, num_ctx 8192, lexical_fallback reranker). Never runs held-out sets.
+#
+# Sets: `relevance` (tests/acceptance/answer_relevance_dev_v1.yaml) and `rbac`
+# (tests/acceptance/rbac_dev_v1.yaml) build their documents from the YAML in the repo. UAT
+# Q001-Q100 and corpus V2 are not in the repository (git-ignored artifacts/), so they cannot run here.
+on:
+  workflow_dispatch:
+    inputs:
+      set:
+        description: "Dev set to run"
+        type: choice
+        options: [relevance, rbac]
+        default: relevance
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eval-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  eval:
+    name: Eval ${{ inputs.set }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      PROJECT: eaka-${{ inputs.set }}-dev
+      OUT: eval-out
+      P3D_BACKEND_IMAGE: eaka-backend:ci-eval
+      EVAL_BACKEND_IMAGE: eaka-backend:ci-eval
+      EVAL_EXPECTED_RERANKER_MODE: lexical_fallback
+      EVAL_OLLAMA_BASE_URL: http://host.docker.internal:11434
+      RAG_ACCEPTANCE_BASE_URL: http://127.0.0.1:18190
+      PYTHONIOENCODING: utf-8
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install runner dependencies
+        run: python -m pip install -e ".[dev]"
+
+      - name: Generate throwaway credentials
+        # Values exist only in this job; they are masked in the log and never stored.
+        run: |
+          for name in SECRET_KEY POSTGRES_PASSWORD UAT_ADMIN_PASSWORD UAT_MANAGER_PASSWORD UAT_STAFF_PASSWORD EVAL_PASSWORD_OPS; do
+            value="Ci$(openssl rand -hex 16)!"
+            echo "::add-mask::$value"
+            echo "$name=$value" >> "$GITHUB_ENV"
+          done
+
+      - name: Write the app environment file
+        run: |
+          cat > .env <<EOF
+          APP_ENV=development
+          APP_DEBUG=false
+          API_V1_PREFIX=/api/v1
+          SECRET_KEY=${SECRET_KEY}
+          JWT_ALGORITHM=HS256
+          JWT_ISSUER=enterprise-ai-knowledge-assistant
+          JWT_AUDIENCE=enterprise-ai-api
+          ACCESS_TOKEN_EXPIRE_MINUTES=15
+          REFRESH_TOKEN_EXPIRE_DAYS=7
+          POSTGRES_DB=enterprise_ai
+          POSTGRES_USER=app_user
+          POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+          STORAGE_BACKEND=local
+          MAX_UPLOAD_SIZE_MB=25
+          EMBEDDING_PROVIDER=sentence_transformers
+          EMBEDDING_MODEL_NAME=intfloat/multilingual-e5-small
+          EMBEDDING_DIMENSIONS=384
+          EMBEDDING_DEVICE=cpu
+          EMBEDDING_BATCH_SIZE=16
+          EMBEDDING_NORMALIZE=true
+          EMBEDDING_QUERY_PREFIX="query: "
+          EMBEDDING_PASSAGE_PREFIX="passage: "
+          EMBEDDING_LOCAL_FILES_ONLY=false
+          RETRIEVAL_TOP_K=10
+          RERANKER_TOP_K=6
+          MIN_RELEVANCE_SCORE=0.50
+          CHUNK_SIZE_TOKENS=700
+          CHUNK_OVERLAP_TOKENS=100
+          LLM_ENABLED=true
+          LLM_PROVIDER=ollama
+          LLM_OLLAMA_MODEL=qwen2.5:3b
+          LLM_OLLAMA_NUM_CTX=8192
+          LLM_OLLAMA_KEEP_ALIVE=10m
+          LLM_MAX_OUTPUT_TOKENS=512
+          LLM_OLLAMA_REASONING_EFFORT=none
+          LLM_TIMEOUT_SECONDS=180
+          LOG_LEVEL=INFO
+          LOG_FORMAT=json
+          RAG_DIAGNOSTICS_ENABLED=true
+          EOF
+          sed -i 's/^          //' .env
+          echo "EVAL_PASSWORD_ADMIN=${UAT_ADMIN_PASSWORD}" >> "$GITHUB_ENV"
+          echo "EVAL_PASSWORD_MANAGER=${UAT_MANAGER_PASSWORD}" >> "$GITHUB_ENV"
+          echo "EVAL_PASSWORD_STAFF=${UAT_STAFF_PASSWORD}" >> "$GITHUB_ENV"
+
+      - name: Install Ollama and pull the model
+        run: |
+          curl -fsSL https://ollama.com/install.sh | sh
+          sudo systemctl stop ollama || true
+          OLLAMA_HOST=0.0.0.0:11434 nohup ollama serve > "$RUNNER_TEMP/ollama.log" 2>&1 &
+          for _ in $(seq 1 30); do curl -sf http://127.0.0.1:11434/api/version && break; sleep 2; done
+          ollama pull qwen2.5:3b
+          mkdir -p "$OUT"
+          { ollama --version; env | grep '^OLLAMA_' || true; nproc; free -m; } > "$OUT/ollama-config.txt"
+
+      - name: Build the backend image
+        run: docker build -t "$P3D_BACKEND_IMAGE" --label eaka.commit="${GITHUB_SHA::7}" .
+
+      - name: Start the eval stack
+        run: |
+          # The API reaches Ollama on the host, as on Docker Desktop.
+          cat > "$RUNNER_TEMP/ci-host.yaml" <<'EOF'
+          services:
+            api:
+              extra_hosts: ["host.docker.internal:host-gateway"]
+            worker:
+              extra_hosts: ["host.docker.internal:host-gateway"]
+          EOF
+          FILES=(-f compose.yaml -f compose.uat-corpus-v2.yaml -f scripts/eval/compose.uat-eval.yaml -f "$RUNNER_TEMP/ci-host.yaml")
+          docker compose -p "$PROJECT" "${FILES[@]}" up -d --no-build postgres redis
+          docker compose -p "$PROJECT" "${FILES[@]}" run --rm --no-deps migration
+          docker compose -p "$PROJECT" "${FILES[@]}" run --rm --no-deps uat-v2-accounts
+          docker compose -p "$PROJECT" "${FILES[@]}" up -d --no-build --no-deps api worker
+          for _ in $(seq 1 90); do
+            [ "$(docker inspect "$PROJECT-api-1" --format '{{.State.Health.Status}}')" = healthy ] && break
+            sleep 5
+          done
+          docker inspect "$PROJECT-api-1" --format '{{.State.Health.Status}}'
+          docker inspect "$PROJECT-api-1" --format '{{range .Config.Env}}{{println .}}{{end}}' | grep '^RAG_' | sort > "$OUT/flags.txt"
+
+      - name: Warm up
+        run: >
+          python scripts/eval/ollama_warmup.py "$OUT/warmup.json" --base-url http://127.0.0.1:11434
+          --model qwen2.5:3b --num-ctx 8192 --keep-alive 10m --seed 20261031
+
+      - name: Run the dev set
+        run: |
+          free -m > "$OUT/memory-before.txt"
+          ( while true; do free -m | awk 'NR==2 {print strftime("%T"), $3, $7}'; sleep 15; done ) > "$OUT/memory.log" &
+          start=$(date +%s)
+          if [ "${{ inputs.set }}" = relevance ]; then
+            python scripts/eval/run_answer_relevance_dev.py --output "$OUT/results.json"
+          else
+            python scripts/eval/run_rbac_dev.py --output "$OUT/results.json"
+          fi
+          echo "seconds=$(( $(date +%s) - start ))" > "$OUT/timing.txt"
+
+      - name: Collect logs
+        if: always()
+        run: |
+          mkdir -p "$OUT"
+          docker compose -p "$PROJECT" logs --no-color api worker > "$OUT/stack.log" 2>&1 || true
+          cp "$RUNNER_TEMP/ollama.log" "$OUT/" 2>/dev/null || true
+          docker compose -p "$PROJECT" down -v || true
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-${{ inputs.set }}-${{ github.run_id }}
+          path: eval-out/
+          retention-days: 14
