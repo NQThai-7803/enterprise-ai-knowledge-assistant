@@ -1,0 +1,65 @@
+# False-refusal dev set (FIX 3 preparation). Synthetic documents and questions, for an isolated
+# stack only, never the main corpus. Written without looking at any held-out question or gold.
+# Group N: the answer is a number the model may write in another form than the source
+#   ("01" / "1", "300.000 đồng" / "300 nghìn đồng", "5%" / "5 phần trăm").
+# Group A: the question uses other words than the source for the same thing (low alignment).
+# Each group also has questions that look alike but are not answered by the documents.
+# fact: text the answer must hold; fact_alternatives: other accepted forms of the same value.
+# Frozen by false_refusal_dev_v1.lock: any edit needs v1.1 and a new lock.
+version: false_refusal_dev_v1
+documents:
+  - code: FRDEV-CTP-001
+    title: Quy dinh cong tac phi trong nuoc
+    scope: ORGANIZATION
+    text: |
+      CÔNG TY DỊCH VỤ KỸ THUẬT HÒA PHONG - TÀI LIỆU NỘI BỘ - Trang 1
+      Quy định công tác phí trong nước.
+      Phụ cấp lưu trú khi đi công tác trong nước là 300.000 đồng mỗi ngày.
+      Nhân viên được tạm ứng tối đa 5.000.000 đồng cho mỗi chuyến công tác.
+      Chứng từ thanh toán phải nộp trong 07 ngày làm việc sau khi kết thúc chuyến đi.
+      Chuyến công tác dài hơn 03 ngày cần trưởng phòng phê duyệt trước khi khởi hành.
+      Vé máy bay được thanh toán theo hạng phổ thông.
+  - code: FRDEV-ATP-001
+    title: Quy che an toan phong thi nghiem
+    scope: ORGANIZATION
+    text: |
+      CÔNG TY DỊCH VỤ KỸ THUẬT HÒA PHONG - TÀI LIỆU NỘI BỘ - Trang 1
+      Quy chế an toàn phòng thí nghiệm.
+      Bình chữa cháy trong phòng thí nghiệm được kiểm tra 01 lần mỗi quý.
+      Mỗi ca làm việc trong phòng thí nghiệm phải có tối thiểu 02 người.
+      Kho hóa chất được giữ ở nhiệt độ dưới 25 độ C.
+      Nhân viên mới phải hoàn thành 08 giờ huấn luyện an toàn trước khi vào phòng thí nghiệm.
+      Kính bảo hộ là trang bị bắt buộc khi thao tác với hóa chất.
+  - code: FRDEV-DTN-001
+    title: Chinh sach ho tro dao tao
+    scope: ORGANIZATION
+    text: |
+      CÔNG TY DỊCH VỤ KỸ THUẬT HÒA PHONG - TÀI LIỆU NỘI BỘ - Trang 1
+      Chính sách hỗ trợ đào tạo bên ngoài.
+      Công ty hỗ trợ 70% học phí, tối đa 20.000.000 đồng mỗi năm cho mỗi nhân viên.
+      Khóa học có học phí trên 10.000.000 đồng yêu cầu cam kết làm việc thêm 12 tháng.
+      Đơn đăng ký khóa học phải gửi phòng nhân sự trước ngày khai giảng ít nhất 15 ngày.
+      Nhân viên đang trong thời gian thử việc chưa được hưởng chính sách này.
+items:
+  # Group N: numbers that may be written in another form.
+  - {id: FR-N01, group: N, expect: answer, document: FRDEV-CTP-001, fact: "300.000", fact_alternatives: ["300 nghìn", "300 ngàn", "300000"], question: "Đi công tác trong nước thì phụ cấp lưu trú một ngày được bao nhiêu tiền?"}
+  - {id: FR-N02, group: N, expect: answer, document: FRDEV-CTP-001, fact: "5.000.000", fact_alternatives: ["5 triệu", "5000000"], question: "Số tiền tạm ứng cao nhất cho một chuyến đi công tác là mấy?"}
+  - {id: FR-N03, group: N, expect: answer, document: FRDEV-CTP-001, fact: "07 ngày", fact_alternatives: ["7 ngày", "bảy ngày"], question: "Sau chuyến đi thì có bao nhiêu ngày làm việc để nộp chứng từ thanh toán?"}
+  - {id: FR-N04, group: N, expect: answer, document: FRDEV-ATP-001, fact: "01 lần", fact_alternatives: ["1 lần", "một lần"], question: "Bình chữa cháy ở phòng thí nghiệm được kiểm tra mấy lần một quý?"}
+  - {id: FR-N05, group: N, expect: answer, document: FRDEV-ATP-001, fact: "08 giờ", fact_alternatives: ["8 giờ", "tám giờ"], question: "Người mới vào làm cần học an toàn bao nhiêu giờ trước khi vào phòng thí nghiệm?"}
+  - {id: FR-N06, group: N, expect: answer, document: FRDEV-DTN-001, fact: "70%", fact_alternatives: ["70 phần trăm", "70 %"], question: "Công ty chi trả bao nhiêu phần trăm học phí cho khóa học bên ngoài?"}
+  - {id: FR-N07, group: N, expect: refuse, question: "Ra nước ngoài công tác thì tiền lưu trú hằng ngày tính thế nào?"}
+  - {id: FR-N08, group: N, expect: refuse, question: "Phòng thí nghiệm được kiểm tra hệ thống điện mấy lần mỗi năm?"}
+  - {id: FR-N09, group: N, expect: refuse, question: "Học phí khóa ngoại ngữ cho người nhà nhân viên được hỗ trợ ra sao?"}
+  - {id: FR-N10, group: N, expect: refuse, question: "Khi đi công tác bằng tàu hỏa, toa giường nằm có được thanh toán không?"}
+  # Group A: the question says the same thing in other words.
+  - {id: FR-A01, group: A, expect: answer, document: FRDEV-CTP-001, fact: "trưởng phòng", question: "Đi công tác hơn ba ngày thì ai phải đồng ý trước khi lên đường?"}
+  - {id: FR-A02, group: A, expect: answer, document: FRDEV-CTP-001, fact: "phổ thông", question: "Khi bay đi công tác, công ty trả tiền cho loại ghế nào?"}
+  - {id: FR-A03, group: A, expect: answer, document: FRDEV-ATP-001, fact: "02 người", fact_alternatives: ["2 người", "hai người"], question: "Một ca trực trong phòng lab cần ít nhất mấy nhân sự?"}
+  - {id: FR-A04, group: A, expect: answer, document: FRDEV-ATP-001, fact: "25 độ", question: "Chỗ cất hóa chất phải giữ mát dưới mức nào?"}
+  - {id: FR-A05, group: A, expect: answer, document: FRDEV-ATP-001, fact: "kính bảo hộ", question: "Làm việc với chất hóa học thì bắt buộc đeo đồ bảo vệ gì cho mắt?"}
+  - {id: FR-A06, group: A, expect: answer, document: FRDEV-DTN-001, fact: "15 ngày", fact_alternatives: ["mười lăm ngày"], question: "Muốn được công ty tài trợ khóa học thì phải nộp hồ sơ sớm bao lâu?"}
+  - {id: FR-A07, group: A, expect: refuse, question: "Đi công tác hơn ba ngày thì ai duyệt chi phí khách sạn?"}
+  - {id: FR-A08, group: A, expect: refuse, question: "Chỗ cất hóa chất phải giữ độ ẩm dưới mức nào?"}
+  - {id: FR-A09, group: A, expect: refuse, question: "Làm việc với chất hóa học thì bắt buộc đeo loại găng tay nào?"}
+  - {id: FR-A10, group: A, expect: refuse, question: "Muốn được công ty tài trợ khóa học thạc sĩ thì cần thâm niên bao lâu?"}

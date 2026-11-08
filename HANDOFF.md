@@ -1,6 +1,6 @@
 # HANDOFF: Enterprise AI Knowledge Assistant (EAKA)
 
-Cập nhật 2026-11-05, nhánh `handover/2026-11-05`. Thiết kế và quy tắc nằm trong `CLAUDE.md`; lịch sử việc nằm trong `TASKS.md` và `PROJECT_STATUS.md`. Bản HANDOFF cũ (có phần workspace AUTH-02 nằm ngoài repo): `git show 09e15cf:HANDOFF.md`.
+Cập nhật 2026-11-08 (trước đó 2026-11-05, nhánh `handover/2026-11-05`). Thiết kế và quy tắc nằm trong `CLAUDE.md`; lịch sử việc nằm trong `TASKS.md` và `PROJECT_STATUS.md`. Bản HANDOFF cũ (có phần workspace AUTH-02 nằm ngoài repo): `git show 09e15cf:HANDOFF.md`.
 
 ## Clone và chạy
 
@@ -16,39 +16,31 @@ docker compose --profile frontend up -d frontend
 - Thêm LLM giả và tài khoản seed: `docker compose -f compose.yaml -f compose.uat.yaml up -d`.
 - **Không có trong git, phải xin chủ dự án:** `artifacts/` (câu hỏi Q001-Q100, baseline v2, manifest), `data/models`. Thiếu `artifacts/` thì không đo được split dev và 5 unit test bị skip.
 
-## Trạng thái
+## Trạng thái (cập nhật 2026-11-08)
 
-- **Sửa lõi RAG vẫn tạm dừng cho tới khi xong PROMPT 4b và 4.5c.** Thứ tự: đo trước, sửa logic lõi sau, đặt sau feature flag (`docs/review/claude-code-prompts.md`, PROMPT 5-7).
-- **Dev** = Q001-Q100, baseline v2 đạt 99/100 theo proxy; Q096 lệch giữa các lượt là nhiễu đã biết.
-- **Held-out v1 đã chấm** (2026-11-05, Claude chấm theo ủy quyền của chủ dự án; [`score.md`](docs/eval/runs/heldout-v1-f3cdbf3/score.md)): `answer_accuracy` 27,5% (11/40). Trong 11 PASS có 9 câu là từ chối đúng: `answerable_accuracy` 7,7% (2/26), `refusal_accuracy` 64,3% (9/14). Từ chối sai 14/26, trả lời sai 5/14, 0 rò rỉ ở mức kiểm tra sơ.
-- **Held-out v1 giờ là bộ diagnostic** (DEC-008), không còn là tập test. Con số công bố ra ngoài phải đo trên held-out v2, chưa có.
-- **Reranker:** hệ thống đang xếp hạng bằng `lexical_fallback`. Cross-encoder chưa từng chạy trong các lần đo đã xác minh (đã kiểm 2 volume: `eaka-p3d-uat`, `enterprise-ai-uat-v2`). Xem chế độ hiện tại ở `GET /health/ready`.
-- TASK-035 (release candidate) vẫn NO-GO vì lỗi S01 chưa đóng.
+- **Mặc định RAG hiện tại:** `strict`, nhóm 1 + 2 (DEC-011) và REL-402 bật. REL-303, REL-103 và 4a tắt. Mỗi flag giữ được để rollback (`ENVIRONMENT_VARIABLES.md`).
+- **Quy tắc đo:** baseline và phương án mới chạy cùng một đợt (DEC-011), chọn theo từng bộ (DEC-013). Các bộ dev: Q001-Q100, RBAC dev, `answer_relevance_dev_v1`, và `false_refusal_dev_v1` (mới, chờ duyệt).
+- **Held-out v1 là diagnostic** (DEC-008). Lượt mới nhất (2026-11-08, mặc định mới cộng REL-303): 0 rò rỉ, trả lời sai 3/14, từ chối sai 14/26, PASS 14/40. Nhãn 10 câu đổi đang chờ owner xác nhận (`docs/eval/runs/heldout-v1-defaults-bb60566/score.md`).
+- **Held-out v2 đợt 1:** 20 câu đã đóng băng; gold chờ owner duyệt; hệ thống chưa chạy trên bộ này (DEC-012).
+- **Kết quả lệch giữa các đợt là do backend GPU của Ollama** (Vulkan trước 2026-11-06 18:26, CUDA sau đó) và phiên bản Ollama, không phải do khởi động lại (`docs/eval/runs/nondeterminism.md`).
+- **Reranker:** vẫn là `lexical_fallback`.
 
-## Test (2026-11-05, image build từ `requirements.lock`, pgvector/Redis tạm)
+## Test (2026-11-08, image build từ git export, pgvector/Redis tạm)
 
 | Lane | Pass | Fail | Xfail | Skip |
 |---|---:|---:|---:|---:|
-| `tests/unit` | 1496 | 1 | 17 | 5 |
+| `tests/unit`, không mount `docs/` | 1659 | 0 | 17 | 7 |
 | `tests/api` không integration | 51 | 0 | 0 | 0 |
 | `tests/api` integration | 245 | 0 | 0 | 0 |
 | `tests/integration` | 404 | 0 | 3 | 0 |
+| LLM provider | 3 | 0 | 0 | 0 |
 | Celery | 4 | 0 | 0 | 0 |
 
-- **Fail:** `test_heldout_runner.py::test_repository_lock_matches_the_frozen_file`. Image không có `docs/eval/`; không phải lỗi logic. Test pass khi chạy trên host (venv).
-- **Xfail, đều là lỗi thật còn mở:**
-  - 14 ca S01 trong `test_multilingual_answer_responsiveness_contract.py` (8) và `test_task0353e_context_admission_contract.py` (6): câu trả lời không liên quan nhưng vẫn có citation.
-  - 3 ca `test_answer_responsiveness_diagnostic.py`: bằng chứng trích nguyên văn chưa chứng minh là trả lời đúng câu hỏi; validator có thể loại mệnh đề điều kiện tiếng Việt.
-  - 2 ca `test_semantic_retrieval_hnsw_recall.py`: bộ lọc quyền chạy sau khi HNSW đã lấy kết quả, làm giảm recall.
-  - 1 ca `test_conversation_memory.py`: câu nối tiếp bị mất chủ đề.
-- **Skip:** 5 ca thiếu manifest trong `artifacts/`.
-- **Chưa chạy:** các lane cần model thật (embedding, processing, semantic, hybrid), LLM thật, frontend.
+Kết quả trên tính cả PR #9 (test lock held-out được skip trong image). Các lane cần model thật chỉ chạy trên CI.
 
 ## Việc đang dở
 
-**PROMPT 4b và 4.5 đã xong** (`docs/eval/runs/heldout-v1-f3cdbf3/diagnosis.md`, `docs/eval/runs/rbac-dev-v1/score.md`). **Bước tiếp theo:** chờ chủ dự án quyết định PROMPT 5 và thứ tự sửa route deterministic, alignment filter, validator. PROMPT 6 lùi lại sau các sửa đó (DEC-009).
-
-Báo cáo kiểm thử 28/10: [`docs/review/bao-cao-kiem-thu-2026-10-28.md`](docs/review/bao-cao-kiem-thu-2026-10-28.md).
+Xem `docs/status/2026-11-08-unattended-report.md`: các PR đang chờ và các quyết định cần owner, sắp theo mức ưu tiên.
 
 ## Lưu ý bắt buộc
 
