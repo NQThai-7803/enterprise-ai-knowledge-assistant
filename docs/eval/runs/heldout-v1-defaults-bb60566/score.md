@@ -20,9 +20,9 @@ Chạy ngày 2026-11-08 từ 14:05 đến 14:20, trên image `eaka-backend:main-
 
 ## Nhãn
 
-30 câu có trạng thái, câu trả lời và tài liệu trích dẫn giống hệt lượt `strict`, nên giữ nhãn của lượt đó. **10 câu đổi do Claude chấm đề xuất, chờ owner xác nhận** (cột `notes` trong `grading.csv`):
+30 câu có trạng thái, câu trả lời và tài liệu trích dẫn giống hệt lượt `strict`, nên giữ nhãn của lượt đó. **10 câu đổi do Claude chấm; owner chấp nhận các nhãn này ở mức diagnostic ngày 2026-11-08** (cột `notes` trong `grading.csv`). Mốc này là diagnostic (DEC-008), không phải kết quả held-out cuối:
 
-| Câu | `strict` | Mới | Nhãn đề xuất |
+| Câu | `strict` | Mới | Nhãn |
 |---|---|---|---|
 | HO-008 | Trả lời sai | Từ chối | PASS |
 | HO-020 | Trả lời sai | Từ chối | PASS |
