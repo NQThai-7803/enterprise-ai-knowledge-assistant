@@ -1,5 +1,10 @@
 # Project Status
 
+## Held-out v2 batch 1 -- 2026-11-07 (gold awaiting owner review)
+
+- **20 questions from team members frozen word for word.** Gold drafted from the PDFs only, and every excerpt checked against its page. The system has not run on this set (DEC-012).
+- **Next:** owner approves `docs/eval/heldout-v2-review.md`, then the gold is frozen.
+
 ## FIX 2 -- 2026-11-07 (groups 1 + 2 on by default, awaiting owner decision on the remaining causes)
 
 - **The 5 held-out false answers come from 4 mechanisms:** a deterministic repair overriding an LLM refusal, a wrong value type with no unit check, off-topic clauses copied verbatim by the LLM, and rejected claims rescued by a weak signal. See `docs/eval/runs/fix2-diagnosis.md`.

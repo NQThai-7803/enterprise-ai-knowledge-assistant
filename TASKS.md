@@ -9,6 +9,11 @@
 - **DONE: groups 1 + 2 are the default under DEC-011; group 4a stays off, with a counter on its branch** (`docs/eval/runs/fix2a-defaults.md`).
 - **DONE: REL-101, 103, 303, 401, 402 traced.** REL-101 is fixed by group 1. The other four fall outside groups 3 and 4b as designed.
 - **WAITING FOR OWNER: what to do with the four remaining causes, and whether to keep groups 3 and 4b as designed.**
+
+## Held-out v2 -- 2026-11-07
+
+- **DONE: batch 1 of 20 questions frozen, in the question fingerprints, gold drafted from the PDFs** (`docs/eval/heldout-v2-review.md`). The system has not run on it (DEC-012).
+- **WAITING FOR OWNER: approve the gold in `docs/eval/heldout-v2-review.md`, then freeze it.**
 - **OPEN: find the root cause of why only 92/100 UAT answers are identical with the same seed and temperature 0.** RBD-03, Q033 and Q071 also change status between runs. Not known yet: whether it comes from the API and trace paths differing, or from Ollama not repeating exactly. Clue from FIX 2: two runs in one session match on all 100 questions, while runs on different days match on 90, so look at what changes between sessions (Ollama restart, loaded state, image) before looking at sampling. Reproducer from FIX 2a: REL-101 got a false answer from the LLM in the FIX 2 batch and a refusal in the DEC-011 batch, with the same seed and temperature 0, on images that differ only by a counter.
 
 ## FIX 1 deterministic route -- 2026-11-06
