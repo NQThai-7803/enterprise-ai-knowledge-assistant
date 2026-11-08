@@ -2923,3 +2923,449 @@ Chỉ báo cáo, không sửa. Sinh bởi `scripts/diagnostics/diacritics_audit.
 | 10790 | `loi` | loi: lõi, lối, lỗi, lội, lời, lợi |
 | 10792 | `linh` | - |
 | 10792 | `hoat` | - |
+
+## Lọc tay (2026-11-08)
+
+Lọc bằng `scripts/diagnostics/diacritics_triage.py` trên các cue một từ. Giữ 568 cue có va chạm thật trong corpus: ít nhất 2 dạng có dấu, mỗi dạng xuất hiện từ 3 lần trong PDF. Loại 960 cue không có va chạm như vậy trong corpus, và 124 cue nằm giữa các từ tiếng Anh.
+
+Mức nguy hiểm theo hàm chứa cue: **Cao** nếu cue tạo hoặc duyệt câu trả lời, **Trung bình** nếu cue phân loại câu hỏi, lọc hoặc quyết định thử lại, **Thấp** nếu cue chỉ ảnh hưởng xếp hạng hoặc ngữ cảnh. Dạng hiếm nhất càng nhiều lần thì va chạm càng dễ xảy ra.
+
+**Đã xác nhận gây lỗi thêm:** `giam` trong `_structured_condition_value_answer` ("giám" khớp "giảm"): REL-103 trả lời sai, và RBD-04, RBD-05 chỉ đúng nhờ lỗi này (`docs/eval/runs/fix2b-cues.md`).
+
+| Mức | Việc | Từ | Dạng trong corpus (số lần) | Hàm | Vị trí |
+|---|---|---|---|---|---|
+| Cao | tạo câu trả lời | `nhan` | nhân (240), nhận (82) | `_structured_condition_value_answer` | `app/services/grounded_answer_service.py:9151` |
+| Cao | tạo câu trả lời | `nhan` | nhân (240), nhận (82) | `_structured_policy_clause_repair_generation` | `app/services/grounded_answer_service.py:9386` |
+| Cao | tạo câu trả lời | `chinh` | chính (145), chỉnh (35) | `_structured_condition_value_answer` | `app/services/grounded_answer_service.py:9146` |
+| Cao | tạo câu trả lời | `chinh` | chính (145), chỉnh (35) | `_structured_policy_clause_repair_generation` | `app/services/grounded_answer_service.py:9385` |
+| Cao | tạo câu trả lời | `co` | có (287), cơ (68), cố (68), cổ (20) | `_structured_condition_value_answer` | `app/services/grounded_answer_service.py:9147` |
+| Cao | tạo câu trả lời | `ngay` | ngày (203), ngay (17) | `_structured_first_day_eligibility_answer` | `app/services/grounded_answer_service.py:9591` |
+| Cao | tạo câu trả lời | `ty` | ty (86), tỷ (12) | `_structured_salary_band_answer` | `app/services/grounded_answer_service.py:9873` |
+| Cao | tạo câu trả lời | `giam` | giám (25), giảm (11) | `_structured_condition_value_answer` | `app/services/grounded_answer_service.py:9162` |
+| Cao | tạo câu trả lời | `cong` | công (290), cộng (9) | `_structured_salary_band_answer` | `app/services/grounded_answer_service.py:9873` |
+| Cao | tạo câu trả lời | `neu` | nếu (66), nêu (8) | `_structured_condition_value_answer` | `app/services/grounded_answer_service.py:9112` |
+| Cao | tạo câu trả lời | `bao` | bảo (166), báo (94), bao (20), bạo (3) | `_structured_condition_value_answer` | `app/services/grounded_answer_service.py:9144` |
+| Cao | tạo câu trả lời | `dau` | đầu (49), đau (6), đâu (3) | `_structured_first_day_eligibility_answer` | `app/services/grounded_answer_service.py:9591` |
+| Cao | tạo câu trả lời | `sau` | sau (36), sáu (3) | `_structured_condition_value_answer` | `app/services/grounded_answer_service.py:9111` |
+| Cao | tạo câu trả lời | `tham` | tham (49), thẩm (38), thâm (3) | `_structured_eligibility_condition_answer` | `app/services/grounded_answer_service.py:9637` |
+| Cao | duyệt câu trả lời | `nhan` | nhân (240), nhận (82) | `<module>` | `app/services/claim_evidence_validation_service.py:192`, `app/services/claim_evidence_validation_service.py:264`, `app/services/claim_evidence_validation_service.py:430`, `app/services/claim_evidence_validation_service.py:515`, `app/services/claim_evidence_validation_service.py:1815` |
+| Cao | duyệt câu trả lời | `nhan` | nhân (240), nhận (82) | `_multi_value_focus_matches_question` | `app/services/claim_evidence_validation_service.py:1097` |
+| Cao | duyệt câu trả lời | `thong` | thông (140), thống (74) | `<module>` | `app/services/claim_evidence_validation_service.py:274` |
+| Cao | duyệt câu trả lời | `muc` | mức (66), mục (63) | `<module>` | `app/services/claim_evidence_validation_service.py:439`, `app/services/claim_evidence_validation_service.py:478` |
+| Cao | duyệt câu trả lời | `phu` | phụ (43), phù (38) | `<module>` | `app/services/claim_evidence_validation_service.py:195`, `app/services/claim_evidence_validation_service.py:492` |
+| Cao | duyệt câu trả lời | `phu` | phụ (43), phù (38) | `_conditional_allowance_terms` | `app/services/claim_evidence_validation_service.py:1897` |
+| Cao | duyệt câu trả lời | `chinh` | chính (145), chỉnh (35) | `<module>` | `app/services/claim_evidence_validation_service.py:263`, `app/services/claim_evidence_validation_service.py:441` |
+| Cao | duyệt câu trả lời | `ve` | về (43), vệ (31) | `<module>` | `app/services/claim_evidence_validation_service.py:103`, `app/services/claim_evidence_validation_service.py:314`, `app/services/claim_evidence_validation_service.py:532` |
+| Cao | duyệt câu trả lời | `gia` | giá (41), gia (33), giả (28) | `<module>` | `app/services/claim_evidence_validation_service.py:3022` |
+| Cao | duyệt câu trả lời | `trong` | trong (93), trọng (25) | `_answer_has_grounded_signal` | `app/services/claim_evidence_validation_service.py:2988` |
+| Cao | duyệt câu trả lời | `trong` | trong (93), trọng (25) | `<module>` | `app/services/claim_evidence_validation_service.py:3030` |
+| Cao | duyệt câu trả lời | `trong` | trong (93), trọng (25) | `_answer_is_low_substance` | `app/services/claim_evidence_validation_service.py:3101` |
+| Cao | duyệt câu trả lời | `ca` | cá (36), ca (23) | `_multi_value_focus_matches_question` | `app/services/claim_evidence_validation_service.py:1093` |
+| Cao | duyệt câu trả lời | `tuan` | tuần (25), tuân (21) | `<module>` | `app/services/claim_evidence_validation_service.py:484` |
+| Cao | duyệt câu trả lời | `tuan` | tuần (25), tuân (21) | `_multi_value_focus_matches_question` | `app/services/claim_evidence_validation_service.py:1110` |
+| Cao | duyệt câu trả lời | `tuan` | tuần (25), tuân (21) | `_explicit_remote_duration_is_aligned` | `app/services/claim_evidence_validation_service.py:3661` |
+| Cao | duyệt câu trả lời | `chuyen` | chuyển (27), chuyên (20) | `<module>` | `app/services/claim_evidence_validation_service.py:444` |
+| Cao | duyệt câu trả lời | `co` | có (287), cơ (68), cố (68), cổ (20) | `<module>` | `app/services/claim_evidence_validation_service.py:97`, `app/services/claim_evidence_validation_service.py:522`, `app/services/claim_evidence_validation_service.py:1806` |
+| Cao | duyệt câu trả lời | `co` | có (287), cơ (68), cố (68), cổ (20) | `_conditional_allowance_terms` | `app/services/claim_evidence_validation_service.py:1893` |
+| Cao | duyệt câu trả lời | `co` | có (287), cơ (68), cố (68), cổ (20) | `_low_substance_answer_is_verbatim_supported` | `app/services/claim_evidence_validation_service.py:3109` |
+| Cao | duyệt câu trả lời | `co` | có (287), cơ (68), cố (68), cổ (20) | `_answer_is_verbatim_supported` | `app/services/claim_evidence_validation_service.py:3119` |
+| Cao | duyệt câu trả lời | `ngay` | ngày (203), ngay (17) | `<module>` | `app/services/claim_evidence_validation_service.py:482` |
+| Cao | duyệt câu trả lời | `ngay` | ngày (203), ngay (17) | `_multi_value_focus_matches_question` | `app/services/claim_evidence_validation_service.py:1107` |
+| Cao | duyệt câu trả lời | `ngay` | ngày (203), ngay (17) | `_conditional_allowance_question_has_scenario` | `app/services/claim_evidence_validation_service.py:1943` |
+| Cao | duyệt câu trả lời | `ngay` | ngày (203), ngay (17) | `_work_schedule_duration_is_aligned` | `app/services/claim_evidence_validation_service.py:3513` |
+| Cao | duyệt câu trả lời | `ngay` | ngày (203), ngay (17) | `_explicit_remote_duration_is_aligned` | `app/services/claim_evidence_validation_service.py:3661` |
+| Cao | duyệt câu trả lời | `phan` | phân (44), phần (38), phản (30), phận (17) | `<module>` | `app/services/claim_evidence_validation_service.py:193`, `app/services/claim_evidence_validation_service.py:487` |
+| Cao | duyệt câu trả lời | `cau` | cầu (97), cấu (27), câu (16) | `<module>` | `app/services/claim_evidence_validation_service.py:300`, `app/services/claim_evidence_validation_service.py:535` |
+| Cao | duyệt câu trả lời | `bat` | bắt (45), bất (15) | `<module>` | `app/citations/evidence.py:51` |
+| Cao | duyệt câu trả lời | `bat` | bắt (45), bất (15) | `<module>` | `app/services/claim_evidence_validation_service.py:390` |
+| Cao | duyệt câu trả lời | `luong` | lương (141), lượng (14) | `<module>` | `app/services/claim_evidence_validation_service.py:440` |
+| Cao | duyệt câu trả lời | `cung` | cung (29), cùng (13) | `<module>` | `app/services/claim_evidence_validation_service.py:324` |
+| Cao | duyệt câu trả lời | `ty` | ty (86), tỷ (12) | `<module>` | `app/services/claim_evidence_validation_service.py:521`, `app/services/claim_evidence_validation_service.py:1823` |
+| Cao | duyệt câu trả lời | `ty` | ty (86), tỷ (12) | `_conditional_allowance_terms` | `app/services/claim_evidence_validation_service.py:1891` |
+| Cao | duyệt câu trả lời | `giam` | giám (25), giảm (11) | `<module>` | `app/services/claim_evidence_validation_service.py:189` |
+| Cao | duyệt câu trả lời | `nhieu` | nhiêu (12), nhiều (11) | `<module>` | `app/services/claim_evidence_validation_service.py:473`, `app/services/claim_evidence_validation_service.py:3026` |
+| Cao | duyệt câu trả lời | `tro` | trợ (56), trở (10), trò (10) | `<module>` | `app/services/claim_evidence_validation_service.py:202`, `app/services/claim_evidence_validation_service.py:400`, `app/services/claim_evidence_validation_service.py:495`, `app/services/claim_evidence_validation_service.py:1822` |
+| Cao | duyệt câu trả lời | `tro` | trợ (56), trở (10), trò (10) | `_conditional_allowance_terms` | `app/services/claim_evidence_validation_service.py:1895` |
+| Cao | duyệt câu trả lời | `cong` | công (290), cộng (9) | `<module>` | `app/services/claim_evidence_validation_service.py:182`, `app/services/claim_evidence_validation_service.py:520`, `app/services/claim_evidence_validation_service.py:1807` |
+| Cao | duyệt câu trả lời | `cong` | công (290), cộng (9) | `_conditional_allowance_terms` | `app/services/claim_evidence_validation_service.py:1890` |
+| Cao | duyệt câu trả lời | `da` | đã (22), đa (9) | `<module>` | `app/services/claim_evidence_validation_service.py:481` |
+| Cao | duyệt câu trả lời | `thang` | tháng (45), thăng (9) | `<module>` | `app/services/claim_evidence_validation_service.py:485` |
+| Cao | duyệt câu trả lời | `thang` | tháng (45), thăng (9) | `_multi_value_focus_matches_question` | `app/services/claim_evidence_validation_service.py:1109` |
+| Cao | duyệt câu trả lời | `cam` | cấm (13), cam (9), cảm (8) | `<module>` | `app/services/claim_evidence_validation_service.py:296` |
+| Cao | duyệt câu trả lời | `doc` | đốc (15), độc (8) | `<module>` | `app/services/claim_evidence_validation_service.py:187` |
+| Cao | duyệt câu trả lời | `dung` | dụng (154), đúng (29), dung (27), dùng (16), dựng (12), dừng (8) | `<module>` | `app/services/claim_evidence_validation_service.py:101`, `app/services/claim_evidence_validation_service.py:319`, `app/services/claim_evidence_validation_service.py:436` |
+| Cao | duyệt câu trả lời | `dung` | dụng (154), đúng (29), dung (27), dùng (16), dựng (12), dừng (8) | `_conditional_allowance_terms` | `app/services/claim_evidence_validation_service.py:1904` |
+| Cao | duyệt câu trả lời | `minh` | minh (22), mình (8) | `<module>` | `app/services/claim_evidence_validation_service.py:230`, `app/services/claim_evidence_validation_service.py:262`, `app/services/claim_evidence_validation_service.py:442` |
+| Cao | duyệt câu trả lời | `neu` | nếu (66), nêu (8) | `_conditional_allowance_question_has_scenario` | `app/services/claim_evidence_validation_service.py:1940` |
+| Cao | duyệt câu trả lời | `phat` | phát (34), phạt (8) | `<module>` | `app/services/claim_evidence_validation_service.py:326` |
+| Cao | duyệt câu trả lời | `nghe` | nghệ (44), nghề (7) | `<module>` | `app/services/claim_evidence_validation_service.py:191` |
+| Cao | duyệt câu trả lời | `thi` | thì (8), thị (7) | `<module>` | `app/services/claim_evidence_validation_service.py:107`, `app/services/claim_evidence_validation_service.py:509`, `app/services/claim_evidence_validation_service.py:526` |
+| Cao | duyệt câu trả lời | `du` | dữ (131), dự (47), đủ (26), dư (18), dụ (6) | `<module>` | `app/services/claim_evidence_validation_service.py:277` |
+| Cao | duyệt câu trả lời | `thieu` | thiểu (24), thiếu (13), thiệu (6) | `<module>` | `app/services/claim_evidence_validation_service.py:480` |
+| Cao | duyệt câu trả lời | `thuong` | thường (28), thưởng (28), thương (6) | `<module>` | `app/services/claim_evidence_validation_service.py:508` |
+| Cao | duyệt câu trả lời | `vi` | vi (79), vị (39), vì (10), ví (6) | `<module>` | `app/services/claim_evidence_validation_service.py:204` |
+| Cao | duyệt câu trả lời | `ban` | bản (211), ban (62), bàn (21), bán (5) | `<module>` | `app/services/claim_evidence_validation_service.py:177` |
+| Cao | duyệt câu trả lời | `bo` | bộ (97), bổ (37), bố (31), bỏ (5) | `<module>` | `app/services/claim_evidence_validation_service.py:178`, `app/services/claim_evidence_validation_service.py:398` |
+| Cao | duyệt câu trả lời | `doi` | đối (67), đổi (66), đời (8), dõi (7), đội (5) | `<module>` | `app/services/claim_evidence_validation_service.py:321` |
+| Cao | duyệt câu trả lời | `ho` | hồ (58), hỗ (48), họ (5) | `<module>` | `app/services/claim_evidence_validation_service.py:494`, `app/services/claim_evidence_validation_service.py:1812` |
+| Cao | duyệt câu trả lời | `ho` | hồ (58), hỗ (48), họ (5) | `_conditional_allowance_terms` | `app/services/claim_evidence_validation_service.py:1894` |
+| Cao | duyệt câu trả lời | `mat` | mật (44), mất (8), mặt (5) | `_paid_parent_bereavement_duration_status` | `app/services/claim_evidence_validation_service.py:2720` |
+| Cao | duyệt câu trả lời | `tien` | tiền (37), tiên (28), tiến (8), tiện (5) | `<module>` | `app/services/claim_evidence_validation_service.py:491`, `app/services/claim_evidence_validation_service.py:1821` |
+| Cao | duyệt câu trả lời | `tien` | tiền (37), tiên (28), tiến (8), tiện (5) | `_conditional_allowance_terms` | `app/services/claim_evidence_validation_service.py:1896` |
+| Cao | duyệt câu trả lời | `toi` | tối (32), tôi (5) | `<module>` | `app/services/claim_evidence_validation_service.py:230`, `app/services/claim_evidence_validation_service.py:261`, `app/services/claim_evidence_validation_service.py:479`, `app/services/claim_evidence_validation_service.py:3029` |
+| Cao | duyệt câu trả lời | `che` | chế (60), che (4) | `<module>` | `app/services/claim_evidence_validation_service.py:298`, `app/services/claim_evidence_validation_service.py:420` |
+| Cao | duyệt câu trả lời | `cho` | cho (114), chờ (4) | `<module>` | `app/services/claim_evidence_validation_service.py:105`, `app/services/claim_evidence_validation_service.py:313`, `app/services/claim_evidence_validation_service.py:531`, `app/services/claim_evidence_validation_service.py:3019` |
+| Cao | duyệt câu trả lời | `cho` | cho (114), chờ (4) | `_conditional_allowance_terms` | `app/services/claim_evidence_validation_service.py:1905` |
+| Cao | duyệt câu trả lời | `dong` | động (253), đồng (100), đóng (16), đông (4) | `<module>` | `app/services/claim_evidence_validation_service.py:268`, `app/services/claim_evidence_validation_service.py:434`, `app/services/claim_evidence_validation_service.py:489`, `app/services/claim_evidence_validation_service.py:519` |
+| Cao | duyệt câu trả lời | `dong` | động (253), đồng (100), đóng (16), đông (4) | `_multi_value_focus_matches_question` | `app/services/claim_evidence_validation_service.py:1101` |
+| Cao | duyệt câu trả lời | `moi` | mối (16), môi (15), mọi (12), mỗi (6), mới (4) | `<module>` | `app/services/claim_evidence_validation_service.py:35`, `app/services/claim_evidence_validation_service.py:497` |
+| Cao | duyệt câu trả lời | `moi` | mối (16), môi (15), mọi (12), mỗi (6), mới (4) | `_multi_value_focus_matches_question` | `app/services/claim_evidence_validation_service.py:1091` |
+| Cao | duyệt câu trả lời | `nam` | năm (62), nam (4) | `<module>` | `app/services/claim_evidence_validation_service.py:486` |
+| Cao | duyệt câu trả lời | `nam` | năm (62), nam (4) | `_multi_value_focus_matches_question` | `app/services/claim_evidence_validation_service.py:1108` |
+| Cao | duyệt câu trả lời | `noi` | nội (110), nơi (13), nối (4), nói (4) | `<module>` | `app/services/claim_evidence_validation_service.py:435` |
+| Cao | duyệt câu trả lời | `quan` | quản (140), quan (71), quán (4) | `<module>` | `app/services/claim_evidence_validation_service.py:438` |
+| Cao | duyệt câu trả lời | `quan` | quản (140), quan (71), quán (4) | `_ordered_first_action_requirement_is_missing` | `app/services/claim_evidence_validation_service.py:2837` |
+| Cao | duyệt câu trả lời | `the` | thể (103), thế (28), thẻ (4) | `<module>` | `app/citations/evidence.py:45` |
+| Cao | duyệt câu trả lời | `the` | thể (103), thế (28), thẻ (4) | `<module>` | `app/services/claim_evidence_validation_service.py:384`, `app/services/claim_evidence_validation_service.py:546`, `app/services/claim_evidence_validation_service.py:1820`, `app/services/claim_evidence_validation_service.py:3027` |
+| Cao | duyệt câu trả lời | `the` | thể (103), thế (28), thẻ (4) | `_conditional_allowance_terms` | `app/services/claim_evidence_validation_service.py:1906` |
+| Cao | duyệt câu trả lời | `the` | thể (103), thế (28), thẻ (4) | `_ordered_first_action_requirement_is_missing` | `app/services/claim_evidence_validation_service.py:2838` |
+| Cao | duyệt câu trả lời | `tin` | tin (83), tín (4) | `<module>` | `app/services/claim_evidence_validation_service.py:275` |
+| Cao | duyệt câu trả lời | `to` | tổ (25), tố (7), tờ (4) | `<module>` | `app/services/claim_evidence_validation_service.py:446` |
+| Cao | duyệt câu trả lời | `yeu` | yêu (82), yếu (4) | `<module>` | `app/services/claim_evidence_validation_service.py:299`, `app/services/claim_evidence_validation_service.py:534` |
+| Cao | duyệt câu trả lời | `bao` | bảo (166), báo (94), bao (20), bạo (3) | `<module>` | `app/citations/evidence.py:55` |
+| Cao | duyệt câu trả lời | `bao` | bảo (166), báo (94), bao (20), bạo (3) | `<module>` | `app/services/claim_evidence_validation_service.py:409`, `app/services/claim_evidence_validation_service.py:472`, `app/services/claim_evidence_validation_service.py:536`, `app/services/claim_evidence_validation_service.py:3018` |
+| Cao | duyệt câu trả lời | `can` | cần (49), căn (30), cận (4), cân (4), cản (3) | `<module>` | `app/services/claim_evidence_validation_service.py:114`, `app/services/claim_evidence_validation_service.py:305` |
+| Cao | duyệt câu trả lời | `cap` | cấp (105), cập (43), cắp (3) | `<module>` | `app/services/claim_evidence_validation_service.py:325`, `app/services/claim_evidence_validation_service.py:493`, `app/services/claim_evidence_validation_service.py:1805` |
+| Cao | duyệt câu trả lời | `cap` | cấp (105), cập (43), cắp (3) | `_conditional_allowance_terms` | `app/services/claim_evidence_validation_service.py:1898` |
+| Cao | duyệt câu trả lời | `dam` | đảm (21), đám (3) | `<module>` | `app/services/claim_evidence_validation_service.py:410`, `app/services/claim_evidence_validation_service.py:537` |
+| Cao | duyệt câu trả lời | `do` | độ (49), do (38), đo (3) | `<module>` | `app/services/claim_evidence_validation_service.py:112`, `app/services/claim_evidence_validation_service.py:303`, `app/services/claim_evidence_validation_service.py:421` |
+| Cao | duyệt câu trả lời | `may` | máy (5), mây (3) | `<module>` | `app/services/claim_evidence_validation_service.py:65`, `app/services/claim_evidence_validation_service.py:304`, `app/services/claim_evidence_validation_service.py:474` |
+| Cao | duyệt câu trả lời | `phong` | phỏng (152), phòng (60), phong (3) | `<module>` | `app/services/claim_evidence_validation_service.py:194` |
+| Cao | duyệt câu trả lời | `su` | sự (187), sử (75), sư (4), sứ (3) | `<module>` | `app/services/claim_evidence_validation_service.py:196`, `app/services/claim_evidence_validation_service.py:318` |
+| Cao | duyệt câu trả lời | `tai` | tài (220), tại (47), tai (17), tái (3) | `<module>` | `app/services/claim_evidence_validation_service.py:197` |
+| Cao | duyệt câu trả lời | `tang` | tăng (14), tảng (10), tầng (7), tang (3) | `<module>` | `app/services/claim_evidence_validation_service.py:402` |
+| Cao | duyệt câu trả lời | `tat` | tất (5), tật (3) | `_multi_value_focus_matches_question` | `app/services/claim_evidence_validation_service.py:1092` |
+| Cao | duyệt câu trả lời | `tham` | tham (49), thẩm (38), thâm (3) | `_eligibility_condition_answer_is_aligned` | `app/services/claim_evidence_validation_service.py:3990` |
+| Cao | duyệt câu trả lời | `tu` | từ (91), tự (47), tư (21), tử (3) | `<module>` | `app/services/claim_evidence_validation_service.py:445` |
+| Cao | duyệt câu trả lời | `van` | văn (47), vận (34), vấn (23), vẫn (3) | `<module>` | `app/services/claim_evidence_validation_service.py:437` |
+| Trung bình | phân loại câu hỏi | `muc` | mức (66), mục (63) | `<module>` | `app/retrieval/structured.py:67`, `app/retrieval/structured.py:86` |
+| Trung bình | phân loại câu hỏi | `tra` | trả (49), tra (42) | `_asks_for_percentage_like` | `app/retrieval/question_analysis.py:447` |
+| Trung bình | phân loại câu hỏi | `chinh` | chính (145), chỉnh (35) | `selected_structural_line_indexes` | `app/retrieval/structured.py:539` |
+| Trung bình | phân loại câu hỏi | `ve` | về (43), vệ (31) | `<module>` | `app/retrieval/structured.py:152` |
+| Trung bình | phân loại câu hỏi | `tuan` | tuần (25), tuân (21) | `_asks_for_amount` | `app/retrieval/question_analysis.py:490` |
+| Trung bình | phân loại câu hỏi | `tuan` | tuần (25), tuân (21) | `<module>` | `app/retrieval/structured.py:101` |
+| Trung bình | phân loại câu hỏi | `tuan` | tuần (25), tuân (21) | `value_units_for_analysis` | `app/retrieval/structured.py:764` |
+| Trung bình | phân loại câu hỏi | `co` | có (287), cơ (68), cố (68), cổ (20) | `<module>` | `app/retrieval/structured.py:146` |
+| Trung bình | phân loại câu hỏi | `ngay` | ngày (203), ngay (17) | `_asks_for_amount` | `app/retrieval/question_analysis.py:490` |
+| Trung bình | phân loại câu hỏi | `ngay` | ngày (203), ngay (17) | `<module>` | `app/retrieval/structured.py:27`, `app/retrieval/structured.py:28`, `app/retrieval/structured.py:100` |
+| Trung bình | phân loại câu hỏi | `ngay` | ngày (203), ngay (17) | `requested_monetary_period` | `app/retrieval/structured.py:372` |
+| Trung bình | phân loại câu hỏi | `ngay` | ngày (203), ngay (17) | `value_units_for_analysis` | `app/retrieval/structured.py:764` |
+| Trung bình | phân loại câu hỏi | `bat` | bắt (45), bất (15) | `<module>` | `app/retrieval/structured.py:164` |
+| Trung bình | phân loại câu hỏi | `luong` | lương (141), lượng (14) | `_asks_for_amount` | `app/retrieval/question_analysis.py:527` |
+| Trung bình | phân loại câu hỏi | `luong` | lương (141), lượng (14) | `<module>` | `app/retrieval/structured.py:66` |
+| Trung bình | phân loại câu hỏi | `nhieu` | nhiêu (12), nhiều (11) | `<module>` | `app/retrieval/structured.py:69` |
+| Trung bình | phân loại câu hỏi | `nhieu` | nhiêu (12), nhiều (11) | `selected_structural_line_indexes` | `app/retrieval/structured.py:535` |
+| Trung bình | phân loại câu hỏi | `tro` | trợ (56), trở (10), trò (10) | `<module>` | `app/retrieval/structured.py:174` |
+| Trung bình | phân loại câu hỏi | `thang` | tháng (45), thăng (9) | `_asks_for_amount` | `app/retrieval/question_analysis.py:490` |
+| Trung bình | phân loại câu hỏi | `thang` | tháng (45), thăng (9) | `<module>` | `app/retrieval/structured.py:30`, `app/retrieval/structured.py:102` |
+| Trung bình | phân loại câu hỏi | `thang` | tháng (45), thăng (9) | `value_units_for_analysis` | `app/retrieval/structured.py:764` |
+| Trung bình | phân loại câu hỏi | `dung` | dụng (154), đúng (29), dung (27), dùng (16), dựng (12), dừng (8) | `<module>` | `app/retrieval/structured.py:150` |
+| Trung bình | phân loại câu hỏi | `neu` | nếu (66), nêu (8) | `_asks_for_policy_condition` | `app/retrieval/question_analysis.py:646` |
+| Trung bình | phân loại câu hỏi | `thi` | thì (8), thị (7) | `<module>` | `app/retrieval/structured.py:77`, `app/retrieval/structured.py:156` |
+| Trung bình | phân loại câu hỏi | `dai` | dài (16), dải (11), đại (6) | `<module>` | `app/retrieval/structured.py:61` |
+| Trung bình | phân loại câu hỏi | `bo` | bộ (97), bổ (37), bố (31), bỏ (5) | `<module>` | `app/retrieval/structured.py:172` |
+| Trung bình | phân loại câu hỏi | `tien` | tiền (37), tiên (28), tiến (8), tiện (5) | `_asks_for_amount` | `app/retrieval/question_analysis.py:526` |
+| Trung bình | phân loại câu hỏi | `tien` | tiền (37), tiên (28), tiến (8), tiện (5) | `<module>` | `app/retrieval/structured.py:75` |
+| Trung bình | phân loại câu hỏi | `toi` | tối (32), tôi (5) | `_canonicalize_retrieval_language` | `app/retrieval/question_analysis.py:145` |
+| Trung bình | phân loại câu hỏi | `che` | chế (60), che (4) | `<module>` | `app/retrieval/structured.py:191` |
+| Trung bình | phân loại câu hỏi | `cho` | cho (114), chờ (4) | `<module>` | `app/retrieval/structured.py:154` |
+| Trung bình | phân loại câu hỏi | `dong` | động (253), đồng (100), đóng (16), đông (4) | `_asks_for_amount` | `app/retrieval/question_analysis.py:524` |
+| Trung bình | phân loại câu hỏi | `dong` | động (253), đồng (100), đóng (16), đông (4) | `<module>` | `app/retrieval/structured.py:62`, `app/retrieval/structured.py:104` |
+| Trung bình | phân loại câu hỏi | `nam` | năm (62), nam (4) | `_asks_for_amount` | `app/retrieval/question_analysis.py:490` |
+| Trung bình | phân loại câu hỏi | `nam` | năm (62), nam (4) | `<module>` | `app/retrieval/structured.py:33`, `app/retrieval/structured.py:103` |
+| Trung bình | phân loại câu hỏi | `nam` | năm (62), nam (4) | `value_units_for_analysis` | `app/retrieval/structured.py:764` |
+| Trung bình | phân loại câu hỏi | `the` | thể (103), thế (28), thẻ (4) | `<module>` | `app/retrieval/structured.py:117`, `app/retrieval/structured.py:158` |
+| Trung bình | phân loại câu hỏi | `the` | thể (103), thế (28), thẻ (4) | `_is_replacement_relation_question` | `app/retrieval/structured.py:943`, `app/retrieval/structured.py:944` |
+| Trung bình | phân loại câu hỏi | `bao` | bảo (166), báo (94), bao (20), bạo (3) | `<module>` | `app/retrieval/structured.py:60`, `app/retrieval/structured.py:183` |
+| Trung bình | phân loại câu hỏi | `bao` | bảo (166), báo (94), bao (20), bạo (3) | `selected_structural_line_indexes` | `app/retrieval/structured.py:534` |
+| Trung bình | phân loại câu hỏi | `can` | cần (49), căn (30), cận (4), cân (4), cản (3) | `_is_yes_no_question` | `app/retrieval/question_analysis.py:326` |
+| Trung bình | phân loại câu hỏi | `do` | độ (49), do (38), đo (3) | `_is_yes_no_question` | `app/retrieval/question_analysis.py:326` |
+| Trung bình | phân loại câu hỏi | `do` | độ (49), do (38), đo (3) | `<module>` | `app/retrieval/structured.py:192` |
+| Trung bình | phân loại câu hỏi | `tang` | tăng (14), tảng (10), tầng (7), tang (3) | `<module>` | `app/retrieval/structured.py:176` |
+| Trung bình | phân loại câu hỏi | `tham` | tham (49), thẩm (38), thâm (3) | `<module>` | `app/retrieval/structured.py:73` |
+| Trung bình | lọc, sửa hoặc thử lại | `nhan` | nhân (240), nhận (82) | `<module>` | `app/services/grounded_answer_service.py:284` |
+| Trung bình | lọc, sửa hoặc thử lại | `nhan` | nhân (240), nhận (82) | `_compound_answer_missing_need_value` | `app/services/grounded_answer_service.py:3594` |
+| Trung bình | lọc, sửa hoặc thử lại | `nhan` | nhân (240), nhận (82) | `_named_monetary_benefit_focus_terms` | `app/services/grounded_answer_service.py:4971` |
+| Trung bình | lọc, sửa hoặc thử lại | `nhan` | nhân (240), nhận (82) | `_scored_question_focused_direct_value_from_text` | `app/services/grounded_answer_service.py:10227` |
+| Trung bình | lọc, sửa hoặc thử lại | `nhan` | nhân (240), nhận (82) | `_workforce_share_alignment_score` | `app/services/grounded_answer_service.py:10488` |
+| Trung bình | lọc, sửa hoặc thử lại | `nhan` | nhân (240), nhận (82) | `_question_focused_time_ranges_from_text` | `app/services/grounded_answer_service.py:10771` |
+| Trung bình | lọc, sửa hoặc thử lại | `thong` | thông (140), thống (74) | `<module>` | `app/services/grounded_answer_service.py:418` |
+| Trung bình | lọc, sửa hoặc thử lại | `muc` | mức (66), mục (63) | `<module>` | `app/services/grounded_answer_service.py:239` |
+| Trung bình | lọc, sửa hoặc thử lại | `muc` | mức (66), mục (63) | `_looks_like_section_number_span` | `app/services/grounded_answer_service.py:4558` |
+| Trung bình | lọc, sửa hoặc thử lại | `muc` | mức (66), mục (63) | `_is_salary_band_request` | `app/services/grounded_answer_service.py:9921` |
+| Trung bình | lọc, sửa hoặc thử lại | `kien` | kiện (63), kiến (39) | `<module>` | `app/services/grounded_answer_service.py:401` |
+| Trung bình | lọc, sửa hoặc thử lại | `phu` | phụ (43), phù (38) | `<module>` | `app/services/grounded_answer_service.py:245`, `app/services/grounded_answer_service.py:460` |
+| Trung bình | lọc, sửa hoặc thử lại | `chinh` | chính (145), chỉnh (35) | `_question_focused_source_time_ranges` | `app/services/grounded_answer_service.py:4248` |
+| Trung bình | lọc, sửa hoặc thử lại | `chinh` | chính (145), chỉnh (35) | `_named_document_title_terms` | `app/services/grounded_answer_service.py:5612` |
+| Trung bình | lọc, sửa hoặc thử lại | `chinh` | chính (145), chỉnh (35) | `_direct_answer_window_score` | `app/services/grounded_answer_service.py:6660` |
+| Trung bình | lọc, sửa hoặc thử lại | `chinh` | chính (145), chỉnh (35) | `_scored_question_focused_direct_value_from_text` | `app/services/grounded_answer_service.py:10222` |
+| Trung bình | lọc, sửa hoặc thử lại | `chinh` | chính (145), chỉnh (35) | `_question_focused_time_ranges_from_text` | `app/services/grounded_answer_service.py:10766` |
+| Trung bình | lọc, sửa hoặc thử lại | `hang` | hàng (51), hằng (32) | `<module>` | `app/services/grounded_answer_service.py:396` |
+| Trung bình | lọc, sửa hoặc thử lại | `hang` | hàng (51), hằng (32) | `_scored_question_focused_direct_value_from_text` | `app/services/grounded_answer_service.py:10400` |
+| Trung bình | lọc, sửa hoặc thử lại | `toan` | toàn (64), toán (30) | `<module>` | `app/services/grounded_answer_service.py:420` |
+| Trung bình | lọc, sửa hoặc thử lại | `toan` | toàn (64), toán (30) | `_terms_ask_about_automatic` | `app/services/grounded_answer_service.py:6710` |
+| Trung bình | lọc, sửa hoặc thử lại | `huong` | hưởng (44), huống (38), hướng (29) | `_duration_direct_value_repair_allowed` | `app/services/grounded_answer_service.py:10114` |
+| Trung bình | lọc, sửa hoặc thử lại | `huong` | hưởng (44), huống (38), hướng (29) | `_scored_question_focused_direct_value_from_text` | `app/services/grounded_answer_service.py:10349` |
+| Trung bình | lọc, sửa hoặc thử lại | `trang` | trang (82), trạng (29) | `_is_change_rule_line_candidate` | `app/services/grounded_answer_service.py:3167` |
+| Trung bình | lọc, sửa hoặc thử lại | `hoi` | hội (39), hỏi (26), hồi (26) | `<module>` | `app/services/grounded_answer_service.py:398`, `app/services/grounded_answer_service.py:429` |
+| Trung bình | lọc, sửa hoặc thử lại | `trong` | trong (93), trọng (25) | `<module>` | `app/services/grounded_answer_service.py:9008` |
+| Trung bình | lọc, sửa hoặc thử lại | `trong` | trong (93), trọng (25) | `_scored_question_focused_direct_value_from_text` | `app/services/grounded_answer_service.py:10229` |
+| Trung bình | lọc, sửa hoặc thử lại | `trong` | trong (93), trọng (25) | `_workforce_share_alignment_score` | `app/services/grounded_answer_service.py:10511` |
+| Trung bình | lọc, sửa hoặc thử lại | `trong` | trong (93), trọng (25) | `_question_focused_time_ranges_from_text` | `app/services/grounded_answer_service.py:10773` |
+| Trung bình | lọc, sửa hoặc thử lại | `ca` | cá (36), ca (23) | `<module>` | `app/services/grounded_answer_service.py:265` |
+| Trung bình | lọc, sửa hoặc thử lại | `nghi` | nghỉ (250), nghị (23) | `_duration_direct_value_repair_allowed` | `app/services/grounded_answer_service.py:10114` |
+| Trung bình | lọc, sửa hoặc thử lại | `nghi` | nghỉ (250), nghị (23) | `_scored_question_focused_direct_value_from_text` | `app/services/grounded_answer_service.py:10400` |
+| Trung bình | lọc, sửa hoặc thử lại | `hop` | hợp (208), họp (21) | `<module>` | `app/services/grounded_answer_service.py:399` |
+| Trung bình | lọc, sửa hoặc thử lại | `tuan` | tuần (25), tuân (21) | `<module>` | `app/services/grounded_answer_service.py:290`, `app/services/grounded_answer_service.py:423` |
+| Trung bình | lọc, sửa hoặc thử lại | `tuan` | tuần (25), tuân (21) | `_number_span_followed_by_question_term` | `app/services/grounded_answer_service.py:4509` |
+| Trung bình | lọc, sửa hoặc thử lại | `tuan` | tuần (25), tuân (21) | `_direct_answer_window_score` | `app/services/grounded_answer_service.py:6682`, `app/services/grounded_answer_service.py:6683` |
+| Trung bình | lọc, sửa hoặc thử lại | `tuan` | tuần (25), tuân (21) | `_scored_question_focused_direct_value_from_text` | `app/services/grounded_answer_service.py:10361`, `app/services/grounded_answer_service.py:10362`, `app/services/grounded_answer_service.py:10400` |
+| Trung bình | lọc, sửa hoặc thử lại | `tuan` | tuần (25), tuân (21) | `_requested_duration_value_units` | `app/services/grounded_answer_service.py:10547` |
+| Trung bình | lọc, sửa hoặc thử lại | `tuan` | tuần (25), tuân (21) | `_requested_duration_period_units` | `app/services/grounded_answer_service.py:10575` |
+| Trung bình | lọc, sửa hoặc thử lại | `chuyen` | chuyển (27), chuyên (20) | `<module>` | `app/services/grounded_answer_service.py:442` |
+| Trung bình | lọc, sửa hoặc thử lại | `co` | có (287), cơ (68), cố (68), cổ (20) | `<module>` | `app/services/grounded_answer_service.py:266`, `app/services/grounded_answer_service.py:443`, `app/services/grounded_answer_service.py:527` |
+| Trung bình | lọc, sửa hoặc thử lại | `co` | có (287), cơ (68), cố (68), cổ (20) | `_question_focused_source_time_ranges` | `app/services/grounded_answer_service.py:4248` |
+| Trung bình | lọc, sửa hoặc thử lại | `co` | có (287), cơ (68), cố (68), cổ (20) | `_filter_to_conditional_allowance_hits` | `app/services/grounded_answer_service.py:4940` |
+| Trung bình | lọc, sửa hoặc thử lại | `co` | có (287), cơ (68), cố (68), cổ (20) | `_direct_answer_window_score` | `app/services/grounded_answer_service.py:6660` |
+| Trung bình | lọc, sửa hoặc thử lại | `co` | có (287), cơ (68), cố (68), cổ (20) | `_allowance_fact_question_match_score` | `app/services/grounded_answer_service.py:8708` |
+| Trung bình | lọc, sửa hoặc thử lại | `co` | có (287), cơ (68), cố (68), cổ (20) | `_condition_entails_scenario` | `app/services/grounded_answer_service.py:8758` |
+| Trung bình | lọc, sửa hoặc thử lại | `co` | có (287), cơ (68), cố (68), cổ (20) | `_scored_question_focused_direct_value_from_text` | `app/services/grounded_answer_service.py:10224` |
+| Trung bình | lọc, sửa hoặc thử lại | `co` | có (287), cơ (68), cố (68), cổ (20) | `_question_focused_time_ranges_from_text` | `app/services/grounded_answer_service.py:10768` |
+| Trung bình | lọc, sửa hoặc thử lại | `truc` | trực (43), trúc (18) | `<module>` | `app/services/grounded_answer_service.py:422` |
+| Trung bình | lọc, sửa hoặc thử lại | `ngay` | ngày (203), ngay (17) | `<module>` | `app/services/grounded_answer_service.py:242`, `app/services/grounded_answer_service.py:282` |
+| Trung bình | lọc, sửa hoặc thử lại | `ngay` | ngày (203), ngay (17) | `_leave_policy_answer_mismatches_bound_clause` | `app/services/grounded_answer_service.py:3573` |
+| Trung bình | lọc, sửa hoặc thử lại | `ngay` | ngày (203), ngay (17) | `_number_span_followed_by_question_term` | `app/services/grounded_answer_service.py:4508` |
+| Trung bình | lọc, sửa hoặc thử lại | `ngay` | ngày (203), ngay (17) | `_direct_answer_window_score` | `app/services/grounded_answer_service.py:6682`, `app/services/grounded_answer_service.py:6683` |
+| Trung bình | lọc, sửa hoặc thử lại | `ngay` | ngày (203), ngay (17) | `_question_asks_allowance_scenario` | `app/services/grounded_answer_service.py:8730` |
+| Trung bình | lọc, sửa hoặc thử lại | `ngay` | ngày (203), ngay (17) | `_duration_direct_value_repair_allowed` | `app/services/grounded_answer_service.py:10118` |
+| Trung bình | lọc, sửa hoặc thử lại | `ngay` | ngày (203), ngay (17) | `_scored_question_focused_direct_value_from_text` | `app/services/grounded_answer_service.py:10361`, `app/services/grounded_answer_service.py:10362` |
+| Trung bình | lọc, sửa hoặc thử lại | `ngay` | ngày (203), ngay (17) | `_requested_duration_value_units` | `app/services/grounded_answer_service.py:10544`, `app/services/grounded_answer_service.py:10545` |
+| Trung bình | lọc, sửa hoặc thử lại | `ngay` | ngày (203), ngay (17) | `_requested_duration_period_units` | `app/services/grounded_answer_service.py:10573` |
+| Trung bình | lọc, sửa hoặc thử lại | `ngay` | ngày (203), ngay (17) | `_duration_match_unit` | `app/services/grounded_answer_service.py:10605` |
+| Trung bình | lọc, sửa hoặc thử lại | `phan` | phân (44), phần (38), phản (30), phận (17) | `<module>` | `app/services/grounded_answer_service.py:244` |
+| Trung bình | lọc, sửa hoặc thử lại | `phan` | phân (44), phần (38), phản (30), phận (17) | `_workforce_share_alignment_score` | `app/services/grounded_answer_service.py:10481` |
+| Trung bình | lọc, sửa hoặc thử lại | `bat` | bắt (45), bất (15) | `_question_focused_time_ranges_from_text` | `app/services/grounded_answer_service.py:10826` |
+| Trung bình | lọc, sửa hoặc thử lại | `thu` | thử (52), thủ (28), thu (25), thứ (15) | `<module>` | `app/services/grounded_answer_service.py:417` |
+| Trung bình | lọc, sửa hoặc thử lại | `luong` | lương (141), lượng (14) | `<module>` | `app/services/grounded_answer_service.py:234` |
+| Trung bình | lọc, sửa hoặc thử lại | `luong` | lương (141), lượng (14) | `_duration_direct_value_repair_allowed` | `app/services/grounded_answer_service.py:10114` |
+| Trung bình | lọc, sửa hoặc thử lại | `cung` | cung (29), cùng (13) | `_workforce_share_alignment_score` | `app/services/grounded_answer_service.py:10501` |
+| Trung bình | lọc, sửa hoặc thử lại | `hon` | hơn (14), hôn (13) | `_scored_question_focused_direct_value_from_text` | `app/services/grounded_answer_service.py:10352` |
+| Trung bình | lọc, sửa hoặc thử lại | `ty` | ty (86), tỷ (12) | `<module>` | `app/services/grounded_answer_service.py:298`, `app/services/grounded_answer_service.py:473` |
+| Trung bình | lọc, sửa hoặc thử lại | `ty` | ty (86), tỷ (12) | `_filter_to_conditional_allowance_hits` | `app/services/grounded_answer_service.py:4940` |
+| Trung bình | lọc, sửa hoặc thử lại | `ty` | ty (86), tỷ (12) | `_allowance_fact_question_match_score` | `app/services/grounded_answer_service.py:8708` |
+| Trung bình | lọc, sửa hoặc thử lại | `ty` | ty (86), tỷ (12) | `_condition_entails_scenario` | `app/services/grounded_answer_service.py:8758` |
+| Trung bình | lọc, sửa hoặc thử lại | `cao` | cáo (19), cao (11) | `<module>` | `app/services/grounded_answer_service.py:384` |
+| Trung bình | lọc, sửa hoặc thử lại | `giam` | giám (25), giảm (11) | `<module>` | `app/services/grounded_answer_service.py:395`, `app/services/grounded_answer_service.py:449` |
+| Trung bình | lọc, sửa hoặc thử lại | `nhieu` | nhiêu (12), nhiều (11) | `<module>` | `app/services/grounded_answer_service.py:243`, `app/services/grounded_answer_service.py:537` |
+| Trung bình | lọc, sửa hoặc thử lại | `nhieu` | nhiêu (12), nhiều (11) | `_workforce_share_alignment_score` | `app/services/grounded_answer_service.py:10506` |
+| Trung bình | lọc, sửa hoặc thử lại | `thuc` | thực (96), thức (40), thúc (11) | `_question_focused_time_ranges_from_text` | `app/services/grounded_answer_service.py:10829` |
+| Trung bình | lọc, sửa hoặc thử lại | `tro` | trợ (56), trở (10), trò (10) | `<module>` | `app/services/grounded_answer_service.py:257`, `app/services/grounded_answer_service.py:289` |
+| Trung bình | lọc, sửa hoặc thử lại | `tro` | trợ (56), trở (10), trò (10) | `_number_span_followed_by_question_term` | `app/services/grounded_answer_service.py:4512` |
+| Trung bình | lọc, sửa hoặc thử lại | `tro` | trợ (56), trở (10), trò (10) | `_filter_to_conditional_allowance_hits` | `app/services/grounded_answer_service.py:4940` |
+| Trung bình | lọc, sửa hoặc thử lại | `tro` | trợ (56), trở (10), trò (10) | `_named_monetary_benefit_focus_terms` | `app/services/grounded_answer_service.py:4974` |
+| Trung bình | lọc, sửa hoặc thử lại | `tro` | trợ (56), trở (10), trò (10) | `_allowance_fact_question_match_score` | `app/services/grounded_answer_service.py:8708` |
+| Trung bình | lọc, sửa hoặc thử lại | `tro` | trợ (56), trở (10), trò (10) | `_condition_entails_scenario` | `app/services/grounded_answer_service.py:8758` |
+| Trung bình | lọc, sửa hoặc thử lại | `bi` | bị (45), bí (9) | `<module>` | `app/services/grounded_answer_service.py:311` |
+| Trung bình | lọc, sửa hoặc thử lại | `cong` | công (290), cộng (9) | `<module>` | `app/services/grounded_answer_service.py:298`, `app/services/grounded_answer_service.py:438` |
+| Trung bình | lọc, sửa hoặc thử lại | `cong` | công (290), cộng (9) | `_filter_to_conditional_allowance_hits` | `app/services/grounded_answer_service.py:4940` |
+| Trung bình | lọc, sửa hoặc thử lại | `cong` | công (290), cộng (9) | `_named_monetary_benefit_focus_terms` | `app/services/grounded_answer_service.py:4966` |
+| Trung bình | lọc, sửa hoặc thử lại | `cong` | công (290), cộng (9) | `_allowance_fact_question_match_score` | `app/services/grounded_answer_service.py:8708` |
+| Trung bình | lọc, sửa hoặc thử lại | `cong` | công (290), cộng (9) | `_condition_entails_scenario` | `app/services/grounded_answer_service.py:8758` |
+| Trung bình | lọc, sửa hoặc thử lại | `thang` | tháng (45), thăng (9) | `<module>` | `app/services/grounded_answer_service.py:253`, `app/services/grounded_answer_service.py:287` |
+| Trung bình | lọc, sửa hoặc thử lại | `thang` | tháng (45), thăng (9) | `_number_span_followed_by_question_term` | `app/services/grounded_answer_service.py:4510` |
+| Trung bình | lọc, sửa hoặc thử lại | `thang` | tháng (45), thăng (9) | `_requested_duration_value_units` | `app/services/grounded_answer_service.py:10550` |
+| Trung bình | lọc, sửa hoặc thử lại | `thang` | tháng (45), thăng (9) | `_requested_duration_period_units` | `app/services/grounded_answer_service.py:10577` |
+| Trung bình | lọc, sửa hoặc thử lại | `cam` | cấm (13), cam (9), cảm (8) | `_prompt_sensitive_policy_score` | `app/services/grounded_answer_service.py:6278`, `app/services/grounded_answer_service.py:6283`, `app/services/grounded_answer_service.py:6288` |
+| Trung bình | lọc, sửa hoặc thử lại | `doc` | đốc (15), độc (8) | `<module>` | `app/services/grounded_answer_service.py:446` |
+| Trung bình | lọc, sửa hoặc thử lại | `dung` | dụng (154), đúng (29), dung (27), dùng (16), dựng (12), dừng (8) | `<module>` | `app/services/grounded_answer_service.py:271`, `app/services/grounded_answer_service.py:527` |
+| Trung bình | lọc, sửa hoặc thử lại | `dung` | dụng (154), đúng (29), dung (27), dùng (16), dựng (12), dừng (8) | `_condition_entails_scenario` | `app/services/grounded_answer_service.py:8752` |
+| Trung bình | lọc, sửa hoặc thử lại | `neu` | nếu (66), nêu (8) | `_named_document_title_terms` | `app/services/grounded_answer_service.py:5604` |
+| Trung bình | lọc, sửa hoặc thử lại | `neu` | nếu (66), nêu (8) | `_question_asks_allowance_scenario` | `app/services/grounded_answer_service.py:8727` |
+| Trung bình | lọc, sửa hoặc thử lại | `dinh` | định (223), đình (7) | `_compound_answer_missing_need_value` | `app/services/grounded_answer_service.py:3604` |
+| Trung bình | lọc, sửa hoặc thử lại | `nghe` | nghệ (44), nghề (7) | `<module>` | `app/services/grounded_answer_service.py:457` |
+| Trung bình | lọc, sửa hoặc thử lại | `thi` | thì (8), thị (7) | `<module>` | `app/services/grounded_answer_service.py:298` |
+| Trung bình | lọc, sửa hoặc thử lại | `thi` | thì (8), thị (7) | `_named_document_title_terms` | `app/services/grounded_answer_service.py:5605` |
+| Trung bình | lọc, sửa hoặc thử lại | `dai` | dài (16), dải (11), đại (6) | `<module>` | `app/services/grounded_answer_service.py:227` |
+| Trung bình | lọc, sửa hoặc thử lại | `dai` | dài (16), dải (11), đại (6) | `_question_bound_structured_evidence` | `app/services/grounded_answer_service.py:5549` |
+| Trung bình | lọc, sửa hoặc thử lại | `du` | dữ (131), dự (47), đủ (26), dư (18), dụ (6) | `<module>` | `app/services/grounded_answer_service.py:394` |
+| Trung bình | lọc, sửa hoặc thử lại | `loi` | lợi (86), lõi (12), lỗi (12), lời (6) | `_question_focused_time_ranges_from_text` | `app/services/grounded_answer_service.py:10833` |
+| Trung bình | lọc, sửa hoặc thử lại | `thieu` | thiểu (24), thiếu (13), thiệu (6) | `<module>` | `app/services/grounded_answer_service.py:471` |
+| Trung bình | lọc, sửa hoặc thử lại | `an` | an (59), án (41), ăn (5) | `<module>` | `app/services/grounded_answer_service.py:381`, `app/services/grounded_answer_service.py:9036` |
+| Trung bình | lọc, sửa hoặc thử lại | `ban` | bản (211), ban (62), bàn (21), bán (5) | `<module>` | `app/services/grounded_answer_service.py:429`, `app/services/grounded_answer_service.py:434` |
+| Trung bình | lọc, sửa hoặc thử lại | `ban` | bản (211), ban (62), bàn (21), bán (5) | `_scored_question_focused_direct_value_from_text` | `app/services/grounded_answer_service.py:10395` |
+| Trung bình | lọc, sửa hoặc thử lại | `biet` | biệt (24), biết (5) | `_negated_question_terms` | `app/services/grounded_answer_service.py:4543`, `app/services/grounded_answer_service.py:4544` |
+| Trung bình | lọc, sửa hoặc thử lại | `bo` | bộ (97), bổ (37), bố (31), bỏ (5) | `<module>` | `app/services/grounded_answer_service.py:429`, `app/services/grounded_answer_service.py:435` |
+| Trung bình | lọc, sửa hoặc thử lại | `ho` | hồ (58), hỗ (48), họ (5) | `<module>` | `app/services/grounded_answer_service.py:233`, `app/services/grounded_answer_service.py:397` |
+| Trung bình | lọc, sửa hoặc thử lại | `ho` | hồ (58), hỗ (48), họ (5) | `_filter_to_conditional_allowance_hits` | `app/services/grounded_answer_service.py:4940` |
+| Trung bình | lọc, sửa hoặc thử lại | `ho` | hồ (58), hỗ (48), họ (5) | `_allowance_fact_question_match_score` | `app/services/grounded_answer_service.py:8708` |
+| Trung bình | lọc, sửa hoặc thử lại | `ho` | hồ (58), hỗ (48), họ (5) | `_condition_entails_scenario` | `app/services/grounded_answer_service.py:8758` |
+| Trung bình | lọc, sửa hoặc thử lại | `mat` | mật (44), mất (8), mặt (5) | `<module>` | `app/services/grounded_answer_service.py:406` |
+| Trung bình | lọc, sửa hoặc thử lại | `mat` | mật (44), mất (8), mặt (5) | `_leave_policy_intent` | `app/services/grounded_answer_service.py:5114` |
+| Trung bình | lọc, sửa hoặc thử lại | `tien` | tiền (37), tiên (28), tiến (8), tiện (5) | `<module>` | `app/services/grounded_answer_service.py:254`, `app/services/grounded_answer_service.py:288` |
+| Trung bình | lọc, sửa hoặc thử lại | `tien` | tiền (37), tiên (28), tiến (8), tiện (5) | `_number_span_followed_by_question_term` | `app/services/grounded_answer_service.py:4511` |
+| Trung bình | lọc, sửa hoặc thử lại | `tien` | tiền (37), tiên (28), tiến (8), tiện (5) | `_filter_to_conditional_allowance_hits` | `app/services/grounded_answer_service.py:4940` |
+| Trung bình | lọc, sửa hoặc thử lại | `tien` | tiền (37), tiên (28), tiến (8), tiện (5) | `_named_monetary_benefit_focus_terms` | `app/services/grounded_answer_service.py:4973` |
+| Trung bình | lọc, sửa hoặc thử lại | `tien` | tiền (37), tiên (28), tiến (8), tiện (5) | `_allowance_fact_question_match_score` | `app/services/grounded_answer_service.py:8708` |
+| Trung bình | lọc, sửa hoặc thử lại | `tien` | tiền (37), tiên (28), tiến (8), tiện (5) | `_condition_entails_scenario` | `app/services/grounded_answer_service.py:8758` |
+| Trung bình | lọc, sửa hoặc thử lại | `toi` | tối (32), tôi (5) | `<module>` | `app/services/grounded_answer_service.py:255`, `app/services/grounded_answer_service.py:467` |
+| Trung bình | lọc, sửa hoặc thử lại | `bang` | bằng (37), bảng (4) | `_question_bound_structured_evidence` | `app/services/grounded_answer_service.py:5544` |
+| Trung bình | lọc, sửa hoặc thử lại | `che` | chế (60), che (4) | `<module>` | `app/services/grounded_answer_service.py:386` |
+| Trung bình | lọc, sửa hoặc thử lại | `che` | chế (60), che (4) | `_named_document_title_terms` | `app/services/grounded_answer_service.py:5616` |
+| Trung bình | lọc, sửa hoặc thử lại | `cho` | cho (114), chờ (4) | `_condition_entails_scenario` | `app/services/grounded_answer_service.py:8752` |
+| Trung bình | lọc, sửa hoặc thử lại | `cho` | cho (114), chờ (4) | `<module>` | `app/services/grounded_answer_service.py:9002` |
+| Trung bình | lọc, sửa hoặc thử lại | `dong` | động (253), đồng (100), đóng (16), đông (4) | `<module>` | `app/services/grounded_answer_service.py:228`, `app/services/grounded_answer_service.py:270`, `app/services/grounded_answer_service.py:393` |
+| Trung bình | lọc, sửa hoặc thử lại | `dong` | động (253), đồng (100), đóng (16), đông (4) | `_terms_ask_about_automatic` | `app/services/grounded_answer_service.py:6710` |
+| Trung bình | lọc, sửa hoặc thử lại | `moi` | mối (16), môi (15), mọi (12), mỗi (6), mới (4) | `<module>` | `app/services/grounded_answer_service.py:237`, `app/services/grounded_answer_service.py:280` |
+| Trung bình | lọc, sửa hoặc thử lại | `moi` | mối (16), môi (15), mọi (12), mỗi (6), mới (4) | `_is_multi_value_yes_no_question` | `app/services/grounded_answer_service.py:3734` |
+| Trung bình | lọc, sửa hoặc thử lại | `moi` | mối (16), môi (15), mọi (12), mỗi (6), mới (4) | `_question_focused_source_time_ranges` | `app/services/grounded_answer_service.py:4248` |
+| Trung bình | lọc, sửa hoặc thử lại | `moi` | mối (16), môi (15), mọi (12), mỗi (6), mới (4) | `_direct_answer_window_score` | `app/services/grounded_answer_service.py:6660` |
+| Trung bình | lọc, sửa hoặc thử lại | `moi` | mối (16), môi (15), mọi (12), mỗi (6), mới (4) | `_scored_question_focused_direct_value_from_text` | `app/services/grounded_answer_service.py:10226` |
+| Trung bình | lọc, sửa hoặc thử lại | `moi` | mối (16), môi (15), mọi (12), mỗi (6), mới (4) | `_question_focused_time_ranges_from_text` | `app/services/grounded_answer_service.py:10770` |
+| Trung bình | lọc, sửa hoặc thử lại | `nam` | năm (62), nam (4) | `<module>` | `app/services/grounded_answer_service.py:240`, `app/services/grounded_answer_service.py:281` |
+| Trung bình | lọc, sửa hoặc thử lại | `nam` | năm (62), nam (4) | `_number_span_followed_by_question_term` | `app/services/grounded_answer_service.py:4513` |
+| Trung bình | lọc, sửa hoặc thử lại | `nam` | năm (62), nam (4) | `_requested_duration_value_units` | `app/services/grounded_answer_service.py:10553` |
+| Trung bình | lọc, sửa hoặc thử lại | `nam` | năm (62), nam (4) | `_requested_duration_period_units` | `app/services/grounded_answer_service.py:10579` |
+| Trung bình | lọc, sửa hoặc thử lại | `noi` | nội (110), nơi (13), nối (4), nói (4) | `<module>` | `app/services/grounded_answer_service.py:407` |
+| Trung bình | lọc, sửa hoặc thử lại | `noi` | nội (110), nơi (13), nối (4), nói (4) | `_named_document_title_terms` | `app/services/grounded_answer_service.py:5614` |
+| Trung bình | lọc, sửa hoặc thử lại | `the` | thể (103), thế (28), thẻ (4) | `_condition_entails_scenario` | `app/services/grounded_answer_service.py:8752` |
+| Trung bình | lọc, sửa hoặc thử lại | `the` | thể (103), thế (28), thẻ (4) | `<module>` | `app/services/grounded_answer_service.py:9034` |
+| Trung bình | lọc, sửa hoặc thử lại | `the` | thể (103), thế (28), thẻ (4) | `_workforce_share_alignment_score` | `app/services/grounded_answer_service.py:10502` |
+| Trung bình | lọc, sửa hoặc thử lại | `tin` | tin (83), tín (4) | `<module>` | `app/services/grounded_answer_service.py:419` |
+| Trung bình | lọc, sửa hoặc thử lại | `to` | tổ (25), tố (7), tờ (4) | `<module>` | `app/services/grounded_answer_service.py:472`, `app/services/grounded_answer_service.py:9038` |
+| Trung bình | lọc, sửa hoặc thử lại | `bao` | bảo (166), báo (94), bao (20), bạo (3) | `<module>` | `app/services/grounded_answer_service.py:225`, `app/services/grounded_answer_service.py:383`, `app/services/grounded_answer_service.py:537`, `app/services/grounded_answer_service.py:8994` |
+| Trung bình | lọc, sửa hoặc thử lại | `bao` | bảo (166), báo (94), bao (20), bạo (3) | `_workforce_share_alignment_score` | `app/services/grounded_answer_service.py:10505` |
+| Trung bình | lọc, sửa hoặc thử lại | `can` | cần (49), căn (30), cận (4), cân (4), cản (3) | `_yes_no_display_prefix` | `app/services/grounded_answer_service.py:7262` |
+| Trung bình | lọc, sửa hoặc thử lại | `can` | cần (49), căn (30), cận (4), cân (4), cản (3) | `<module>` | `app/services/grounded_answer_service.py:9060` |
+| Trung bình | lọc, sửa hoặc thử lại | `cap` | cấp (105), cập (43), cắp (3) | `<module>` | `app/services/grounded_answer_service.py:226`, `app/services/grounded_answer_service.py:385` |
+| Trung bình | lọc, sửa hoặc thử lại | `dau` | đầu (49), đau (6), đâu (3) | `_question_focused_time_ranges_from_text` | `app/services/grounded_answer_service.py:10826` |
+| Trung bình | lọc, sửa hoặc thử lại | `do` | độ (49), do (38), đo (3) | `<module>` | `app/services/grounded_answer_service.py:524`, `app/services/grounded_answer_service.py:9048` |
+| Trung bình | lọc, sửa hoặc thử lại | `do` | độ (49), do (38), đo (3) | `_yes_no_display_prefix` | `app/services/grounded_answer_service.py:7260` |
+| Trung bình | lọc, sửa hoặc thử lại | `ke` | kế (46), kể (6), kê (3) | `<module>` | `app/services/grounded_answer_service.py:400` |
+| Trung bình | lọc, sửa hoặc thử lại | `phong` | phỏng (152), phòng (60), phong (3) | `<module>` | `app/services/grounded_answer_service.py:429`, `app/services/grounded_answer_service.py:463` |
+| Trung bình | lọc, sửa hoặc thử lại | `san` | sản (66), sẵn (3) | `<module>` | `app/services/grounded_answer_service.py:464` |
+| Trung bình | lọc, sửa hoặc thử lại | `sau` | sau (36), sáu (3) | `_is_narrow_duration_question` | `app/services/grounded_answer_service.py:3777` |
+| Trung bình | lọc, sửa hoặc thử lại | `sau` | sau (36), sáu (3) | `<module>` | `app/services/grounded_answer_service.py:8975` |
+| Trung bình | lọc, sửa hoặc thử lại | `soc` | sóc (6), soc (3) | `<module>` | `app/services/grounded_answer_service.py:416` |
+| Trung bình | lọc, sửa hoặc thử lại | `tai` | tài (220), tại (47), tai (17), tái (3) | `<module>` | `app/services/grounded_answer_service.py:251` |
+| Trung bình | lọc, sửa hoặc thử lại | `tai` | tài (220), tại (47), tai (17), tái (3) | `_reason_evidence_is_missing` | `app/services/grounded_answer_service.py:3252` |
+| Trung bình | lọc, sửa hoặc thử lại | `tat` | tất (5), tật (3) | `<module>` | `app/services/grounded_answer_service.py:286` |
+| Trung bình | lọc, sửa hoặc thử lại | `tham` | tham (49), thẩm (38), thâm (3) | `<module>` | `app/services/grounded_answer_service.py:252` |
+| Trung bình | lọc, sửa hoặc thử lại | `tinh` | tình (53), tính (29), tinh (3) | `_terms_ask_about_automatic` | `app/services/grounded_answer_service.py:6710` |
+| Trung bình | lọc, sửa hoặc thử lại | `truong` | trường (67), trưởng (4), trương (3) | `<module>` | `app/services/grounded_answer_service.py:470` |
+| Trung bình | lọc, sửa hoặc thử lại | `tu` | từ (91), tự (47), tư (21), tử (3) | `<module>` | `app/services/grounded_answer_service.py:424` |
+| Trung bình | lọc, sửa hoặc thử lại | `tu` | từ (91), tự (47), tư (21), tử (3) | `_asks_for_full_range` | `app/services/grounded_answer_service.py:4323` |
+| Trung bình | lọc, sửa hoặc thử lại | `tu` | từ (91), tự (47), tư (21), tử (3) | `_is_salary_band_request` | `app/services/grounded_answer_service.py:9921` |
+| Trung bình | lọc, sửa hoặc thử lại | `uy` | ủy (8), uy (3) | `<module>` | `app/services/grounded_answer_service.py:425`, `app/services/grounded_answer_service.py:429` |
+| Trung bình | lọc, sửa hoặc thử lại | `van` | văn (47), vận (34), vấn (23), vẫn (3) | `<module>` | `app/services/grounded_answer_service.py:429`, `app/services/grounded_answer_service.py:474` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `nhan` | nhân (240), nhận (82) | `<module>` | `app/chat/prompt_builder.py:24` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `nhan` | nhân (240), nhận (82) | `<module>` | `app/retrieval/keyword_repository.py:39` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `nhan` | nhân (240), nhận (82) | `<module>` | `app/retrieval/reranker.py:69` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `nhan` | nhân (240), nhận (82) | `_important_term_coverage_score` | `app/retrieval/reranker.py:644` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `thong` | thông (140), thống (74) | `<module>` | `app/retrieval/reranker.py:182`, `app/retrieval/reranker.py:222` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `muc` | mức (66), mục (63) | `<module>` | `app/chat/prompt_builder.py:48` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `muc` | mức (66), mục (63) | `<module>` | `app/retrieval/keyword_repository.py:35` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `muc` | mức (66), mục (63) | `<module>` | `app/retrieval/reranker.py:82` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `kien` | kiện (63), kiến (39) | `<module>` | `app/retrieval/reranker.py:159`, `app/retrieval/reranker.py:207` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `phu` | phụ (43), phù (38) | `_person_role_excerpt` | `app/chat/context_builder.py:1060` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `phu` | phụ (43), phù (38) | `<module>` | `app/retrieval/keyword_repository.py:40` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `chinh` | chính (145), chỉnh (35) | `<module>` | `app/retrieval/keyword_repository.py:28` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `chinh` | chính (145), chỉnh (35) | `<module>` | `app/retrieval/reranker.py:67` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `hang` | hàng (51), hằng (32) | `<module>` | `app/retrieval/reranker.py:155`, `app/retrieval/reranker.py:204` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `toan` | toàn (64), toán (30) | `<module>` | `app/retrieval/reranker.py:184`, `app/retrieval/reranker.py:224` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `hoi` | hội (39), hỏi (26), hồi (26) | `<module>` | `app/retrieval/reranker.py:157`, `app/retrieval/reranker.py:205`, `app/retrieval/reranker.py:230` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `trong` | trong (93), trọng (25) | `<module>` | `app/retrieval/keyword_repository.py:92` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `nghi` | nghỉ (250), nghị (23) | `<module>` | `app/retrieval/keyword_repository.py:38` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `hop` | hợp (208), họp (21) | `<module>` | `app/retrieval/reranker.py:158`, `app/retrieval/reranker.py:206` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `tuan` | tuần (25), tuân (21) | `<module>` | `app/chat/prompt_builder.py:55` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `tuan` | tuần (25), tuân (21) | `<module>` | `app/retrieval/keyword_repository.py:45` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `tuan` | tuần (25), tuân (21) | `_important_term_coverage_score` | `app/retrieval/reranker.py:650` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `ra` | rà (28), ra (18) | `<module>` | `app/chat/context_builder.py:715` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `ra` | rà (28), ra (18) | `<module>` | `app/retrieval/keyword_repository.py:87` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `truc` | trực (43), trúc (18) | `<module>` | `app/retrieval/reranker.py:185`, `app/retrieval/reranker.py:225` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `con` | con (21), còn (17) | `<module>` | `app/chat/follow_up_resolver.py:12`, `app/chat/follow_up_resolver.py:56` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `con` | con (21), còn (17) | `_expand_explicit_topic_follow_up` | `app/chat/follow_up_resolver.py:380` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `ngay` | ngày (203), ngay (17) | `_wrapped_value_label_rows` | `app/chat/context_builder.py:691` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `ngay` | ngày (203), ngay (17) | `<module>` | `app/chat/prompt_builder.py:53` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `ngay` | ngày (203), ngay (17) | `<module>` | `app/retrieval/keyword_repository.py:37` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `ngay` | ngày (203), ngay (17) | `<module>` | `app/retrieval/reranker.py:84` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `ngay` | ngày (203), ngay (17) | `_important_term_coverage_score` | `app/retrieval/reranker.py:649` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `phan` | phân (44), phần (38), phản (30), phận (17) | `<module>` | `app/chat/prompt_builder.py:57` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `cau` | cầu (97), cấu (27), câu (16) | `<module>` | `app/chat/prompt_builder.py:36` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `luong` | lương (141), lượng (14) | `<module>` | `app/retrieval/keyword_repository.py:34` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `ty` | ty (86), tỷ (12) | `<module>` | `app/chat/prompt_builder.py:28` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `cao` | cáo (19), cao (11) | `<module>` | `app/retrieval/reranker.py:140`, `app/retrieval/reranker.py:195` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `giam` | giám (25), giảm (11) | `<module>` | `app/chat/context_builder.py:54` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `giam` | giám (25), giảm (11) | `<module>` | `app/retrieval/reranker.py:154` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `nhieu` | nhiêu (12), nhiều (11) | `<module>` | `app/chat/context_builder.py:45` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `nhieu` | nhiêu (12), nhiều (11) | `<module>` | `app/chat/prompt_builder.py:47` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `nhieu` | nhiêu (12), nhiều (11) | `<module>` | `app/retrieval/reranker.py:63` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `nhieu` | nhiêu (12), nhiều (11) | `_important_term_coverage_score` | `app/retrieval/reranker.py:648` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `cong` | công (290), cộng (9) | `<module>` | `app/chat/prompt_builder.py:27` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `cong` | công (290), cộng (9) | `<module>` | `app/retrieval/reranker.py:146` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `da` | đã (22), đa (9) | `<module>` | `app/chat/prompt_builder.py:50` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `da` | đã (22), đa (9) | `<module>` | `app/retrieval/reranker.py:80` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `thang` | tháng (45), thăng (9) | `<module>` | `app/chat/prompt_builder.py:56` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `thang` | tháng (45), thăng (9) | `<module>` | `app/retrieval/keyword_repository.py:42` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `thang` | tháng (45), thăng (9) | `_important_term_coverage_score` | `app/retrieval/reranker.py:651` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `neu` | nếu (66), nêu (8) | `_line_requires_continuation` | `app/chat/context_builder.py:660` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `neu` | nếu (66), nêu (8) | `<module>` | `app/chat/follow_up_resolver.py:69` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `nghe` | nghệ (44), nghề (7) | `<module>` | `app/retrieval/reranker.py:166` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `dien` | diện (15), điện (15), diễn (6) | `<module>` | `app/chat/context_builder.py:714` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `du` | dữ (131), dự (47), đủ (26), dư (18), dụ (6) | `<module>` | `app/retrieval/reranker.py:153`, `app/retrieval/reranker.py:203` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `thuong` | thường (28), thưởng (28), thương (6) | `_wrapped_value_label_rows` | `app/chat/context_builder.py:691` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `thuong` | thường (28), thưởng (28), thương (6) | `<module>` | `app/chat/context_builder.py:713` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `an` | an (59), án (41), ăn (5) | `<module>` | `app/retrieval/reranker.py:135`, `app/retrieval/reranker.py:192` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `ban` | bản (211), ban (62), bàn (21), bán (5) | `<module>` | `app/retrieval/reranker.py:137`, `app/retrieval/reranker.py:230` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `bo` | bộ (97), bổ (37), bố (31), bỏ (5) | `<module>` | `app/retrieval/reranker.py:230` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `ho` | hồ (58), hỗ (48), họ (5) | `<module>` | `app/chat/follow_up_resolver.py:43` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `ho` | hồ (58), hỗ (48), họ (5) | `_replace_pronoun_reference` | `app/chat/follow_up_resolver.py:504` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `ho` | hồ (58), hỗ (48), họ (5) | `<module>` | `app/retrieval/reranker.py:156` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `mat` | mật (44), mất (8), mặt (5) | `<module>` | `app/retrieval/reranker.py:165`, `app/retrieval/reranker.py:212` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `toi` | tối (32), tôi (5) | `<module>` | `app/chat/prompt_builder.py:49` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `toi` | tối (32), tôi (5) | `<module>` | `app/retrieval/reranker.py:79` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `che` | chế (60), che (4) | `<module>` | `app/retrieval/reranker.py:142`, `app/retrieval/reranker.py:197` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `cho` | cho (114), chờ (4) | `<module>` | `app/chat/prompt_builder.py:34` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `cho` | cho (114), chờ (4) | `<module>` | `app/retrieval/keyword_repository.py:60` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `de` | để (56), đề (21), đe (4), đẻ (4) | `_line_requires_continuation` | `app/chat/context_builder.py:664` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `dong` | động (253), đồng (100), đóng (16), đông (4) | `<module>` | `app/retrieval/reranker.py:152`, `app/retrieval/reranker.py:202` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `gop` | góp (6), gộp (4) | `<module>` | `app/retrieval/leave_relations.py:18` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `moi` | mối (16), môi (15), mọi (12), mỗi (6), mới (4) | `<module>` | `app/chat/context_builder.py:46` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `moi` | mối (16), môi (15), mọi (12), mỗi (6), mới (4) | `<module>` | `app/chat/prompt_builder.py:51` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `moi` | mối (16), môi (15), mọi (12), mỗi (6), mới (4) | `<module>` | `app/retrieval/reranker.py:78` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `nam` | năm (62), nam (4) | `_multi_value_focus_positions` | `app/chat/context_builder.py:1140` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `nam` | năm (62), nam (4) | `<module>` | `app/chat/prompt_builder.py:52` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `nam` | năm (62), nam (4) | `<module>` | `app/retrieval/authority.py:17` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `nam` | năm (62), nam (4) | `<module>` | `app/retrieval/keyword_repository.py:36` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `nam` | năm (62), nam (4) | `_important_term_coverage_score` | `app/retrieval/reranker.py:652` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `noi` | nội (110), nơi (13), nối (4), nói (4) | `<module>` | `app/retrieval/reranker.py:167` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `the` | thể (103), thế (28), thẻ (4) | `<module>` | `app/retrieval/reranker.py:89` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `tin` | tin (83), tín (4) | `<module>` | `app/retrieval/reranker.py:183`, `app/retrieval/reranker.py:223` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `to` | tổ (25), tố (7), tờ (4) | `_line_requires_continuation` | `app/chat/context_builder.py:670` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `yeu` | yêu (82), yếu (4) | `<module>` | `app/chat/prompt_builder.py:35` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `bao` | bảo (166), báo (94), bao (20), bạo (3) | `<module>` | `app/chat/context_builder.py:45` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `bao` | bảo (166), báo (94), bao (20), bạo (3) | `<module>` | `app/chat/prompt_builder.py:46` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `bao` | bảo (166), báo (94), bao (20), bạo (3) | `<module>` | `app/retrieval/keyword_repository.py:26`, `app/retrieval/keyword_repository.py:53` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `bao` | bảo (166), báo (94), bao (20), bạo (3) | `<module>` | `app/retrieval/reranker.py:62`, `app/retrieval/reranker.py:138`, `app/retrieval/reranker.py:194` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `bao` | bảo (166), báo (94), bao (20), bạo (3) | `_important_term_coverage_score` | `app/retrieval/reranker.py:647` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `cap` | cấp (105), cập (43), cắp (3) | `<module>` | `app/retrieval/keyword_repository.py:27` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `cap` | cấp (105), cập (43), cắp (3) | `<module>` | `app/retrieval/reranker.py:141`, `app/retrieval/reranker.py:196` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `it` | ít (15), it (3) | `<module>` | `app/chat/follow_up_resolver.py:50` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `it` | ít (15), it (3) | `_replace_pronoun_reference` | `app/chat/follow_up_resolver.py:511` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `phong` | phỏng (152), phòng (60), phong (3) | `<module>` | `app/retrieval/reranker.py:172`, `app/retrieval/reranker.py:230` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `sau` | sau (36), sáu (3) | `_is_broad_multi_value_duration_question` | `app/chat/context_builder.py:977` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `sau` | sau (36), sáu (3) | `<module>` | `app/chat/follow_up_resolver.py:68` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `soc` | sóc (6), soc (3) | `<module>` | `app/retrieval/reranker.py:180`, `app/retrieval/reranker.py:221` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `tang` | tăng (14), tảng (10), tầng (7), tang (3) | `<module>` | `app/chat/context_builder.py:52` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `tham` | tham (49), thẩm (38), thâm (3) | `<module>` | `app/retrieval/keyword_repository.py:43` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `uy` | ủy (8), uy (3) | `<module>` | `app/retrieval/reranker.py:186`, `app/retrieval/reranker.py:226`, `app/retrieval/reranker.py:230` |
+| Thấp | xếp hạng hoặc ngữ cảnh | `van` | văn (47), vận (34), vấn (23), vẫn (3) | `<module>` | `app/retrieval/reranker.py:187`, `app/retrieval/reranker.py:230` |

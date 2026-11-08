@@ -1,0 +1,15 @@
+{
+ "started_at": "2026-11-08T07:06:27Z",
+ "api_image": "sha256:7ac20ed865a22fc227f9fa449771fb61a16f037272a324c5250ffd79873940c4",
+ "api_image_commit": "bb60566",
+ "reranker_mode": "lexical_fallback",
+ "llm": {
+  "provider": "ollama",
+  "model": "qwen2.5:3b",
+  "num_ctx_option": "8192",
+  "seed": "20261031",
+  "temperature": "0",
+  "base_url": "http://host.docker.internal:11434"
+ },
+ "rag_deterministic_route_mode": null
+}
