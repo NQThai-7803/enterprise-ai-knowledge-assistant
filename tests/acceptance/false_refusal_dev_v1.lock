@@ -1,0 +1,9 @@
+{
+ "version": "false_refusal_dev_v1",
+ "file": "tests/acceptance/false_refusal_dev_v1.yaml",
+ "sha256": "5214fd0e5ad97c7963cc6c8d2bbae6c0281ef718d37f228b5f6ed602d719a7ad",
+ "frozen_at": "2026-11-08",
+ "items": 20,
+ "approved_by": "pending owner review (FIX 3 preparation)",
+ "rule": "any edit needs v1.1 with a new lock"
+}
