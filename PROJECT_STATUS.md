@@ -1,5 +1,13 @@
 # Project Status
 
+## FIX 2d -- 2026-11-08 (REL-303 on by default after an Actions batch)
+
+- **Ollama pinned (DEC-014):** version 0.40.15 on CUDA, auto-update off, checked by every eval runner.
+- **REL-303 handles English and unaccented questions;** the 4 unit tests that broke when it was on are fixed. **On by default** after a DEC-013 batch on GitHub Actions (DEC-016, CPU): relevance set from 6 to 5 false answers, false-refusal set, RBAC (0 leaks, retrieval 18/18) and UAT (100/100 proxy) unchanged (`docs/eval/runs/fix2d-rel303-actions.md`).
+- **`false_refusal_dev_v1` approved,** fingerprinted and gradable. **Held-out v1 labels** accepted at diagnostic level.
+- **UAT runs on GitHub Actions** from `eval-data/`; a 5-question run matched the local CUDA answers.
+- See `docs/status/2026-11-08-session-report.md`.
+
 ## Held-out v2 batch 1 -- 2026-11-07 (gold awaiting owner review)
 
 - **20 questions from team members frozen word for word.** Gold drafted from the PDFs only, and every excerpt checked against its page. The system has not run on this set (DEC-012).

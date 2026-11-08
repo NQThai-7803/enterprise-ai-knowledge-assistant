@@ -1,8 +1,13 @@
-"""Run the answer relevance dev set against the isolated stack eaka-relevance-dev.
+"""Run a synthetic-document dev set against its own isolated stack.
 
 usage (repo root, host venv, stack up):
   EVAL_PASSWORD_ADMIN=... EVAL_PASSWORD_STAFF=... \
   python scripts/eval/run_answer_relevance_dev.py --output <dir>/results.json [--setup-only]
+      [--set answer_relevance_dev_v1|false_refusal_dev_v1]
+
+answer_relevance_dev_v1 runs on eaka-relevance-dev. false_refusal_dev_v1 needs a stack of its own:
+its documents must not join another set's corpus. An item's `fact_alternatives` are other accepted
+forms of its `fact` ("07 ngày" / "7 ngày"); the answer must hold one of them.
 
 Refuses to run unless the SHA256 of the set matches its lock. Builds PDFs from the set, uploads them
 through the API and asks every question as staff. A `refuse` question passes on NO_ANSWER; an
@@ -16,6 +21,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import sys
 import tempfile
 from collections.abc import Iterable, Mapping, Sequence
@@ -29,6 +35,7 @@ if str(ROOT) not in sys.path:
 
 from scripts.eval import branch_counters, reranker_check, run_rbac_dev  # noqa: E402
 
+SETS = ("answer_relevance_dev_v1", "false_refusal_dev_v1")
 SOURCE = ROOT / "tests" / "acceptance" / "answer_relevance_dev_v1.yaml"
 LOCK = ROOT / "tests" / "acceptance" / "answer_relevance_dev_v1.lock"
 ROLE = "staff"
@@ -49,6 +56,19 @@ def verify_frozen(source: Path = SOURCE, lock: Path = LOCK) -> dict[str, Any]:
     return expected
 
 
+def states_fact(item: Mapping[str, Any], answer: str) -> bool:
+    """The answer holds the item's fact or one of its accepted alternative forms.
+
+    No digit may touch the form, so "1 lần" does not match "11 lần" nor "7 ngày" "17 ngày".
+    """
+    folded = run_rbac_dev._fold(answer)
+    forms = (item["fact"], *item.get("fact_alternatives", ()))
+    return any(
+        re.search(rf"(?<![\d.,]){re.escape(run_rbac_dev._fold(form))}(?!\d)", folded)
+        for form in forms
+    )
+
+
 def grade_case(
     case: Mapping[str, Any], item: Mapping[str, Any], codes: Mapping[str, str]
 ) -> dict[str, Any]:
@@ -58,9 +78,7 @@ def grade_case(
         passed = case.get("status") == "NO_ANSWER"
     else:
         passed = (
-            answered
-            and item["document"] in cited
-            and run_rbac_dev._fold(item["fact"]) in run_rbac_dev._fold(case.get("answer") or "")
+            answered and item["document"] in cited and states_fact(item, case.get("answer") or "")
         )
     return {
         "id": item["id"],
@@ -95,6 +113,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     reranker_check.add_arguments(parser)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--setup-only", action="store_true", help="upload documents, ask nothing")
+    parser.add_argument("--set", choices=SETS, default=SETS[0], dest="set_name")
     args = parser.parse_args(argv)
     passwords = {}
     for role in ("admin", ROLE):
@@ -103,14 +122,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             parser.error(f"set EVAL_PASSWORD_{role.upper()}")
         passwords[role] = value
     base_url = os.environ.get("RAG_ACCEPTANCE_BASE_URL", "http://127.0.0.1:18190")
+    source = ROOT / "tests" / "acceptance" / f"{args.set_name}.yaml"
     try:
-        lock = verify_frozen()
+        lock = verify_frozen(source, source.with_suffix(".lock"))
         reranker = reranker_check.guard(args, base_url)
     except (SetChangedError, reranker_check.RerankerModeRefusedError) as exc:
         print(f"REFUSED: {exc}", file=sys.stderr)
         return 2
 
-    data = run_rbac_dev.load_set(SOURCE)
+    data = run_rbac_dev.load_set(source)
     admin = run_rbac_dev._Admin(base_url, passwords["admin"])
     ids: dict[str, str] = {}
     with tempfile.TemporaryDirectory() as folder:

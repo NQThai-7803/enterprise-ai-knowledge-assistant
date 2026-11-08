@@ -122,6 +122,16 @@ Set by the owner on 2026-11-08, written before the next measurement. Replaces th
 
 Note on the RBAC score: RBD-04 and RBD-05 are correct at baseline only because, without diacritics, "giám" (in "Phó giám đốc") matches the outcome cue for "giảm", so the condition route answers them. A fix that removes that match can lose these two controls without being worse in substance (`docs/eval/runs/fix2b-cues.md`).
 
+## DEC-014 — Ollama version and backend are part of a run
+
+Set by the owner on 2026-11-08, after `docs/eval/runs/nondeterminism.md` found that results change when Ollama changes GPU backend, not when it restarts.
+
+- **Baselines before 2026-11-06 18:26 ran on Vulkan and are not comparable with later runs.** That covers FIX 1, FIX 2 except its second UAT baseline run, and held-out v1 `f3cdbf3`. Later runs use CUDA.
+- Pinned for local measurements: Ollama **0.40.15**, backend **CUDA** (GTX 1650, driver 13.3). Auto-update of the Windows app is off (`auto_update_enabled = 0` in `%LOCALAPPDATA%\Ollama\db.sqlite`, the "Auto update" switch in the app settings) while measurements run.
+- Every eval runner refuses to start when the Ollama version or backend differs from the expected one (`scripts/eval/ollama_check.py`, called from `reranker_check.guard`). The defaults are the pinned values above; `EVAL_OLLAMA_EXPECTED_VERSION` and `EVAL_OLLAMA_EXPECTED_BACKEND` override them for another host (CI runs on CPU).
+- Every run records `ollama_version`, `ollama_backend` and `ollama_auto_update` at the start and the version and backend at the end. A change during the run invalidates it.
+- Changing the pinned version or backend is a new baseline: re-run the baseline in the same batch as the candidate (DEC-011) before comparing anything.
+
 ## DEC-015 — Embedding fine-tune data rule
 
 Set by the owner on 2026-11-08, before any training (`docs/design/embedding-finetune.md`).

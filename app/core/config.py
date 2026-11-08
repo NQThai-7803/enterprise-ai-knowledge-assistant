@@ -142,7 +142,7 @@ class Settings(BaseSettings):
     # FIX 2b: a refusal of the asked point plus a side fact becomes NO_ANSWER.
     rag_partial_refusal_no_answer_enabled: bool = True
     # FIX 2b: a short answer needs the text around it to cover what the question asks.
-    rag_short_answer_question_terms_enabled: bool = False
+    rag_short_answer_question_terms_enabled: bool = True
     # FIX 2b: in strict mode, outcome cues keep their diacritics, so giám is not giảm.
     rag_strict_outcome_cues_exact_enabled: bool = False
     reranker_enabled: bool = True

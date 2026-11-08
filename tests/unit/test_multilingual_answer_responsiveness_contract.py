@@ -27,9 +27,11 @@ _S01_OPEN = frozenset(
         "K_conditional_requirement",
         "L_unrelated_same_number",
         "M_repaired_claim_recheck",
-        "N_missing_condition",
     }
 )
+# N_missing_condition left this set in FIX 2d: with REL-303 on by default the paraphrased answer
+# cannot be located next to the asked terms, so it is INSUFFICIENT as expected. The missing
+# condition itself is still not detected.
 
 
 @pytest.mark.parametrize(

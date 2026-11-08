@@ -17,7 +17,7 @@ from app.models import CitationSourceType
 from app.retrieval import question_analysis
 from app.retrieval.evidence_quality import EvidenceContextKind, classify_evidence_context
 from app.retrieval.models import HybridRetrievalHit
-from app.retrieval.question_analysis import analyze_question, retrieval_query_variants
+from app.retrieval.question_analysis import analyze_question, fold_text, retrieval_query_variants
 from app.retrieval.reranker import (
     HeuristicRetrievalReranker,
     SentenceTransformerCrossEncoderReranker,
@@ -6880,6 +6880,76 @@ def test_asked_terms_drop_question_words_but_keep_lookalike_content(
     terms = claim_validation_module.asked_terms(question)
     assert kept <= terms
     assert not dropped & terms
+
+
+@pytest.mark.parametrize(
+    ("question", "form"),
+    [
+        ("Người phụ trách kho tên gì?", "vi"),
+        ("Hồ sơ đã được duyệt chưa?", "vi"),
+        ("nguoi phu trach kho ten gi?", "vi_unaccented"),
+        ("CTO Nova Digital la ai?", "vi_unaccented"),
+        ("can bao nhieu ngay phep nam?", "vi_unaccented"),
+        ("Co duoc nghi bu khong?", "vi_unaccented"),
+        ("Who approves the leave request?", "en"),
+        ("How many days of annual leave do staff get?", "en"),
+        ("May I carry over unused leave?", "en"),
+        ("Is remote work allowed on Fridays?", "en"),
+        ("latest policy update", None),
+        ("Chính sách nghỉ phép năm", None),
+    ],
+)
+def test_question_form_follows_the_question_words_used(question: str, form: str | None) -> None:
+    assert claim_validation_module.question_form(question) == form
+
+
+def test_unaccented_question_words_are_generated_from_the_accented_list() -> None:
+    form = claim_validation_module._VI_UNACCENTED_FORM
+    for phrase in claim_validation_module._VI_QUESTION_PHRASES:
+        assert form.question_words.fullmatch(fold_text(phrase)), phrase
+
+
+@pytest.mark.parametrize(
+    ("question", "kept", "dropped"),
+    [
+        ("nguoi phu trach kho ten gi?", {"phu", "trach", "kho"}, {"ten", "nguoi"}),
+        ("khi nao nop bao cao quy?", {"nop", "bao", "cao", "quy"}, {"khi", "nao"}),
+        ("Who approves the leave request?", {"approves", "leave", "request"}, {"who", "the"}),
+        ("How many days of annual leave do staff get?", {"annual", "leave", "staff"}, {"how"}),
+        ("Is remote work allowed on Fridays?", {"remote", "work", "allowed"}, {"is"}),
+        ("What must happen before dispatch?", {"happen", "before", "dispatch"}, {"what", "must"}),
+    ],
+)
+def test_asked_terms_drop_question_words_in_unaccented_and_english_questions(
+    question: str, kept: set[str], dropped: set[str]
+) -> None:
+    terms = claim_validation_module.asked_terms(question)
+    assert kept <= terms
+    assert not dropped & terms
+
+
+@pytest.mark.parametrize(
+    ("question", "answer"),
+    [
+        ("Ai là CTO của Nova Digital?", "Là Le Thu Ha."),
+        ("CTO Nova Digital la ai?", "cto la le thu ha."),
+        ("Who is the CTO of Nova Digital?", "The CTO is Le Thu Ha."),
+    ],
+)
+def test_short_answer_check_reads_the_value_past_a_restated_question(
+    question: str, answer: str
+) -> None:
+    near = "the cto of nova digital is le thu ha and manages technology."
+    far = "nova digital " + "x " * 30 + "the cto role is held by le thu ha."
+    check = claim_validation_module._short_answer_misses_question_terms
+    assert not check(question=question, answer=fold_text(answer), evidence=near)
+    assert check(question=question, answer=fold_text(answer), evidence=far)
+
+
+def test_short_answer_check_skips_text_that_asks_nothing() -> None:
+    assert not claim_validation_module._short_answer_misses_question_terms(
+        question="latest policy update", answer="grounded answer", evidence="allowed context"
+    )
 
 
 def test_short_answer_to_a_name_question_is_not_refused_for_the_question_word(
