@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import unicodedata
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -3031,6 +3032,20 @@ _QUESTION_STOPWORDS = frozenset(
         "voi",
     ]
 )
+# Vietnamese question words and frames, matched with their diacritics so that a content word
+# that folds to the same letters ("máy" and "mấy", "sao lưu" and "vì sao") survives. A particle
+# that also means "not" or "not yet" counts only at the end of the question.
+_QUESTION_WORD_PATTERN = re.compile(
+    r"(?<!\w)(?:như thế nào|thế nào|như nào|ra sao|làm sao|vì sao|tại sao|thì sao"
+    r"|bằng cách nào|cách nào|bao nhiêu|bao lâu|bao giờ|khi nào|lúc nào|hồi nào|nơi nào"
+    r"|chỗ nào|ở đâu|đâu|tên là gì|tên gì|là gì|là ai|cái gì|gì|ai|nào|mấy"
+    r"|có phải|phải không|đúng không|được không|hay không|hay chưa)(?!\w)"
+)
+_QUESTION_TAIL_PATTERN = re.compile(r"(?<!\w)(?:không|chưa|à|hả|nhỉ|vậy)\W*$")
+_QUESTION_YES_NO_PATTERN = re.compile(r"(?<!\w)có(?!\w)(?=.*(?<!\w)(?:không|chưa)\W*$)")
+_ASKED_FUNCTION_WORD_PATTERN = re.compile(
+    r"(?<!\w)(?:các|cho|của|được|không|một|này|người|những|theo|thì|tôi|trong|trên|với)(?!\w)"
+)
 _SHORT_ANSWER_WINDOW_WORDS = 15
 _SHORT_ANSWER_MIN_COVERAGE = 0.6
 
@@ -3044,9 +3059,19 @@ def question_content_terms(text: str) -> set[str]:
     }
 
 
+def asked_terms(question: str) -> set[str]:
+    """Content words of a question once its question words and particles are removed."""
+    text = unicodedata.normalize("NFC", question).casefold()
+    text = _QUESTION_YES_NO_PATTERN.sub(" ", text, count=1)
+    text = _QUESTION_TAIL_PATTERN.sub(" ", text.strip())
+    text = _QUESTION_WORD_PATTERN.sub(" ", text)
+    text = _ASKED_FUNCTION_WORD_PATTERN.sub(" ", text)
+    return {term for term in re.findall(r"\w+", fold_text(text)) if len(term) >= 3}
+
+
 def _short_answer_misses_question_terms(*, question: str, answer: str, evidence: str) -> bool:
     """True when a short answer is not in the source, or the text around it lacks the ask."""
-    asked = question_content_terms(question) - question_content_terms(answer)
+    asked = asked_terms(question) - question_content_terms(answer)
     answer_words = re.findall(r"\w+", answer)
     if len(asked) < 2 or len(answer_words) < 2:
         return False
