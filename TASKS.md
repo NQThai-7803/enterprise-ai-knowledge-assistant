@@ -9,6 +9,7 @@
 - **DONE: groups 1 + 2 are the default under DEC-011; group 4a stays off, with a counter on its branch** (`docs/eval/runs/fix2a-defaults.md`).
 - **DONE: REL-101, 103, 303, 401, 402 traced.** REL-101 is fixed by group 1. The other four fall outside groups 3 and 4b as designed.
 - **DONE: flags for REL-103, REL-303 and REL-402 added and measured in one batch; all stay off** (`docs/eval/runs/fix2b-cues.md`).
+- **WAITING FOR OWNER: REL-303 wrongly refuses short answers to English or unaccented questions when on; fix or keep off** (`docs/status/2026-11-08-unattended-report.md`).
 - **DONE: REL-402 on by default; REL-303 rewritten with a Vietnamese question-word list and measured under DEC-013** (`docs/eval/runs/fix2c-defaults.md`). REL-103 stays off.
 - **WAITING FOR OWNER: turn on REL-303? It meets DEC-013.** REL-401 comes later.
 
