@@ -1,0 +1,2019 @@
+{
+  "created_at": "2026-10-13T16:40:36.915559+00:00",
+  "scope": "Original frozen Q001-Q100 on isolated TASK-035.3B candidate only",
+  "reviewer_attestation": "Each candidate question/answer/cited evidence was inspected by the qualifying agent; high-risk material conditions and negations were cross-checked against restored source chunks. Exact answer/source identity to the previously manually reviewed final V2 capture was a corroborating control, not the runner's transport status.",
+  "limitation": "This case-level broad grade does not include the separate private-document staff-query safety gate, which failed and blocks overall qualification.",
+  "summary": {
+    "total": 100,
+    "supported_semantic_pass": 98,
+    "supported_denominator": 98,
+    "material_citation_pass": 101,
+    "q018_conflict_safety": "PASS",
+    "q100_unsupported_safety": "PASS"
+  },
+  "cases": [
+    {
+      "id": "Q001",
+      "category": "A",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "CEO bên Nova Digital là ai vậy?",
+      "answer": "CEO là Nguyễn Anh Khoa. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "5a04088f-11cc-42b9-a2f8-5d2e6705bd42",
+          "chunk_id": "500e034f-51bf-45c0-81e1-4288aba7213e",
+          "page_number": 6
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Person, organization and product facts checked against cited V2 chunks."
+    },
+    {
+      "id": "Q002",
+      "category": "A",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Ai đang làm tổng giám đốc Nova Digital?",
+      "answer": "Nguyễn Anh Khoa [1] [2]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 2,
+      "citation_ids": [
+        {
+          "document_id": "e12f25b7-b962-408a-87db-0d1b7e331839",
+          "chunk_id": "eebad2db-716a-490a-9217-48ffd25fcccc",
+          "page_number": 2
+        },
+        {
+          "document_id": "cb61ecee-557b-4639-ad52-725156466c3f",
+          "chunk_id": "aa059dc5-c790-4ccf-bae5-4ef130cb6639",
+          "page_number": 2
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Person, organization and product facts checked against cited V2 chunks."
+    },
+    {
+      "id": "Q003",
+      "category": "A",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "CTO công ty là ai?",
+      "answer": "CTO là Lê Thu Hà. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "5a04088f-11cc-42b9-a2f8-5d2e6705bd42",
+          "chunk_id": "c6141144-ba57-4b98-a751-7b90912f2357",
+          "page_number": 6
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Person, organization and product facts checked against cited V2 chunks."
+    },
+    {
+      "id": "Q004",
+      "category": "A",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Người phụ trách công nghệ của Nova Digital tên gì?",
+      "answer": "Lê Thu Hà [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "5a04088f-11cc-42b9-a2f8-5d2e6705bd42",
+          "chunk_id": "c6141144-ba57-4b98-a751-7b90912f2357",
+          "page_number": 6
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Person, organization and product facts checked against cited V2 chunks."
+    },
+    {
+      "id": "Q005",
+      "category": "A",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "COO là ai nhỉ?",
+      "answer": "COO là Võ Ngọc Linh. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "5a04088f-11cc-42b9-a2f8-5d2e6705bd42",
+          "chunk_id": "c6141144-ba57-4b98-a751-7b90912f2357",
+          "page_number": 6
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Person, organization and product facts checked against cited V2 chunks."
+    },
+    {
+      "id": "Q006",
+      "category": "A",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "CFO bên công ty tên gì?",
+      "answer": "CFO là Phạm Gia Minh. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "5a04088f-11cc-42b9-a2f8-5d2e6705bd42",
+          "chunk_id": "c6141144-ba57-4b98-a751-7b90912f2357",
+          "page_number": 6
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Person, organization and product facts checked against cited V2 chunks."
+    },
+    {
+      "id": "Q007",
+      "category": "A",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "CHRO Nova Digital là ai?",
+      "answer": "Trương Thanh An [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "5a04088f-11cc-42b9-a2f8-5d2e6705bd42",
+          "chunk_id": "c6141144-ba57-4b98-a751-7b90912f2357",
+          "page_number": 6
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Person, organization and product facts checked against cited V2 chunks."
+    },
+    {
+      "id": "Q008",
+      "category": "A",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Công ty này thành lập hồi năm nào vậy?",
+      "answer": "Công ty này thành lập hồi năm 2021. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "5a04088f-11cc-42b9-a2f8-5d2e6705bd42",
+          "chunk_id": "5b3f2520-f988-4cc9-9f53-c886ef510c11",
+          "page_number": 2
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Person, organization and product facts checked against cited V2 chunks."
+    },
+    {
+      "id": "Q009",
+      "category": "A",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Nova Digital có cỡ bao nhiêu nhân viên?",
+      "answer": "Nova Digital có khoảng 180 người nhân sự. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "5a04088f-11cc-42b9-a2f8-5d2e6705bd42",
+          "chunk_id": "5b3f2520-f988-4cc9-9f53-c886ef510c11",
+          "page_number": 2
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Person, organization and product facts checked against cited V2 chunks."
+    },
+    {
+      "id": "Q010",
+      "category": "A",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Khoảng bao nhiêu phần trăm nhân sự làm kỹ thuật, data với security?",
+      "answer": "Tỷ lệ là 60%. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "5a04088f-11cc-42b9-a2f8-5d2e6705bd42",
+          "chunk_id": "5b3f2520-f988-4cc9-9f53-c886ef510c11",
+          "page_number": 2
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Person, organization and product facts checked against cited V2 chunks."
+    },
+    {
+      "id": "Q011",
+      "category": "A",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Nova Digital có văn phòng ở đâu?",
+      "answer": "Nova Digital có văn phòng ở Thành phố Hồ Chí Minh, Hà Nội và Đà Nẵng. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "5a04088f-11cc-42b9-a2f8-5d2e6705bd42",
+          "chunk_id": "5b3f2520-f988-4cc9-9f53-c886ef510c11",
+          "page_number": 2
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Person, organization and product facts checked against cited V2 chunks."
+    },
+    {
+      "id": "Q012",
+      "category": "A",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Công ty đang làm những mảng gì?",
+      "answer": "Công ty đang làm những mảng gồm Phần mềm doanh nghiệp, AI và dữ liệu, điện toán đám mây, an toàn thông tin, dịch vụ vận hành số. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "5a04088f-11cc-42b9-a2f8-5d2e6705bd42",
+          "chunk_id": "5b3f2520-f988-4cc9-9f53-c886ef510c11",
+          "page_number": 2
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Person, organization and product facts checked against cited V2 chunks."
+    },
+    {
+      "id": "Q013",
+      "category": "A",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "NovaAssist là cái gì vậy?",
+      "answer": "NovaAssist là trợ lý AI doanh nghiệp. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "5a04088f-11cc-42b9-a2f8-5d2e6705bd42",
+          "chunk_id": "7444c487-0730-424b-b83e-31db5e469668",
+          "page_number": 5
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Person, organization and product facts checked against cited V2 chunks."
+    },
+    {
+      "id": "Q014",
+      "category": "A",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "NovaAssist dùng để làm gì?",
+      "answer": "NovaAssist dùng để Tra cứu tri thức nội bộ bằng RAG, trả lời có trích dẫn, phân quyền và audit log. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "5a04088f-11cc-42b9-a2f8-5d2e6705bd42",
+          "chunk_id": "7444c487-0730-424b-b83e-31db5e469668",
+          "page_number": 5
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Person, organization and product facts checked against cited V2 chunks."
+    },
+    {
+      "id": "Q015",
+      "category": "A",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Bộ phận nào trực tiếp xây mấy hệ thống AI/RAG của công ty?",
+      "answer": "Trung tâm AI & Dữ liệu [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "5a04088f-11cc-42b9-a2f8-5d2e6705bd42",
+          "chunk_id": "b3e66a26-1bb8-44c6-9ece-36de147301d6",
+          "page_number": 7
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Person, organization and product facts checked against cited V2 chunks."
+    },
+    {
+      "id": "Q016",
+      "category": "B",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Một tuần bình thường làm bao nhiêu tiếng?",
+      "answer": "Thời lượng là 40 gio/tuan. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "cb61ecee-557b-4639-ad52-725156466c3f",
+          "chunk_id": "fb0100bf-7d9a-49fb-b56f-ca9f63d328aa",
+          "page_number": 5
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Schedule, attendance, remote and on-call conditions checked."
+    },
+    {
+      "id": "Q017",
+      "category": "B",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Mỗi ngày làm mấy tiếng vậy?",
+      "answer": "Thời lượng là 08 gio/ngay. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "e12f25b7-b962-408a-87db-0d1b7e331839",
+          "chunk_id": "387c1b2c-10a5-4bb5-b2da-86c34dbfb8a6",
+          "page_number": 4
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Schedule, attendance, remote and on-call conditions checked."
+    },
+    {
+      "id": "Q018",
+      "category": "B",
+      "applicability": "INTENTIONALLY_CONFLICTING",
+      "question": "Sáng mình được vào làm từ mấy giờ tới mấy giờ?",
+      "answer": "Khong tim thay du thong tin trong cac tai lieu ban duoc phep truy cap de tra loi cau hoi nay.",
+      "grounding_status": "NO_ANSWER",
+      "semantic_result": "SAFE_ABSTENTION",
+      "material_citation_result": "NOT_APPLICABLE_ZERO_CITATIONS",
+      "claim_evidence_support_result": "NOT_APPLICABLE",
+      "citation_count": 0,
+      "citation_ids": [],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Schedule, attendance, remote and on-call conditions checked."
+    },
+    {
+      "id": "Q019",
+      "category": "B",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Nếu vào lúc 9 giờ thì khoảng mấy giờ được về?",
+      "answer": "Nếu bắt đầu lúc 09:00 thì thời điểm kết thúc tương ứng là khoảng 18:00. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "e12f25b7-b962-408a-87db-0d1b7e331839",
+          "chunk_id": "387c1b2c-10a5-4bb5-b2da-86c34dbfb8a6",
+          "page_number": 4
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Schedule, attendance, remote and on-call conditions checked."
+    },
+    {
+      "id": "Q020",
+      "category": "B",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Core hours của công ty là khung nào?",
+      "answer": "Các khoảng thời gian là 09:30 - 11:30 và 13:30 - 16:30. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "e12f25b7-b962-408a-87db-0d1b7e331839",
+          "chunk_id": "387c1b2c-10a5-4bb5-b2da-86c34dbfb8a6",
+          "page_number": 4
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Schedule, attendance, remote and on-call conditions checked."
+    },
+    {
+      "id": "Q021",
+      "category": "B",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Buổi chiều giờ cốt lõi bắt đầu lúc mấy giờ?",
+      "answer": "Giờ cốt lõi buổi chiều bắt đầu lúc 13:30. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "e12f25b7-b962-408a-87db-0d1b7e331839",
+          "chunk_id": "387c1b2c-10a5-4bb5-b2da-86c34dbfb8a6",
+          "page_number": 4
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Schedule, attendance, remote and on-call conditions checked."
+    },
+    {
+      "id": "Q022",
+      "category": "B",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Nghỉ trưa thường bao lâu?",
+      "answer": "Thời lượng là 60 phut. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "e12f25b7-b962-408a-87db-0d1b7e331839",
+          "chunk_id": "387c1b2c-10a5-4bb5-b2da-86c34dbfb8a6",
+          "page_number": 4
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Schedule, attendance, remote and on-call conditions checked."
+    },
+    {
+      "id": "Q023",
+      "category": "B",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Mình quên check-out hôm qua thì giờ sửa sao?",
+      "answer": "Quên check-in hoặc check-out nhưng có bằng chứng hợp lý về việc làm việc thực tế. Yêu cầu nên được gửi trong vòng 03 ngày làm việc kể từ ngày phát sinh. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "e12f25b7-b962-408a-87db-0d1b7e331839",
+          "chunk_id": "3b0c1c31-0c95-46af-a301-8aef0c72b757",
+          "page_number": 5
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Schedule, attendance, remote and on-call conditions checked."
+    },
+    {
+      "id": "Q024",
+      "category": "B",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Quên chấm công thì trong bao lâu nên gửi yêu cầu chỉnh?",
+      "answer": "Quên check-in hoặc check-out nhưng có bằng chứng hợp lý về việc làm việc thực tế. Yêu cầu nên được gửi trong vòng 03 ngày làm việc kể từ ngày phát sinh. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "e12f25b7-b962-408a-87db-0d1b7e331839",
+          "chunk_id": "3b0c1c31-0c95-46af-a301-8aef0c72b757",
+          "page_number": 5
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Schedule, attendance, remote and on-call conditions checked."
+    },
+    {
+      "id": "Q025",
+      "category": "B",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Ai duyệt yêu cầu sửa chấm công của mình?",
+      "answer": "Quản lý trực tiếp kiểm tra lịch làm việc, lịch họp, ticket, log dự án hoặc thông tin liên quan và phê duyệt/từ chối. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "e12f25b7-b962-408a-87db-0d1b7e331839",
+          "chunk_id": "3b0c1c31-0c95-46af-a301-8aef0c72b757",
+          "page_number": 5
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Schedule, attendance, remote and on-call conditions checked."
+    },
+    {
+      "id": "Q026",
+      "category": "B",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Sau khi HR khóa kỳ công rồi còn sửa được nữa không?",
+      "answer": "Không. Sau khi khóa kỳ: Điều chỉnh muộn chỉ thực hiện qua yêu cầu đặc biệt có phê duyệt của HR và quản lý có thẩm quyền. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "e12f25b7-b962-408a-87db-0d1b7e331839",
+          "chunk_id": "5e660577-8e4e-4d1e-96e1-b39e0aa9ba97",
+          "page_number": 9
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Schedule, attendance, remote and on-call conditions checked."
+    },
+    {
+      "id": "Q027",
+      "category": "B",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Remote được tối đa mấy ngày một tuần vậy?",
+      "answer": "Thời lượng là 02 ngay/tuan. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "e12f25b7-b962-408a-87db-0d1b7e331839",
+          "chunk_id": "30d76527-2a11-40bc-8efe-aaa1f933ee0b",
+          "page_number": 6
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Schedule, attendance, remote and on-call conditions checked."
+    },
+    {
+      "id": "Q028",
+      "category": "B",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Muốn remote ngày mai thì hôm nay phải đăng ký trước mấy giờ?",
+      "answer": "Đăng ký lịch: Trước 16:00 của ngày làm việc liền trước hoặc theo lịch cố định của bộ phận. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "e12f25b7-b962-408a-87db-0d1b7e331839",
+          "chunk_id": "30d76527-2a11-40bc-8efe-aaa1f933ee0b",
+          "page_number": 6
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Schedule, attendance, remote and on-call conditions checked."
+    },
+    {
+      "id": "Q029",
+      "category": "B",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Làm remote thì có phải giữ core hours không?",
+      "answer": "Có. Giờ làm việc: Giữ nguyên thời lượng, giờ cốt lõi và nghĩa vụ chấm công như khi làm tại văn phòng. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "e12f25b7-b962-408a-87db-0d1b7e331839",
+          "chunk_id": "52d6982f-c375-4426-a946-d424746f49eb",
+          "page_number": 7
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Schedule, attendance, remote and on-call conditions checked."
+    },
+    {
+      "id": "Q030",
+      "category": "B",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Trực on-call có mặc định tính hết thành OT không?",
+      "answer": "Không. On-call không tự động được coi là thời gian làm thêm; thời gian thực tế xử lý sự cố phải được ghi nhận theo quy định của công ty và pháp luật. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "e12f25b7-b962-408a-87db-0d1b7e331839",
+          "chunk_id": "1735b70c-dc0c-4b5d-9ec3-6f238411d8d4",
+          "page_number": 7
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Schedule, attendance, remote and on-call conditions checked."
+    },
+    {
+      "id": "Q031",
+      "category": "C",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "remote dc may ngay/tuan vay?",
+      "answer": "Thời lượng là 02 ngay/tuan. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "e12f25b7-b962-408a-87db-0d1b7e331839",
+          "chunk_id": "30d76527-2a11-40bc-8efe-aaa1f933ee0b",
+          "page_number": 6
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Paraphrased attendance/remote conditions and negations checked."
+    },
+    {
+      "id": "Q032",
+      "category": "C",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "core hour may gio?",
+      "answer": "Các khoảng thời gian là 09:30 - 11:30 và 13:30 - 16:30. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "e12f25b7-b962-408a-87db-0d1b7e331839",
+          "chunk_id": "387c1b2c-10a5-4bb5-b2da-86c34dbfb8a6",
+          "page_number": 4
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Paraphrased attendance/remote conditions and negations checked."
+    },
+    {
+      "id": "Q033",
+      "category": "C",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "quen checkout thi sao?",
+      "answer": "Quên checkout thì cần có bằng chứng hợp lý về việc làm việc thực tế để được điều chỉnh. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "e12f25b7-b962-408a-87db-0d1b7e331839",
+          "chunk_id": "3b0c1c31-0c95-46af-a301-8aef0c72b757",
+          "page_number": 5
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Paraphrased attendance/remote conditions and negations checked."
+    },
+    {
+      "id": "Q034",
+      "category": "C",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "1 tuan lam 40h dung ko?",
+      "answer": "Nova Digital áp dụng tuần làm việc tiêu chuẩn 40 giờ, trừ bộ phận có lịch trực, ca hoặc thỏa thuận riêng. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "e12f25b7-b962-408a-87db-0d1b7e331839",
+          "chunk_id": "3d04738a-9dfd-4876-9eb0-743b9bec2d31",
+          "page_number": 2
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Paraphrased attendance/remote conditions and negations checked."
+    },
+    {
+      "id": "Q035",
+      "category": "C",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "đi muộn thì bù sang ngày mai được không?",
+      "answer": "Không. Đi muộn/về sớm có thể được bù trong cùng ngày nếu phù hợp lịch và được quản lý chấp thuận; không được tự ý bù sang ngày khác. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "e12f25b7-b962-408a-87db-0d1b7e331839",
+          "chunk_id": "59403786-a55a-4f4e-a4d2-dab07671a61e",
+          "page_number": 8
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Paraphrased attendance/remote conditions and negations checked."
+    },
+    {
+      "id": "Q036",
+      "category": "C",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Hôm nay tôi tới trễ, tối nay làm bù luôn được không?",
+      "answer": "Có. Đi muộn/về sớm có thể được bù trong cùng ngày nếu phù hợp lịch và được quản lý chấp thuận; không được tự ý bù sang ngày khác. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "e12f25b7-b962-408a-87db-0d1b7e331839",
+          "chunk_id": "7c51666f-67a9-40e5-bb66-1086ecdd6780",
+          "page_number": 9
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Paraphrased attendance/remote conditions and negations checked."
+    },
+    {
+      "id": "Q037",
+      "category": "C",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "On call nhưng không có incident thì có tính OT hết thời gian trực không?",
+      "answer": "Không. On-call không tự động được coi là thời gian làm thêm; thời gian thực tế xử lý sự cố phải được ghi nhận theo quy định của công ty và pháp luật. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "e12f25b7-b962-408a-87db-0d1b7e331839",
+          "chunk_id": "1735b70c-dc0c-4b5d-9ec3-6f238411d8d4",
+          "page_number": 7
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Paraphrased attendance/remote conditions and negations checked."
+    },
+    {
+      "id": "Q038",
+      "category": "C",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Tôi làm ở nhà thì có cần chấm công như đi văn phòng không?",
+      "answer": "Có. Giữ nguyên thời lượng, giờ cốt lõi và nghĩa vụ chấm công như khi làm tại văn phòng. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "e12f25b7-b962-408a-87db-0d1b7e331839",
+          "chunk_id": "30d76527-2a11-40bc-8efe-aaa1f933ee0b",
+          "page_number": 6
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Paraphrased attendance/remote conditions and negations checked."
+    },
+    {
+      "id": "Q039",
+      "category": "D",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Một năm nhân viên bình thường có bao nhiêu ngày phép?",
+      "answer": "Công việc trong điều kiện bình thường 12 ngày làm việc/năm khi đủ 12 tháng làm việc. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0392b990-0522-447e-92b1-23c8927a5908",
+          "chunk_id": "d0c0a8cc-bb4a-435b-8dd6-8c4e37a7966b",
+          "page_number": 3
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Leave allocation, notice, approval and incident clauses checked."
+    },
+    {
+      "id": "Q040",
+      "category": "D",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Tôi làm ở đây đủ 5 năm rồi thì được thêm ngày phép không?",
+      "answer": "Có. Cứ đủ 05 năm làm việc cho Nova Digital, tăng thêm 01 ngày nghỉ hằng năm theo quy định pháp luật. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0392b990-0522-447e-92b1-23c8927a5908",
+          "chunk_id": "6f7632be-8862-4024-8700-a85cdfadbef9",
+          "page_number": 4
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Leave allocation, notice, approval and incident clauses checked."
+    },
+    {
+      "id": "Q041",
+      "category": "D",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Làm 10 năm thì quy tắc tăng phép tính thế nào?",
+      "answer": "Có. Theo quy tắc cứ đủ 5 năm tăng thêm 01 ngày, 10 năm được tăng thêm 2 ngày nghỉ hằng năm. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0392b990-0522-447e-92b1-23c8927a5908",
+          "chunk_id": "d0c0a8cc-bb4a-435b-8dd6-8c4e37a7966b",
+          "page_number": 3
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Leave allocation, notice, approval and incident clauses checked."
+    },
+    {
+      "id": "Q042",
+      "category": "D",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Chưa làm đủ một năm thì phép tính sao?",
+      "answer": "Chua du 12 thang: phep nam tinh theo ty le tuong ung voi thoi gian lam viec. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0392b990-0522-447e-92b1-23c8927a5908",
+          "chunk_id": "d0c0a8cc-bb4a-435b-8dd6-8c4e37a7966b",
+          "page_number": 3
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Leave allocation, notice, approval and incident clauses checked."
+    },
+    {
+      "id": "Q043",
+      "category": "D",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Tôi cưới thì được nghỉ mấy ngày?",
+      "answer": "Thời lượng là 03 ngay. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0392b990-0522-447e-92b1-23c8927a5908",
+          "chunk_id": "ff581c7b-a3aa-419f-be87-df4f2c8f5591",
+          "page_number": 5
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Leave allocation, notice, approval and incident clauses checked."
+    },
+    {
+      "id": "Q044",
+      "category": "D",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Con tôi cưới thì tôi được nghỉ mấy ngày?",
+      "answer": "Thời lượng là 01 ngay. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "b983593e-6416-4039-9202-322ea9ee699c",
+          "chunk_id": "382a6c05-54eb-4e78-94ab-81fb9224b141",
+          "page_number": 3
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Leave allocation, notice, approval and incident clauses checked."
+    },
+    {
+      "id": "Q045",
+      "category": "D",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Ba mẹ mất thì được nghỉ hưởng lương bao lâu?",
+      "answer": "Thời lượng là 03 ngay. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0392b990-0522-447e-92b1-23c8927a5908",
+          "chunk_id": "ff581c7b-a3aa-419f-be87-df4f2c8f5591",
+          "page_number": 5
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Leave allocation, notice, approval and incident clauses checked."
+    },
+    {
+      "id": "Q046",
+      "category": "D",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Tôi xin nghỉ không lương 2 tuần thì cứ tạo đơn là được nghỉ luôn hả?",
+      "answer": "Không. Nhân viên tạo yêu cầu trên HRM -> quản lý trực tiếp rà soát kế hoạch nguồn lực -> HR kiểm tra số dư/hồ sơ đối với trường hợp cần kiểm soát -> hệ thống ghi trạng thái cuối cùng. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0392b990-0522-447e-92b1-23c8927a5908",
+          "chunk_id": "36a5e55a-d0b1-420b-a1dc-712a14af26b0",
+          "page_number": 9
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Leave allocation, notice, approval and incident clauses checked."
+    },
+    {
+      "id": "Q047",
+      "category": "D",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Nghỉ không lương dài ngày nên báo trước bao lâu?",
+      "answer": "Nên gửi đề nghị trước ít nhất 10 ngay lam viec, nếu tình huống cho phép. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0392b990-0522-447e-92b1-23c8927a5908",
+          "chunk_id": "057fb3d4-d2f7-490d-92c6-47ab01a366e3",
+          "page_number": 8
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Leave allocation, notice, approval and incident clauses checked."
+    },
+    {
+      "id": "Q048",
+      "category": "D",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Muốn nghỉ phép 2 ngày thì nên xin trước mấy ngày?",
+      "answer": "Cần báo trước ít nhất 02 ngay lam viec. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0392b990-0522-447e-92b1-23c8927a5908",
+          "chunk_id": "057fb3d4-d2f7-490d-92c6-47ab01a366e3",
+          "page_number": 8
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Leave allocation, notice, approval and incident clauses checked."
+    },
+    {
+      "id": "Q049",
+      "category": "D",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Nếu nghỉ 4 ngày thì nên gửi đơn trước bao lâu?",
+      "answer": "Cần báo trước ít nhất 05 ngay lam viec. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0392b990-0522-447e-92b1-23c8927a5908",
+          "chunk_id": "057fb3d4-d2f7-490d-92c6-47ab01a366e3",
+          "page_number": 8
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Leave allocation, notice, approval and incident clauses checked."
+    },
+    {
+      "id": "Q050",
+      "category": "D",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Nghỉ hơn 5 ngày thì báo trước bao lâu?",
+      "answer": "Cần báo trước ít nhất 10 ngay lam viec. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0392b990-0522-447e-92b1-23c8927a5908",
+          "chunk_id": "057fb3d4-d2f7-490d-92c6-47ab01a366e3",
+          "page_number": 8
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Leave allocation, notice, approval and incident clauses checked."
+    },
+    {
+      "id": "Q051",
+      "category": "D",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Tôi bị sốt sáng nay thì phải làm gì trước?",
+      "answer": "Ốm đau / khẩn cấp Thông báo ngay khi có thể; hoàn thiện HRM và hồ sơ sau. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0392b990-0522-447e-92b1-23c8927a5908",
+          "chunk_id": "36a5e55a-d0b1-420b-a1dc-712a14af26b0",
+          "page_number": 9
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Leave allocation, notice, approval and incident clauses checked."
+    },
+    {
+      "id": "Q052",
+      "category": "D",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Đang nghỉ phép mà production P1 thì tôi có bắt buộc phải vào xử lý không?",
+      "answer": "Không. Quản lý kích hoạt người thay thế trước; chỉ liên hệ nhân viên nghỉ khi không còn phương án hợp lý và có sự đồng ý. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0392b990-0522-447e-92b1-23c8927a5908",
+          "chunk_id": "146852e7-627b-4a03-a7b5-99b778e66d3b",
+          "page_number": 9
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Leave allocation, notice, approval and incident clauses checked."
+    },
+    {
+      "id": "Q053",
+      "category": "D",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Nghỉ việc mà còn phép chưa dùng thì xử lý sao?",
+      "answer": "Khi chấm dứt quan hệ lao động, việc thanh toán tiền lương cho ngày nghỉ hằng năm chưa nghỉ hoặc chưa nghỉ hết được thực hiện theo pháp luật và kết quả đối soát số dư phép hợp lệ. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0392b990-0522-447e-92b1-23c8927a5908",
+          "chunk_id": "6f7632be-8862-4024-8700-a85cdfadbef9",
+          "page_number": 4
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Leave allocation, notice, approval and incident clauses checked."
+    },
+    {
+      "id": "Q054",
+      "category": "E",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Công ty trả lương ngày mấy?",
+      "answer": "Ngày là ngay 10 cua thang ke tiep. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0ab5082f-41b7-4ea5-947c-40a1e59bebec",
+          "chunk_id": "e0520f26-cf74-411d-a645-0335857f49eb",
+          "page_number": 5
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Payroll, salary, allowances, OT, review and own-salary rights checked."
+    },
+    {
+      "id": "Q055",
+      "category": "E",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Nếu ngày trả lương rơi đúng ngày nghỉ thì sao?",
+      "answer": "Nếu ngày trả lương rơi đúng ngày nghỉ/lễ, thì việc trả lương sẽ được thực hiện vào ngày làm việc liền trước hoặc theo phương án hợp pháp thuận lợi cho người lao động. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0ab5082f-41b7-4ea5-947c-40a1e59bebec",
+          "chunk_id": "e0520f26-cf74-411d-a645-0335857f49eb",
+          "page_number": 5
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Payroll, salary, allowances, OT, review and own-salary rights checked."
+    },
+    {
+      "id": "Q056",
+      "category": "E",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Senior Engineer bên Nova khoảng bao nhiêu tiền một tháng?",
+      "answer": "Giá trị là 28 - 48 trieu dong. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0ab5082f-41b7-4ea5-947c-40a1e59bebec",
+          "chunk_id": "92ed3756-1f72-47c5-8354-e23692f1e987",
+          "page_number": 4
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Payroll, salary, allowances, OT, review and own-salary rights checked."
+    },
+    {
+      "id": "Q057",
+      "category": "E",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Junior Developer thuộc dải lương nào?",
+      "answer": "Dải lương tham khảo là 12 - 20 trieu dong. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0ab5082f-41b7-4ea5-947c-40a1e59bebec",
+          "chunk_id": "92ed3756-1f72-47c5-8354-e23692f1e987",
+          "page_number": 4
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Payroll, salary, allowances, OT, review and own-salary rights checked."
+    },
+    {
+      "id": "Q058",
+      "category": "E",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Middle Developer khoảng bao nhiêu?",
+      "answer": "N3 Middle Developer / BA / Data Analyst 18 - 32 triệu đồng [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0ab5082f-41b7-4ea5-947c-40a1e59bebec",
+          "chunk_id": "92ed3756-1f72-47c5-8354-e23692f1e987",
+          "page_number": 4
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Payroll, salary, allowances, OT, review and own-salary rights checked."
+    },
+    {
+      "id": "Q059",
+      "category": "E",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Tech Lead thì range lương bao nhiêu?",
+      "answer": "Dải lương tham khảo là 42 - 70 trieu dong. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0ab5082f-41b7-4ea5-947c-40a1e59bebec",
+          "chunk_id": "92ed3756-1f72-47c5-8354-e23692f1e987",
+          "page_number": 4
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Payroll, salary, allowances, OT, review and own-salary rights checked."
+    },
+    {
+      "id": "Q060",
+      "category": "E",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Director có range lương cỡ nào?",
+      "answer": "Dải lương tham khảo là 65 - 110 trieu dong. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0ab5082f-41b7-4ea5-947c-40a1e59bebec",
+          "chunk_id": "92ed3756-1f72-47c5-8354-e23692f1e987",
+          "page_number": 4
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Payroll, salary, allowances, OT, review and own-salary rights checked."
+    },
+    {
+      "id": "Q061",
+      "category": "E",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Phụ cấp ăn trưa là bao nhiêu?",
+      "answer": "Giá trị là 900.000 d/thang. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0ab5082f-41b7-4ea5-947c-40a1e59bebec",
+          "chunk_id": "f3677bc8-29b3-4cb7-9f16-b3a7dfb3f038",
+          "page_number": 5
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Payroll, salary, allowances, OT, review and own-salary rights checked."
+    },
+    {
+      "id": "Q062",
+      "category": "E",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Tiền ăn trưa mỗi tháng được hỗ trợ bao nhiêu?",
+      "answer": "Giá trị là 900.000 d/thang. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0ab5082f-41b7-4ea5-947c-40a1e59bebec",
+          "chunk_id": "f3677bc8-29b3-4cb7-9f16-b3a7dfb3f038",
+          "page_number": 5
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Payroll, salary, allowances, OT, review and own-salary rights checked."
+    },
+    {
+      "id": "Q063",
+      "category": "E",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Công ty có hỗ trợ tiền remote không?",
+      "answer": "Có. Hybrid / Remote stipend là 500.000 đ/tháng; áp dụng khi hybrid/remote thường xuyên; không áp dụng cho ngày WFH phát sinh đơn lẻ. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0ab5082f-41b7-4ea5-947c-40a1e59bebec",
+          "chunk_id": "f3677bc8-29b3-4cb7-9f16-b3a7dfb3f038",
+          "page_number": 5
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Payroll, salary, allowances, OT, review and own-salary rights checked."
+    },
+    {
+      "id": "Q064",
+      "category": "E",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "WFH đúng 1 hôm thì có được 500k remote allowance không?",
+      "answer": "Không. Hybrid / Remote stipend (500.000 đ/tháng) không áp dụng cho ngày WFH phát sinh đơn lẻ. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0ab5082f-41b7-4ea5-947c-40a1e59bebec",
+          "chunk_id": "f3677bc8-29b3-4cb7-9f16-b3a7dfb3f038",
+          "page_number": 5
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Payroll, salary, allowances, OT, review and own-salary rights checked."
+    },
+    {
+      "id": "Q065",
+      "category": "E",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Phụ cấp điện thoại khoảng bao nhiêu?",
+      "answer": "Giá trị là 300.000 - 800.000 d/thang. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0ab5082f-41b7-4ea5-947c-40a1e59bebec",
+          "chunk_id": "f3677bc8-29b3-4cb7-9f16-b3a7dfb3f038",
+          "page_number": 5
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Payroll, salary, allowances, OT, review and own-salary rights checked."
+    },
+    {
+      "id": "Q066",
+      "category": "E",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Đi làm Chủ nhật được tính ít nhất bao nhiêu %?",
+      "answer": "Tỷ lệ là 200%. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0ab5082f-41b7-4ea5-947c-40a1e59bebec",
+          "chunk_id": "e6e23d75-f59e-49c2-9835-9a9c00a5d9f5",
+          "page_number": 7
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Payroll, salary, allowances, OT, review and own-salary rights checked."
+    },
+    {
+      "id": "Q067",
+      "category": "E",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "OT ngày thường thì ít nhất bao nhiêu phần trăm?",
+      "answer": "Ít nhất 150%. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0ab5082f-41b7-4ea5-947c-40a1e59bebec",
+          "chunk_id": "e6e23d75-f59e-49c2-9835-9a9c00a5d9f5",
+          "page_number": 7
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Payroll, salary, allowances, OT, review and own-salary rights checked."
+    },
+    {
+      "id": "Q068",
+      "category": "E",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Làm ngày lễ thì OT tối thiểu bao nhiêu?",
+      "answer": "Ít nhất 300%. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0ab5082f-41b7-4ea5-947c-40a1e59bebec",
+          "chunk_id": "e6e23d75-f59e-49c2-9835-9a9c00a5d9f5",
+          "page_number": 7
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Payroll, salary, allowances, OT, review and own-salary rights checked."
+    },
+    {
+      "id": "Q069",
+      "category": "E",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Làm việc ban đêm được cộng thêm bao nhiêu?",
+      "answer": "Tỷ lệ là 30%. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0ab5082f-41b7-4ea5-947c-40a1e59bebec",
+          "chunk_id": "e6e23d75-f59e-49c2-9835-9a9c00a5d9f5",
+          "page_number": 7
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Payroll, salary, allowances, OT, review and own-salary rights checked."
+    },
+    {
+      "id": "Q070",
+      "category": "E",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Salary review có nghĩa là chắc chắn tăng lương không?",
+      "answer": "Không. việc tham gia salary review không tạo quyền đương nhiên được tăng lương. Tuy nhiên, công ty phải tuân thủ mức lương tối thiểu, thỏa thuận HĐLĐ và các nghĩa vụ pháp lý bắt buộc. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0ab5082f-41b7-4ea5-947c-40a1e59bebec",
+          "chunk_id": "acb91ebd-afa8-46a0-a2fe-d0e20e5ddc30",
+          "page_number": 8
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Payroll, salary, allowances, OT, review and own-salary rights checked."
+    },
+    {
+      "id": "Q071",
+      "category": "E",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Thường salary review diễn ra khoảng thời gian nào?",
+      "answer": "Thường salary review diễn ra trong chu kỳ đánh giá hiệu suất năm Tháng 01 - 02, hiệu chỉnh/Calibration Tháng 03, phê duyệt ngân sách tăng lương Tháng 03 - 04, thông báo điều chỉnh Trong tháng 04, và ngày hiệu lực thông thường 01/05. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0ab5082f-41b7-4ea5-947c-40a1e59bebec",
+          "chunk_id": "9391f85a-83b5-478e-9c1e-c465431c820b",
+          "page_number": 7
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Payroll, salary, allowances, OT, review and own-salary rights checked."
+    },
+    {
+      "id": "Q072",
+      "category": "E",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Meets Expectations thì bonus mục tiêu cỡ bao nhiêu tháng lương?",
+      "answer": "0,5–1,0 tháng Base Salary. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0ab5082f-41b7-4ea5-947c-40a1e59bebec",
+          "chunk_id": "acb91ebd-afa8-46a0-a2fe-d0e20e5ddc30",
+          "page_number": 8
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Payroll, salary, allowances, OT, review and own-salary rights checked."
+    },
+    {
+      "id": "Q073",
+      "category": "E",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Tôi có được nói cho đồng nghiệp biết lương của chính tôi không?",
+      "answer": "Có. The policy does not prohibit an employee from disclosing, using, or providing their own salary information when exercising legal rights. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0ab5082f-41b7-4ea5-947c-40a1e59bebec",
+          "chunk_id": "400d54f2-f10c-4f5f-b68a-f39ae0ec13dd",
+          "page_number": 11
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Payroll, salary, allowances, OT, review and own-salary rights checked."
+    },
+    {
+      "id": "Q074",
+      "category": "F",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Công ty đóng BHXH bao nhiêu phần trăm?",
+      "answer": "Tài liệu không quy định một tỷ lệ cố định; Phần người lao động đóng được thể hiện trên payslip; phần Khấu trừ và đóng góp công ty đóng được hạch toán riêng. Tỷ lệ cụ thể được cập nhật theo pháp luật tại kỳ payroll. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0df6288e-9f1f-4e37-a877-847a93b2dd6c",
+          "chunk_id": "50b9eb0d-60ea-4253-9450-4dacad42609b",
+          "page_number": 3
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Benefit eligibility, amounts, periods and accident conditions checked."
+    },
+    {
+      "id": "Q075",
+      "category": "F",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Trong policy có ghi cố định tỷ lệ BHXH công ty đóng không?",
+      "answer": "Không. Tài liệu không quy định một tỷ lệ cố định; Phần người lao động đóng được thể hiện trên payslip; phần Khấu trừ và đóng góp công ty đóng được hạch toán riêng. Tỷ lệ cụ thể được cập nhật theo pháp luật tại kỳ payroll. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0df6288e-9f1f-4e37-a877-847a93b2dd6c",
+          "chunk_id": "50b9eb0d-60ea-4253-9450-4dacad42609b",
+          "page_number": 3
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Benefit eligibility, amounts, periods and accident conditions checked."
+    },
+    {
+      "id": "Q076",
+      "category": "F",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "NovaCare có ngay từ ngày đầu vào làm không?",
+      "answer": "Không. NovaCare: từ ngày nhận việc Không; sau thử việc Có. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0df6288e-9f1f-4e37-a877-847a93b2dd6c",
+          "chunk_id": "88b8cdac-ed6d-4f07-87cd-f453d77093fa",
+          "page_number": 10
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Benefit eligibility, amounts, periods and accident conditions checked."
+    },
+    {
+      "id": "Q077",
+      "category": "F",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "NovaCare nội trú được tối đa bao nhiêu một năm?",
+      "answer": "Giá trị là 150 trieu dong. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0df6288e-9f1f-4e37-a877-847a93b2dd6c",
+          "chunk_id": "90958d71-9b97-42a3-ac40-907ebaecf7b5",
+          "page_number": 5
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Benefit eligibility, amounts, periods and accident conditions checked."
+    },
+    {
+      "id": "Q078",
+      "category": "F",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Ngoại trú được bao nhiêu?",
+      "answer": "Giá trị là 12 trieu dong. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0df6288e-9f1f-4e37-a877-847a93b2dd6c",
+          "chunk_id": "90958d71-9b97-42a3-ac40-907ebaecf7b5",
+          "page_number": 5
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Benefit eligibility, amounts, periods and accident conditions checked."
+    },
+    {
+      "id": "Q079",
+      "category": "F",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Một lần khám ngoại trú tối đa bao nhiêu?",
+      "answer": "Giá trị là 1,2 trieu dong/lan. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0df6288e-9f1f-4e37-a877-847a93b2dd6c",
+          "chunk_id": "90958d71-9b97-42a3-ac40-907ebaecf7b5",
+          "page_number": 5
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Benefit eligibility, amounts, periods and accident conditions checked."
+    },
+    {
+      "id": "Q080",
+      "category": "F",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Nha khoa được hỗ trợ bao nhiêu?",
+      "answer": "Giá trị là 3 trieu dong. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0df6288e-9f1f-4e37-a877-847a93b2dd6c",
+          "chunk_id": "90958d71-9b97-42a3-ac40-907ebaecf7b5",
+          "page_number": 5
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Benefit eligibility, amounts, periods and accident conditions checked."
+    },
+    {
+      "id": "Q081",
+      "category": "F",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Thai sản bổ sung của NovaCare có hạn mức bao nhiêu?",
+      "answer": "Giá trị là 20 trieu dong. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0df6288e-9f1f-4e37-a877-847a93b2dd6c",
+          "chunk_id": "453ef5d5-3c6b-457b-b8c4-9893677fdb84",
+          "page_number": 5
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Benefit eligibility, amounts, periods and accident conditions checked."
+    },
+    {
+      "id": "Q082",
+      "category": "F",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Bảo hiểm tai nạn cá nhân có hạn mức bao nhiêu?",
+      "answer": "Giá trị là 200 trieu dong. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0df6288e-9f1f-4e37-a877-847a93b2dd6c",
+          "chunk_id": "453ef5d5-3c6b-457b-b8c4-9893677fdb84",
+          "page_number": 5
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Benefit eligibility, amounts, periods and accident conditions checked."
+    },
+    {
+      "id": "Q083",
+      "category": "F",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Mỗi năm được tư vấn EAP mấy buổi?",
+      "answer": "Mỗi nhân viên chính thức có tối đa 04 phiên tư vấn tâm lý bảo mật/năm qua đối tác EAP. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0df6288e-9f1f-4e37-a877-847a93b2dd6c",
+          "chunk_id": "15d0091a-47c1-42ea-b022-864298c8665e",
+          "page_number": 7
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Benefit eligibility, amounts, periods and accident conditions checked."
+    },
+    {
+      "id": "Q084",
+      "category": "F",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Công ty hỗ trợ gym/yoga mỗi năm bao nhiêu?",
+      "answer": "Gym/yoga thuộc khoản Sức khỏe/vận động; hạn mức 2.400.000 đ/năm. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0df6288e-9f1f-4e37-a877-847a93b2dd6c",
+          "chunk_id": "ff2c5c5d-26f4-493a-aa17-ae12544f668c",
+          "page_number": 8
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Benefit eligibility, amounts, periods and accident conditions checked."
+    },
+    {
+      "id": "Q085",
+      "category": "F",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Tiền mua đồ ergonomic được hỗ trợ bao nhiêu và bao lâu được một lần?",
+      "answer": "Giá trị là 1.500.000 d/24 thang. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0df6288e-9f1f-4e37-a877-847a93b2dd6c",
+          "chunk_id": "ff2c5c5d-26f4-493a-aa17-ae12544f668c",
+          "page_number": 8
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Benefit eligibility, amounts, periods and accident conditions checked."
+    },
+    {
+      "id": "Q086",
+      "category": "F",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Nhân viên kết hôn có khoản hỗ trợ riêng của công ty không?",
+      "answer": "Có. ket hon cua nhan vien là 2.000.000 d. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0df6288e-9f1f-4e37-a877-847a93b2dd6c",
+          "chunk_id": "ff2c5c5d-26f4-493a-aa17-ae12544f668c",
+          "page_number": 8
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Benefit eligibility, amounts, periods and accident conditions checked."
+    },
+    {
+      "id": "Q087",
+      "category": "F",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Có con thì công ty hỗ trợ bao nhiêu tiền?",
+      "answer": "Giá trị là 2.000.000 d/lan. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0df6288e-9f1f-4e37-a877-847a93b2dd6c",
+          "chunk_id": "ff2c5c5d-26f4-493a-aa17-ae12544f668c",
+          "page_number": 8
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Benefit eligibility, amounts, periods and accident conditions checked."
+    },
+    {
+      "id": "Q088",
+      "category": "F",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Nếu có tai nạn trong lúc đang remote ở nhà thì mặc định là tai nạn lao động đúng không?",
+      "answer": "Không. Nếu tai nạn xảy ra khi làm việc từ xa, việc xác định có phải tai nạn lao động hay không phải dựa trên hoàn cảnh, nhiệm vụ, thời gian, địa điểm và bằng chứng thực tế; không mặc định mọi tai nạn tại nhà đều là tai nạn lao động. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0df6288e-9f1f-4e37-a877-847a93b2dd6c",
+          "chunk_id": "15d0091a-47c1-42ea-b022-864298c8665e",
+          "page_number": 7
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Benefit eligibility, amounts, periods and accident conditions checked."
+    },
+    {
+      "id": "Q089",
+      "category": "G",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Tôi đưa mật khẩu cho đồng nghiệp đăng nhập giúp được không?",
+      "answer": "Không. cấm chia sẻ mật khẩu, mã OTP, khóa API, khóa SSH hoặc token truy cập. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "cb61ecee-557b-4639-ad52-725156466c3f",
+          "chunk_id": "e7871c39-51ba-4c35-ae68-99a7f52c6e41",
+          "page_number": 7
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Credential, source-code, personal-channel and public-AI rules checked."
+    },
+    {
+      "id": "Q090",
+      "category": "G",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Có được gửi OTP cho teammate không?",
+      "answer": "Không. cấm chia sẻ mật khẩu, mã OTP, khóa API, khóa SSH hoặc token truy cập. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "cb61ecee-557b-4639-ad52-725156466c3f",
+          "chunk_id": "e7871c39-51ba-4c35-ae68-99a7f52c6e41",
+          "page_number": 7
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Credential, source-code, personal-channel and public-AI rules checked."
+    },
+    {
+      "id": "Q091",
+      "category": "G",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Tôi copy source code công ty lên GitHub cá nhân để làm ở nhà được không?",
+      "answer": "Không. không đưa mã nguồn, secret, dữ liệu khách hàng hoặc cấu hình sản xuất lên kho cá nhân hoặc dịch vụ công cộng. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "cb61ecee-557b-4639-ad52-725156466c3f",
+          "chunk_id": "e7871c39-51ba-4c35-ae68-99a7f52c6e41",
+          "page_number": 7
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Credential, source-code, personal-channel and public-AI rules checked."
+    },
+    {
+      "id": "Q092",
+      "category": "G",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Có được gửi file công việc sang Gmail cá nhân không?",
+      "answer": "Không. Không được tự gửi dữ liệu công việc sang email cá nhân. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "cb61ecee-557b-4639-ad52-725156466c3f",
+          "chunk_id": "e7871c39-51ba-4c35-ae68-99a7f52c6e41",
+          "page_number": 7
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Credential, source-code, personal-channel and public-AI rules checked."
+    },
+    {
+      "id": "Q093",
+      "category": "G",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Tôi có thể paste source code nội bộ vào ChatGPT/public AI để hỏi lỗi không?",
+      "answer": "Không. Không nhập dữ liệu mật, dữ liệu cá nhân, mã nguồn độc quyền, khóa truy cập, hợp đồng hoặc thông tin khách hàng vào dịch vụ AI công cộng chưa được đánh giá. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "cb61ecee-557b-4639-ad52-725156466c3f",
+          "chunk_id": "13fdcfc4-d8d4-4052-ba95-9cc84478ab22",
+          "page_number": 7
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Credential, source-code, personal-channel and public-AI rules checked."
+    },
+    {
+      "id": "Q094",
+      "category": "G",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "AI tạo ra kết quả rồi thì có được dùng thẳng làm bằng chứng test không?",
+      "answer": "Không. Nội dung do AI tạo phải được con người kiểm tra về tính chính xác, bảo mật, bản quyền, thiên lệch và phù hợp mục đích trước khi sử dụng. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "cb61ecee-557b-4639-ad52-725156466c3f",
+          "chunk_id": "13fdcfc4-d8d4-4052-ba95-9cc84478ab22",
+          "page_number": 7
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Credential, source-code, personal-channel and public-AI rules checked."
+    },
+    {
+      "id": "Q095",
+      "category": "G",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Nếu nghi tài khoản bị lộ thì phải báo ai?",
+      "answer": "Nếu nghi tài khoản bị lộ thì phải báo cho Service Desk và Security Operations. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "cb61ecee-557b-4639-ad52-725156466c3f",
+          "chunk_id": "e7871c39-51ba-4c35-ae68-99a7f52c6e41",
+          "page_number": 7
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Credential, source-code, personal-channel and public-AI rules checked."
+    },
+    {
+      "id": "Q096",
+      "category": "H",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Tôi là nhân viên hybrid, vậy vừa phải tuân thủ bảo mật gì khi làm ở nhà vừa được hưởng khoản hỗ trợ nào?",
+      "answer": "Khi làm việc từ xa/hybrid, nhân viên phải tuân thủ bảo mật thông qua việc sử dụng thiết bị được phê duyệt, sử dụng VPN/MFA khi cần thiết và không làm việc với dữ liệu mật trên thiết bị hoặc mạng không an toàn. Hybrid / Remote stipend là 500.000 đ/tháng; áp dụng khi hybrid/remote thường xuyên. [1] [2]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 2,
+      "citation_ids": [
+        {
+          "document_id": "e12f25b7-b962-408a-87db-0d1b7e331839",
+          "chunk_id": "52d6982f-c375-4426-a946-d424746f49eb",
+          "page_number": 7
+        },
+        {
+          "document_id": "0ab5082f-41b7-4ea5-947c-40a1e59bebec",
+          "chunk_id": "f3677bc8-29b3-4cb7-9f16-b3a7dfb3f038",
+          "page_number": 5
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Hybrid, Sunday on-call/OT and leave-incident claims checked."
+    },
+    {
+      "id": "Q097",
+      "category": "H",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Tôi on-call và phải xử lý incident vào Chủ nhật thì thời gian làm việc và tiền OT được xử lý thế nào?",
+      "answer": "Không. On-call không tự động được coi là thời gian làm thêm; thời gian thực tế xử lý sự cố phải được ghi nhận theo quy định của công ty và pháp luật. Ít nhất 200%. [1] [2]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 2,
+      "citation_ids": [
+        {
+          "document_id": "e12f25b7-b962-408a-87db-0d1b7e331839",
+          "chunk_id": "1735b70c-dc0c-4b5d-9ec3-6f238411d8d4",
+          "page_number": 7
+        },
+        {
+          "document_id": "0ab5082f-41b7-4ea5-947c-40a1e59bebec",
+          "chunk_id": "e6e23d75-f59e-49c2-9835-9a9c00a5d9f5",
+          "page_number": 7
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Hybrid, Sunday on-call/OT and leave-incident claims checked."
+    },
+    {
+      "id": "Q098",
+      "category": "H",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "Tôi đang nghỉ phép mà phải hỗ trợ production incident thì công ty xử lý quyền nghỉ với thời gian phát sinh thế nào?",
+      "answer": "Quản lý phải ưu tiên on-call và người thay thế; chỉ liên hệ người đang nghỉ khi thực sự cần và thống nhất cách ghi nhận thời gian phát sinh. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "0392b990-0522-447e-92b1-23c8927a5908",
+          "chunk_id": "a8313c35-01d1-4b9a-a863-d2d8ac3ea889",
+          "page_number": 12
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Hybrid, Sunday on-call/OT and leave-incident claims checked."
+    },
+    {
+      "id": "Q099",
+      "category": "I",
+      "applicability": "SUPPORTED_BY_V2",
+      "question": "CEO Nova Digital là Lê Thu Hà đúng không?",
+      "answer": "Không. CEO là Nguyễn Anh Khoa. [1]",
+      "grounding_status": "ANSWERED",
+      "semantic_result": "PASS",
+      "material_citation_result": "PASS",
+      "claim_evidence_support_result": "PASS",
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "5a04088f-11cc-42b9-a2f8-5d2e6705bd42",
+          "chunk_id": "500e034f-51bf-45c0-81e1-4288aba7213e",
+          "page_number": 6
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. False-premise correction and unsupported-source abstention reviewed separately."
+    },
+    {
+      "id": "Q100",
+      "category": "I",
+      "applicability": "UNSUPPORTED_BY_V2",
+      "question": "Nova Digital dùng AWS cho toàn bộ production đúng không?",
+      "answer": "Khong tim thay du thong tin trong cac tai lieu ban duoc phep truy cap de tra loi cau hoi nay.",
+      "grounding_status": "NO_ANSWER",
+      "semantic_result": "SAFE_ABSTENTION",
+      "material_citation_result": "NOT_APPLICABLE_ZERO_CITATIONS",
+      "claim_evidence_support_result": "NOT_APPLICABLE",
+      "citation_count": 0,
+      "citation_ids": [],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. False-premise correction and unsupported-source abstention reviewed separately."
+    }
+  ]
+}
