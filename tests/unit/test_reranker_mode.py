@@ -23,10 +23,17 @@ from app.retrieval.reranker import (
     SentenceTransformerCrossEncoderReranker,
 )
 from app.retrieval.reranker_factory import log_reranker_startup_status, resolve_reranker_mode
-from scripts.eval import reranker_check
+from scripts.eval import ollama_check, reranker_check
 from scripts.eval.reranker_check import RerankerModeRefusedError
 
 ERROR_CODE = "RERANKER_FALLBACK_ACTIVE"
+OLLAMA_OK = {
+    "ollama_version": "0.40.15",
+    "ollama_backend": "CUDA",
+    "ollama_expected_version": "0.40.15",
+    "ollama_expected_backend": "CUDA",
+    "ollama_auto_update": False,
+}
 
 
 def _hit(index: int = 0) -> HybridRetrievalHit:
@@ -176,13 +183,49 @@ def _args(expected: str = "lexical_fallback", allow: bool = False) -> argparse.N
 
 def test_guard_records_the_mode_and_raises_on_mismatch(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(reranker_check, "read_mode", lambda *_: "lexical_fallback")
+    monkeypatch.setattr(ollama_check, "read", lambda: dict(OLLAMA_OK))
     assert reranker_check.guard(_args(), "http://x") == {
         "reranker_mode": "lexical_fallback",
         "expected_reranker_mode": "lexical_fallback",
         "allow_reranker_fallback": False,
+        **OLLAMA_OK,
     }
     with pytest.raises(RerankerModeRefusedError):
         reranker_check.guard(_args("cross_encoder"), "http://x")
+
+
+@pytest.mark.parametrize(
+    ("version", "backend"), [("0.40.16", "CUDA"), ("0.40.15", "VULKAN"), ("0.40.15", None)]
+)
+def test_guard_refuses_another_ollama_version_or_backend(
+    monkeypatch: pytest.MonkeyPatch, version: str, backend: str | None
+) -> None:
+    monkeypatch.setattr(reranker_check, "read_mode", lambda *_: "lexical_fallback")
+    fields = {**OLLAMA_OK, "ollama_version": version, "ollama_backend": backend}
+    monkeypatch.setattr(ollama_check, "read", lambda: fields)
+    with pytest.raises(RerankerModeRefusedError, match="Ollama"):
+        reranker_check.guard(_args(), "http://x")
+
+
+def test_expected_ollama_comes_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("EVAL_OLLAMA_EXPECTED_VERSION", raising=False)
+    monkeypatch.delenv("EVAL_OLLAMA_EXPECTED_BACKEND", raising=False)
+    assert ollama_check.expected() == ("0.40.15", "CUDA")
+    monkeypatch.setenv("EVAL_OLLAMA_EXPECTED_VERSION", "0.40.15")
+    monkeypatch.setenv("EVAL_OLLAMA_EXPECTED_BACKEND", "cpu")
+    assert ollama_check.expected() == ("0.40.15", "CPU")
+
+
+def test_backend_is_read_from_the_current_server_only() -> None:
+    old = 'msg="Listening on 127.0.0.1:11434 (version 0.40.14)"\n'
+    vulkan = 'msg="inference compute" id=0 filter_id=1 library=Vulkan compute=0.0 driver=0.0\n'
+    cuda = 'msg="inference compute" id=0 filter_id=0 library=CUDA compute=7.5 driver=13.3\n'
+    new = 'msg="Listening on 127.0.0.1:11434 (version 0.40.15)"\n'
+    assert ollama_check.backend_from_log(old + vulkan) == "VULKAN"
+    assert ollama_check.backend_from_log(old + vulkan + new + cuda) == "CUDA"
+    assert ollama_check.backend_from_log(old + vulkan + new) is None
+    cpu = 'msg="inference compute" id=cpu library=cpu compute="" driver=0.0\n'
+    assert ollama_check.backend_from_log(new + cpu) == "CPU"
 
 
 def test_expected_mode_defaults_to_cross_encoder_and_reads_env(
@@ -203,13 +246,26 @@ def test_mode_change_during_a_run_invalidates_it(
 ) -> None:
     output = tmp_path / "run.json"
     output.write_text("{}", encoding="utf-8")
-    meta = {"reranker_mode": "cross_encoder"}
+    meta = {"reranker_mode": "cross_encoder", **OLLAMA_OK}
     monkeypatch.setattr(reranker_check, "read_mode", lambda *_: "cross_encoder")
+    monkeypatch.setattr(ollama_check, "read", lambda: dict(OLLAMA_OK))
     assert reranker_check.finish(output, meta, "http://x", 0) == 0
     monkeypatch.setattr(reranker_check, "read_mode", lambda *_: "lexical_fallback")
     assert reranker_check.finish(output, meta, "http://x", 0) == reranker_check.EXIT_MODE_CHANGED
     payload = json.loads(output.read_text(encoding="utf-8"))
     assert payload["reranker_mode_end"] == "lexical_fallback"
+
+
+def test_ollama_update_during_a_run_invalidates_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output = tmp_path / "run.json"
+    output.write_text("{}", encoding="utf-8")
+    meta = {"reranker_mode": "cross_encoder", **OLLAMA_OK}
+    monkeypatch.setattr(reranker_check, "read_mode", lambda *_: "cross_encoder")
+    monkeypatch.setattr(ollama_check, "read", lambda: {**OLLAMA_OK, "ollama_version": "0.40.16"})
+    assert reranker_check.finish(output, meta, "http://x", 0) == reranker_check.EXIT_MODE_CHANGED
+    assert json.loads(output.read_text(encoding="utf-8"))["ollama_version_end"] == "0.40.16"
 
 
 class _Model:

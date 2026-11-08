@@ -34,6 +34,8 @@ if [ "$PHASE" != "part2" ]; then
 API_IMAGE=$(docker inspect "$API_CID" --format '{{.Image}}')
 python - "$OUT/metadata.json" <<PY
 import json, sys
+sys.path.insert(0, "scripts/eval")
+import ollama_check
 json.dump({
     "started_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
     "repo_head": "$(git rev-parse HEAD)",
@@ -54,6 +56,7 @@ json.dump({
     "expected_reranker_mode": "$EVAL_EXPECTED_RERANKER_MODE",
     "allow_reranker_fallback": "${EVAL_ALLOW_RERANKER_FALLBACK:-}",
     "compose_project": "$PROJECT",
+    "ollama": ollama_check.read(),  # DEC-014: version and backend, checked by the runner
     "runner": "scripts/eval/run_heldout.py",
 }, open(sys.argv[1], "w", encoding="utf-8"), indent=1)
 PY

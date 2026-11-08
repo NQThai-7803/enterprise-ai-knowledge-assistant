@@ -1,5 +1,8 @@
 """Refuse an eval run when the stack ranks with something other than what the run expects.
 
+It also refuses a run when Ollama's version or backend is not the pinned one (ollama_check.py,
+DEC-014), and records both in the run output, at the start and at the end.
+
 usage: python scripts/eval/reranker_check.py --base-url <api> [--expected-reranker-mode MODE]
            [--allow-reranker-fallback]
 Prints the mode reported by GET /health/ready and exits 0, or explains and exits 2.
@@ -19,6 +22,11 @@ from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import urlopen
+
+try:
+    from scripts.eval import ollama_check
+except ModuleNotFoundError:  # run as `python scripts/eval/reranker_check.py`
+    import ollama_check  # type: ignore[no-redef]
 
 CROSS_ENCODER = "cross_encoder"
 LEXICAL_FALLBACK = "lexical_fallback"
@@ -78,24 +86,38 @@ def guard(args: argparse.Namespace, base_url: str) -> dict[str, Any]:
     reason = refusal(actual, args.expected_reranker_mode, args.allow_reranker_fallback)
     if reason:
         raise RerankerModeRefusedError(reason)
+    try:
+        ollama = ollama_check.guard()
+    except ollama_check.OllamaMismatchError as exc:
+        raise RerankerModeRefusedError(str(exc)) from exc
     return {
         "reranker_mode": actual,
         "expected_reranker_mode": args.expected_reranker_mode,
         "allow_reranker_fallback": args.allow_reranker_fallback,
+        **ollama,
     }
 
 
 def finish(output: Path, metadata: dict[str, Any], base_url: str, code: int) -> int:
-    """Record the mode after the run; a mode that changed during the run invalidates it."""
+    """Record the mode and Ollama after the run; a change during the run invalidates it."""
     end_mode = read_mode(base_url)
+    end_ollama = ollama_check.read()
     payload = json.loads(output.read_text(encoding="utf-8"))
     payload["reranker_mode_end"] = end_mode
+    payload["ollama_version_end"] = end_ollama["ollama_version"]
+    payload["ollama_backend_end"] = end_ollama["ollama_backend"]
     output.write_text(json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8")
-    if end_mode != metadata["reranker_mode"]:
-        print(
-            f"INVALID RUN: reranker_mode changed from {metadata['reranker_mode']} to {end_mode}",
-            file=sys.stderr,
+    changed = [
+        f"{key} changed from {metadata.get(key)} to {value}"
+        for key, value in (
+            ("reranker_mode", end_mode),
+            ("ollama_version", end_ollama["ollama_version"]),
+            ("ollama_backend", end_ollama["ollama_backend"]),
         )
+        if value != metadata.get(key)
+    ]
+    if changed:
+        print("INVALID RUN: " + "; ".join(changed), file=sys.stderr)
         return code or EXIT_MODE_CHANGED
     return code
 
