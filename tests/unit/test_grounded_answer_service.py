@@ -3887,3 +3887,9 @@ def test_refusal_is_only_counted_when_it_names_what_the_answer_omits(
     question: str, answer: str, omits: bool
 ) -> None:
     assert _refusal_names_what_the_answer_omits(question=question, answer=answer) is omits
+
+
+def test_refusal_with_a_side_fact_keeps_the_answer_when_the_flag_is_off() -> None:
+    draft = asyncio.run(_draft_for_side_fact(rag_partial_refusal_no_answer_enabled=False))
+
+    assert draft.grounding_status == GroundingStatus.ANSWERED

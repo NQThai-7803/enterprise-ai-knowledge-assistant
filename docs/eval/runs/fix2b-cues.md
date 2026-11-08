@@ -13,7 +13,7 @@ Chạy từ 2026-11-07 22:34 đến 2026-11-08 02:20 trên image `eaka-backend:f
 | `RAG_SHORT_ANSWER_QUESTION_TERMS_ENABLED=true` (REL-303) | 0 | **98/100** | **3 / 19** | 1 / 22 | Giữ tắt: sửa Q004 rồi đo lại |
 | `RAG_PARTIAL_REFUSAL_NO_ANSWER_ENABLED=true` (REL-402) | 0 | 99/100 | **3 / 19** | 1 / 22 | Đạt, tốt nhất |
 
-**Kiểm tra quyền ở tầng retrieval:** 7 trên 8 lượt đều 18/18 cặp kết luận được, không cặp nào thấy chunk ở tài khoản không có quyền. **Lượt thứ 8 (flag REL-402, lượt 2) chưa có kết quả:** hệ thống dừng lệnh vì thiếu bộ nhớ và tôi không chạy lại. Lượt 1 của flag này đạt 18/18, và flag không chạm vào retrieval.
+**Kiểm tra quyền ở tầng retrieval:** 7 trên 8 lượt đều 18/18 cặp kết luận được, không cặp nào thấy chunk ở tài khoản không có quyền. **Lượt thứ 8 (flag REL-402, lượt 2)** bị hệ thống dừng vì thiếu bộ nhớ và được chạy lại ngày 2026-11-08 theo yêu cầu, trên cùng image `dc3fa38` và cấu hình: 18/18 cặp kết luận được, không có chunk bị lộ. Lần này Ollama đã khởi động lại, nhưng kiểm tra retrieval không gọi LLM. **REL-402 được bật mặc định từ 2026-11-08**; đặt `RAG_PARTIAL_REFUSAL_NO_ANSWER_ENABLED=false` để rollback.
 
 ## Thay đổi xuất hiện ở cả 2 lượt
 

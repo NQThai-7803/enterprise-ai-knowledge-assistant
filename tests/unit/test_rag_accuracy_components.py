@@ -6729,6 +6729,7 @@ def test_route_mode_defaults_to_strict_and_rejects_unknown_values() -> None:
     assert Settings(_env_file=None).rag_repair_after_llm_refusal_enabled is False
     assert Settings(_env_file=None).rag_answer_unit_guard_enabled is True
     assert Settings(_env_file=None).rag_reselect_requires_strong_support_enabled is False
+    assert Settings(_env_file=None).rag_partial_refusal_no_answer_enabled is True
     with pytest.raises(ValueError):
         Settings(_env_file=None, rag_deterministic_route_mode="other")
 
