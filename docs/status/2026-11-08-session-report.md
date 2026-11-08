@@ -99,3 +99,19 @@ Hai nhánh cùng thêm một mục vào cuối `DECISIONS.md` (DEC-014 và DEC-0
 - **Ollama chạy CUDA thật:** cách đọc backend từ log đã kiểm trên log thật, nhưng chưa chạy trong một lượt eval thật trên máy local.
 - **Pipeline fine-tune:** `in_container.py`, `generate_queries.py`, `mine_negatives.py`, `train.py` và `eval_retrieval.py` chưa chạy từ đầu đến cuối. Chỉ có phần logic thuần được unit test.
 - **Phần kiểm quy tắc dữ liệu (DEC-015):** dùng fingerprints 4-gram, nên không bắt được câu viết lại ý mà không trùng cụm 4 từ nào.
+
+## Cập nhật: sau DEC-016 (CI và Actions thay cho chạy local)
+
+- **PR #12 (đợt đo trên Actions):** đã merge sau 4 check xanh.
+  - `eval.yml` có các input: bộ câu hỏi, danh sách cấu hình flag, số lượt.
+  - Bước cài Ollama dùng `pipefail` và `curl --retry 5 --retry-delay 10`.
+  - UAT được chấm proxy bằng `eval-data/uat/reference-grade.json`.
+  - RBAC có thêm kiểm tra rò rỉ ở tầng retrieval.
+- **REL-303:** đo theo DEC-013 trên Actions, 4 job, baseline và REL-303 xen kẽ, 2 lượt mỗi bên. **Đạt**; đã bật mặc định và gỡ marker `N_missing_condition` (`docs/eval/runs/fix2d-rel303-actions.md`).
+  - Relevance: 6 → 5 câu trả lời sai.
+  - False-refusal, RBAC (0 rò rỉ, retrieval 18/18) và UAT (100/100): không đổi.
+- **C9 và C10:** chạy trên Actions, nhánh C (`docs/eval/runs/finetune-baseline.md`).
+  - **Embedding gốc:** recall@10 0,908 với câu có dấu, 0,480 khi bỏ dấu.
+  - **UAT end-to-end:** proxy 98/100 với câu có dấu, 91/100 khi bỏ dấu.
+  - **Smoke test:** cả pipeline chạy từ đầu đến cuối trong 7 phút; model smoke đã bị xóa trong job.
+- **Chuyển ra khỏi OneDrive:** danh sách cần chép và lệnh nằm ở `docs/status/2026-11-08-move-out-of-onedrive.md`. Chưa thực hiện, không xóa gì.

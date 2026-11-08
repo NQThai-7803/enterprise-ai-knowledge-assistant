@@ -1,9 +1,9 @@
 # Project Status
 
-## FIX 2d -- 2026-11-08 (code ready; measurement blocked by host memory)
+## FIX 2d -- 2026-11-08 (REL-303 on by default after an Actions batch)
 
 - **Ollama pinned (DEC-014):** version 0.40.15 on CUDA, auto-update off, checked by every eval runner.
-- **REL-303 handles English and unaccented questions;** the 4 unit tests that broke when it was on are fixed. Its DEC-013 batch has not run: the host stayed below the 1000 MB start gate for over an hour, so the default is unchanged.
+- **REL-303 handles English and unaccented questions;** the 4 unit tests that broke when it was on are fixed. **On by default** after a DEC-013 batch on GitHub Actions (DEC-016, CPU): relevance set from 6 to 5 false answers, false-refusal set, RBAC (0 leaks, retrieval 18/18) and UAT (100/100 proxy) unchanged (`docs/eval/runs/fix2d-rel303-actions.md`).
 - **`false_refusal_dev_v1` approved,** fingerprinted and gradable. **Held-out v1 labels** accepted at diagnostic level.
 - **UAT runs on GitHub Actions** from `eval-data/`; a 5-question run matched the local CUDA answers.
 - See `docs/status/2026-11-08-session-report.md`.
