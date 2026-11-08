@@ -1,4 +1,13 @@
-# Chuyển repo ra khỏi OneDrive sang `C:\dev\eaka` (chuẩn bị, chưa thực hiện)
+# Chuyển repo ra khỏi OneDrive sang `C:\dev\eaka` (đã thực hiện 2026-11-08)
+
+## Kết quả (2026-11-08)
+
+- **Cách làm khác kế hoạch dưới đây:** `C:\dev\eaka` là một `git clone` mới, rồi chỉ chép các file local-only bằng robocopy với `/XD .git`: `.env`, `.env.task035.production`, `frontend/.env.local`, `artifacts/`, `.backups/`, `data/`, `.verify/`. Không chép `.ci-data/`, `graphify-out/cache/`, `vite-monorepo/`.
+- **Kiểm:** `artifacts/` 5028 file / 636 967 269 B, `data/` 21 / 493 293 103 B, `.backups/` 18 / 2 970 951 B, `.verify/` 97 / 4 320 021 B, khớp với bản cũ. SHA256 của 3 file `.env` khớp. Memory Claude Code đã chép sang `C--dev-eaka\memory`.
+- **Sửa một điểm ghi sai bên dưới:** `master` và `feat/react-bits-ai-motion` **không** có commit chưa push; cả hai đã nằm trong `origin/main` (`git rev-list --count origin/main..<nhánh>` = 0). Không cần chép `.git` cũ.
+- **Môi trường:** `.venv312` tạo từ `requirements.lock` (bỏ `uvloop`, không có trên Windows) cộng `-e ".[dev]"`; `npm ci` trong `frontend/`. Unit test trong `.venv312` (ngoài image chuẩn, chỉ tham khảo): 1706 passed, 16 xfailed, 0 failed.
+- **Docker:** tên project vẫn là `enterprise-ai-knowledge-assistant` vì `compose.yaml` cố định `name:`; không có volume `eaka_*` nào được tạo. Các stack eval vẫn cần `-p` như trước.
+- **DEC-016 vẫn có hiệu lực** cho tới khi eaka-verify chạy được trong `C:\dev\eaka` (xem mục "Sau khi chép").
 
 Lý do: OneDrive giữ 2,1–2,7 GB RAM khi đồng bộ thư mục repo, khiến máy ở dưới cổng 1000 MB (DEC-016). **Không xóa gì trong thư mục OneDrive.** Bản cũ giữ nguyên cho tới khi bản mới chạy được và owner quyết định.
 
@@ -16,7 +25,7 @@ Lý do: OneDrive giữ 2,1–2,7 GB RAM khi đồng bộ thư mục repo, khiế
 | `.verify/` | 4,5 MB | JUnit XML của các lượt eaka-verify | Có (để so sánh lần sau) |
 | `graphify-out/cache/` | trong 16 MB | Cache của graphify | Không bắt buộc |
 | `vite-monorepo/` | lớn (có `node_modules`) | Thư mục thử nghiệm frontend, bị ignore hoàn toàn | Có, trừ `node_modules` |
-| `.git/` | 22 MB | **Có nhánh chưa push:** `master`, `feat/react-bits-ai-motion` | **Có**: chép nguyên `.git` |
+| `.git/` | 22 MB | Nhánh local `master`, `feat/react-bits-ai-motion` (đã nằm trong `origin/main`, xem "Kết quả") | Không: clone lại |
 | `.venv/`, `.venv312/`, `node_modules/`, `__pycache__/`, `.pytest_cache/`, `.ruff_cache/`, `frontend/dist/`, `*.tsbuildinfo` | lớn | Sinh lại được | **Không**: tạo lại |
 
 **Nằm ngoài repo, không bị ảnh hưởng:**
@@ -66,5 +75,5 @@ robocopy $old $new /E /COPY:DAT /R:1 /W:1 /NP
 
 - **Chạy thử:** `python -m pytest tests\unit -q` trong `C:\dev\eaka`, rồi `docker compose ps` để thấy các stack cũ vẫn nhận volume của chúng.
 - **Không còn mở repo từ thư mục OneDrive.** Nếu không, hai bản sẽ trôi lệch nhau. Có thể tạm dừng đồng bộ OneDrive cho thư mục cũ.
-- **Thư mục OneDrive giữ nguyên** cho tới khi owner quyết định; trong đó có `.git` với hai nhánh chưa push.
+- **Thư mục OneDrive giữ nguyên** cho tới khi owner quyết định.
 - **Kết thúc DEC-016** khi `C:\dev\eaka` chạy eaka-verify và các lượt đo local được trở lại, rồi ghi một DEC mới.
