@@ -131,3 +131,12 @@ Set by the owner on 2026-11-08, after `docs/eval/runs/nondeterminism.md` found t
 - Every eval runner refuses to start when the Ollama version or backend differs from the expected one (`scripts/eval/ollama_check.py`, called from `reranker_check.guard`). The defaults are the pinned values above; `EVAL_OLLAMA_EXPECTED_VERSION` and `EVAL_OLLAMA_EXPECTED_BACKEND` override them for another host (CI runs on CPU).
 - Every run records `ollama_version`, `ollama_backend` and `ollama_auto_update` at the start and the version and backend at the end. A change during the run invalidates it.
 - Changing the pinned version or backend is a new baseline: re-run the baseline in the same batch as the candidate (DEC-011) before comparing anything.
+
+## DEC-016 — Temporary: CI replaces local verification and measurement
+
+Set by the owner on 2026-11-08, because the local host stays below the 1000 MB start gate. Temporary; it ends when the repository moves out of OneDrive and local runs are possible again.
+
+- **Verification:** a branch is pushed and the 4 GitHub CI checks replace `eaka-verify` before review. No PR is merged until all 4 checks are green.
+- **Measurement:** every batch runs on GitHub Actions (`eval.yml`, `workflow_dispatch`) through `scripts/eval/ci_batch.sh`. The baseline and every candidate configuration run in the same job, interleaved (run 1 of each, then run 2), on one image and one Ollama (0.40.15, CPU). DEC-011 and DEC-013 apply unchanged.
+- **Metadata:** each batch records the Ollama version and backend (`batch.json`), and every runner records them per run (DEC-014).
+- **No comparison with local runs:** CPU and CUDA runs are not comparable. A decision uses only runs from one Actions job.

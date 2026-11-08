@@ -1,0 +1,102 @@
+{
+ "corpus_version": "2.0.0",
+ "generated_at": "2026-11-01T23:17:39.7149133+07:00",
+ "api_url": "http://127.0.0.1:18000",
+ "documents": [
+  {
+   "code": "ND-CORP-001",
+   "id": "5a04088f-11cc-42b9-a2f8-5d2e6705bd42",
+   "title": "Giá»›i thiá»‡u vÃ  cÆ¡ cáº¥u tá»• chá»©c CÃ´ng ty CÃ´ng nghá»‡ Nova Digital",
+   "sha256": "593156f8b218e95ff5519000e95b8391b3338e9d4ee4e4742ae1bc327b9f7962",
+   "status": "READY",
+   "visibility": "ORGANIZATION",
+   "owner": "admin.uat@example.test",
+   "required_grants": []
+  },
+  {
+   "code": "ND-HR-002",
+   "id": "cb61ecee-557b-4639-ad52-725156466c3f",
+   "title": "Ná»™i quy lao Ä‘á»™ng CÃ´ng ty CÃ´ng nghá»‡ Nova Digital",
+   "sha256": "3d92ef98c6e1dfd2723cea1f3740404f7d707ba27033b43a17101c9de6d5942a",
+   "status": "READY",
+   "visibility": "ORGANIZATION",
+   "owner": "admin.uat@example.test",
+   "required_grants": []
+  },
+  {
+   "code": "ND-HR-003",
+   "id": "e12f25b7-b962-408a-87db-0d1b7e331839",
+   "title": "ChÃ­nh sÃ¡ch lÃ m viá»‡c vÃ  cháº¥m cÃ´ng CÃ´ng ty CÃ´ng nghá»‡ Nova Digital",
+   "sha256": "75b949e101288bfae6d11b70abeb42a212807666f48b82824ecf9e59d64d8652",
+   "status": "READY",
+   "visibility": "ORGANIZATION",
+   "owner": "admin.uat@example.test",
+   "required_grants": []
+  },
+  {
+   "code": "ND-HR-004",
+   "id": "0392b990-0522-447e-92b1-23c8927a5908",
+   "title": "ChÃ­nh sÃ¡ch nghá»‰ cá»§a ngÆ°á»i lao Ä‘á»™ng CÃ´ng ty CÃ´ng nghá»‡ Nova Digital",
+   "sha256": "efcc573cf4aded7fcce81953a50727ef8aaeaa812e82069d31f62fc612440413",
+   "status": "READY",
+   "visibility": "ORGANIZATION",
+   "owner": "admin.uat@example.test",
+   "required_grants": []
+  },
+  {
+   "code": "ND-HR-005",
+   "id": "0ab5082f-41b7-4ea5-947c-40a1e59bebec",
+   "title": "ChÃ­nh sÃ¡ch tiá»n lÆ°Æ¡ng phá»¥ cáº¥p vÃ  thÆ°á»Ÿng CÃ´ng ty CÃ´ng nghá»‡ Nova Digital",
+   "sha256": "e243fed816c48f66b400c1cf50f81ab701ecb68600af535bb398729d53a1198c",
+   "status": "READY",
+   "visibility": "ORGANIZATION",
+   "owner": "admin.uat@example.test",
+   "required_grants": []
+  },
+  {
+   "code": "ND-HR-006",
+   "id": "0df6288e-9f1f-4e37-a877-847a93b2dd6c",
+   "title": "ChÃ­nh sÃ¡ch báº£o hiá»ƒm vÃ  phÃºc lá»£i CÃ´ng ty CÃ´ng nghá»‡ Nova Digital",
+   "sha256": "75aedd6f49fee99f585d7ecad2d5f5968a8883b646840453c10bdbbe552f8874",
+   "status": "READY",
+   "visibility": "ORGANIZATION",
+   "owner": "admin.uat@example.test",
+   "required_grants": []
+  },
+  {
+   "code": "UAT-LEAVE-AUTHORITY-001",
+   "id": "b983593e-6416-4039-9202-322ea9ee699c",
+   "title": "ChÃ­nh sÃ¡ch nghá»‰ cá»§a ngÆ°á»i lao Ä‘á»™ng",
+   "sha256": "24178db420422e474326986672b6c15cc67373ee6adbe1489ba5e8addf95f4f4",
+   "status": "READY",
+   "visibility": "ORGANIZATION",
+   "owner": "admin.uat@example.test",
+   "required_grants": []
+  },
+  {
+   "code": "UAT-GROUNDING-001",
+   "id": "82eef3f9-bcd6-43ad-9df5-ce47efd3e61d",
+   "title": "UAT Grounding Handbook",
+   "sha256": "43a4d9f1661b38f0e3245afd824849ba33d9fe87aa063873c11fdc01b3601040",
+   "status": "READY",
+   "visibility": "PRIVATE",
+   "owner": "admin.uat@example.test",
+   "required_grants": [
+    {
+     "user": "manager.uat@example.test",
+     "permission": "VIEW"
+    }
+   ]
+  },
+  {
+   "code": "UAT-SHARED-001",
+   "id": "5adafcbc-1ae4-4d06-9c9b-445391f47de1",
+   "title": "UAT Shared Knowledge Policy",
+   "sha256": "d6a93cb8db7620166ce9764a289ad83598c2fc3d657c8ef51f1adbf8b492080b",
+   "status": "READY",
+   "visibility": "ORGANIZATION",
+   "owner": "admin.uat@example.test",
+   "required_grants": []
+  }
+ ]
+}

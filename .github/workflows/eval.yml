@@ -1,0 +1,209 @@
+name: Eval
+
+# Manual only. One measurement batch per run (DEC-011, DEC-013, DEC-016): every flag configuration
+# in `configs` runs `runs` times in this one job, on the same image and the same Ollama, interleaved,
+# and each later configuration is compared with the first. Ollama runs on CPU here, so these runs
+# are compared only with each other, never with local runs (DEC-014, DEC-016).
+#
+# Sets: `uat` (Q001-Q100 from eval-data/, corpus V2 PDFs from eval-data/corpus-v2, proxy grade
+# against eval-data/uat/reference-grade.json), `rbac` (tests/acceptance/rbac_dev_v1.yaml, with the
+# retrieval-level leak check), `relevance` (answer_relevance_dev_v1) and `false_refusal`
+# (false_refusal_dev_v1). Never runs held-out sets.
+on:
+  workflow_dispatch:
+    inputs:
+      set:
+        description: "Question set"
+        type: choice
+        options: [uat, rbac, relevance, false_refusal]
+        default: relevance
+      configs:
+        description: "Configurations, ';'-separated, baseline first: name or name:EVAL_VAR=value,..."
+        type: string
+        default: "base"
+      runs:
+        description: "Runs per configuration (2 for a DEC-013 comparison)"
+        type: choice
+        options: ["1", "2"]
+        default: "1"
+      cases:
+        description: "uat only: space-separated ids (e.g. Q001 Q021); empty runs all 100"
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eval-${{ github.ref }}-${{ inputs.set }}
+  cancel-in-progress: false
+
+jobs:
+  eval:
+    name: Eval ${{ inputs.set }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    env:
+      PROJECT: eaka-${{ inputs.set }}-dev
+      OUT: eval-out
+      P3D_BACKEND_IMAGE: eaka-backend:ci-eval
+      EVAL_BACKEND_IMAGE: eaka-backend:ci-eval
+      EVAL_EXPECTED_RERANKER_MODE: lexical_fallback
+      COMPOSE_FILES: "-f compose.yaml -f compose.uat-corpus-v2.yaml -f scripts/eval/compose.uat-eval.yaml -f ci-host.yaml"
+      # DEC-014: the runners refuse another Ollama version or backend than these.
+      OLLAMA_VERSION: 0.40.15
+      EVAL_OLLAMA_EXPECTED_VERSION: 0.40.15
+      EVAL_OLLAMA_EXPECTED_BACKEND: CPU
+      EVAL_OLLAMA_BASE_URL: http://host.docker.internal:11434
+      RAG_ACCEPTANCE_BASE_URL: http://127.0.0.1:18190
+      PYTHONIOENCODING: utf-8
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install runner dependencies
+        run: python -m pip install -e ".[dev]"
+
+      - name: Generate throwaway credentials
+        # Values exist only in this job; they are masked in the log and never stored.
+        run: |
+          for name in SECRET_KEY POSTGRES_PASSWORD UAT_ADMIN_PASSWORD UAT_MANAGER_PASSWORD UAT_STAFF_PASSWORD EVAL_PASSWORD_OPS; do
+            value="Ci$(openssl rand -hex 16)!"
+            echo "::add-mask::$value"
+            echo "$name=$value" >> "$GITHUB_ENV"
+          done
+
+      - name: Write the app environment file
+        run: |
+          cat > .env <<EOF
+          APP_ENV=development
+          APP_DEBUG=false
+          API_V1_PREFIX=/api/v1
+          SECRET_KEY=${SECRET_KEY}
+          JWT_ALGORITHM=HS256
+          JWT_ISSUER=enterprise-ai-knowledge-assistant
+          JWT_AUDIENCE=enterprise-ai-api
+          ACCESS_TOKEN_EXPIRE_MINUTES=15
+          REFRESH_TOKEN_EXPIRE_DAYS=7
+          POSTGRES_DB=enterprise_ai
+          POSTGRES_USER=app_user
+          POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+          STORAGE_BACKEND=local
+          MAX_UPLOAD_SIZE_MB=25
+          EMBEDDING_PROVIDER=sentence_transformers
+          EMBEDDING_MODEL_NAME=intfloat/multilingual-e5-small
+          EMBEDDING_DIMENSIONS=384
+          EMBEDDING_DEVICE=cpu
+          EMBEDDING_BATCH_SIZE=16
+          EMBEDDING_NORMALIZE=true
+          EMBEDDING_QUERY_PREFIX="query: "
+          EMBEDDING_PASSAGE_PREFIX="passage: "
+          EMBEDDING_LOCAL_FILES_ONLY=false
+          RETRIEVAL_TOP_K=10
+          RERANKER_TOP_K=6
+          MIN_RELEVANCE_SCORE=0.50
+          CHUNK_SIZE_TOKENS=700
+          CHUNK_OVERLAP_TOKENS=100
+          LLM_ENABLED=true
+          LLM_PROVIDER=ollama
+          LLM_OLLAMA_MODEL=qwen2.5:3b
+          LLM_OLLAMA_NUM_CTX=8192
+          LLM_OLLAMA_KEEP_ALIVE=10m
+          LLM_MAX_OUTPUT_TOKENS=512
+          LLM_OLLAMA_REASONING_EFFORT=none
+          LLM_TIMEOUT_SECONDS=180
+          LOG_LEVEL=INFO
+          LOG_FORMAT=json
+          RAG_DIAGNOSTICS_ENABLED=true
+          EOF
+          sed -i 's/^          //' .env
+          echo "EVAL_PASSWORD_ADMIN=${UAT_ADMIN_PASSWORD}" >> "$GITHUB_ENV"
+          echo "EVAL_PASSWORD_MANAGER=${UAT_MANAGER_PASSWORD}" >> "$GITHUB_ENV"
+          echo "EVAL_PASSWORD_STAFF=${UAT_STAFF_PASSWORD}" >> "$GITHUB_ENV"
+
+      - name: Install Ollama and pull the model
+        run: |
+          set -euo pipefail
+          curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors -o "$RUNNER_TEMP/ollama-install.sh" \
+            https://ollama.com/install.sh
+          OLLAMA_VERSION="$OLLAMA_VERSION" sh "$RUNNER_TEMP/ollama-install.sh"
+          sudo systemctl stop ollama || true
+          echo "EVAL_OLLAMA_LOG=$RUNNER_TEMP/ollama.log" >> "$GITHUB_ENV"
+          OLLAMA_HOST=0.0.0.0:11434 OLLAMA_CONTEXT_LENGTH=8192 OLLAMA_NUM_PARALLEL=1 \
+            nohup ollama serve > "$RUNNER_TEMP/ollama.log" 2>&1 &
+          for _ in $(seq 1 30); do curl -sf http://127.0.0.1:11434/api/version && break; sleep 2; done
+          for attempt in 1 2 3; do ollama pull qwen2.5:3b && break; sleep 15; done
+          ollama list | grep -q '^qwen2.5:3b'
+          mkdir -p "$OUT"
+          { ollama --version; env | grep '^OLLAMA_' || true; nproc; free -m; } > "$OUT/ollama-config.txt"
+
+      - name: Build the backend image
+        run: docker build -t "$P3D_BACKEND_IMAGE" --label eaka.commit="${GITHUB_SHA::7}" .
+
+      - name: Start the eval stack
+        run: |
+          set -euo pipefail
+          # The API reaches Ollama on the host, as on Docker Desktop.
+          cat > ci-host.yaml <<'EOF'
+          services:
+            api:
+              extra_hosts: ["host.docker.internal:host-gateway"]
+            worker:
+              extra_hosts: ["host.docker.internal:host-gateway"]
+          EOF
+          read -r -a FILES <<< "$COMPOSE_FILES"
+          docker compose -p "$PROJECT" "${FILES[@]}" up -d --no-build postgres redis
+          docker compose -p "$PROJECT" "${FILES[@]}" run --rm --no-deps migration
+          docker compose -p "$PROJECT" "${FILES[@]}" run --rm --no-deps uat-v2-accounts
+          docker compose -p "$PROJECT" "${FILES[@]}" up -d --no-build --no-deps api worker
+          for _ in $(seq 1 90); do
+            [ "$(docker inspect "$PROJECT-api-1" --format '{{.State.Health.Status}}')" = healthy ] && break
+            sleep 5
+          done
+          docker inspect "$PROJECT-api-1" --format '{{.State.Health.Status}}' | grep -q healthy
+
+      - name: Load corpus V2
+        if: inputs.set == 'uat'
+        run: >
+          python scripts/eval/bootstrap_corpus_v2.py . http://127.0.0.1:18190
+          "$OUT/runtime-manifest.json"
+
+      - name: Run the batch
+        env:
+          SET: ${{ inputs.set }}
+          CONFIGS: ${{ inputs.configs }}
+          RUNS: ${{ inputs.runs }}
+          CASES_INPUT: ${{ inputs.cases }}
+        run: |
+          CASES=()
+          for id in $CASES_INPUT; do
+            [[ "$id" =~ ^Q[0-9]{3}$ ]] || { echo "bad case id: $id"; exit 1; }
+            CASES+=("$id")
+          done
+          ( while true; do free -m | awk 'NR==2 {print strftime("%T"), $3, $7}'; sleep 30; done ) \
+            > "$OUT/memory.log" &
+          bash scripts/eval/ci_batch.sh "$SET" "$CONFIGS" "$RUNS" "$OUT" ${CASES[@]+"${CASES[@]}"}
+          cat "$OUT/summary.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Collect logs
+        if: always()
+        run: |
+          mkdir -p "$OUT"
+          docker compose -p "$PROJECT" logs --no-color api worker > "$OUT/stack.log" 2>&1 || true
+          cp "$RUNNER_TEMP/ollama.log" "$OUT/" 2>/dev/null || true
+          docker compose -p "$PROJECT" down -v || true
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-${{ inputs.set }}-${{ github.run_id }}
+          path: eval-out/
+          retention-days: 14
