@@ -111,3 +111,13 @@ Set by the owner on 2026-11-07, for batch 1 (`docs/eval/heldout-v2-questions.yam
 - `scripts/eval/question_fingerprints.json` includes these questions, so `check_no_question_leak.py` blocks them in `app/`.
 
 Known limit: the implementer wrote this gold and also works on fixes in the same session. The fixes approved next (REL-103, REL-303, REL-402) were set by the owner from the relevance dev traces before this set existed.
+
+## DEC-013 — Choose per set, not on a sum
+
+Set by the owner on 2026-11-08, written before the next measurement. Replaces the sum rule of DEC-011; the batch rule of DEC-011 stays.
+
+- Required: no permission leak, in the RBAC API runs and in the retrieval check; no regression on Q001-Q100 (tolerance of 1 question under `eaka-rag-change-guard`); and **false answers do not increase on any single set** (`answer_relevance_dev_v1`, RBAC dev).
+- Then compare set by set, in order: (a) fewer false answers, then (b) more correct answers. A candidate wins only if, on every set, it is not worse under that order, and on at least one set it is better.
+- Only changes seen in both runs count, and every case that gets worse is reported by id.
+
+Note on the RBAC score: RBD-04 and RBD-05 are correct at baseline only because, without diacritics, "giám" (in "Phó giám đốc") matches the outcome cue for "giảm", so the condition route answers them. A fix that removes that match can lose these two controls without being worse in substance (`docs/eval/runs/fix2b-cues.md`).

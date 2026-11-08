@@ -6,6 +6,12 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### FIX 2c -- 2026-11-08
+
+- **Changed default:** `RAG_PARTIAL_REFUSAL_NO_ANSWER_ENABLED=true`. Set `false` to roll back.
+- `RAG_SHORT_ANSWER_QUESTION_TERMS_ENABLED` now leaves Vietnamese question words, the yes/no frame and function words out of the check, matched on text with diacritics. Still off by default.
+- DEC-013: flags are chosen per set, not on a sum. Results in `docs/eval/runs/fix2c-defaults.md`.
+
 ### FIX 2b -- 2026-11-08
 
 - New flags, all off by default: `RAG_STRICT_OUTCOME_CUES_EXACT_ENABLED`, `RAG_SHORT_ANSWER_QUESTION_TERMS_ENABLED`, `RAG_PARTIAL_REFUSAL_NO_ANSWER_ENABLED`. Results in `docs/eval/runs/fix2b-cues.md`.

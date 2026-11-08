@@ -13,7 +13,7 @@ Chạy từ 2026-11-07 22:34 đến 2026-11-08 02:20 trên image `eaka-backend:f
 | `RAG_SHORT_ANSWER_QUESTION_TERMS_ENABLED=true` (REL-303) | 0 | **98/100** | **3 / 19** | 1 / 22 | Giữ tắt: sửa Q004 rồi đo lại |
 | `RAG_PARTIAL_REFUSAL_NO_ANSWER_ENABLED=true` (REL-402) | 0 | 99/100 | **3 / 19** | 1 / 22 | Đạt, tốt nhất |
 
-**Kiểm tra quyền ở tầng retrieval:** 7 trên 8 lượt đều 18/18 cặp kết luận được, không cặp nào thấy chunk ở tài khoản không có quyền. **Lượt thứ 8 (flag REL-402, lượt 2) chưa có kết quả:** hệ thống dừng lệnh vì thiếu bộ nhớ và tôi không chạy lại. Lượt 1 của flag này đạt 18/18, và flag không chạm vào retrieval.
+**Kiểm tra quyền ở tầng retrieval:** 7 trên 8 lượt đều 18/18 cặp kết luận được, không cặp nào thấy chunk ở tài khoản không có quyền. **Lượt thứ 8 (flag REL-402, lượt 2)** bị hệ thống dừng vì thiếu bộ nhớ và được chạy lại ngày 2026-11-08 theo yêu cầu, trên cùng image `dc3fa38` và cấu hình: 18/18 cặp kết luận được, không có chunk bị lộ. Lần này Ollama đã khởi động lại, nhưng kiểm tra retrieval không gọi LLM. **REL-402 được bật mặc định từ 2026-11-08**; đặt `RAG_PARTIAL_REFUSAL_NO_ANSWER_ENABLED=false` để rollback.
 
 ## Thay đổi xuất hiện ở cả 2 lượt
 
@@ -31,7 +31,7 @@ Trên UAT, flag REL-103 và REL-402 giữ nguyên trạng thái và nội dung c
 
 Flag làm đúng việc ở nhánh deterministic: "giám sát" không còn bị coi là "giảm", nên nhánh này không trả lời nữa. Nhưng câu hỏi chuyển sang LLM, và LLM chép nguyên văn một câu khác: "Giám sát trưởng ký biên bản nghiệm thu hạng mục kết cấu." Validator duyệt vì câu đó có nguyên văn trong nguồn. REL-103 vẫn sai, chỉ đổi cơ chế.
 
-Cũng chính sự trùng "giam" đó đang giúp 2 câu RBAC. RBD-04 và RBD-05 có "Phó giám đốc vận hành" trong nguồn, nên nhánh deterministic trả đúng. Khi tắt sự trùng này, LLM từ chối sai 2 câu đó. Vậy nhánh này có đúng một phần nhờ lỗi.
+Cũng chính sự trùng "giam" đó đang giúp 2 câu RBAC (ghi chú trong DEC-013 và `rbac-dev-v1/score.md`). RBD-04 và RBD-05 có "Phó giám đốc vận hành" trong nguồn, nên nhánh deterministic trả đúng. Khi tắt sự trùng này, LLM từ chối sai 2 câu đó. Vậy nhánh này có đúng một phần nhờ lỗi.
 
 **Đính chính báo cáo FIX 2a:** tôi nói nhóm 3 như thiết kế không sửa được REL-103. Điều đó đúng khi flag này tắt. Khi bật, REL-103 thành đúng dạng nhóm 3: LLM chép nguyên văn câu lạc đề.
 

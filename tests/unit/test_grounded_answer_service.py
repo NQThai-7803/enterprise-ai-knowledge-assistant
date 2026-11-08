@@ -3887,3 +3887,9 @@ def test_refusal_is_only_counted_when_it_names_what_the_answer_omits(
     question: str, answer: str, omits: bool
 ) -> None:
     assert _refusal_names_what_the_answer_omits(question=question, answer=answer) is omits
+
+
+def test_refusal_with_a_side_fact_goes_on_to_validation_when_the_flag_is_off() -> None:
+    # Without the flag the early refusal does not fire; the side fact then fails validation.
+    with pytest.raises(CitationValidationFailedApplicationError):
+        asyncio.run(_draft_for_side_fact(rag_partial_refusal_no_answer_enabled=False))

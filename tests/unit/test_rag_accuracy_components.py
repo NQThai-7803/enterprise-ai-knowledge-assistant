@@ -6729,6 +6729,7 @@ def test_route_mode_defaults_to_strict_and_rejects_unknown_values() -> None:
     assert Settings(_env_file=None).rag_repair_after_llm_refusal_enabled is False
     assert Settings(_env_file=None).rag_answer_unit_guard_enabled is True
     assert Settings(_env_file=None).rag_reselect_requires_strong_support_enabled is False
+    assert Settings(_env_file=None).rag_partial_refusal_no_answer_enabled is True
     with pytest.raises(ValueError):
         Settings(_env_file=None, rag_deterministic_route_mode="other")
 
@@ -6852,4 +6853,45 @@ def test_short_answer_check_skips_too_little_to_compare() -> None:
     )
     assert not claim_validation_module._short_answer_misses_question_terms(
         question="Người nào phê duyệt tạm ứng?", answer="kho", evidence="giam doc ky"
+    )
+
+
+@pytest.mark.parametrize(
+    ("question", "kept", "dropped"),
+    [
+        ("Người phụ trách kho tên gì?", {"phu", "trach", "kho"}, {"ten", "gi"}),
+        ("Trưởng ca là ai?", {"truong"}, {"ai"}),
+        ("Máy in đặt ở đâu?", {"may", "dat"}, {"dau"}),
+        ("Mấy giờ thì mở cửa kho?", {"gio", "cua", "kho"}, {"may"}),
+        ("Khi nào nộp báo cáo quý?", {"nop", "bao", "cao", "quy"}, {"khi", "nao"}),
+        ("Phí cấp lại thẻ là bao nhiêu?", {"phi", "cap", "lai", "the"}, {"nhieu"}),
+        ("Vì sao hồ sơ bị trả lại?", {"tra", "lai"}, {"sao"}),
+        ("Hồ sơ sao lưu nằm ở thư mục nào?", {"sao", "luu", "nam", "muc"}, {"nao"}),
+        ("Thủ tục đổi ca như thế nào?", {"thu", "tuc", "doi"}, {"nhu", "the", "nao"}),
+        ("Lịch bảo trì thay đổi ra sao?", {"lich", "bao", "tri", "thay", "doi"}, {"sao"}),
+        ("Có được nghỉ bù không?", {"nghi"}, {"khong"}),
+        ("Hồ sơ đã được duyệt chưa?", {"duyet"}, {"chua"}),
+        ("Người chưa đủ 12 tháng được nghỉ mấy ngày?", {"chua", "thang", "nghi", "ngay"}, {"may"}),
+    ],
+)
+def test_asked_terms_drop_question_words_but_keep_lookalike_content(
+    question: str, kept: set[str], dropped: set[str]
+) -> None:
+    terms = claim_validation_module.asked_terms(question)
+    assert kept <= terms
+    assert not dropped & terms
+
+
+def test_short_answer_to_a_name_question_is_not_refused_for_the_question_word(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        claim_validation_module,
+        "get_settings",
+        lambda: SimpleNamespace(rag_short_answer_question_terms_enabled=True),
+    )
+    assert not claim_validation_module._short_answer_misses_question_terms(
+        question="Người phụ trách kho vật tư tên gì?",
+        answer="tran van binh",
+        evidence="truong kho tran van binh phu trach kho vat tu",
     )
