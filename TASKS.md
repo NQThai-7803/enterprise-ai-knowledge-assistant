@@ -1,6 +1,20 @@
 
 # Implementation Tasks
 
+## Order of the next work -- 2026-11-08
+
+1. REL-303 measurement under DEC-013 (code ready on `feat/fix-2d-rel303`), then its default.
+2. FIX 3 (false refusals), measured on `false_refusal_dev_v1` among the dev sets.
+3. **Embedding fine-tune** (`docs/design/embedding-finetune.md` and DEC-015 on branch `feat/embedding-finetune-infra`): infrastructure only so far; the baseline measurement and training come after FIX 3.
+4. The final held-out v2 measurement, once, after the choices above are made (DEC-012).
+
+## FIX 2d and eval environment -- 2026-11-08
+
+- **DONE: Ollama version and backend pinned (DEC-014).** Every eval runner refuses another version or backend than 0.40.15 on CUDA (`scripts/eval/ollama_check.py`) and records both at the start and the end of a run. The Windows app's auto-update is off.
+- **DONE: REL-303 reads the question form** (accented, unaccented, English) and uses that form's question words; the unaccented list is generated from the accented one. Text with no question word is not checked. The 4 unit tests that failed with the flag on now pass (one of them, `N_missing_condition`, is a strict xfail that REL-303 fixes).
+- **DONE: owner accepted the 10 held-out v1 labels at diagnostic level, and `false_refusal_dev_v1`.** The set is in the question fingerprints; the dev runner grades it with `--set false_refusal_dev_v1` and `fact_alternatives`.
+- **DONE: UAT on Actions.** Corpus V2 PDFs and the Q001-Q100 questions are in `eval-data/` (fictional data); `eval.yml` runs `uat` with optional case ids. First run: 5 questions, answers and citations identical to the local CUDA runs.
+
 ## FIX 2 false answers -- 2026-11-06
 
 - **DONE: diagnosis in `docs/eval/runs/fix2-diagnosis.md`.**
@@ -9,7 +23,7 @@
 - **DONE: groups 1 + 2 are the default under DEC-011; group 4a stays off, with a counter on its branch** (`docs/eval/runs/fix2a-defaults.md`).
 - **DONE: REL-101, 103, 303, 401, 402 traced.** REL-101 is fixed by group 1. The other four fall outside groups 3 and 4b as designed.
 - **DONE: flags for REL-103, REL-303 and REL-402 added and measured in one batch; all stay off** (`docs/eval/runs/fix2b-cues.md`).
-- **WAITING FOR OWNER: REL-303 wrongly refuses short answers to English or unaccented questions when on; fix or keep off** (`docs/status/2026-11-08-unattended-report.md`).
+- **DONE (2026-11-08, FIX 2d): REL-303 wrongly refused short answers to English or unaccented questions when on; fixed by reading the question form.**
 - **DONE: REL-402 on by default; REL-303 rewritten with a Vietnamese question-word list and measured under DEC-013** (`docs/eval/runs/fix2c-defaults.md`). REL-103 stays off.
 - **WAITING FOR OWNER: turn on REL-303? It meets DEC-013.** REL-401 comes later.
 
