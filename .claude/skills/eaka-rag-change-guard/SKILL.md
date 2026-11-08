@@ -18,12 +18,9 @@ Lõi RAG là nơi rủi ro cao nhất của EAKA: sai một chỗ là lộ tài 
 
 ### Trước khi sửa
 1. Đọc phần liên quan, xác định module bị đụng.
-2. Ghi baseline trên split **dev**:
-   ```bash
-   python tests/acceptance/rag_h5_2_exact_100.py --output .eval/before.json
-   ```
+2. Xác định các bộ dev sẽ đo và viết quy tắc chọn **trước khi đo**. Baseline không đo trước ở đây mà đo ở bước 7, cùng đợt với phương án mới (DEC-011).
    Split dev = Q001-Q100; chạy theo stack và biến môi trường trong `scripts/eval/README.md`.
-   **Không bao giờ chạy split `test`** (held-out v2, chưa có) trong quá trình phát triển. Split test chỉ chạy ở mốc release và phải có người duyệt.
+   **Không bao giờ chạy held-out v2** trong quá trình phát triển, và không dùng nó để thiết kế bản sửa (DEC-012). Chỉ chạy ở mốc release và phải có người duyệt.
    Held-out v1 (`scripts/eval/run_heldout.py`): diagnostic — đã dùng để chẩn đoán theo DEC-008, được phép chạy để chẩn đoán.
    Mọi con số công bố ra ngoài (release, báo cáo) phải đo trên held-out v2.
 
@@ -41,11 +38,12 @@ Lõi RAG là nơi rủi ro cao nhất của EAKA: sai một chỗ là lộ tài 
    Exit code ≠ 0 → xem từng match; nếu là trùng thật thì sửa lại cho tổng quát.
    Exit code 2 = không có nguồn câu hỏi hoặc lỗi git: kết quả không có giá trị, phải xử lý trước khi đi tiếp. Fingerprint build bằng `python scripts/eval/question_leak.py build`.
 6. Chạy các file test bắt buộc theo bảng ánh xạ bên dưới (dùng skill `eaka-verify` để chạy trong môi trường chuẩn).
-7. Chạy lại held-out với flag **bật**:
+7. Đo baseline và phương án mới **trong cùng một đợt** (DEC-011): cùng image, cùng phiên, Ollama không restart, API chỉ tạo lại để đổi flag, chạy xen kẽ (baseline, mới, baseline, mới), mỗi bên ít nhất 2 lượt. Baseline của đợt khác không được dùng, kể cả để giải thích hay so sánh trong báo cáo.
    ```bash
-   python tests/acceptance/rag_h5_2_exact_100.py --output .eval/after.json
+   python scripts/eval/compare_flag_runs.py <relevance|rbac|uat> <base1> <base2> <flag1> <flag2>
    ```
-8. Áp cổng quyết định (gate) dưới đây.
+8. So theo **từng câu kèm nguyên nhân**, không chỉ theo tổng: cùng một tổng có thể che một câu đã đổi nhánh. Chỉ tính thay đổi xuất hiện ở cả 2 lượt; câu lúc đúng lúc sai báo là không ổn định. Mọi kết luận về một flag phải có bằng chứng từ cùng đợt.
+9. Áp cổng quyết định (gate) dưới đây.
 
 ## Cổng đổi mặc định (default-flip gate)
 
@@ -60,6 +58,10 @@ Chỉ được đề xuất đổi mặc định của flag khi **đồng thời
 Dung sai (tolerance): split dev nhỏ nên lệch 1 câu là nhiễu. Mặc định dung sai = **1 câu** (tức `1 / n_dev`). `n_dev = 100`.
 
 Nếu chênh lệch nằm trong dung sai mà không có cải thiện rõ ràng → giữ mặc định cũ, ghi nhận trong báo cáo.
+
+Seed cố định không làm LLM chạy lại giống hệt: dung sai trên chỉ có nghĩa khi đã so trong cùng đợt, ít nhất 2 lượt mỗi bên, và báo khoảng khi các lượt khác nhau.
+
+Flag không tạo thay đổi nào chưa phải là vô hại: báo số ca thật sự vào nhánh được flag bảo vệ (`branch_counters` trong metadata, hoặc trace) trước khi kết luận.
 
 ## Bảng ánh xạ module → test bắt buộc
 
@@ -77,6 +79,6 @@ Mọi file nằm dưới `tests/`. Ghi tắt: `unit/` = `tests/unit/`, `integrat
 ## Báo cáo cuối task
 
 - Flag mới + mặc định.
-- Bảng before/after của 3 chỉ số (kèm `n_dev`).
+- Bảng baseline/phương án mới của 3 chỉ số, đo cùng đợt (kèm `n_dev`), cùng danh sách câu đổi ở cả 2 lượt.
 - Kết quả `check_no_question_leak.py`.
 - Test đã chạy + kết quả. Phần nào chưa kiểm chứng → mục **NOT_VERIFIED**.

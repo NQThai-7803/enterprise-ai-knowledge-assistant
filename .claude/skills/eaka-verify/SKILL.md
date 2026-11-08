@@ -1,6 +1,6 @@
 ---
 name: eaka-verify
-description: Use when running or re-running EAKA tests or integration tests, comparing test results between runs, investigating "CI fail", or "test trong image". Runs tests in the canonical locked image with temporary pgvector/Redis, protects shared stacks, and classifies every failure.
+description: Use before reporting any EAKA task as done, and when running or re-running EAKA tests or integration tests, comparing test results between runs, investigating "CI fail", or "test trong image". Takes precedence over general verification skills. Runs tests in the canonical locked image with temporary pgvector/Redis, protects shared stacks, and classifies every failure.
 ---
 
 # EAKA verify — chạy test an toàn trong môi trường chuẩn
@@ -18,16 +18,16 @@ description: Use when running or re-running EAKA tests or integration tests, com
 
 ## Hạ tầng tạm cho test
 
-- DB pgvector tạm: `127.0.0.1:55499`.
-- Redis: chọn cổng trống (kiểm tra trước, không đoán).
-- Đặt tên container/project có tiền tố riêng (ví dụ `eaka-verify-`) để dọn đúng thứ mình tạo.
+- `scripts/test/compose.integration.yaml` dựng pgvector và Redis tạm trên mạng riêng, không publish cổng, dữ liệu nằm trên tmpfs.
+- Đặt tên project có tiền tố riêng (ví dụ `eaka-verify-`) để dọn đúng thứ mình tạo.
 - Sau khi xong: dừng container tạm, liệt kê anonymous volume do mình tạo, **hỏi** rồi mới xóa.
 
 ## Quy trình
 
-1. Build/lấy image từ lock.
-2. Dựng pgvector + Redis tạm.
-3. Chạy các lane theo `ci.yml` (dùng `scripts/run_ci_lanes.sh` nếu có), xuất JUnit XML cho mỗi lane vào `.verify/<run-id>/`.
+1. Build image từ `git archive` của đúng commit cần kiểm, đặt ngoài thư mục OneDrive, với `docker build --target test`: thư mục làm việc có thể lỗi do file placeholder, và bản export chứng minh image khớp commit. Đọc kết quả trước khi chạy bất kỳ việc gì phụ thuộc vào nó, như push.
+2. Dựng pgvector + Redis tạm bằng `scripts/test/compose.integration.yaml` với `-p eaka-verify-<tên>`; stack này không publish cổng.
+3. Chạy các lane theo `ci.yml`, xuất JUnit XML cho mỗi lane vào `.verify/<run-id>/`. Lane unit cần mount `docs/` chỉ đọc (`-v <repo>/docs:/app/docs:ro`) vì image không có thư mục này; ghi mount đó trong báo cáo. Xanh nghĩa là 0 test fail trong lane đã chạy.
+   Đặt giới hạn thời gian đủ dài: `timeout` chỉ dừng client, container test vẫn chạy tiếp. Nếu lượt bị ngắt, dọn container `eaka-verify-<tên>` trước khi chạy lại, vì hai lượt dùng chung một database sẽ làm hàng loạt test fail giả.
 4. Tóm tắt:
    ```bash
    python .claude/skills/eaka-verify/scripts/junit_summary.py .verify/<run-id>/*.xml

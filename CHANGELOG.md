@@ -6,6 +6,11 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### FIX 2b -- 2026-11-08
+
+- New flags, all off by default: `RAG_STRICT_OUTCOME_CUES_EXACT_ENABLED`, `RAG_SHORT_ANSWER_QUESTION_TERMS_ENABLED`, `RAG_PARTIAL_REFUSAL_NO_ANSWER_ENABLED`. Results in `docs/eval/runs/fix2b-cues.md`.
+- `eaka-rag-change-guard` now requires a baseline and its candidate in one batch (DEC-011), compared per case. `eaka-verify` records the git export, the `docs/` mount and the leftover container trap.
+
 ### Held-out v2 batch 1 -- 2026-11-07
 
 - `docs/eval/heldout-v2-questions.yaml`: 20 frozen questions. `docs/eval/heldout-v2-gold.yaml`: gold draft from the PDFs, reviewed in `docs/eval/heldout-v2-review.md`. `scripts/eval/heldout_v2_check.py` checks them.

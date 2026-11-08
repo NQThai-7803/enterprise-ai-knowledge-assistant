@@ -121,6 +121,7 @@ from app.services.claim_evidence_validation_service import (
     ClaimRepairFeedback,
     answer_missing_requested_unit,
     infer_yes_no_polarity,
+    question_content_terms,
 )
 from app.web_search.errors import WebSearchError
 from app.web_search.intent import WebSearchIntentClassifier
@@ -2222,7 +2223,12 @@ class GroundedAnswerService:
             raise CitationValidationFailedApplicationError() from exc
         if grounded_output.answer.strip() == self.settings.llm_no_answer_sentinel:
             raise CitationValidationFailedApplicationError()
-        if _is_no_answer_like_json_answer(grounded_output.answer):
+        if _is_no_answer_like_json_answer(grounded_output.answer) or (
+            self.settings.rag_partial_refusal_no_answer_enabled
+            and _refusal_names_what_the_answer_omits(
+                question=grounding_question, answer=grounded_output.answer
+            )
+        ):
             if self.settings.rag_diagnostics_enabled:
                 _log_no_answer_diagnostics(reason="llm_no_answer_like_json")
             return _no_answer_draft(
@@ -7044,6 +7050,23 @@ def _is_no_answer_like_json_answer(answer: str) -> bool:
     return not _answer_has_grounded_substance(answer)
 
 
+def _refusal_names_what_the_answer_omits(*, question: str, answer: str) -> bool:
+    """True when the answer refuses the asked point and only adds a side fact."""
+    if len(information_need_queries(question)) > 1:
+        return False
+    sentences = re.split(r"(?<=[.!?;])\s+", answer.strip())
+    refusals = [
+        sentence
+        for sentence in sentences
+        if any(phrase in sentence.casefold() for phrase in _NO_ANSWER_LIKE_ANSWER_PHRASES)
+    ]
+    if not refusals:
+        return False
+    rest = " ".join(sentence for sentence in sentences if sentence not in refusals)
+    named = question_content_terms(question) & question_content_terms(" ".join(refusals))
+    return bool(named - question_content_terms(rest))
+
+
 def _answer_has_grounded_substance(answer: str) -> bool:
     folded_answer = _fold_for_person_match(answer)
     if _NUMBER_UNIT_PATTERN.search(folded_answer):
@@ -8942,6 +8965,10 @@ _CONDITION_CUE_PATTERN = re.compile(
     r"(?<!\w)(sau|nếu|khi|chưa đủ|cứ đủ|ít hơn|nhiều hơn"
     r"|after|if|when|before|at least|less than|more than)(?!\w)"
 )
+_OUTCOME_CUE_PATTERN = re.compile(
+    r"(?<!\w)(tăng thêm|giảm|tỷ lệ|tỉ lệ|tương ứng|được tính|không được"
+    r"|additional|increase\w*|decrease\w*|proportion\w*|prorated|eligible|entitled)(?!\w)"
+)
 _TOPIC_WORD_PATTERN = re.compile(r"[^\W\d_]+")
 _TOPIC_STOPWORDS = frozenset(
     [
@@ -9046,6 +9073,11 @@ def _exact_condition_cues(text: str) -> set[str]:
     return {match.group(1) for match in _CONDITION_CUE_PATTERN.finditer(_exact_text(text))}
 
 
+def _exact_outcome_cues(text: str) -> set[str]:
+    """Outcome cues as whole words on text that keeps its diacritics."""
+    return {match.group(1) for match in _OUTCOME_CUE_PATTERN.finditer(_exact_text(text))}
+
+
 def _span_shares_question_topic(*, question: str, span: str) -> bool:
     """Require a shared two-word anchor and most of the question's content words in the span."""
     question_words = [
@@ -9140,6 +9172,7 @@ def _structured_condition_value_answer(
         "eligible",
         "entitled",
     )
+    exact_outcomes = strict and get_settings().rag_strict_outcome_cues_exact_enabled
     candidates: list[tuple[float, int, int, str, str]] = []
     for source_index, source in enumerate(source_registry.sources):
         lines = tuple(line.strip() for line in source.text.splitlines() if line.strip())
@@ -9169,15 +9202,18 @@ def _structured_condition_value_answer(
                     folded_window,
                 )
             )
-            has_outcome = number_unit_count >= 2 or any(
-                cue in folded_window for cue in outcome_cues
+            window_outcomes = (
+                _exact_outcome_cues(exact_window)
+                if exact_outcomes
+                else {cue for cue in outcome_cues if cue in folded_window}
             )
+            has_outcome = number_unit_count >= 2 or bool(window_outcomes)
             if not has_outcome:
                 continue
             matched_terms = sum(1 for term in focus_terms if term in folded_window)
             score = matched_terms * 8.0 + number_unit_count * 20.0
             score += len(question_numbers.intersection(window_numbers)) * 40.0
-            score += sum(15.0 for cue in outcome_cues if cue in folded_window)
+            score += 15.0 * len(window_outcomes)
             score += sum(80.0 for cue in requested_condition_cues if cue in window_cues)
             score -= sum(120.0 for cue in window_cues if cue not in requested_condition_cues)
             answer = " ".join(lines[start:end]).strip(" -•")

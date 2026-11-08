@@ -30,6 +30,7 @@ from app.retrieval.structured import (
     monetary_value_period_pairs,
     requested_monetary_period,
 )
+from app.services import claim_evidence_validation_service as claim_validation_module
 from app.services import grounded_answer_service as gas
 from app.services.claim_evidence_validation_service import (
     ClaimEvidenceStatus,
@@ -6692,6 +6693,31 @@ def test_off_removes_the_route_and_the_chain_passes_the_mode(
     assert seen == ["strict"]
 
 
+ROLE_QUESTION = "Giám đốc kho làm gì trước khi đóng kho?"
+ROLE_CLAUSE = "Giám đốc kho ghi nhận sổ trước khi chuyển hồ sơ. Nhà cung cấp có 7 ngày bổ sung."
+
+
+def test_role_giám_counts_as_outcome_giảm_unless_the_flag_is_on(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert _condition(ROLE_QUESTION, ROLE_CLAUSE, "strict") is not None
+    monkeypatch.setattr(
+        gas, "get_settings", lambda: SimpleNamespace(rag_strict_outcome_cues_exact_enabled=True)
+    )
+    assert _condition(ROLE_QUESTION, ROLE_CLAUSE, "strict") is None
+
+
+def test_exact_outcome_cue_keeps_a_real_outcome(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        gas, "get_settings", lambda: SimpleNamespace(rag_strict_outcome_cues_exact_enabled=True)
+    )
+    assert gas._exact_outcome_cues("Phí giảm một nửa, giám đốc ký") == {"giảm"}
+    assert gas._exact_outcome_cues("Giám đốc kho ký") == set()
+    question = "Nếu máy in hỏng thì nhà thầu được giảm phí bao nhiêu?"
+    answer = _condition(question, "Nếu máy in hỏng, nhà thầu được giảm phí một nửa.", "strict")
+    assert answer is not None
+
+
 def test_topic_check_ignores_generic_words() -> None:
     assert not gas._span_shares_question_topic(
         question="Tôi được tối đa bao nhiêu?", span="Tôi được tối đa bao nhiêu ngày."
@@ -6787,3 +6813,43 @@ def test_strong_support_needs_the_exact_text_or_number_and_unit(
         answer=answer, source_registry=source(source_text), label="SOURCE_1"
     )
     assert result is strong
+
+
+SHORT_SOURCE = "Giám đốc kho duyệt thanh toán đợt cuối cho nhà cung cấp."
+
+
+@pytest.mark.parametrize(
+    ("question", "flag", "supported"),
+    [
+        ("Người nào phê duyệt tạm ứng cho nhà cung cấp?", False, True),
+        ("Người nào phê duyệt tạm ứng cho nhà cung cấp?", True, False),
+        ("Người nào duyệt thanh toán đợt cuối cho nhà cung cấp?", True, True),
+    ],
+)
+def test_short_answer_needs_the_question_terms_around_it(
+    question: str, flag: bool, supported: bool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        claim_validation_module,
+        "get_settings",
+        lambda: SimpleNamespace(rag_short_answer_question_terms_enabled=flag),
+    )
+    status = claim_validation_module._validate_answer_against_evidence(
+        answer="Giám đốc kho", evidence=SHORT_SOURCE, question=question
+    )
+    assert (status == ClaimEvidenceStatus.SUPPORTED) is supported
+
+
+def test_short_answer_not_in_the_source_misses_the_question() -> None:
+    assert claim_validation_module._short_answer_misses_question_terms(
+        question="Người nào phê duyệt tạm ứng?", answer="truong kho", evidence="giam doc ky"
+    )
+
+
+def test_short_answer_check_skips_too_little_to_compare() -> None:
+    assert not claim_validation_module._short_answer_misses_question_terms(
+        question="Ai ký?", answer="giam doc", evidence="giam doc duyet"
+    )
+    assert not claim_validation_module._short_answer_misses_question_terms(
+        question="Người nào phê duyệt tạm ứng?", answer="kho", evidence="giam doc ky"
+    )
