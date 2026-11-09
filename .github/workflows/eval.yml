@@ -172,7 +172,7 @@ jobs:
               extra_hosts: ["host.docker.internal:host-gateway"]
           EOF
           read -r -a FILES <<< "$COMPOSE_FILES"
-          docker compose -p "$PROJECT" "${FILES[@]}" up -d --no-build postgres redis
+          docker compose -p "$PROJECT" "${FILES[@]}" up -d --wait --no-build postgres redis
           docker compose -p "$PROJECT" "${FILES[@]}" run --rm --no-deps migration
           docker compose -p "$PROJECT" "${FILES[@]}" run --rm --no-deps uat-v2-accounts
           docker compose -p "$PROJECT" "${FILES[@]}" up -d --no-build --no-deps api worker
