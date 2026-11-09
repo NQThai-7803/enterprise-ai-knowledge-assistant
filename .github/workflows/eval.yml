@@ -8,7 +8,8 @@ name: Eval
 # Sets: `uat` (Q001-Q100 from eval-data/, corpus V2 PDFs from eval-data/corpus-v2, proxy grade
 # against eval-data/uat/reference-grade.json), `rbac` (tests/acceptance/rbac_dev_v1.yaml, with the
 # retrieval-level leak check), `relevance` (answer_relevance_dev_v1) and `false_refusal`
-# (false_refusal_dev_v1). Never runs held-out sets.
+# (false_refusal_dev_v1). Never runs held-out v2 (DEC-012). Held-out v1 only through
+# `trace_heldout_v1`, a layer-by-layer diagnostic trace that is not scored (DEC-008).
 on:
   workflow_dispatch:
     inputs:
@@ -34,6 +35,10 @@ on:
         description: "relevance/false_refusal only: after the batch, trace every case layer by layer (diagnosis, not scored; use with configs=base)"
         type: boolean
         default: false
+      trace_heldout_v1:
+        description: "uat only: held-out v1 ids to trace after the batch (e.g. HO-001 HO-004); diagnosis, not scored"
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -220,6 +225,24 @@ jobs:
           docker exec -w /app -e PYTHONPATH=/app "$API" python /tmp/heldout_trace.py \
             --input /tmp/trace-input.json --output /tmp/trace.json --mode full
           docker cp "$API:/tmp/trace.json" "$OUT/trace.json"
+
+      - name: Trace held-out v1 cases (diagnosis only, DEC-008)
+        if: inputs.set == 'uat' && inputs.trace_heldout_v1 != ''
+        env:
+          IDS_INPUT: ${{ inputs.trace_heldout_v1 }}
+        run: |
+          set -euo pipefail
+          IDS=()
+          for id in $IDS_INPUT; do
+            [[ "$id" =~ ^HO-[0-9]{3}$ ]] || { echo "bad held-out v1 id: $id"; exit 1; }
+            IDS+=("$id")
+          done
+          python scripts/diagnostics/prepare_dev_trace_input.py --heldout-v1 "${IDS[@]}"             --manifest "$OUT/runtime-manifest.json" --output "$OUT/trace-heldout-v1-input.json"
+          API="$PROJECT-api-1"
+          docker cp scripts/diagnostics/heldout_trace.py "$API:/tmp/heldout_trace.py"
+          docker cp "$OUT/trace-heldout-v1-input.json" "$API:/tmp/trace-input.json"
+          docker exec -w /app -e PYTHONPATH=/app "$API" python /tmp/heldout_trace.py             --input /tmp/trace-input.json --output /tmp/trace.json --mode full
+          docker cp "$API:/tmp/trace.json" "$OUT/trace-heldout-v1.json"
 
       - name: Collect logs
         if: always()
