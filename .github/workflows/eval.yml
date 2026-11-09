@@ -135,9 +135,18 @@ jobs:
       - name: Install Ollama and pull the model
         run: |
           set -euo pipefail
-          curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors -o "$RUNNER_TEMP/ollama-install.sh" \
-            https://ollama.com/install.sh
-          OLLAMA_VERSION="$OLLAMA_VERSION" sh "$RUNNER_TEMP/ollama-install.sh"
+          if ! { curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors \
+                   -o "$RUNNER_TEMP/ollama-install.sh" https://ollama.com/install.sh \
+                 && OLLAMA_VERSION="$OLLAMA_VERSION" sh "$RUNNER_TEMP/ollama-install.sh"; }; then
+            # The release download has failed with 504/404; the same release ships as an image.
+            echo "install.sh failed; taking Ollama $OLLAMA_VERSION from ollama/ollama:$OLLAMA_VERSION"
+            docker create --name ollama-src "ollama/ollama:$OLLAMA_VERSION" >/dev/null
+            sudo docker cp ollama-src:/usr/bin/ollama /usr/local/bin/ollama
+            sudo mkdir -p /usr/local/lib
+            sudo docker cp ollama-src:/usr/lib/ollama /usr/local/lib/ollama
+            docker rm ollama-src >/dev/null
+          fi
+          ollama --version
           sudo systemctl stop ollama || true
           echo "EVAL_OLLAMA_LOG=$RUNNER_TEMP/ollama.log" >> "$GITHUB_ENV"
           OLLAMA_HOST=0.0.0.0:11434 OLLAMA_CONTEXT_LENGTH=8192 OLLAMA_NUM_PARALLEL=1 \
