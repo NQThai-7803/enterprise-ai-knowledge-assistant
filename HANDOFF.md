@@ -19,7 +19,7 @@ docker compose --profile frontend up -d frontend
 ## Trạng thái (cập nhật 2026-11-08)
 
 - **Mặc định RAG hiện tại:** `strict`, nhóm 1 + 2 (DEC-011), REL-402 và REL-303 (FIX 2d) bật. REL-103 và 4a tắt.
-- **Tạm thời (DEC-016):** máy local thiếu RAM, nên CI GitHub thay eaka-verify và mọi đợt đo chạy trên Actions (`eval.yml`, CPU). Không so với lượt local. Mỗi flag giữ được để rollback (`ENVIRONMENT_VARIABLES.md`).
+- **Verify và đo (DEC-018, DEC-016):** eaka-verify chạy lại được ở local (`C:\dev\eaka`) và phải xanh trước khi push; cổng 1000 MB Available áp dụng lúc khởi động stack. Mọi đợt đo vẫn chạy trên Actions (`eval.yml`, CPU). Không so với lượt local. Mỗi flag giữ được để rollback (`ENVIRONMENT_VARIABLES.md`).
 - **Quy tắc đo:** baseline và phương án mới chạy cùng một đợt (DEC-011), chọn theo từng bộ (DEC-013). Các bộ dev: Q001-Q100, RBAC dev, `answer_relevance_dev_v1`, và `false_refusal_dev_v1` (owner đã duyệt 2026-11-08; chấm bằng `run_answer_relevance_dev.py --set false_refusal_dev_v1`, cần stack riêng).
 - **Ollama là một phần của lượt đo (DEC-014):** runner từ chối chạy nếu Ollama khác 0.40.15 hoặc khác backend CUDA; tự cập nhật của app Ollama đã tắt. Trên Actions đặt `EVAL_OLLAMA_EXPECTED_BACKEND=CPU`.
 - **Held-out v1 là diagnostic** (DEC-008). Lượt mới nhất (2026-11-08, mặc định mới cộng REL-303): 0 rò rỉ, trả lời sai 3/14, từ chối sai 14/26, PASS 14/40. Owner chấp nhận 10 nhãn đổi ở mức diagnostic (`docs/eval/runs/heldout-v1-defaults-bb60566/score.md`).
@@ -29,18 +29,17 @@ docker compose --profile frontend up -d frontend
 - **Eval trên GitHub Actions:** `eval.yml` (chỉ chạy tay) chạy được `relevance`, `rbac` và `uat` (có thể chọn câu). Chạy trên CPU, nên không so trực tiếp với lượt local.
 - **Fine-tune embedding:** mới có hạ tầng, trên nhánh `feat/embedding-finetune-infra` chưa merge (`ml/embedding_finetune/`, `docs/design/embedding-finetune.md`, DEC-015); chưa train, model của app không đổi.
 
-## Test (2026-11-08, image build từ git export, pgvector/Redis tạm)
+## Test (2026-11-09, `315efd6`, image build từ git export, pgvector/Redis tạm, chạy local)
 
 | Lane | Pass | Fail | Xfail | Skip |
 |---|---:|---:|---:|---:|
-| `tests/unit`, không mount `docs/` | 1659 | 0 | 17 | 7 |
+| `tests/unit`, mount `docs/` chỉ đọc | 1698 | 0 | 16 | 8 |
 | `tests/api` không integration | 51 | 0 | 0 | 0 |
 | `tests/api` integration | 245 | 0 | 0 | 0 |
 | `tests/integration` | 404 | 0 | 3 | 0 |
 | LLM provider | 3 | 0 | 0 | 0 |
-| Celery | 4 | 0 | 0 | 0 |
 
-Kết quả trên tính cả PR #9 (test lock held-out được skip trong image). Các lane cần model thật chỉ chạy trên CI.
+Lane Celery (4 pass ngày 2026-11-08) không chạy trong lượt này; các lane cần model thật chỉ chạy trên CI.
 
 ## Việc đang dở
 

@@ -16,7 +16,7 @@
 - **DONE: UAT on Actions.** Corpus V2 PDFs and the Q001-Q100 questions are in `eval-data/` (fictional data); `eval.yml` runs `uat` with optional case ids. First run: 5 questions, answers and citations identical to the local CUDA runs.
 - **DONE: measurement on Actions (DEC-016).** `eval.yml` takes a set, a list of flag configurations and 1 or 2 runs; `scripts/eval/ci_batch.sh` runs them interleaved in one job.
 - **DONE: repository moved to `C:\dev\eaka`** (fresh clone plus the local-only files, sizes and hashes checked; `docs/status/2026-11-08-move-out-of-onedrive.md`). The OneDrive copy is untouched.
-- **TODO: end DEC-016** once eaka-verify and local measurements run in `C:\dev\eaka`.
+- **DONE (2026-11-09): DEC-018** — eaka-verify runs locally again (`315efd6`, all lanes green) and is required before a push; measurement stays on Actions.
 
 ## FIX 2 false answers -- 2026-11-06
 

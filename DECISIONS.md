@@ -134,9 +134,18 @@ Set by the owner on 2026-11-08, after `docs/eval/runs/nondeterminism.md` found t
 
 ## DEC-016 — Temporary: CI replaces local verification and measurement
 
-Set by the owner on 2026-11-08, because the local host stays below the 1000 MB start gate. Temporary; it ends when the repository moves out of OneDrive and local runs are possible again.
+Set by the owner on 2026-11-08, because the local host stays below the 1000 MB start gate. Temporary; it ends when the repository moves out of OneDrive and local runs are possible again. **Verification part ended by DEC-018 (2026-11-09); measurement stays on Actions.**
 
 - **Verification:** a branch is pushed and the 4 GitHub CI checks replace `eaka-verify` before review. No PR is merged until all 4 checks are green.
 - **Measurement:** every batch runs on GitHub Actions (`eval.yml`, `workflow_dispatch`) through `scripts/eval/ci_batch.sh`. The baseline and every candidate configuration run in the same job, interleaved (run 1 of each, then run 2), on one image and one Ollama (0.40.15, CPU). DEC-011 and DEC-013 apply unchanged.
 - **Metadata:** each batch records the Ollama version and backend (`batch.json`), and every runner records them per run (DEC-014).
 - **No comparison with local runs:** CPU and CUDA runs are not comparable. A decision uses only runs from one Actions job.
+
+## DEC-018 — Local eaka-verify is back before every push
+
+Set by the owner on 2026-11-09, after the repository moved to `C:\dev\eaka`. Ends the verification part of DEC-016; its measurement part stays, now under DEC-017 (embedding fine-tune, PR #14).
+
+- **Rule restored: eaka-verify green locally, then push.** The image is built from `git archive` of the commit, the lanes of `ci.yml` run in it against the throwaway stack of `scripts/test/compose.integration.yaml`, and the 4 GitHub CI checks stay required before a merge.
+- **Evidence (2026-11-09, `315efd6`):** unit 1698 passed, api 51 + 245, integration 404, llm-provider 3; 0 failed, 0 regressed against `6a2c72f`. Available RAM was 1100-1380 MB at the start, 296 MB at the lowest during the run (Docker VM peak 1816 MB), with no out-of-memory error; the whole run took about 5.5 minutes.
+- **The 1000 MB Available gate applies at stack start.** Below it, wait; if it stays below, verify on CI as under DEC-016 and say so in the report.
+- **Measurement stays on GitHub Actions (CPU)** for end-to-end, flag and model comparisons (DEC-016, DEC-017). Local and Actions numbers are never compared.
