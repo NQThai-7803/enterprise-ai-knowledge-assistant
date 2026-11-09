@@ -1,5 +1,9 @@
 # Project Status
 
+## FIX 3a -- 2026-11-09 (measured, no default change)
+
+- **Three flags for false answers** (M2 extended refusal phrases, M1a asked phrase in evidence, M1b question/evidence similarity) were measured on Actions in one batch per set. **None meets DEC-013:** M1a and M1b regress UAT by 47 and 43 questions; M2 improves no set. All stay off. See `docs/eval/runs/fix3a-false-answers.md`.
+
 ## FIX 3 diagnosis -- 2026-11-09 (waiting for owner)
 
 - **Baseline on Actions (CPU, 2 runs, current defaults) on `false_refusal_dev_v1`:** 6 false answers, 13 correct, 1 false refusal, identical in both runs.

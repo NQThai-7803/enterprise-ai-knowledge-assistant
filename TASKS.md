@@ -8,6 +8,11 @@
 3. **Embedding fine-tune** (`docs/design/embedding-finetune.md` and DEC-015 on branch `feat/embedding-finetune-infra`): infrastructure only so far; the baseline measurement and training come after FIX 3.
 4. The final held-out v2 measurement, once, after the choices above are made (DEC-012).
 
+## FIX 3a false answers -- 2026-11-09 (flags measured, all stay off)
+
+- **DONE: M2, M1a, M1b flags measured under DEC-013 on Actions** (`docs/eval/runs/fix3a-false-answers.md`). None wins: M1a and M1b regress 47 and 43 UAT questions; M2 changes nothing on the dev sets and loses Q075. Defaults unchanged.
+- **Later:** M1b cut false answers on the relevance set from 5 to 1 but its 0.85 threshold, calibrated on synthetic sets, does not transfer to UAT; recalibrate on representative data before measuring again. M2 needs the retry after a recognised refusal to stop, or the repair answers a side fact.
+
 ## FIX 2d and eval environment -- 2026-11-08
 
 - **DONE: Ollama version and backend pinned (DEC-014).** Every eval runner refuses another version or backend than 0.40.15 on CUDA (`scripts/eval/ollama_check.py`) and records both at the start and the end of a run. The Windows app's auto-update is off.

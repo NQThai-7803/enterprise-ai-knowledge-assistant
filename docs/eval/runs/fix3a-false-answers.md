@@ -47,3 +47,34 @@ Tool: `scripts/eval/calibrate_question_evidence_similarity.py`, trên `answer_re
 3. **"Phương án M1 tốt hơn"** là phương án thắng `base`, và không thua phương án M1 kia ở bộ nào khi so cùng thứ tự (a), (b). Nếu cả hai cùng thắng nhưng không phương án nào trội ở mọi bộ, owner quyết định.
 4. **Cấu hình được bật mặc định:** trong các cấu hình thắng `base`, lấy cấu hình trội ở mọi bộ so với các cấu hình còn lại. Nếu không có cấu hình nào như vậy, owner quyết định. Các flag giữ lại để rollback.
 5. Held-out v2 không dùng (DEC-012).
+
+## Kết quả (2026-11-09, GitHub Actions, CPU, Ollama 0.40.15)
+
+**Run:** false_refusal `42579759113`, relevance `42581559132`, RBAC `42585512856`, UAT `42579790622`. Mỗi bộ chạy trong một job, 6 cấu hình × 2 lượt xen kẽ.
+
+| Cấu hình | Rò rỉ (API + retrieval) | UAT proxy | `false_refusal_dev_v1` sai / đúng | `answer_relevance_dev_v1` sai / đúng | RBAC sai / control đạt |
+|---|---:|---:|---:|---:|---:|
+| `base` | 0 | 100, 100 | 6 / 13 | 5 / 17 | 0 / 5 (chỉ lượt 2) |
+| `m2` | 0 | 99, 99 | 6 / 13 | 5 / 17 | 0 / 5 |
+| `m1a` | 0 | **53, 53** | 2 / 10 | 0 / 17 | 0 / 5 |
+| `m1b` | 0 | **57, 57** | 6 / 12 | 1 / 21 | 0 / 4 |
+| `m2m1a` | 0 | **52, 52** | 2 / 10 | 0–1 / 16–17 (dao động REL-201) | 0 / 5 |
+| `m2m1b` | 0 | **57, 57** | 6 / 12 | 1 / 21 | 0 / 4 |
+
+**Số ca mỗi nhánh chặn, mỗi lượt:**
+
+| Flag | false_refusal | RBAC |
+|---|---:|---:|
+| M2 (`refusal_phrase_extended`) | 1 | 1 |
+| M1a (`question_head_missing`) | 21–22 | 5–6 |
+| M1b (`question_evidence_dissimilar`) | 2 | 7–8 |
+
+Runner UAT không ghi counter.
+
+**Theo DEC-013: không cấu hình nào đạt, không đổi mặc định.** Cả ba flag giữ tắt và còn nguyên để đo lại sau.
+
+- **M1a và M1b trượt điều kiện bắt buộc:** UAT hồi quy ở 47 và 43 câu (cùng một danh sách câu đổi ở cả 2 lượt; ví dụ Q001, Q003, Q004).
+  - **M1a:** cụm "được hỏi" hiếm khi xuất hiện nguyên văn trong evidence thật. Nó loại cả các câu đúng của nhóm A (A02, A03, A05, A06) lẫn nhóm N (N01, N03, N06).
+  - **M1b:** ngưỡng 0,85 hiệu chỉnh trên hai bộ tổng hợp không áp dụng được cho UAT. Câu hỏi UAT và câu evidence của nó có cosine thấp hơn nhiều. Riêng trên relevance, M1b giảm trả lời sai từ 5 xuống 1 và tăng câu đúng từ 17 lên 21, nên ý tưởng đo độ tương đồng vẫn đáng giữ nếu hiệu chỉnh trên dữ liệu đại diện hơn.
+- **M2 không tốt hơn ở bộ nào; UAT mất Q075** (đúng → sai, trong dung sai 1 câu). Ở FR-A08, M2 có chặn câu "độ ẩm … không được cụ thể hóa", nhưng lần thử lại hoặc repair sau đó trả lời "Kho hóa chất được giữ ở nhiệt độ dưới 25 độ C.", vẫn là trả lời sai. Muốn có tác dụng, M2 phải đi cùng việc không cho thử lại sau khi đã nhận diện được câu từ chối.
+- **Giới hạn của đợt đo:** lượt 1 của baseline RBAC không có kết quả API. Runner gặp `401 Unauthorized` lúc chuẩn bị, có lẽ token admin hết hạn sau khi upload. Check retrieval vẫn đủ 12 lượt, 0 rò rỉ. Kết luận không đổi, vì `m2` cho kết quả RBAC giống hệt `base` lượt 2, còn M1 đã trượt ở UAT.
