@@ -1,5 +1,10 @@
 # Project Status
 
+## FIX 3b diagnosis -- 2026-11-09 (waiting for owner)
+
+- **Held-out v1 false refusals traced on Actions (diagnostic):** 13/14 reproduce on CPU. Four mechanisms: answer document dropped by the low-alignment document filter (5), two-part questions refused when one part fails (6), zero-padded counts with slash units (2), English questions over Vietnamese sources (2).
+- **`false_refusal_dev_v2`** (24 questions) simulates those mechanisms; frozen by hash and fingerprinted, not run yet. See `docs/eval/runs/fix3b-diagnosis.md`.
+
 ## FIX 3a -- 2026-11-09 (measured, no default change)
 
 - **Three flags for false answers** (M2 extended refusal phrases, M1a asked phrase in evidence, M1b question/evidence similarity) were measured on Actions in one batch per set. **None meets DEC-013:** M1a and M1b regress UAT by 47 and 43 questions; M2 improves no set. All stay off. See `docs/eval/runs/fix3a-false-answers.md`.

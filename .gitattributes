@@ -10,6 +10,8 @@ docs/eval/heldout-v2-questions.lock text eol=lf
 # The false-refusal dev set is hashed byte for byte too.
 tests/acceptance/false_refusal_dev_v1.yaml text eol=lf
 tests/acceptance/false_refusal_dev_v1.lock text eol=lf
+tests/acceptance/false_refusal_dev_v2.yaml text eol=lf
+tests/acceptance/false_refusal_dev_v2.lock text eol=lf
 # Eval data for CI: PDFs are hashed byte for byte (eval-data/corpus-v2/SHA256SUMS).
 eval-data/**/*.pdf binary
 eval-data/**/*.json text eol=lf
