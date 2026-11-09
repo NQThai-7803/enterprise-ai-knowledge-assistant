@@ -14,7 +14,17 @@ MAX_ROUTE_LABEL_LENGTH = 160
 # change the sources it can move to. Counted with the flag on or off.
 BRANCH_RESELECT_AFTER_REJECTION = "reselect_after_rejection"
 BRANCH_RESELECT_GUARD_WOULD_CHANGE = "reselect_guard_would_change"
-ANSWER_BRANCHES = (BRANCH_RESELECT_AFTER_REJECTION, BRANCH_RESELECT_GUARD_WOULD_CHANGE)
+# FIX 3a: an answer turned into NO_ANSWER by M2, M1a or M1b; counted only with its flag on.
+BRANCH_REFUSAL_PHRASE_EXTENDED = "refusal_phrase_extended"
+BRANCH_QUESTION_HEAD_MISSING = "question_head_missing"
+BRANCH_QUESTION_EVIDENCE_DISSIMILAR = "question_evidence_dissimilar"
+ANSWER_BRANCHES = (
+    BRANCH_RESELECT_AFTER_REJECTION,
+    BRANCH_RESELECT_GUARD_WOULD_CHANGE,
+    BRANCH_REFUSAL_PHRASE_EXTENDED,
+    BRANCH_QUESTION_HEAD_MISSING,
+    BRANCH_QUESTION_EVIDENCE_DISSIMILAR,
+)
 _UUID_SEGMENT_PATTERN = re.compile(
     r"(?<=/)[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
     r"[0-9a-fA-F]{4}-[0-9a-fA-F]{12}(?=/|$)"

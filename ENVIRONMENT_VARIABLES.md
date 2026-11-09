@@ -229,6 +229,10 @@ RAG_RESELECT_REQUIRES_STRONG_SUPPORT_ENABLED=false
 RAG_PARTIAL_REFUSAL_NO_ANSWER_ENABLED=true
 RAG_SHORT_ANSWER_QUESTION_TERMS_ENABLED=true
 RAG_STRICT_OUTCOME_CUES_EXACT_ENABLED=false
+RAG_REFUSAL_PHRASES_EXTENDED_ENABLED=false
+RAG_QUESTION_HEAD_IN_EVIDENCE_ENABLED=false
+RAG_QUESTION_EVIDENCE_SIMILARITY_ENABLED=false
+RAG_QUESTION_EVIDENCE_MIN_SIMILARITY=0.85
 ```
 
 Retrieval variable rules:
@@ -258,6 +262,9 @@ Retrieval variable rules:
 - `RAG_PARTIAL_REFUSAL_NO_ANSWER_ENABLED` (boolean, default `true` since 2026-11-08; FIX 2b): `false` restores the old behaviour. On a question with one information need, an answer whose refusal sentence names question words that the rest of the answer does not mention becomes NO_ANSWER, wherever the refusal sits.
 - `RAG_SHORT_ANSWER_QUESTION_TERMS_ENABLED` (boolean, default `true` since FIX 2d, DEC-013 batch on Actions; set `false` to roll back; FIX 2b): a short answer that the validator would accept for having little substance is rejected when the 15 words on each side of it cover less than 60% of the question's content words (question words such as "ai", "gì", "nào", "đâu", "bao nhiêu", "mấy", "khi nào", "tên gì", "thế nào", "ra sao", "vì sao" and the "có ... không" frame do not count), or when the answer is not in the source at all, so a rejected answer cannot move to a source that does not hold it. A one-word answer or a question with fewer than two content words outside the answer keeps the old behaviour.
 - `RAG_STRICT_OUTCOME_CUES_EXACT_ENABLED` (boolean, default `false`; FIX 2b): in `strict` mode, the outcome cues of `_structured_condition_value_answer` match as whole words on text that keeps its diacritics, so "giám" no longer counts as "giảm".
+- `RAG_REFUSAL_PHRASES_EXTENDED_ENABLED` (boolean, default `false`, stays off after its DEC-013 batch; FIX 3a M2): with `RAG_PARTIAL_REFUSAL_NO_ANSWER_ENABLED`, a refusal sentence is also recognised by grammar-built phrases (`không`/`chưa` + optional `được` + a verb of stating such as `nêu`, `đề cập`, `quy định`, `cụ thể hóa`; `không có thông tin`), in accented, generated unaccented and English forms (`not specified`, `does not mention`).
+- `RAG_QUESTION_HEAD_IN_EVIDENCE_ENABLED` (boolean, default `false`, stays off: 47 UAT regressions; FIX 3a M1a): on a question with one information need, the most specific words of the phrase the question word attaches to (diacritics kept, classifiers dropped) must occur in the cited evidence; otherwise the answer becomes NO_ANSWER.
+- `RAG_QUESTION_EVIDENCE_SIMILARITY_ENABLED` (boolean, default `false`, stays off: 43 UAT regressions; FIX 3a M1b) and `RAG_QUESTION_EVIDENCE_MIN_SIMILARITY` (float 0-1, default `0.85`, calibrated in `docs/eval/runs/fix3a-false-answers.md`): the e5 cosine between the question and the evidence sentence the answer rests on must reach the threshold; otherwise NO_ANSWER. Adds one query and one passage embedding per checked answer.
 - Hybrid RRF scores are ranking scores, not probabilities.
 - These retrieval values are not secrets.
 - `RERANKER_ENABLED` enables the document/chunk reranking layer after hybrid retrieval and before final context packing.

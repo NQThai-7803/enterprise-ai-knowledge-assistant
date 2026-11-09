@@ -145,6 +145,14 @@ class Settings(BaseSettings):
     rag_short_answer_question_terms_enabled: bool = True
     # FIX 2b: in strict mode, outcome cues keep their diacritics, so giám is not giảm.
     rag_strict_outcome_cues_exact_enabled: bool = False
+    # FIX 3a M2: REL-402 also knows "không được nêu", "không đề cập", "not specified", ...
+    rag_refusal_phrases_extended_enabled: bool = False
+    # FIX 3a M1a: the most specific words the question asks about must be in the evidence.
+    rag_question_head_in_evidence_enabled: bool = False
+    # FIX 3a M1b: the question must be close enough (e5 cosine) to the supporting sentence.
+    rag_question_evidence_similarity_enabled: bool = False
+    # Calibrated 2026-11-09 (docs/eval/runs/fix3a-false-answers.md): the lowest answer item.
+    rag_question_evidence_min_similarity: float = Field(default=0.85, ge=0.0, le=1.0)
     reranker_enabled: bool = True
     reranker_provider: Literal["sentence_transformers", "heuristic"] = "sentence_transformers"
     reranker_model: str = Field(default="BAAI/bge-reranker-v2-m3", min_length=1)

@@ -3815,6 +3815,9 @@ def test_reselection_is_counted_with_the_strong_support_flag_off() -> None:
     assert GLOBAL_METRICS.answer_branch_counts() == {
         "reselect_after_rejection": 1,
         "reselect_guard_would_change": 1,
+        "refusal_phrase_extended": 0,
+        "question_head_missing": 0,
+        "question_evidence_dissimilar": 0,
     }
     GLOBAL_METRICS.reset()
 
@@ -3845,6 +3848,9 @@ def test_reselection_guard_is_not_counted_when_the_source_holds_the_answer() -> 
     assert GLOBAL_METRICS.answer_branch_counts() == {
         "reselect_after_rejection": 1,
         "reselect_guard_would_change": 0,
+        "refusal_phrase_extended": 0,
+        "question_head_missing": 0,
+        "question_evidence_dissimilar": 0,
     }
     GLOBAL_METRICS.reset()
 
@@ -3893,3 +3899,163 @@ def test_refusal_with_a_side_fact_goes_on_to_validation_when_the_flag_is_off() -
     # Without the flag the early refusal does not fire; the side fact then fails validation.
     with pytest.raises(CitationValidationFailedApplicationError):
         asyncio.run(_draft_for_side_fact(rag_partial_refusal_no_answer_enabled=False))
+
+
+# FIX 3a: invented policy texts and questions; none comes from a dev or held-out set.
+def _registry(*texts: str) -> PromptSourceRegistry:
+    return PromptSourceRegistry(
+        sources=tuple(
+            PromptSource(
+                marker=f"[SOURCE_{index}]",
+                source_type=CitationSourceType.INTERNAL,
+                document_title="Document",
+                text=text,
+                page_numbers=(1,),
+                start_page=1,
+                end_page=1,
+                hybrid_score=1.0,
+                chunk_id=UUID(int=300 + index),
+                document_id=UUID(int=400 + index),
+            )
+            for index, text in enumerate(texts, start=1)
+        )
+    )
+
+
+BADGE_QUESTION = "Thẻ ra vào được cấp lại trong bao lâu?"
+BADGE_ANSWER = (
+    "Thẻ ra vào do phòng hành chính quản lý. Thời gian cấp lại thẻ không được nêu trong tài liệu."
+)
+
+
+@pytest.mark.parametrize(
+    ("question", "answer"),
+    [
+        (BADGE_QUESTION, BADGE_ANSWER),
+        (
+            "The ra vao duoc cap lai trong bao lau?",
+            "The ra vao do phong hanh chinh quan ly. Thoi gian cap lai the khong de cap.",
+        ),
+        (
+            "Who signs the visitor badge?",
+            "The badge is printed at reception. Who signs the visitor badge is not specified.",
+        ),
+    ],
+)
+def test_extended_refusal_phrases_are_recognised_in_all_three_forms(
+    question: str, answer: str
+) -> None:
+    assert _refusal_names_what_the_answer_omits(question=question, answer=answer) is False
+    assert (
+        _refusal_names_what_the_answer_omits(
+            question=question, answer=answer, extended_phrases=True
+        )
+        is True
+    )
+
+
+def test_extended_refusal_turns_the_side_fact_into_no_answer_and_is_counted() -> None:
+    GLOBAL_METRICS.reset()
+
+    async def scenario() -> Any:
+        service, _, _, _, _, _, _ = make_service(
+            settings_obj=settings(rag_refusal_phrases_extended_enabled=True)
+        )
+        return await service._draft_from_generation(
+            _fake_generation(
+                json.dumps({"answer": BADGE_ANSWER, "citations": ["SOURCE_1"]}, ensure_ascii=False)
+            ),
+            source_registry=_registry("Thẻ ra vào do phòng hành chính quản lý."),
+            current_user=user(),
+            grounding_question=BADGE_QUESTION,
+        )
+
+    draft = asyncio.run(scenario())
+
+    assert draft.grounding_status == GroundingStatus.NO_ANSWER
+    assert GLOBAL_METRICS.answer_branch_counts()["refusal_phrase_extended"] == 1
+    GLOBAL_METRICS.reset()
+
+
+UNIFORM_QUESTION = "Nhân viên kho phải mặc loại áo nào?"
+UNIFORM_ANSWER = "Nhân viên kho phải đội mũ bảo hộ."
+
+
+def test_answer_without_the_asked_phrase_in_its_evidence_becomes_no_answer() -> None:
+    GLOBAL_METRICS.reset()
+
+    async def scenario() -> Any:
+        service, _, _, _, _, _, _ = make_service(
+            settings_obj=settings(rag_question_head_in_evidence_enabled=True)
+        )
+        return await service._draft_from_generation(
+            _fake_generation(
+                json.dumps(
+                    {"answer": UNIFORM_ANSWER, "citations": ["SOURCE_1"]}, ensure_ascii=False
+                )
+            ),
+            source_registry=_registry("Quy định kho. Nhân viên kho phải đội mũ bảo hộ."),
+            current_user=user(),
+            grounding_question=UNIFORM_QUESTION,
+        )
+
+    draft = asyncio.run(scenario())
+
+    assert draft.grounding_status == GroundingStatus.NO_ANSWER
+    assert GLOBAL_METRICS.answer_branch_counts()["question_head_missing"] == 1
+    GLOBAL_METRICS.reset()
+
+
+class _FixedEmbeddings:
+    """Query and passage vectors chosen by the test, so the cosine is known."""
+
+    def __init__(self, query: tuple[float, ...], passage: tuple[float, ...]) -> None:
+        self.query, self.passage = query, passage
+
+    def embed_query(self, text: str) -> Any:
+        return SimpleNamespace(values=self.query)
+
+    def embed_passages(self, texts: Any) -> Any:
+        return SimpleNamespace(vectors=[SimpleNamespace(values=self.passage)])
+
+
+@pytest.mark.parametrize(
+    ("passage", "addresses", "counted"),
+    [((1.0, 0.0), True, 0), ((0.6, 0.8), False, 1)],  # cosine 1.0 and 0.6 against 0.85
+)
+def test_similarity_check_compares_the_question_with_the_supporting_sentence(
+    passage: tuple[float, ...], addresses: bool, counted: int
+) -> None:
+    GLOBAL_METRICS.reset()
+    service, _, _, retrieval, _, _, _ = make_service(
+        settings_obj=settings(rag_question_evidence_similarity_enabled=True)
+    )
+    retrieval.semantic_retrieval_service = SimpleNamespace(
+        embedding_provider=_FixedEmbeddings((1.0, 0.0), passage)
+    )
+
+    result = asyncio.run(
+        service._answer_addresses_question(
+            question=UNIFORM_QUESTION,
+            answer=UNIFORM_ANSWER,
+            source_registry=_registry("Quy định kho. Nhân viên kho phải đội mũ bảo hộ."),
+            cited_source_labels=("SOURCE_1",),
+        )
+    )
+
+    assert result is addresses
+    assert GLOBAL_METRICS.answer_branch_counts()["question_evidence_dissimilar"] == counted
+    GLOBAL_METRICS.reset()
+
+
+def test_answer_checks_do_nothing_with_their_flags_off() -> None:
+    service, _, _, _, _, _, _ = make_service(settings_obj=settings())
+
+    assert asyncio.run(
+        service._answer_addresses_question(
+            question=UNIFORM_QUESTION,
+            answer=UNIFORM_ANSWER,
+            source_registry=_registry("Nhân viên kho phải đội mũ bảo hộ."),
+            cited_source_labels=("SOURCE_1",),
+        )
+    )

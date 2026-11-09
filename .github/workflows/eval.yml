@@ -30,6 +30,10 @@ on:
         description: "uat only: space-separated ids (e.g. Q001 Q021); empty runs all 100"
         type: string
         default: ""
+      trace:
+        description: "relevance/false_refusal only: after the batch, trace every case layer by layer (diagnosis, not scored; use with configs=base)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -131,9 +135,18 @@ jobs:
       - name: Install Ollama and pull the model
         run: |
           set -euo pipefail
-          curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors -o "$RUNNER_TEMP/ollama-install.sh" \
-            https://ollama.com/install.sh
-          OLLAMA_VERSION="$OLLAMA_VERSION" sh "$RUNNER_TEMP/ollama-install.sh"
+          if ! { curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors \
+                   -o "$RUNNER_TEMP/ollama-install.sh" https://ollama.com/install.sh \
+                 && OLLAMA_VERSION="$OLLAMA_VERSION" sh "$RUNNER_TEMP/ollama-install.sh"; }; then
+            # The release download has failed with 504/404; the same release ships as an image.
+            echo "install.sh failed; taking Ollama $OLLAMA_VERSION from ollama/ollama:$OLLAMA_VERSION"
+            docker create --name ollama-src "ollama/ollama:$OLLAMA_VERSION" >/dev/null
+            sudo docker cp ollama-src:/usr/bin/ollama /usr/local/bin/ollama
+            sudo mkdir -p /usr/local/lib
+            sudo docker cp ollama-src:/usr/lib/ollama /usr/local/lib/ollama
+            docker rm ollama-src >/dev/null
+          fi
+          ollama --version
           sudo systemctl stop ollama || true
           echo "EVAL_OLLAMA_LOG=$RUNNER_TEMP/ollama.log" >> "$GITHUB_ENV"
           OLLAMA_HOST=0.0.0.0:11434 OLLAMA_CONTEXT_LENGTH=8192 OLLAMA_NUM_PARALLEL=1 \
@@ -159,7 +172,7 @@ jobs:
               extra_hosts: ["host.docker.internal:host-gateway"]
           EOF
           read -r -a FILES <<< "$COMPOSE_FILES"
-          docker compose -p "$PROJECT" "${FILES[@]}" up -d --no-build postgres redis
+          docker compose -p "$PROJECT" "${FILES[@]}" up -d --wait --no-build postgres redis
           docker compose -p "$PROJECT" "${FILES[@]}" run --rm --no-deps migration
           docker compose -p "$PROJECT" "${FILES[@]}" run --rm --no-deps uat-v2-accounts
           docker compose -p "$PROJECT" "${FILES[@]}" up -d --no-build --no-deps api worker
@@ -191,6 +204,22 @@ jobs:
             > "$OUT/memory.log" &
           bash scripts/eval/ci_batch.sh "$SET" "$CONFIGS" "$RUNS" "$OUT" ${CASES[@]+"${CASES[@]}"}
           cat "$OUT/summary.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Trace every case (diagnosis only)
+        if: inputs.trace && (inputs.set == 'relevance' || inputs.set == 'false_refusal')
+        env:
+          SET: ${{ inputs.set }}
+        run: |
+          set -euo pipefail
+          NAME=answer_relevance_dev_v1; [ "$SET" = false_refusal ] && NAME=false_refusal_dev_v1
+          python scripts/diagnostics/prepare_dev_trace_input.py --set "$NAME" \
+            --output "$OUT/trace-input.json"
+          API="$PROJECT-api-1"
+          docker cp scripts/diagnostics/heldout_trace.py "$API:/tmp/heldout_trace.py"
+          docker cp "$OUT/trace-input.json" "$API:/tmp/trace-input.json"
+          docker exec -w /app -e PYTHONPATH=/app "$API" python /tmp/heldout_trace.py \
+            --input /tmp/trace-input.json --output /tmp/trace.json --mode full
+          docker cp "$API:/tmp/trace.json" "$OUT/trace.json"
 
       - name: Collect logs
         if: always()

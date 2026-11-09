@@ -6,6 +6,16 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### FIX 3a -- 2026-11-09
+
+- New flags, all off by default after their DEC-013 batch: `RAG_REFUSAL_PHRASES_EXTENDED_ENABLED`, `RAG_QUESTION_HEAD_IN_EVIDENCE_ENABLED`, `RAG_QUESTION_EVIDENCE_SIMILARITY_ENABLED` with `RAG_QUESTION_EVIDENCE_MIN_SIMILARITY` (0.85). Branch counters `refusal_phrase_extended`, `question_head_missing`, `question_evidence_dissimilar`.
+- `eval.yml` takes Ollama from its Docker image when the release download fails, and waits for healthy PostgreSQL and Redis before the migration.
+
+### FIX 3 diagnosis -- 2026-11-09
+
+- `eval.yml` input `trace` (relevance and false_refusal sets): traces every case with `heldout_trace.py` after the batch; `scripts/diagnostics/prepare_dev_trace_input.py` builds its input.
+- FIX 3 baseline and trace recorded in `docs/eval/runs/fix3-diagnosis.md`.
+
 ### Local verification -- 2026-11-09
 
 - DEC-018: eaka-verify runs locally again and must be green before a push; measurement stays on GitHub Actions.
