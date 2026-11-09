@@ -78,3 +78,8 @@ Runner UAT không ghi counter.
   - **M1b:** ngưỡng 0,85 hiệu chỉnh trên hai bộ tổng hợp không áp dụng được cho UAT. Câu hỏi UAT và câu evidence của nó có cosine thấp hơn nhiều. Riêng trên relevance, M1b giảm trả lời sai từ 5 xuống 1 và tăng câu đúng từ 17 lên 21, nên ý tưởng đo độ tương đồng vẫn đáng giữ nếu hiệu chỉnh trên dữ liệu đại diện hơn.
 - **M2 không tốt hơn ở bộ nào; UAT mất Q075** (đúng → sai, trong dung sai 1 câu). Ở FR-A08, M2 có chặn câu "độ ẩm … không được cụ thể hóa", nhưng lần thử lại hoặc repair sau đó trả lời "Kho hóa chất được giữ ở nhiệt độ dưới 25 độ C.", vẫn là trả lời sai. Muốn có tác dụng, M2 phải đi cùng việc không cho thử lại sau khi đã nhận diện được câu từ chối.
 - **Giới hạn của đợt đo:** lượt 1 của baseline RBAC không có kết quả API. Runner gặp `401 Unauthorized` lúc chuẩn bị, có lẽ token admin hết hạn sau khi upload. Check retrieval vẫn đủ 12 lượt, 0 rò rỉ. Kết luận không đổi, vì `m2` cho kết quả RBAC giống hệt `base` lượt 2, còn M1 đã trượt ở UAT.
+
+## Bài học (owner, 2026-11-09)
+
+- **Ngưỡng hiệu chỉnh trên bộ giả lập không chuyển sang UAT được.** Ngưỡng 0,85 của M1b giữ được mọi câu phải trả lời trong `answer_relevance_dev_v1` và `false_refusal_dev_v1`, nhưng làm hỏng 43 câu UAT. Ngưỡng phải được hiệu chỉnh hoặc kiểm trên dữ liệu đại diện cho corpus thật.
+- **Mọi thay đổi validator phải đo trên UAT,** không chỉ trên các bộ nhắm vào lỗi đang sửa.
