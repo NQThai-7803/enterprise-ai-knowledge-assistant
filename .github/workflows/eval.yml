@@ -30,6 +30,10 @@ on:
         description: "uat only: space-separated ids (e.g. Q001 Q021); empty runs all 100"
         type: string
         default: ""
+      trace:
+        description: "relevance/false_refusal only: after the batch, trace every case layer by layer (diagnosis, not scored; use with configs=base)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -191,6 +195,22 @@ jobs:
             > "$OUT/memory.log" &
           bash scripts/eval/ci_batch.sh "$SET" "$CONFIGS" "$RUNS" "$OUT" ${CASES[@]+"${CASES[@]}"}
           cat "$OUT/summary.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Trace every case (diagnosis only)
+        if: inputs.trace && (inputs.set == 'relevance' || inputs.set == 'false_refusal')
+        env:
+          SET: ${{ inputs.set }}
+        run: |
+          set -euo pipefail
+          NAME=answer_relevance_dev_v1; [ "$SET" = false_refusal ] && NAME=false_refusal_dev_v1
+          python scripts/diagnostics/prepare_dev_trace_input.py --set "$NAME" \
+            --output "$OUT/trace-input.json"
+          API="$PROJECT-api-1"
+          docker cp scripts/diagnostics/heldout_trace.py "$API:/tmp/heldout_trace.py"
+          docker cp "$OUT/trace-input.json" "$API:/tmp/trace-input.json"
+          docker exec -w /app -e PYTHONPATH=/app "$API" python /tmp/heldout_trace.py \
+            --input /tmp/trace-input.json --output /tmp/trace.json --mode full
+          docker cp "$API:/tmp/trace.json" "$OUT/trace.json"
 
       - name: Collect logs
         if: always()
