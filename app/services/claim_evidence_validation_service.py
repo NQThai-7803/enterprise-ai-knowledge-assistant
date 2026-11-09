@@ -3200,6 +3200,103 @@ def _short_answer_misses_question_terms(*, question: str, answer: str, evidence:
     )
 
 
+# FIX 3a M2: a refusal is negation + (được) + a verb of stating, or "no information".
+_VI_REFUSAL_NEGATORS = ("không", "chưa")
+_VI_REFUSAL_VERBS = (
+    "nêu", "đề cập", "quy định", "nói rõ", "cụ thể hóa", "cụ thể hoá", "ghi rõ", "xác định",
+    "đưa ra", "cung cấp",
+)  # fmt: skip
+_VI_REFUSAL_PHRASES = tuple(
+    dict.fromkeys(
+        [f"{neg} {verb}" for neg in _VI_REFUSAL_NEGATORS for verb in _VI_REFUSAL_VERBS]
+        + [f"{neg} được {verb}" for neg in _VI_REFUSAL_NEGATORS for verb in _VI_REFUSAL_VERBS]
+        + [f"{neg} có {noun}" for neg in _VI_REFUSAL_NEGATORS for noun in ("thông tin", "dữ liệu")]
+    )
+)
+_EN_REFUSAL_PHRASES = tuple(
+    [f"not {verb}" for verb in ("mentioned", "specified", "stated", "provided", "defined")]
+    + [f"{aux} not {verb}" for aux in ("does", "do") for verb in ("mention", "specify", "say")]
+    + ["no information"]
+)
+REFUSAL_PHRASES = _VI_REFUSAL_PHRASES + _unaccented(_VI_REFUSAL_PHRASES) + _EN_REFUSAL_PHRASES
+
+_FORMS_BY_NAME = {"vi": _VI_FORM, "vi_unaccented": _VI_UNACCENTED_FORM, "en": _EN_FORM}
+_ASK_CLAUSE_BREAK = re.compile(r"(?<!\w)(?:thì|thi)(?!\w)|[,;:]")
+# Classifiers and kind words name no content of their own ("loại áo" asks about the shirt).
+_VI_CLASSIFIERS = ("loại", "kiểu", "dạng", "hạng", "mức", "cái", "chiếc", "con", "kind", "type")
+_HEAD_SKIP_WORDS = frozenset(_VI_CLASSIFIERS + _unaccented(_VI_CLASSIFIERS))
+
+
+def question_head_phrase(question: str) -> str | None:
+    """The most specific words of the phrase the question asks about, diacritics kept.
+
+    FIX 3a M1a. In the clause holding the question word, with question and function words
+    removed: the run of words right before the question word ("mặc loại áo nào" -> "áo"),
+    else the first run after it ("ai ký đơn xin nghỉ" -> "xin nghỉ").
+    A classifier opens the noun phrase, so only what follows it counts; then the last two
+    words are kept: Vietnamese puts modifiers after the head, so the end of the phrase is
+    where it is most specific. There is no part-of-speech tagger here, so the phrase may end
+    in a verb ("bảo dưỡng mấy lần").
+    None when nothing in particular is asked (no question word, a yes/no question).
+    """
+    name = question_form(question)
+    if name is None:
+        return None
+    form = _FORMS_BY_NAME[name]
+    text = unicodedata.normalize("NFC", question).casefold().strip()
+    if form.tail is not None:
+        text = form.tail.sub(" ", text)
+    clauses = [clause for clause in _ASK_CLAUSE_BREAK.split(text) if clause.strip()]
+    asking = [clause for clause in clauses if form.question_words.search(clause)]
+    if not asking:
+        return None
+    marked = form.function_words.sub(" | ", form.question_words.sub(" ? ", asking[-1]))
+    runs: list[list[str]] = [[]]
+    question_at: int | None = None
+    for token in re.findall(r"\w+|[|?]", marked):
+        if token in {"|", "?"}:
+            if token == "?" and question_at is None:
+                question_at = len(runs)
+            runs.append([])
+        else:
+            runs[-1].append(token)
+    if question_at is None:
+        return None
+    before = runs[question_at - 1] if question_at > 0 else []
+    after = next((run for run in runs[question_at:] if run), [])
+    head = before or after
+    starts = [index for index, word in enumerate(head) if word in _HEAD_SKIP_WORDS]
+    if starts:  # a classifier opens the noun phrase: keep what follows it
+        head = head[starts[-1] + 1 :]
+    return " ".join(head[-2:]) if head else None
+
+
+def question_head_in_evidence(*, question: str, evidence: str) -> bool:
+    """True unless the question has a head phrase that the evidence does not contain.
+
+    Compared with diacritics when the question has them, folded when it has none.
+    """
+    head = question_head_phrase(question)
+    if head is None:
+        return True
+    if _has_diacritics(head):
+        haystack = unicodedata.normalize("NFC", evidence).casefold()
+    else:
+        head, haystack = fold_text(head), fold_text(evidence)
+    return re.search(rf"(?<!\w){re.escape(head)}(?!\w)", haystack) is not None
+
+
+def supporting_sentence(*, answer: str, evidence: str) -> str | None:
+    """The evidence sentence or line sharing the most words with the answer (FIX 3a M1b)."""
+    answer_words = set(re.findall(r"\w+", fold_text(answer)))
+    best, best_overlap = None, 0
+    for sentence in re.split(r"(?<=[.!?;])\s+|\n+", evidence):
+        overlap = len(answer_words & set(re.findall(r"\w+", fold_text(sentence))))
+        if overlap > best_overlap:
+            best, best_overlap = sentence.strip(), overlap
+    return best
+
+
 def _answer_is_low_substance(answer: str) -> bool:
     terms = {
         term

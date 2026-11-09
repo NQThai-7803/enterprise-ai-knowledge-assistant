@@ -13,6 +13,7 @@ from itertools import combinations
 from time import perf_counter
 from uuid import UUID
 
+import anyio
 from sqlalchemy import and_, or_, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -72,6 +73,9 @@ from app.llm.errors import LLMError, LLMFailureCode
 from app.llm.models import LLMGenerationResult, LLMMessage
 from app.models import ChatMessage, ChatMessageRole, Document, DocumentChunk, DocumentStatus, User
 from app.observability.metrics import (
+    BRANCH_QUESTION_EVIDENCE_DISSIMILAR,
+    BRANCH_QUESTION_HEAD_MISSING,
+    BRANCH_REFUSAL_PHRASE_EXTENDED,
     BRANCH_RESELECT_AFTER_REJECTION,
     BRANCH_RESELECT_GUARD_WOULD_CHANGE,
     GLOBAL_METRICS,
@@ -116,12 +120,16 @@ from app.services.audit_service import AuditContext, AuditService
 from app.services.chat_message_service import ChatMessageService, normalize_message_content
 from app.services.citation_validation_service import CitationValidationService
 from app.services.claim_evidence_validation_service import (
+    REFUSAL_PHRASES,
     ClaimEvidenceStatus,
     ClaimEvidenceValidationService,
     ClaimRepairFeedback,
+    _evidence_for_labels,
     answer_missing_requested_unit,
     infer_yes_no_polarity,
     question_content_terms,
+    question_head_in_evidence,
+    supporting_sentence,
 )
 from app.web_search.errors import WebSearchError
 from app.web_search.intent import WebSearchIntentClassifier
@@ -2156,6 +2164,56 @@ class GroundedAnswerService:
             return ()
         return results.results
 
+    async def _answer_addresses_question(
+        self,
+        *,
+        question: str,
+        answer: str,
+        source_registry: PromptSourceRegistry,
+        cited_source_labels: tuple[str, ...],
+    ) -> bool:
+        """FIX 3a M1: False when a cited, supported answer does not address what was asked."""
+        settings = self.settings
+        if (
+            not (
+                settings.rag_question_head_in_evidence_enabled
+                or settings.rag_question_evidence_similarity_enabled
+            )
+            or len(information_need_queries(question)) > 1
+        ):
+            return True
+        evidence = _evidence_for_labels(
+            source_registry=source_registry, cited_source_labels=cited_source_labels
+        )
+        if not evidence:
+            return True  # citation validation decides answers that cite nothing usable
+        if settings.rag_question_head_in_evidence_enabled and not question_head_in_evidence(
+            question=question, evidence=evidence
+        ):
+            GLOBAL_METRICS.record_answer_branch(BRANCH_QUESTION_HEAD_MISSING)
+            if settings.rag_diagnostics_enabled:
+                _log_no_answer_diagnostics(reason="question_head_missing_from_evidence")
+            return False
+        if not settings.rag_question_evidence_similarity_enabled:
+            return True
+        sentence = supporting_sentence(answer=answer, evidence=evidence)
+        provider = getattr(
+            getattr(self.hybrid_retrieval_service, "semantic_retrieval_service", None),
+            "embedding_provider",
+            None,
+        )
+        if sentence is None or provider is None:
+            return True
+        query = await anyio.to_thread.run_sync(provider.embed_query, question)
+        passage = await anyio.to_thread.run_sync(provider.embed_passages, [sentence])
+        similarity = _cosine(query.values, passage.vectors[0].values)
+        if similarity >= settings.rag_question_evidence_min_similarity:
+            return True
+        GLOBAL_METRICS.record_answer_branch(BRANCH_QUESTION_EVIDENCE_DISSIMILAR)
+        if settings.rag_diagnostics_enabled:
+            _log_no_answer_diagnostics(reason="question_evidence_dissimilar")
+        return False
+
     async def _draft_from_generation(
         self,
         generation: LLMGenerationResult,
@@ -2226,9 +2284,19 @@ class GroundedAnswerService:
         if _is_no_answer_like_json_answer(grounded_output.answer) or (
             self.settings.rag_partial_refusal_no_answer_enabled
             and _refusal_names_what_the_answer_omits(
-                question=grounding_question, answer=grounded_output.answer
+                question=grounding_question,
+                answer=grounded_output.answer,
+                extended_phrases=self.settings.rag_refusal_phrases_extended_enabled,
             )
         ):
+            if (
+                self.settings.rag_refusal_phrases_extended_enabled
+                and not _is_no_answer_like_json_answer(grounded_output.answer)
+                and not _refusal_names_what_the_answer_omits(
+                    question=grounding_question, answer=grounded_output.answer
+                )
+            ):
+                GLOBAL_METRICS.record_answer_branch(BRANCH_REFUSAL_PHRASE_EXTENDED)
             if self.settings.rag_diagnostics_enabled:
                 _log_no_answer_diagnostics(reason="llm_no_answer_like_json")
             return _no_answer_draft(
@@ -2241,6 +2309,19 @@ class GroundedAnswerService:
             )
         if _is_placeholder_like_json_answer(grounded_output.answer):
             raise CitationValidationFailedApplicationError()
+        if not claims_already_validated and not await self._answer_addresses_question(
+            question=grounding_question,
+            answer=grounded_output.answer,
+            source_registry=source_registry,
+            cited_source_labels=tuple(grounded_output.citations),
+        ):
+            return _no_answer_draft(
+                self.settings.chat_no_answer_message,
+                selected_chunk_count=selected_chunk_count,
+                response_time_ms=generation.response_time_ms,
+                prompt_tokens=generation.prompt_tokens,
+                completion_tokens=generation.completion_tokens,
+            )
 
         answer = _canonical_answer_with_selected_markers(grounded_output)
         try:
@@ -7050,15 +7131,27 @@ def _is_no_answer_like_json_answer(answer: str) -> bool:
     return not _answer_has_grounded_substance(answer)
 
 
-def _refusal_names_what_the_answer_omits(*, question: str, answer: str) -> bool:
+def _cosine(a: Sequence[float], b: Sequence[float]) -> float:
+    norm = math.sqrt(sum(x * x for x in a)) * math.sqrt(sum(y * y for y in b))
+    return sum(x * y for x, y in zip(a, b, strict=True)) / norm if norm else 0.0
+
+
+def _refusal_names_what_the_answer_omits(
+    *, question: str, answer: str, extended_phrases: bool = False
+) -> bool:
     """True when the answer refuses the asked point and only adds a side fact."""
     if len(information_need_queries(question)) > 1:
         return False
+    phrases = _NO_ANSWER_LIKE_ANSWER_PHRASES + (REFUSAL_PHRASES if extended_phrases else ())
     sentences = re.split(r"(?<=[.!?;])\s+", answer.strip())
     refusals = [
         sentence
         for sentence in sentences
-        if any(phrase in sentence.casefold() for phrase in _NO_ANSWER_LIKE_ANSWER_PHRASES)
+        if any(
+            phrase
+            in (unicodedata.normalize("NFC", sentence) if extended_phrases else sentence).casefold()
+            for phrase in phrases
+        )
     ]
     if not refusals:
         return False
