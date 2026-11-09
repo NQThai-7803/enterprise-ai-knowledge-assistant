@@ -178,22 +178,31 @@ class _Admin:
         import httpx
 
         self.http = httpx.Client(base_url=base_url, timeout=300, trust_env=False)
+        self.password = password
+        self._login()
+
+    def _login(self) -> None:
         response = self.http.post(
-            "/api/v1/auth/login", json={"email": ACCOUNTS["admin"], "password": password}
+            "/api/v1/auth/login", json={"email": ACCOUNTS["admin"], "password": self.password}
         )
         response.raise_for_status()
         token = response.json()["data"]["access_token"]
         self.http.headers["Authorization"] = f"Bearer {token}"
 
-    def get(self, path: str) -> Any:
-        response = self.http.get(path)
+    def _send(self, method: str, path: str, **kwargs: Any) -> Any:
+        # Setup can outlive the 15-minute access token (uploads wait for READY): log in again once.
+        response = self.http.request(method, path, **kwargs)
+        if response.status_code == 401:
+            self._login()
+            response = self.http.request(method, path, **kwargs)
         response.raise_for_status()
-        return response.json()["data"]
+        return response
+
+    def get(self, path: str) -> Any:
+        return self._send("GET", path).json()["data"]
 
     def post(self, path: str, **kwargs: Any) -> Any:
-        response = self.http.post(path, **kwargs)
-        response.raise_for_status()
-        return response.json()["data"]
+        return self._send("POST", path, **kwargs).json()["data"]
 
     def ensure_ops_account(self, password: str) -> str:
         departments = self.get("/api/v1/departments?page_size=100")
@@ -267,10 +276,9 @@ class _Admin:
         user_id = self.user_id(role)
         for permission in self.permissions(document_id):
             if permission.get("user_id") == user_id:
-                response = self.http.delete(
-                    f"/api/v1/documents/{document_id}/permissions/{permission['id']}"
+                self._send(
+                    "DELETE", f"/api/v1/documents/{document_id}/permissions/{permission['id']}"
                 )
-                response.raise_for_status()
 
 
 def _asker(base_url: str, passwords: Mapping[str, str]) -> Callable[[str, str], dict[str, Any]]:
