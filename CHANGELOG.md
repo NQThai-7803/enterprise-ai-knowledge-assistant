@@ -6,6 +6,10 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### Local verification -- 2026-11-09
+
+- DEC-018: eaka-verify runs locally again and must be green before a push; measurement stays on GitHub Actions.
+
 ### Repository move -- 2026-11-08
 
 - The working copy moved from OneDrive to `C:\dev\eaka`; the move report now records the result and corrects the claim that `master` and `feat/react-bits-ai-motion` were unpushed.

@@ -1,10 +1,15 @@
 # Project Status
 
+## Local verification back -- 2026-11-09 (DEC-018)
+
+- **eaka-verify ran locally on `315efd6`:** unit 1698, api 51 + 245, integration 404, llm-provider 3, all passed; 0 regressed against `6a2c72f`. Available RAM 1100-1380 MB at the start, 296 MB at the lowest during the run.
+- **DEC-018:** local eaka-verify green before every push again; measurement stays on GitHub Actions.
+
 ## Repository out of OneDrive -- 2026-11-08
 
 - **The working copy is now `C:\dev\eaka`:** a fresh clone plus the local-only files (`.env` files, `artifacts/`, `.backups/`, `data/`, `.verify/`), with counts, sizes and SHA256 checked against the old copy, which is untouched. Unit tests in `.venv312`: 1706 passed, 0 failed (reference only, outside the image).
 - `master` and `feat/react-bits-ai-motion` were wrongly listed as unpushed; both are in `origin/main`.
-- **DEC-016 still applies** until eaka-verify runs here. See `docs/status/2026-11-08-move-out-of-onedrive.md`.
+- DEC-016's verification part ended with DEC-018 (2026-11-09). See `docs/status/2026-11-08-move-out-of-onedrive.md`.
 
 ## FIX 2d -- 2026-11-08 (REL-303 on by default after an Actions batch)
 

@@ -7,7 +7,7 @@
 - **Sửa một điểm ghi sai bên dưới:** `master` và `feat/react-bits-ai-motion` **không** có commit chưa push; cả hai đã nằm trong `origin/main` (`git rev-list --count origin/main..<nhánh>` = 0). Không cần chép `.git` cũ.
 - **Môi trường:** `.venv312` tạo từ `requirements.lock` (bỏ `uvloop`, không có trên Windows) cộng `-e ".[dev]"`; `npm ci` trong `frontend/`. Unit test trong `.venv312` (ngoài image chuẩn, chỉ tham khảo): 1706 passed, 16 xfailed, 0 failed.
 - **Docker:** tên project vẫn là `enterprise-ai-knowledge-assistant` vì `compose.yaml` cố định `name:`; không có volume `eaka_*` nào được tạo. Các stack eval vẫn cần `-p` như trước.
-- **DEC-016 vẫn có hiệu lực** cho tới khi eaka-verify chạy được trong `C:\dev\eaka` (xem mục "Sau khi chép").
+- **2026-11-09: eaka-verify chạy xanh trong `C:\dev\eaka`; DEC-018 kết thúc phần verify của DEC-016.** Đo vẫn chạy trên Actions.
 
 Lý do: OneDrive giữ 2,1–2,7 GB RAM khi đồng bộ thư mục repo, khiến máy ở dưới cổng 1000 MB (DEC-016). **Không xóa gì trong thư mục OneDrive.** Bản cũ giữ nguyên cho tới khi bản mới chạy được và owner quyết định.
 
