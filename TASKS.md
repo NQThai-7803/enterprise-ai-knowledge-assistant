@@ -4,7 +4,7 @@
 ## Order of the next work -- 2026-11-08
 
 1. **DONE: REL-303 measured under DEC-013 on Actions and on by default** (`docs/eval/runs/fix2d-rel303-actions.md`).
-2. FIX 3 (false refusals), measured on `false_refusal_dev_v1` among the dev sets.
+2. FIX 3, measured on `false_refusal_dev_v1` among the dev sets. **WAITING FOR OWNER (2026-11-09):** baseline and trace done (`docs/eval/runs/fix3-diagnosis.md`, run `42571829930`): 6 false answers, 1 false refusal, 13 correct, stable over 2 runs; three mechanisms and three flag-gated directions proposed, none applied.
 3. **Embedding fine-tune** (`docs/design/embedding-finetune.md` and DEC-015 on branch `feat/embedding-finetune-infra`): infrastructure only so far; the baseline measurement and training come after FIX 3.
 4. The final held-out v2 measurement, once, after the choices above are made (DEC-012).
 

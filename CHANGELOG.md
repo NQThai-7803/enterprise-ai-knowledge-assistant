@@ -6,6 +6,11 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### FIX 3 diagnosis -- 2026-11-09
+
+- `eval.yml` input `trace` (relevance and false_refusal sets): traces every case with `heldout_trace.py` after the batch; `scripts/diagnostics/prepare_dev_trace_input.py` builds its input.
+- FIX 3 baseline and trace recorded in `docs/eval/runs/fix3-diagnosis.md`.
+
 ### Repository move -- 2026-11-08
 
 - The working copy moved from OneDrive to `C:\dev\eaka`; the move report now records the result and corrects the claim that `master` and `feat/react-bits-ai-motion` were unpushed.

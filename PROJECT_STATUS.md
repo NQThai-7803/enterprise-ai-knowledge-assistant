@@ -1,5 +1,10 @@
 # Project Status
 
+## FIX 3 diagnosis -- 2026-11-09 (waiting for owner)
+
+- **Baseline on Actions (CPU, 2 runs, current defaults) on `false_refusal_dev_v1`:** 6 false answers, 13 correct, 1 false refusal, identical in both runs.
+- **Trace:** retrieval is not the cause. M1: supported but non-responsive answers (4); M2: "not stated" answers returned as ANSWERED, a phrase gap in REL-402 (2); M3: the one false refusal, a bare "Khong" to a who-question. Directions in `docs/eval/runs/fix3-diagnosis.md`; nothing in `app/` changed.
+
 ## Repository out of OneDrive -- 2026-11-08
 
 - **The working copy is now `C:\dev\eaka`:** a fresh clone plus the local-only files (`.env` files, `artifacts/`, `.backups/`, `data/`, `.verify/`), with counts, sizes and SHA256 checked against the old copy, which is untouched. Unit tests in `.venv312`: 1706 passed, 0 failed (reference only, outside the image).
