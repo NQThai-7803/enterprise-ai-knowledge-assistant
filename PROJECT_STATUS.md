@@ -1,5 +1,10 @@
 # Project Status
 
+## FIX 3 diagnosis -- 2026-11-09 (waiting for owner)
+
+- **Baseline on Actions (CPU, 2 runs, current defaults) on `false_refusal_dev_v1`:** 6 false answers, 13 correct, 1 false refusal, identical in both runs.
+- **Trace:** retrieval is not the cause. M1: supported but non-responsive answers (4); M2: "not stated" answers returned as ANSWERED, a phrase gap in REL-402 (2); M3: the one false refusal, a bare "Khong" to a who-question. Directions in `docs/eval/runs/fix3-diagnosis.md`; nothing in `app/` changed.
+
 ## Local verification back -- 2026-11-09 (DEC-018)
 
 - **eaka-verify ran locally on `315efd6`:** unit 1698, api 51 + 245, integration 404, llm-provider 3, all passed; 0 regressed against `6a2c72f`. Available RAM 1100-1380 MB at the start, 296 MB at the lowest during the run.
