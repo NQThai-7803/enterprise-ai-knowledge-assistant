@@ -128,3 +128,26 @@ def test_noise_in_the_baseline_is_not_a_change() -> None:
     result = compare.compare(base, flag)
     assert result["changed_in_both_runs"] == []
     assert result["unstable"] == ["A"]
+
+
+def test_false_refusal_v2_matches_its_lock_and_every_fact_is_in_its_document() -> None:
+    source = relevance.ROOT / "tests" / "acceptance" / "false_refusal_dev_v2.yaml"
+    lock = relevance.verify_frozen(source, source.with_suffix(".lock"))
+    data = run_rbac_dev.load_set(source)
+    assert lock["items"] == len(data["items"]) == 24
+    documents = {doc["code"]: doc["text"] for doc in data["documents"]}
+    for group in "LFCE":
+        expects = [item["expect"] for item in data["items"] if item["group"] == group]
+        assert sorted(expects) == ["answer"] * 4 + ["refuse"] * 2, group
+    for item in data["items"]:
+        if item["expect"] == "answer":
+            assert relevance.states_fact(item, documents[item["document"]]), item["id"]
+
+
+def test_every_also_fact_must_be_in_the_answer() -> None:
+    item = {
+        "fact": "40 giờ",
+        "also_facts": [{"fact": "6 tháng", "fact_alternatives": ["06 tháng"]}],
+    }
+    assert relevance.states_fact(item, "Khóa học 40 giờ, cần làm việc từ 06 tháng.")
+    assert not relevance.states_fact(item, "Khóa học kéo dài 40 giờ.")

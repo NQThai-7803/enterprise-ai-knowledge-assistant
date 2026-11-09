@@ -1,0 +1,218 @@
+# False-refusal dev set v2 (FIX 3b). Synthetic documents and questions for an isolated stack
+# only, never the main corpus. Each group reproduces a MECHANISM found by tracing the held-out
+# v1 false refusals (docs/eval/runs/fix3b-diagnosis.md); no held-out question is paraphrased and
+# no held-out topic is reused. Every group has questions that must be answered and questions
+# that look alike but are not answered by the documents.
+# Group L: the answer sits in a document worded unlike the question, so a document-level
+#   lexical alignment filter can drop it before the context.
+# Group F: the answer is a zero-padded count with a slash unit ("01 lần/năm") inside a passage
+#   full of other numbers; the answer may write it as "1 lần".
+# Group C: one question asks two things, both stated in the documents.
+# Group E: an English question over Vietnamese documents.
+# fact: text the answer must hold; fact_alternatives: other accepted forms of the same value;
+# also_facts: further facts that must all be in the answer too (group C).
+# Frozen by false_refusal_dev_v2.lock: any edit needs v2.1 and a new lock.
+version: false_refusal_dev_v2
+documents:
+  - code: FR2-KHL-001
+    title: Quy trinh van hanh kho lanh
+    scope: ORGANIZATION
+    text: |
+      CÔNG TY CỔ PHẦN LOGISTICS AN KHÁNH - TÀI LIỆU NỘI BỘ - Trang 1
+      Quy trình vận hành kho lạnh.
+      Nhiệt độ buồng cấp đông được duy trì ở mức âm 18 độ C hoặc thấp hơn.
+      Cửa buồng lạnh không được mở quá 05 phút mỗi lần nhập hoặc xuất hàng.
+      Nhật ký nhiệt độ được ghi 04 lần/ngày, vào 6 giờ, 12 giờ, 18 giờ và 24 giờ.
+      Hàng trả về phải nằm ở khu cách ly tối thiểu 24 giờ trước khi nhập lại kho.
+      Người vào buồng cấp đông phải mặc áo giữ nhiệt và làm việc liên tục không quá 30 phút.
+      Máy nén dự phòng được chạy thử 01 lần/tuần, mỗi lần 15 phút.
+  - code: FR2-XNG-001
+    title: Quy dinh su dung xe nang
+    scope: ORGANIZATION
+    text: |
+      CÔNG TY CỔ PHẦN LOGISTICS AN KHÁNH - TÀI LIỆU NỘI BỘ - Trang 1
+      Quy định sử dụng xe nâng và thiết bị nâng hạ.
+      Chỉ người có chứng chỉ vận hành còn hiệu lực mới được lái xe nâng.
+      Chứng chỉ vận hành xe nâng có hiệu lực 24 tháng kể từ ngày cấp.
+      Tải trọng tối đa của xe nâng điện trong kho là 2.500 kg.
+      Tốc độ tối đa khi chạy trong lối đi giữa các kệ là 6 km/giờ.
+      Ắc quy xe nâng được sạc tại trạm sạc riêng, cách kệ hàng ít nhất 3 mét.
+      Mỗi ca, người vận hành kiểm tra phanh, còi và đèn trước khi nhận xe.
+      Sự cố hư hỏng phải báo cho tổ trưởng kho trong vòng 30 phút.
+  - code: FR2-HCC-001
+    title: Quy dinh hieu chuan can dien tu
+    scope: ORGANIZATION
+    text: |
+      CÔNG TY CỔ PHẦN LOGISTICS AN KHÁNH - TÀI LIỆU NỘI BỘ - Trang 1
+      Quy định đo lường và hiệu chuẩn cân điện tử.
+      Cân sàn 01 tấn: kiểm tra nội bộ 01 lần/tuần, hiệu chuẩn bên ngoài 01 lần/năm.
+      Cân bàn 60 kg: kiểm tra nội bộ 02 lần/tháng, hiệu chuẩn bên ngoài 02 lần/năm.
+      Cân phân tích 220 g: kiểm tra nội bộ mỗi ngày, hiệu chuẩn bên ngoài 01 lần/quý.
+      Sai số cho phép của cân sàn là 0,5 kg; của cân bàn là 20 g.
+      Chi phí hiệu chuẩn bên ngoài dự kiến 1.500.000 - 3.000.000 đồng/lần tùy loại cân.
+      Cân vượt sai số phải dán nhãn ngừng sử dụng và báo phòng Chất lượng trong 01 ngày làm việc.
+  - code: FR2-DTV-001
+    title: Chinh sach dao tao van hanh vien kho
+    scope: ORGANIZATION
+    text: |
+      CÔNG TY CỔ PHẦN LOGISTICS AN KHÁNH - TÀI LIỆU NỘI BỘ - Trang 1
+      Chính sách đào tạo vận hành viên kho.
+      Khóa vận hành xe nâng cơ bản kéo dài 40 giờ, gồm 16 giờ lý thuyết và 24 giờ thực hành.
+      Học viên được hỗ trợ 100% học phí nếu cam kết làm việc tối thiểu 12 tháng sau khóa học.
+      Điều kiện đăng ký: đã làm việc tại kho từ 06 tháng trở lên và có giấy khám sức khỏe đạt yêu cầu.
+      Mỗi học viên được thi lại tối đa 02 lần; từ lần thi lại thứ hai, học viên tự trả lệ phí 500.000 đồng/lần.
+      Người hướng dẫn thực hành được bồi dưỡng 200.000 đồng/buổi.
+      Kết quả đào tạo được lưu trong hồ sơ nhân sự trong 05 năm.
+items:
+  # Group L: low lexical alignment between the question and the document that answers it.
+  - id: FR2-L01
+    group: L
+    expect: answer
+    document: FR2-XNG-001
+    question: Muốn lái xe nâng thì phải có loại giấy tờ gì còn thời hạn?
+    fact: chứng chỉ vận hành
+  - id: FR2-L02
+    group: L
+    expect: answer
+    document: FR2-XNG-001
+    question: Bình điện của xe nâng được nạp ở chỗ nào?
+    fact: trạm sạc riêng
+  - id: FR2-L03
+    group: L
+    expect: answer
+    document: FR2-KHL-001
+    question: Hàng khách gửi trả lại phải chờ bao lâu mới được cất lại lên kệ?
+    fact: 24 giờ
+  - id: FR2-L04
+    group: L
+    expect: answer
+    document: FR2-XNG-001
+    question: Xe nâng hỏng giữa ca thì chậm nhất sau mấy phút phải báo lên tổ trưởng?
+    fact: 30 phút
+  - id: FR2-L05
+    group: L
+    expect: refuse
+    question: Muốn lái xe nâng thì phải đội loại mũ nào?
+  - id: FR2-L06
+    group: L
+    expect: refuse
+    question: Bình điện của xe nâng được thay mới sau bao lâu?
+  # Group F: zero-padded counts with slash units among other numbers.
+  - id: FR2-F01
+    group: F
+    expect: answer
+    document: FR2-HCC-001
+    question: Cân sàn một tấn được hiệu chuẩn bên ngoài mấy lần một năm?
+    fact: 1 lần
+    fact_alternatives: [01 lần, một lần]
+  - id: FR2-F02
+    group: F
+    expect: answer
+    document: FR2-HCC-001
+    question: Cân bàn 60 kg được kiểm tra nội bộ bao nhiêu lần mỗi tháng?
+    fact: 2 lần
+    fact_alternatives: [02 lần, hai lần]
+  - id: FR2-F03
+    group: F
+    expect: answer
+    document: FR2-KHL-001
+    question: Máy nén dự phòng ở kho lạnh được chạy thử mấy lần mỗi tuần?
+    fact: 1 lần
+    fact_alternatives: [01 lần, một lần]
+  - id: FR2-F04
+    group: F
+    expect: answer
+    document: FR2-HCC-001
+    question: Mỗi lần thuê đơn vị ngoài hiệu chuẩn cân thì tốn khoảng bao nhiêu tiền?
+    fact: "1.500.000"
+    fact_alternatives: ["1,5 triệu", "1.5 triệu"]
+  - id: FR2-F05
+    group: F
+    expect: refuse
+    question: Với cân treo, việc tự kiểm tra trong công ty diễn ra bao nhiêu lần một tháng?
+  - id: FR2-F06
+    group: F
+    expect: refuse
+    question: Nhật ký điện năng tiêu thụ của kho lạnh được ghi mấy lần mỗi ngày?
+  # Group C: two asks in one question, both answered by the documents.
+  - id: FR2-C01
+    group: C
+    expect: answer
+    document: FR2-DTV-001
+    question: Khóa vận hành xe nâng cơ bản kéo dài bao nhiêu giờ và cần làm ở kho bao lâu mới được đăng ký?
+    fact: 40 giờ
+    also_facts:
+      - fact: 6 tháng
+        fact_alternatives: [06 tháng, sáu tháng]
+  - id: FR2-C02
+    group: C
+    expect: answer
+    document: FR2-XNG-001
+    question: Chứng chỉ lái xe nâng có hiệu lực bao lâu và xe nâng điện chở tối đa bao nhiêu?
+    fact: 24 tháng
+    also_facts:
+      - fact: 2.500 kg
+        fact_alternatives: ["2500 kg", "2,5 tấn", "2.5 tấn"]
+  - id: FR2-C03
+    group: C
+    expect: answer
+    document: FR2-DTV-001
+    question: Học viên được thi lại tối đa mấy lần và từ lần thứ hai phải tự trả bao nhiêu?
+    fact: "500.000"
+    fact_alternatives: ["500 nghìn", "500.000 đồng"]
+    also_facts:
+      - fact: 2 lần
+        fact_alternatives: [02 lần, hai lần]
+  - id: FR2-C04
+    group: C
+    expect: answer
+    document: FR2-KHL-001
+    question: Cửa buồng lạnh được mở tối đa bao lâu mỗi lần và người vào buồng cấp đông làm liên tục tối đa bao lâu?
+    fact: 30 phút
+    also_facts:
+      - fact: 5 phút
+        fact_alternatives: [05 phút, năm phút]
+  - id: FR2-C05
+    group: C
+    expect: refuse
+    question: Khóa vận hành xe nâng nâng cao kéo dài bao nhiêu giờ và học phí là bao nhiêu?
+  - id: FR2-C06
+    group: C
+    expect: refuse
+    question: Cân treo có sai số cho phép bao nhiêu và được hiệu chuẩn mấy lần mỗi năm?
+  # Group E: English questions over the Vietnamese documents.
+  - id: FR2-E01
+    group: E
+    expect: answer
+    document: FR2-XNG-001
+    question: What is the maximum load of the electric forklift in the warehouse?
+    fact: 2.500 kg
+    fact_alternatives: ["2500 kg", "2,500 kg", "2.5 tons", "2,5 tấn"]
+  - id: FR2-E02
+    group: E
+    expect: answer
+    document: FR2-KHL-001
+    question: How long must returned goods stay in quarantine before going back into stock?
+    fact: 24 giờ
+    fact_alternatives: [24 hours]
+  - id: FR2-E03
+    group: E
+    expect: answer
+    document: FR2-XNG-001
+    question: What is the speed limit for forklifts in the aisles between the racks?
+    fact: 6 km
+  - id: FR2-E04
+    group: E
+    expect: answer
+    document: FR2-DTV-001
+    question: How many hours of hands-on practice does the basic forklift course include?
+    fact: 24 giờ
+    fact_alternatives: [24 hours]
+  - id: FR2-E05
+    group: E
+    expect: refuse
+    question: What is the speed limit for forklifts on the road outside the warehouse?
+  - id: FR2-E06
+    group: E
+    expect: refuse
+    question: How long is the warranty on the warehouse scales?

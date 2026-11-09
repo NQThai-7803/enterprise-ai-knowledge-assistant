@@ -6,6 +6,12 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### FIX 3b diagnosis -- 2026-11-09
+
+- `eval.yml` input `trace_heldout_v1` (uat set): traces named held-out v1 cases after the batch as a diagnostic (DEC-008); `prepare_dev_trace_input.py --heldout-v1` builds the input.
+- `eval.yml` takes Ollama from `ollama/ollama:<version>` when the release download fails, and waits for healthy PostgreSQL and Redis before the migration.
+- `false_refusal_dev_v2` frozen (`tests/acceptance/false_refusal_dev_v2.lock`) and added to the question fingerprints; `run_answer_relevance_dev.py` accepts `--set false_refusal_dev_v2` and grades `also_facts`.
+
 ### FIX 3a -- 2026-11-09
 
 - New flags, all off by default after their DEC-013 batch: `RAG_REFUSAL_PHRASES_EXTENDED_ENABLED`, `RAG_QUESTION_HEAD_IN_EVIDENCE_ENABLED`, `RAG_QUESTION_EVIDENCE_SIMILARITY_ENABLED` with `RAG_QUESTION_EVIDENCE_MIN_SIMILARITY` (0.85). Branch counters `refusal_phrase_extended`, `question_head_missing`, `question_evidence_dissimilar`.

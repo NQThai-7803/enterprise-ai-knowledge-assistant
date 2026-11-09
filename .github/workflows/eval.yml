@@ -7,15 +7,16 @@ name: Eval
 #
 # Sets: `uat` (Q001-Q100 from eval-data/, corpus V2 PDFs from eval-data/corpus-v2, proxy grade
 # against eval-data/uat/reference-grade.json), `rbac` (tests/acceptance/rbac_dev_v1.yaml, with the
-# retrieval-level leak check), `relevance` (answer_relevance_dev_v1) and `false_refusal`
-# (false_refusal_dev_v1). Never runs held-out sets.
+# retrieval-level leak check), `relevance` (answer_relevance_dev_v1), `false_refusal`
+# (false_refusal_dev_v1) and `false_refusal_v2` (false_refusal_dev_v2). Never runs held-out v2 (DEC-012). Held-out v1 only through
+# `trace_heldout_v1`, a layer-by-layer diagnostic trace that is not scored (DEC-008).
 on:
   workflow_dispatch:
     inputs:
       set:
         description: "Question set"
         type: choice
-        options: [uat, rbac, relevance, false_refusal]
+        options: [uat, rbac, relevance, false_refusal, false_refusal_v2]
         default: relevance
       configs:
         description: "Configurations, ';'-separated, baseline first: name or name:EVAL_VAR=value,..."
@@ -31,9 +32,13 @@ on:
         type: string
         default: ""
       trace:
-        description: "relevance/false_refusal only: after the batch, trace every case layer by layer (diagnosis, not scored; use with configs=base)"
+        description: "relevance/false_refusal sets only: after the batch, trace every case layer by layer (diagnosis, not scored; use with configs=base)"
         type: boolean
         default: false
+      trace_heldout_v1:
+        description: "uat only: held-out v1 ids to trace after the batch (e.g. HO-001 HO-004); diagnosis, not scored"
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -206,12 +211,13 @@ jobs:
           cat "$OUT/summary.md" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Trace every case (diagnosis only)
-        if: inputs.trace && (inputs.set == 'relevance' || inputs.set == 'false_refusal')
+        if: inputs.trace && (inputs.set == 'relevance' || startsWith(inputs.set, 'false_refusal'))
         env:
           SET: ${{ inputs.set }}
         run: |
           set -euo pipefail
           NAME=answer_relevance_dev_v1; [ "$SET" = false_refusal ] && NAME=false_refusal_dev_v1
+          [ "$SET" = false_refusal_v2 ] && NAME=false_refusal_dev_v2
           python scripts/diagnostics/prepare_dev_trace_input.py --set "$NAME" \
             --output "$OUT/trace-input.json"
           API="$PROJECT-api-1"
@@ -220,6 +226,24 @@ jobs:
           docker exec -w /app -e PYTHONPATH=/app "$API" python /tmp/heldout_trace.py \
             --input /tmp/trace-input.json --output /tmp/trace.json --mode full
           docker cp "$API:/tmp/trace.json" "$OUT/trace.json"
+
+      - name: Trace held-out v1 cases (diagnosis only, DEC-008)
+        if: inputs.set == 'uat' && inputs.trace_heldout_v1 != ''
+        env:
+          IDS_INPUT: ${{ inputs.trace_heldout_v1 }}
+        run: |
+          set -euo pipefail
+          IDS=()
+          for id in $IDS_INPUT; do
+            [[ "$id" =~ ^HO-[0-9]{3}$ ]] || { echo "bad held-out v1 id: $id"; exit 1; }
+            IDS+=("$id")
+          done
+          python scripts/diagnostics/prepare_dev_trace_input.py --heldout-v1 "${IDS[@]}"             --manifest "$OUT/runtime-manifest.json" --output "$OUT/trace-heldout-v1-input.json"
+          API="$PROJECT-api-1"
+          docker cp scripts/diagnostics/heldout_trace.py "$API:/tmp/heldout_trace.py"
+          docker cp "$OUT/trace-heldout-v1-input.json" "$API:/tmp/trace-input.json"
+          docker exec -w /app -e PYTHONPATH=/app "$API" python /tmp/heldout_trace.py             --input /tmp/trace-input.json --output /tmp/trace.json --mode full
+          docker cp "$API:/tmp/trace.json" "$OUT/trace-heldout-v1.json"
 
       - name: Collect logs
         if: always()

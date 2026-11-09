@@ -35,7 +35,7 @@ if str(ROOT) not in sys.path:
 
 from scripts.eval import branch_counters, reranker_check, run_rbac_dev  # noqa: E402
 
-SETS = ("answer_relevance_dev_v1", "false_refusal_dev_v1")
+SETS = ("answer_relevance_dev_v1", "false_refusal_dev_v1", "false_refusal_dev_v2")
 SOURCE = ROOT / "tests" / "acceptance" / "answer_relevance_dev_v1.yaml"
 LOCK = ROOT / "tests" / "acceptance" / "answer_relevance_dev_v1.lock"
 ROLE = "staff"
@@ -60,12 +60,15 @@ def states_fact(item: Mapping[str, Any], answer: str) -> bool:
     """The answer holds the item's fact or one of its accepted alternative forms.
 
     No digit may touch the form, so "1 lần" does not match "11 lần" nor "7 ngày" "17 ngày".
+    Each of the item's `also_facts` (a question asking two things) must be there too.
     """
     folded = run_rbac_dev._fold(answer)
-    forms = (item["fact"], *item.get("fact_alternatives", ()))
-    return any(
-        re.search(rf"(?<![\d.,]){re.escape(run_rbac_dev._fold(form))}(?!\d)", folded)
-        for form in forms
+    return all(
+        any(
+            re.search(rf"(?<![\d.,]){re.escape(run_rbac_dev._fold(form))}(?!\d)", folded)
+            for form in (fact["fact"], *fact.get("fact_alternatives", ()))
+        )
+        for fact in (item, *item.get("also_facts", ()))
     )
 
 

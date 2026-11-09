@@ -4,9 +4,16 @@
 ## Order of the next work -- 2026-11-08
 
 1. **DONE: REL-303 measured under DEC-013 on Actions and on by default** (`docs/eval/runs/fix2d-rel303-actions.md`).
-2. FIX 3, measured on `false_refusal_dev_v1` among the dev sets. **WAITING FOR OWNER (2026-11-09):** baseline and trace done (`docs/eval/runs/fix3-diagnosis.md`, run `42571829930`): 6 false answers, 1 false refusal, 13 correct, stable over 2 runs; three mechanisms and three flag-gated directions proposed, none applied.
+2. FIX 3: **3a done** (flags measured, all off, `docs/eval/runs/fix3a-false-answers.md`); **3b done** (held-out v1 refusals traced, `false_refusal_dev_v2` approved); **3c next**: F, C, A in that order, one flag each, measured on 5 dev sets (E and M3 wait for the NLU phase).
 3. **Embedding fine-tune** (`docs/design/embedding-finetune.md` and DEC-015 on branch `feat/embedding-finetune-infra`): infrastructure only so far; the baseline measurement and training come after FIX 3.
 4. The final held-out v2 measurement, once, after the choices above are made (DEC-012).
+
+## FIX 3b re-diagnosis of false refusals -- 2026-11-09
+
+- **DONE: held-out v1 false refusals traced on Actions** (run `42581562670`, CPU, diagnostic only, DEC-008): 13/14 still refused. Mechanisms: A, answer document dropped by `_filter_low_alignment_documents` after the lexical-fallback rerank (5); C, a two-part question refused when one part's evidence is empty or wrong (6); F, zero-padded counts with slash units among other numbers read as contradicted (2); E, English questions over Vietnamese sources (2). `docs/eval/runs/fix3b-diagnosis.md`.
+- **DONE: `false_refusal_dev_v2` frozen and approved by the owner (2026-11-09)** (24 questions, groups L/F/C/E with answer and refuse cases, overlap below 0.60 against every set, in the question fingerprints). `eval.yml` runs it as `set=false_refusal_v2`.
+- **TODO (NLU phase): E**, English questions over Vietnamese sources (HO-035, HO-036, group E of v2), together with M3.
+- **TODO (NLU phase): M3**, a question that uses another verb than the source for the same act ("đồng ý" vs "phê duyệt", FR-A01). Handle it in question understanding, not with a synonym table.
 
 ## FIX 3a false answers -- 2026-11-09 (flags measured, all stay off)
 
