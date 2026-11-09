@@ -8,10 +8,11 @@
 3. **Embedding fine-tune** (`docs/design/embedding-finetune.md` and DEC-015 on branch `feat/embedding-finetune-infra`): infrastructure only so far; the baseline measurement and training come after FIX 3.
 4. The final held-out v2 measurement, once, after the choices above are made (DEC-012).
 
-## FIX 3b re-diagnosis of false refusals -- 2026-11-09 (branch `feat/fix-3b-diagnosis`, WAITING FOR OWNER)
+## FIX 3b re-diagnosis of false refusals -- 2026-11-09
 
 - **DONE: held-out v1 false refusals traced on Actions** (run `42581562670`, CPU, diagnostic only, DEC-008): 13/14 still refused. Mechanisms: A, answer document dropped by `_filter_low_alignment_documents` after the lexical-fallback rerank (5); C, a two-part question refused when one part's evidence is empty or wrong (6); F, zero-padded counts with slash units among other numbers read as contradicted (2); E, English questions over Vietnamese sources (2). `docs/eval/runs/fix3b-diagnosis.md`.
-- **DONE: `false_refusal_dev_v2` drafted and frozen** (24 questions, groups L/F/C/E with answer and refuse cases, overlap below 0.60 against every set, in the question fingerprints). **WAITING FOR OWNER:** approve the set before any run; then add it to `eval.yml`/`ci_batch.sh`.
+- **DONE: `false_refusal_dev_v2` frozen and approved by the owner (2026-11-09)** (24 questions, groups L/F/C/E with answer and refuse cases, overlap below 0.60 against every set, in the question fingerprints). `eval.yml` runs it as `set=false_refusal_v2`.
+- **TODO (NLU phase): E**, English questions over Vietnamese sources (HO-035, HO-036, group E of v2), together with M3.
 - **TODO (NLU phase): M3**, a question that uses another verb than the source for the same act ("đồng ý" vs "phê duyệt", FR-A01). Handle it in question understanding, not with a synonym table.
 
 ## FIX 3a false answers -- 2026-11-09 (flags measured, all stay off)

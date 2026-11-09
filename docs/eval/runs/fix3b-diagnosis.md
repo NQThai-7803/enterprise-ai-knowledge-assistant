@@ -34,7 +34,7 @@ Ngày 2026-11-09. Nhánh `feat/fix-3b-diagnosis`. Dừng ở đây để owner d
 - **F. Số có số 0 đứng đầu, kèm đơn vị có gạch chéo ("01 lần/năm"), nằm giữa nhiều số khác** (2 câu). Câu trả lời viết "1 lần" bị `_numbers_are_contradicted` báo CONTRADICTED. Nhóm N của `false_refusal_dev_v1` có "01"/"1" nhưng không chặn, vì đoạn ở đó ít số và không có đơn vị gạch chéo.
 - **E. Câu hỏi tiếng Anh, tài liệu tiếng Việt** (2 câu, và một phần HO-039). Evidence của câu trả lời tiếng Anh rỗng hoặc lấy từ nguồn khác. Các lần thử lại trả về sai định dạng.
 
-## Bộ mới: `false_refusal_dev_v2` (đóng băng, chờ owner duyệt)
+## Bộ mới: `false_refusal_dev_v2` (đóng băng, owner duyệt 2026-11-09)
 
 - **File:** `tests/acceptance/false_refusal_dev_v2.yaml`, SHA256 `540772d8befb5974a4408a858bdb7de55d995c573bf3ec8049441dc411264e9b` trong `false_refusal_dev_v2.lock`. Cố định LF trong `.gitattributes`. Sửa bất kỳ chỗ nào cũng phải ra v2.1 với lock mới.
 - **Nội dung:** 24 câu trên 4 tài liệu giả lập của một công ty mới (kho lạnh, xe nâng, hiệu chuẩn cân, đào tạo vận hành viên). Mỗi cơ chế A (nhóm L), F, C, E có 4 câu phải trả lời và 2 câu phải từ chối.
@@ -55,7 +55,7 @@ Ngày 2026-11-09. Nhánh `feat/fix-3b-diagnosis`. Dừng ở đây để owner d
 | `false_refusal_dev_v1` | 0,321 | 0,588 | 0,043 |
 
 - **Fingerprints:** `scripts/eval/question_fingerprints.json` đã dựng lại, có `false_refusal_v2` (24 câu). `check_no_question_leak.py` vì vậy chặn cả các câu này trong `app/`. Lệnh `question_leak.py overlap` chạy qua.
-- **Chưa làm:** hệ thống chưa chạy trên v2. `eval.yml`/`ci_batch.sh` mới chỉ có bộ `false_refusal` v1. Việc thêm v2 vào hai file này chờ owner duyệt bộ.
+- **Chạy:** `eval.yml` với `set=false_refusal_v2` (thêm sau khi owner duyệt). Chưa có lượt đo nào trên v2.
 
 ## Không thuộc FIX 3b
 

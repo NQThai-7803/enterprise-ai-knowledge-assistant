@@ -7,8 +7,8 @@ name: Eval
 #
 # Sets: `uat` (Q001-Q100 from eval-data/, corpus V2 PDFs from eval-data/corpus-v2, proxy grade
 # against eval-data/uat/reference-grade.json), `rbac` (tests/acceptance/rbac_dev_v1.yaml, with the
-# retrieval-level leak check), `relevance` (answer_relevance_dev_v1) and `false_refusal`
-# (false_refusal_dev_v1). Never runs held-out v2 (DEC-012). Held-out v1 only through
+# retrieval-level leak check), `relevance` (answer_relevance_dev_v1), `false_refusal`
+# (false_refusal_dev_v1) and `false_refusal_v2` (false_refusal_dev_v2). Never runs held-out v2 (DEC-012). Held-out v1 only through
 # `trace_heldout_v1`, a layer-by-layer diagnostic trace that is not scored (DEC-008).
 on:
   workflow_dispatch:
@@ -16,7 +16,7 @@ on:
       set:
         description: "Question set"
         type: choice
-        options: [uat, rbac, relevance, false_refusal]
+        options: [uat, rbac, relevance, false_refusal, false_refusal_v2]
         default: relevance
       configs:
         description: "Configurations, ';'-separated, baseline first: name or name:EVAL_VAR=value,..."
@@ -32,7 +32,7 @@ on:
         type: string
         default: ""
       trace:
-        description: "relevance/false_refusal only: after the batch, trace every case layer by layer (diagnosis, not scored; use with configs=base)"
+        description: "relevance/false_refusal sets only: after the batch, trace every case layer by layer (diagnosis, not scored; use with configs=base)"
         type: boolean
         default: false
       trace_heldout_v1:
@@ -211,12 +211,13 @@ jobs:
           cat "$OUT/summary.md" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Trace every case (diagnosis only)
-        if: inputs.trace && (inputs.set == 'relevance' || inputs.set == 'false_refusal')
+        if: inputs.trace && (inputs.set == 'relevance' || startsWith(inputs.set, 'false_refusal'))
         env:
           SET: ${{ inputs.set }}
         run: |
           set -euo pipefail
           NAME=answer_relevance_dev_v1; [ "$SET" = false_refusal ] && NAME=false_refusal_dev_v1
+          [ "$SET" = false_refusal_v2 ] && NAME=false_refusal_dev_v2
           python scripts/diagnostics/prepare_dev_trace_input.py --set "$NAME" \
             --output "$OUT/trace-input.json"
           API="$PROJECT-api-1"

@@ -6,7 +6,7 @@
 #
 #   bash scripts/eval/ci_batch.sh <set> "<configs>" <runs> <out> [case ids...]
 #
-# set:     uat | rbac | relevance | false_refusal
+# set:     uat | rbac | relevance | false_refusal | false_refusal_v2
 # configs: ";"-separated "name" or "name:EVAL_VAR=value,EVAL_VAR=value", first one is the baseline,
 #          e.g. "base; f303:EVAL_SHORT_ANSWER_QUESTION_TERMS=true". EVAL_* variables are read by
 #          scripts/eval/compose.uat-eval.yaml; EVAL_UAT_UNACCENTED=1 asks UAT without diacritics.
@@ -19,7 +19,7 @@ read -r -a FILES <<< "${COMPOSE_FILES:?space-separated -f arguments}"
 API=http://127.0.0.1:18190
 mkdir -p "$OUT"
 
-case "$SET" in uat|rbac|relevance|false_refusal) ;; *) echo "unknown set $SET"; exit 2 ;; esac
+case "$SET" in uat|rbac|relevance|false_refusal|false_refusal_v2) ;; *) echo "unknown set $SET"; exit 2 ;; esac
 [[ "$RUNS" =~ ^[12]$ ]] || { echo "runs must be 1 or 2"; exit 2; }
 
 NAMES=(); ENVS=()
@@ -87,8 +87,9 @@ run_one() {  # $1 = config index, $2 = run number
     relevance)
       python scripts/eval/run_answer_relevance_dev.py --output "$dir/results.json" \
         > "$dir/runner.log" 2>&1 || echo "runner exit $?" >> "$dir/runner.log" ;;
-    false_refusal)
-      python scripts/eval/run_answer_relevance_dev.py --set false_refusal_dev_v1 \
+    false_refusal|false_refusal_v2)
+      local version=v1; [ "$SET" = false_refusal_v2 ] && version=v2
+      python scripts/eval/run_answer_relevance_dev.py --set "false_refusal_dev_$version" \
         --output "$dir/results.json" > "$dir/runner.log" 2>&1 \
         || echo "runner exit $?" >> "$dir/runner.log" ;;
   esac
@@ -116,7 +117,7 @@ for run in $(seq 1 "$RUNS"); do
 done
 
 # Compare every later configuration with the first one (needs 2 runs per side).
-KIND="$SET"; [ "$SET" = false_refusal ] && KIND=relevance
+KIND="$SET"; [[ "$SET" == false_refusal* ]] && KIND=relevance
 if [ "$RUNS" = 2 ]; then
   base="${NAMES[0]}"
   for name in "${NAMES[@]:1}"; do
