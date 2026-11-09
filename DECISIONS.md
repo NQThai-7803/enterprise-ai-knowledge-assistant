@@ -149,3 +149,12 @@ Set by the owner on 2026-11-09, after the repository moved to `C:\dev\eaka`. End
 - **Evidence (2026-11-09, `315efd6`):** unit 1698 passed, api 51 + 245, integration 404, llm-provider 3; 0 failed, 0 regressed against `6a2c72f`. Available RAM was 1100-1380 MB at the start, 296 MB at the lowest during the run (Docker VM peak 1816 MB), with no out-of-memory error; the whole run took about 5.5 minutes.
 - **The 1000 MB Available gate applies at stack start.** Below it, wait; if it stays below, verify on CI as under DEC-016 and say so in the report.
 - **Measurement stays on GitHub Actions (CPU)** for end-to-end, flag and model comparisons (DEC-016, DEC-017). Local and Actions numbers are never compared.
+
+## DEC-019 — CI replaces local eaka-verify when the RAM gate stays closed
+
+Set by the owner on 2026-11-09. Amends DEC-018.
+
+- **Fallback:** if Available RAM stays below the 1000 MB gate for 15 minutes, the branch may be pushed and the 4 GitHub CI checks stand in for local eaka-verify.
+- **No merge without the 4 checks green**, as under DEC-016 and DEC-018.
+- **The PR says so:** a PR verified this way states "verified by CI (DEC-019), local eaka-verify not run" and gives the RAM readings that kept the gate closed.
+- Local eaka-verify stays the default whenever the gate opens.

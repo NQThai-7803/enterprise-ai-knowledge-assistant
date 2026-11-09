@@ -1,5 +1,9 @@
 # Project Status
 
+## DEC-019 -- 2026-11-09
+
+- CI may stand in for local eaka-verify when the RAM gate stays closed for 15 minutes; merges still need the 4 checks green. FIX 3a accepted as not met (flags off); lesson recorded in `docs/eval/runs/fix3a-false-answers.md`.
+
 ## FIX 3b diagnosis -- 2026-11-09
 
 - **Held-out v1 false refusals traced on Actions (diagnostic):** 13/14 reproduce on CPU. Four mechanisms: answer document dropped by the low-alignment document filter (5), two-part questions refused when one part fails (6), zero-padded counts with slash units (2), English questions over Vietnamese sources (2).
