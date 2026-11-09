@@ -153,6 +153,8 @@ class Settings(BaseSettings):
     rag_question_evidence_similarity_enabled: bool = False
     # Calibrated 2026-11-09 (docs/eval/runs/fix3a-false-answers.md): the lowest answer item.
     rag_question_evidence_min_similarity: float = Field(default=0.85, ge=0.0, le=1.0)
+    # FIX 3c F: numbers are compared once written one way (01 = 1, 1,2 trieu = 1.200.000).
+    rag_number_normalization_enabled: bool = False
     reranker_enabled: bool = True
     reranker_provider: Literal["sentence_transformers", "heuristic"] = "sentence_transformers"
     reranker_model: str = Field(default="BAAI/bge-reranker-v2-m3", min_length=1)
