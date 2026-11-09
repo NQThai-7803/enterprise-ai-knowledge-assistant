@@ -15,7 +15,8 @@
 - **DONE: owner accepted the 10 held-out v1 labels at diagnostic level, and `false_refusal_dev_v1`.** The set is in the question fingerprints; the dev runner grades it with `--set false_refusal_dev_v1` and `fact_alternatives`.
 - **DONE: UAT on Actions.** Corpus V2 PDFs and the Q001-Q100 questions are in `eval-data/` (fictional data); `eval.yml` runs `uat` with optional case ids. First run: 5 questions, answers and citations identical to the local CUDA runs.
 - **DONE: measurement on Actions (DEC-016).** `eval.yml` takes a set, a list of flag configurations and 1 or 2 runs; `scripts/eval/ci_batch.sh` runs them interleaved in one job.
-- **TODO: move the repository out of OneDrive** (`docs/status/2026-11-08-move-out-of-onedrive.md`); DEC-016 ends when local runs are possible again.
+- **DONE: repository moved to `C:\dev\eaka`** (fresh clone plus the local-only files, sizes and hashes checked; `docs/status/2026-11-08-move-out-of-onedrive.md`). The OneDrive copy is untouched.
+- **TODO: end DEC-016** once eaka-verify and local measurements run in `C:\dev\eaka`.
 
 ## FIX 2 false answers -- 2026-11-06
 

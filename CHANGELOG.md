@@ -6,6 +6,10 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### Repository move -- 2026-11-08
+
+- The working copy moved from OneDrive to `C:\dev\eaka`; the move report now records the result and corrects the claim that `master` and `feat/react-bits-ai-motion` were unpushed.
+
 ### FIX 2d and eval environment -- 2026-11-08
 
 - **Eval runners refuse another Ollama version or backend** than the pinned 0.40.15 on CUDA (`scripts/eval/ollama_check.py`, DEC-014), and record both at the start and end of each run. `EVAL_OLLAMA_EXPECTED_VERSION`, `EVAL_OLLAMA_EXPECTED_BACKEND` and `EVAL_OLLAMA_LOG` adapt it to another host.

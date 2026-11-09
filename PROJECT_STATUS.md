@@ -1,5 +1,11 @@
 # Project Status
 
+## Repository out of OneDrive -- 2026-11-08
+
+- **The working copy is now `C:\dev\eaka`:** a fresh clone plus the local-only files (`.env` files, `artifacts/`, `.backups/`, `data/`, `.verify/`), with counts, sizes and SHA256 checked against the old copy, which is untouched. Unit tests in `.venv312`: 1706 passed, 0 failed (reference only, outside the image).
+- `master` and `feat/react-bits-ai-motion` were wrongly listed as unpushed; both are in `origin/main`.
+- **DEC-016 still applies** until eaka-verify runs here. See `docs/status/2026-11-08-move-out-of-onedrive.md`.
+
 ## FIX 2d -- 2026-11-08 (REL-303 on by default after an Actions batch)
 
 - **Ollama pinned (DEC-014):** version 0.40.15 on CUDA, auto-update off, checked by every eval runner.
