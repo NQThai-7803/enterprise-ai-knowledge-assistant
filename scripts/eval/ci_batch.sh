@@ -32,6 +32,8 @@ for entry in "${ENTRIES[@]}"; do
   IFS=',' read -r -a PAIRS <<< "$vars"
   for pair in "${PAIRS[@]}"; do
     [[ "$pair" =~ ^EVAL_[A-Z0-9_]+=[A-Za-z0-9_./:-]+$ ]] || { echo "bad setting: $pair"; exit 2; }
+    # Git Bash rewrites /path arguments to C:/Program Files/Git/path when dispatching from Windows.
+    [[ "${pair#*=}" =~ ^[A-Za-z]:/ ]] && { echo "host-rewritten path in $pair (MSYS_NO_PATHCONV=1)"; exit 2; }
   done
   NAMES+=("$name"); ENVS+=("$vars")
 done
