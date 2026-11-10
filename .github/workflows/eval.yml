@@ -44,7 +44,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: eval-${{ github.ref }}-${{ inputs.set }}
+  group: eval-${{ github.ref }}-${{ inputs.set }}-${{ inputs.configs }}
   cancel-in-progress: false
 
 jobs:
