@@ -11,7 +11,8 @@ more names joined by "." select what is patched:
                       validated parts and says, in a fixed server-side sentence, which parts the
                       permitted documents do not mention, instead of refusing it all (mechanism C).
   oracle              the prompt gets the gold chunks of the question (EVAL_ORACLE_FILE), found
-                      in the permission-filtered retrieval, past ranking and filters; questions
+                      in the permission-filtered retrieval (widened to the service's maximum
+                      top_k), past ranking and filters; questions
                       without gold, or whose gold the user cannot retrieve, run unchanged.
 
 Diagnostic only: per-request state lives in context variables, and every patch logs one
@@ -31,7 +32,6 @@ from typing import Any
 logger = logging.getLogger("eaka.ablation")
 
 PARTIAL_SENTENCE = "Tài liệu bạn được phép truy cập không đề cập: {need}"
-ORACLE_TOP_K = 200
 
 _question: contextvars.ContextVar[str | None] = contextvars.ContextVar("question", default=None)
 _oracle_hit: contextvars.ContextVar[bool] = contextvars.ContextVar("oracle_hit", default=False)
@@ -103,8 +103,10 @@ def _patch_prepared_hits(gas: Any, *, oracle: bool) -> None:
             return await original_retrieve(
                 self, query=query, current_user=current_user, top_k=top_k
             )
+        # The widest retrieval the service allows; a larger top_k is INVALID_RETRIEVAL_TOP_K.
+        widest = self.settings.hybrid_retrieval_max_top_k
         result = await original_retrieve(
-            self, query=query, current_user=current_user, top_k=max(top_k, ORACLE_TOP_K)
+            self, query=query, current_user=current_user, top_k=max(top_k, widest)
         )
         codes = await _document_codes({hit.document_id for hit in result.hits})
         hits = tuple(hit for hit in result.hits if is_gold(hit, codes.get(hit.document_id), entry))
