@@ -149,3 +149,42 @@ Số dòng tính trên `main` `c3f55cd`. "gas" là `app/services/grounded_answer
 | M3: đồng nghĩa ("đồng ý"/"phê duyệt") | so khớp từ trong đoạn trích, repair PERSON | chọn câu bằng cross-encoder, thay cho chọn dòng theo từ | các cặp diễn đạt lại do LLM viết từ câu trong chunk | FR-A01 và nhóm A của `false_refusal_dev_v1`, nhóm L của v2 | flag ở `query_focused_excerpt` |
 
 **Thứ tự đề xuất:** (1) kiểm độ đáp ứng, vì nó chặn trả lời sai, lỗi nặng hơn từ chối sai; (2) phân loại ý định, thay route deterministic; (3) tách câu hỏi ghép; (4) E và M3. Thứ tự cuối cùng chốt sau khi có số đo ablation (mục 3).
+
+## 3. Kết quả ablation (GitHub Actions, CPU, Ollama 0.40.15, 2026-11-10)
+
+Mỗi ô: **đúng / từ chối sai / trả lời sai / sai khác** (c/fr/fa/w), lượt 1 và lượt 2 khi khác nhau. Rò rỉ = 0 ở **mọi** cấu hình, mọi bộ (API và retrieval). Số câu đổi là số câu đổi ở cả 2 lượt (DEC-011). Run ID trong `artifacts/prompt6/runs.txt` và `runs2.txt`; tổng hợp bằng `scripts/diagnostics/summarize_ablation.py`.
+
+### Baseline (cùng job với từng nhóm; khác nhau giữa các job là dao động của Ollama)
+
+| Bộ | base c/fr/fa/w | Ghi chú |
+|---|---|---|
+| UAT Q001-Q100 | 100/0/0/0, có job 98–99 (Q002 dao động) | proxy |
+| RBAC dev (18 cặp) | 22–23 / 12 / 0–1 / 1 | 12 control bị từ chối sai ở mọi job |
+| `answer_relevance_dev_v1` | 17/3/5/0 | |
+| `false_refusal_dev_v1` | 13/1/6/0 | |
+| `false_refusal_dev_v2` | 13/5/5/1 | nhóm F: F01, F02 từ chối sai; nhóm E: E01, E02, E04 từ chối sai; C05, C06, L06 trả lời sai |
+
+### Từng cấu hình so với baseline cùng job
+
+| Cấu hình | UAT | RBAC | relevance | FR v1 | FR v2 | Kết luận |
+|---|---|---|---|---|---|---|
+| `lowalign` (A: bỏ bộ lọc tài liệu) | **−2** (Q066, Q069 đúng→sai) | 0 | 0 | 0 | 0 | không cứu được câu nào trên dev; chỉ gây hại |
+| `group5` (B: `[:2]`→`[:5]`) | **−6** (Q007, Q009 →từ chối sai; Q008, Q043, Q097 →sai; Q018 →trả lời sai) | 0 | −1 (REL-402 →trả lời sai) | ±: N09 fa→đúng, N02 đúng→từ chối sai | 0 | nhiều context hơn = nhiều nhiễu hơn cho model 3B |
+| `excerpt_off` (nguyên chunk) | **−8** (5 từ chối sai, 3 sai) | **−5 control** (04, 05, 11, 15 →từ chối sai; 16 →sai) | +1 (REL-403 fa→đúng) | ±: A01 fr→đúng, N05 đúng→fr | +2 fa→đúng (C05, L06), −2 fr (C04, L03) | đoạn trích theo từ vựng vừa là lý do dev đạt 100 vừa là nguyên nhân FR-A01 |
+| `numnorm` (F) | 0 | 0 | 0 | 0 | 0 | **không chạm ca nào**: F01, F02 của v2 không bị chặn bởi `_numbers_are_contradicted` (xem trace) |
+| `partial` (C) | 0 | 0 | 0 | 0 | 0 | không có câu ghép nào trên dev hỏng *một phần*; chính sách chỉ đo được trên held-out v1 (diagnostic, bên dưới) |
+| `ce_bge` (bge-reranker-v2-m3, thật) | (đang chạy) | 0 | 0 | 0 | 0 | `reranker_mode=cross_encoder` ở mọi lượt, 0 timeout |
+| `ce_mmarco` (mMiniLMv2-L12) | 0 | 0 | 0 | 0 | 0 | như trên |
+
+**Cross-encoder thật không đổi một câu nào.** Lý do nằm ở code, không ở model: `_prepare_prompt_retrieval_hits` (gas:1746–1749) xếp lại toàn bộ theo alignment (`_rank_hits_for_prompt`) rồi `_merge_retrieval_hits(ranked_hits, reranked_hits)` đặt thứ hạng alignment **trước**; điểm cross-encoder chỉ còn vai trò nối đuôi. Vì vậy mọi số đo từ trước tới nay (tất cả đều `lexical_fallback`) **không lệch** so với khi có reranker thật, và việc có cross-encoder hay không là vô nghĩa cho tới khi đổi thứ tự xếp hạng (PROMPT 6 cũ, `reranker_first`).
+
+**Chi phí reranker trên runner 16 GB:**
+
+| | base | `ce_bge` | `ce_mmarco` |
+|---|---|---|---|
+| RAM dùng đỉnh của runner (MB) | 5 900–6 800 | 6 150–7 350 | 6 400–7 200 |
+| Độ trễ trung vị, relevance (ms) | 11 000–12 300 | 17 300 | 12 000 |
+| Độ trễ trung vị, UAT (ms) | 1 100 | (đang chạy) | 9 800 |
+| `RERANKER_TIMEOUT` | — | 0 | 0 |
+
+UAT baseline nhanh (1,1 s) vì 75/100 câu đi route deterministic không gọi LLM; cross-encoder chạy trước route đó nên cộng thẳng ~8–9 s mỗi câu.
