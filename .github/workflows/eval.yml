@@ -165,14 +165,53 @@ jobs:
       - name: Build the backend image
         run: docker build -t "$P3D_BACKEND_IMAGE" --label eaka.commit="${GITHUB_SHA::7}" .
 
+      - name: Prepare the oracle and reranker folders
+        id: prep
+        env:
+          CONFIGS: ${{ inputs.configs }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/oracle" "$HOME/rerankers"
+          echo "ORACLE_DIR=$RUNNER_TEMP/oracle" >> "$GITHUB_ENV"
+          echo "RERANKER_DIR=$HOME/rerankers" >> "$GITHUB_ENV"
+          models=$(grep -oE 'EVAL_RERANKER_MODEL=[^,;]+' <<< "$CONFIGS" | cut -d= -f2 | sort -u | tr '\n' ' ' || true)
+          echo "RERANKER_MODELS=$models" >> "$GITHUB_ENV"
+          echo "key=rerankers-v1-$(echo "$models" | sha256sum | cut -c1-16)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore cached reranker models
+        if: contains(inputs.configs, 'EVAL_RERANKER_MODEL=')
+        uses: actions/cache@v4
+        with:
+          path: ~/rerankers
+          key: ${{ steps.prep.outputs.key }}
+
+      - name: Download reranker models missing from the cache
+        if: contains(inputs.configs, 'EVAL_RERANKER_MODEL=')
+        run: |
+          set -euo pipefail
+          for model in $RERANKER_MODELS; do
+            python - "$model" "$HOME/rerankers" <<'PY'
+          import sys
+          from huggingface_hub import snapshot_download
+          skip = ["onnx/*", "openvino/*", "*.h5", "*.msgpack", "*.ot", "tf_model*", "flax_model*"]
+          print(snapshot_download(sys.argv[1], cache_dir=sys.argv[2], ignore_patterns=skip))
+          PY
+          done
+          chmod -R a+rwX "$HOME/rerankers"
+          du -sh "$HOME/rerankers"/* | tee -a "$GITHUB_STEP_SUMMARY"
+
       - name: Start the eval stack
         run: |
           set -euo pipefail
-          # The API reaches Ollama on the host, as on Docker Desktop.
+          # The API reaches Ollama on the host, as on Docker Desktop. The oracle map and the
+          # reranker models are mounted for the PROMPT 6 configurations; unused otherwise.
           cat > ci-host.yaml <<'EOF'
           services:
             api:
               extra_hosts: ["host.docker.internal:host-gateway"]
+              volumes:
+                - ${ORACLE_DIR}:/oracle:ro
+                - ${RERANKER_DIR}:/rerankers
             worker:
               extra_hosts: ["host.docker.internal:host-gateway"]
           EOF
