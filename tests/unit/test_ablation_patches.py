@@ -141,6 +141,7 @@ def test_every_ablation_applies_to_the_current_service(tmp_path: Path) -> None:
     oracle.write_text(json.dumps({"Câu hỏi?": [{"document": "D", "pages": [1]}]}), "utf-8")
     site = ROOT / "scripts" / "diagnostics" / "ablation_site"
     env = {**os.environ, "EVAL_ABLATION": "oracle.partial_compound.group5.low_alignment_off"}
+    env["EVAL_ABLATION"] += ".excerpt_off"
     env["EVAL_ORACLE_FILE"] = str(oracle)
     env["PYTHONPATH"] = os.pathsep.join([str(site), str(ROOT)])
     code = (
@@ -148,7 +149,9 @@ def test_every_ablation_applies_to_the_current_service(tmp_path: Path) -> None:
         "from app.retrieval.hybrid_service import HybridRetrievalService as H;"
         "s = g.GroundedAnswerService;"
         "print(H.retrieve.__qualname__, s._prepare_prompt_retrieval_hits.__qualname__,"
-        " s._compound_draft_with_claim_repair.__qualname__, s._prepare_answer_draft.__qualname__)"
+        " s._compound_draft_with_claim_repair.__qualname__, s._prepare_answer_draft.__qualname__);"
+        "import app.chat.context_builder as c;"
+        "assert c.query_focused_excerpt('a b', 'Ai ký?') == 'a b'"
     )
     result = subprocess.run(
         [sys.executable, "-c", code], env=env, capture_output=True, text=True, cwd=ROOT

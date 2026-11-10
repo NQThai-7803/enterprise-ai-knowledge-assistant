@@ -14,6 +14,7 @@ Trạng thái: bản nháp, đang đo. Nhánh `feat/prompt6-ablation`. Không s�
 |---|---|---|
 | A1 | `base`, `oracle`, `lowalign` (A), `group5` | trần của LLM + validator; đóng góp của bộ lọc và của nhát cắt `[:2]` |
 | A2 | `base`, `numnorm` (F), `partial` (C) | chuẩn hoá số; trả lời một phần cho câu hỏi ghép |
+| A3 | `base`, `excerpt_off`, `oracle_full` | thêm sau khi đọc code: đoạn trích theo từ vựng thay nội dung chunk; trần thật của LLM + validator |
 | R1 | `base`, `ce_bge` | `BAAI/bge-reranker-v2-m3` thật, so với `lexical_fallback` |
 | R2 | `base`, `ce_mmarco` | `cross-encoder/mmarco-mMiniLMv2-L12-H384-v1` (so sánh hoãn từ DEC-009) |
 
@@ -29,6 +30,8 @@ Trạng thái: bản nháp, đang đo. Nhánh `feat/prompt6-ablation`. Không s�
   - các bộ còn lại: document và fact của câu phải trả lời.
 
   Câu không có gold, hoặc có gold nằm ngoài quyền của người hỏi, chạy như baseline. Vì vậy oracle không thể gây rò rỉ. Mỗi câu ghi một dòng log `oracle hit|miss`.
+- **`excerpt_off`:** mỗi source của prompt là nguyên chunk, không qua `query_focused_excerpt` (`app/chat/context_builder.py:221`). Hàm này thay chunk bằng các dòng chọn theo từ vựng khi câu hỏi hỏi người, giá trị, yes/no, điều kiện, hoặc là câu hỏi ghép (khối "CLAIM_n evidence").
+- **`oracle_full`:** `oracle` cộng `excerpt_off`, tức đúng nghĩa "đưa thẳng chunk gold cho LLM". Bản `oracle` của A1 vẫn qua bước trích, nên là trần của "bước trích + LLM + validator".
 - **`lowalign`:** `_filter_low_alignment_documents` giữ mọi tài liệu.
 - **`group5`:** nhát cắt `group_hits[:2]` trong `_prepare_answer_draft` thành `[:5]`. Giới hạn source của prompt là `min(10, RERANKER_TOP_K=6)`, nên 5 lọt được hết.
 - **`numnorm`:** flag `RAG_NUMBER_NORMALIZATION_ENABLED` của F.

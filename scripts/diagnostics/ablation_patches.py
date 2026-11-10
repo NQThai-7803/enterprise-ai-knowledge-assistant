@@ -4,6 +4,8 @@ Loaded by scripts/diagnostics/ablation_site/sitecustomize.py when EVAL_ABLATION 
 more names joined by "." select what is patched:
 
   low_alignment_off   _filter_low_alignment_documents keeps every document (mechanism A).
+  excerpt_off         each prompt source is its whole chunk, not query_focused_excerpt's
+                      lexically chosen lines ("oracle.excerpt_off" is the full oracle).
   group5              the per-question cut of prepared hits keeps 5 instead of 2 (group_hits[:2]).
   partial_compound    a two-part question whose claims are only partly validated answers the
                       validated parts and says, in a fixed server-side sentence, which parts the
@@ -58,7 +60,7 @@ def selected() -> frozenset[str]:
 def apply(names: frozenset[str]) -> None:
     import app.services.grounded_answer_service as gas
 
-    unknown = names - {"low_alignment_off", "group5", "partial_compound", "oracle"}
+    unknown = names - {"low_alignment_off", "excerpt_off", "group5", "partial_compound", "oracle"}
     if unknown:
         raise RuntimeError(f"unknown ablation(s): {sorted(unknown)}")
     service = gas.GroundedAnswerService
@@ -77,6 +79,10 @@ def apply(names: frozenset[str]) -> None:
 
     if "low_alignment_off" in names:
         gas._filter_low_alignment_documents = lambda scored_hits: scored_hits
+    if "excerpt_off" in names:
+        import app.chat.context_builder as context_builder
+
+        context_builder.query_focused_excerpt = lambda text, question, **_: text
     if "group5" in names or "oracle" in names:
         _patch_prepared_hits(gas, oracle="oracle" in names)
     if "partial_compound" in names:
