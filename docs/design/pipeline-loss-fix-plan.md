@@ -188,3 +188,9 @@ Mỗi ô: **đúng / từ chối sai / trả lời sai / sai khác** (c/fr/fa/w)
 | `RERANKER_TIMEOUT` | — | 0 | 0 |
 
 UAT baseline nhanh (1,1 s) vì 75/100 câu đi route deterministic không gọi LLM; cross-encoder chạy trước route đó nên cộng thẳng ~8–9 s mỗi câu.
+
+### Việc còn mở (2026-11-10, tạm dừng vì hết hạn mức phiên)
+
+- **`oracle` lần 1 hỏng** vì `ORACLE_TOP_K=200` vượt `hybrid_retrieval_max_top_k=50` → 503 ở mọi câu có gold. Đã sửa (`1af0890`) và chạy lại nhóm A4 trên 5 bộ (`artifacts/prompt6/runs4.txt`); chưa có kết quả.
+- **`partial` chưa từng chạy vào nhánh bắt lỗi** (0 dòng `ABLATION partial` trong mọi job, kể cả trace held-out `42802915105`), dù `_compound_draft_with_claim_repair` chỉ có một lối ra ném `CitationValidationFailedApplicationError` (gas:1427). Nguyên nhân chưa rõ; cần tái hiện local với một câu ghép giả lập trước khi tin bất kỳ số đo nào của `partial`. Trong trace đó, HO-033/037/038 đổi thành ANSWERED đúng gold **mà không do patch**: nhánh câu hỏi ghép dao động giữa các lượt (đã ghi ở 4b cho HO-037).
+- **Chưa có:** kết quả `uat R1` (ce_bge trên UAT, run `42767230504`), trace v2 (`42802589033`, giải thích FR2-F01/F02 và nhóm E), bảng cơ chế × đóng góp × thứ tự, DEC mới, ADR fine-tune, PR tài liệu.
