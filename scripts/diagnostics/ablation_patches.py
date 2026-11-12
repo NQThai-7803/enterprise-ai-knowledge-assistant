@@ -67,7 +67,9 @@ def apply(names: frozenset[str]) -> None:
     original_prepare_draft = service._prepare_answer_draft
 
     async def prepare_draft(self: Any, **kwargs: Any) -> Any:
-        token = _question.set(kwargs["conversation_context"].resolved_question.standalone_question)
+        # The question as sent: the resolver rewrites first-person UAT wording before
+        # standalone_question, and the oracle map is keyed on the sets' own text.
+        token = _question.set(kwargs["question"])
         hit_token = _oracle_hit.set(False)
         try:
             return await original_prepare_draft(self, **kwargs)

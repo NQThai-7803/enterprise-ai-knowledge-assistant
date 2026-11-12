@@ -262,7 +262,8 @@ jobs:
           API="$PROJECT-api-1"
           docker cp scripts/diagnostics/heldout_trace.py "$API:/tmp/heldout_trace.py"
           docker cp "$OUT/trace-input.json" "$API:/tmp/trace-input.json"
-          docker exec -w /app -e PYTHONPATH=/app "$API" python /tmp/heldout_trace.py \
+          # The container's own PYTHONPATH stays, so an EVAL_ABLATION applies to the trace too.
+          docker exec -w /app "$API" python /tmp/heldout_trace.py \
             --input /tmp/trace-input.json --output /tmp/trace.json --mode full
           docker cp "$API:/tmp/trace.json" "$OUT/trace.json"
 
@@ -281,7 +282,8 @@ jobs:
           API="$PROJECT-api-1"
           docker cp scripts/diagnostics/heldout_trace.py "$API:/tmp/heldout_trace.py"
           docker cp "$OUT/trace-heldout-v1-input.json" "$API:/tmp/trace-input.json"
-          docker exec -w /app -e PYTHONPATH=/app "$API" python /tmp/heldout_trace.py             --input /tmp/trace-input.json --output /tmp/trace.json --mode full
+          docker exec -w /app "$API" python /tmp/heldout_trace.py \
+            --input /tmp/trace-input.json --output /tmp/trace.json --mode full
           docker cp "$API:/tmp/trace.json" "$OUT/trace-heldout-v1.json"
 
       - name: Collect logs
