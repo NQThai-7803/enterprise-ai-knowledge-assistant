@@ -161,10 +161,29 @@ Set by the owner on 2026-11-09. Amends DEC-018.
 
 ## DEC-020 — PROMPT 6 findings; what stays as it is until the owner decides
 
-Recorded on 2026-11-12 from the ablation batches on GitHub Actions (`docs/design/pipeline-loss-fix-plan.md`). Proposals in that document wait for the owner; this entry fixes only what the measurements settle.
+Recorded on 2026-11-12 from the ablation batches on GitHub Actions (`docs/design/pipeline-loss-fix-plan.md`). This entry fixes what the measurements settle; the owner's choices are in DEC-021.
 
-- **F (`RAG_NUMBER_NORMALIZATION_ENABLED`) does not meet DEC-013:** 0 cases changed on all 5 dev sets. The flag stays off and unmerged (branch `feat/fix-3c-f`).
+- **F (`RAG_NUMBER_NORMALIZATION_ENABLED`) does not meet DEC-013:** 0 cases changed on all 5 dev sets. The flag stays off; its code is merged flag-off (DEC-021) so the completeness checks can reuse the number normalization.
 - **No default changes from the ablations.** Removing the low-alignment document filter, widening `group_hits[:2]` to 5, or passing whole chunks instead of query-focused excerpts each regress UAT (−2, −6, −8) and help no set on balance. They are not to be shipped as fixes with `qwen2.5:3b`.
 - **A real cross-encoder changes no answer** (bge-reranker-v2-m3 and mMiniLMv2-L12, `reranker_mode=cross_encoder` verified) because prompt ranking puts the lexical alignment order first. Earlier `lexical_fallback` measurements therefore stand. bge adds about 100 s per UAT question on a CPU runner.
 - **Oracle context (gold chunks straight to the prompt) barely improves any dev set.** The loss is after the context: the 3B model, the validator, and the retry forced by the completeness checks. Retrieval and embeddings are not the bottleneck on dev, so the embedding fine-tune is not required before held-out v2.
 - **Diagnostic tooling** (`scripts/diagnostics/ablation_patches.py`, `EVAL_ABLATION`) lives on branch `feat/prompt6-ablation`; it patches the eval API process only and is not part of `app/`.
+
+## DEC-021 — Owner decisions after PROMPT 6
+
+Set by the owner on 2026-11-12.
+
+- **Two-part questions get a partial answer.** The validated parts are answered; each other part gets a fixed server-side sentence saying it **could not be verified** from the documents the user may access ("chưa xác minh được…"). The wording "the documents do not mention" is not used: on the diagnostic traces the documents did state those parts. Nothing is made up for a missing part. A dev set of half-answerable two-part questions (overlap check, fingerprints, frozen) comes before any code for this.
+- **Order of work:** (i) the retry after the completeness checks, (ii) a responsiveness check calibrated on UAT, (iii) a fallback for query-focused excerpts, (iv) two-part questions. The low-alignment filter (A) and `group_hits[:2]` (B) are left as they are.
+- **F is merged flag-off;** its number normalization is reused in the completeness checks.
+- **No cross-encoder for now,** on Actions or in production. The docs say that prompt ranking puts the lexical alignment order before the cross-encoder score, so the reranker does not affect results today.
+- **No embedding fine-tune before held-out v2.** PR #14 stays open.
+
+## DEC-022 — Held-out v2 was run once by hand outside DEC-012
+
+Recorded on 2026-11-12 at the owner's instruction.
+
+- On 2026-11-11 the owner ran the 20 held-out v2 questions by hand on the system, outside the procedure of DEC-012.
+- **The record of that run is not in the repository** and is not used to design any fix. The implementer (Claude Code) does not read it and does not ask for it.
+- Only three general display defects were taken from that run, and nothing else: the fixed no-answer sentence is written without Vietnamese diacritics; answer templates print unaccented Vietnamese (units such as "trieu/thang"); an answer can repeat one sentence twice.
+- **Any report of held-out v2 results must state this event.**
