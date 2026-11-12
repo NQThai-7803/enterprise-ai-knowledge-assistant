@@ -223,3 +223,49 @@ UAT baseline nhanh (1,1 s) vì 75/100 câu đi route deterministic không gọi 
 | M3: đồng nghĩa ("đồng ý"/"phê duyệt") | so khớp từ trong đoạn trích, repair PERSON | chọn câu bằng cross-encoder, thay cho chọn dòng theo từ | các cặp diễn đạt lại do LLM viết từ câu trong chunk | FR-A01 và nhóm A của `false_refusal_dev_v1`, nhóm L của v2 | flag ở `query_focused_excerpt` |
 
 **Thứ tự đề xuất:** (1) kiểm độ đáp ứng, vì nó chặn trả lời sai, lỗi nặng hơn từ chối sai; (2) phân loại ý định, thay route deterministic; (3) tách câu hỏi ghép; (4) E và M3. Thứ tự cuối cùng chốt sau khi có số đo ablation (mục 3).
+
+## 5. Tổng hợp: cơ chế × đóng góp × phương án × thứ tự
+
+"Đóng góp" là số câu dev đổi khi gỡ hoặc sửa cơ chế (ablation), và số ca held-out v1 gắn với cơ chế (chỉ chẩn đoán, không chấm).
+
+| # | Cơ chế | Đóng góp đo được trên dev | Ca held-out v1 (chẩn đoán) | Phương án đề xuất | Thứ tự |
+|---|---|---|---|---|---|
+| R | **Vòng thử lại sau check độ đầy đủ** (`_should_retry_incomplete_answer`) | 5/6 ca FR v2 đã trace: câu trả lời đầu đúng, bị bác, thử lại hỏng. FR-A08 cùng mẫu | HO-035, HO-036, HO-005 | Flag: khi câu trả lời đầu đã SUPPORTED, check độ đầy đủ không được ép thử lại nếu số của câu trả lời bằng số của nguồn sau chuẩn hoá (dùng lại `canonical_number_unit_pairs` của F); nếu thử lại không qua thì **giữ câu trả lời đầu**, không trả NO_ANSWER | **1** |
+| V | Validator quá dễ (chép nguyên văn là SUPPORTED) | 5–6 trả lời sai ở FR v1, 4–6 ở relevance, 3–5 ở FR v2; không đổi dưới oracle | HO-011, HO-022, HO-023 | Kiểm độ đáp ứng bằng mô hình học được, hiệu chỉnh trên UAT (mục 4). M1b cho thấy tín hiệu có thật (relevance 5→1) nhưng ngưỡng phải lấy từ UAT | **2** |
+| X | Đoạn trích theo từ vựng (`query_focused_excerpt`) | bỏ hẳn: UAT −8, RBAC −5; nhưng cứu FR-A01, REL-403, C05, L06 | HO-025, HO-037 (evidence của claim 2 rỗng) | Giữ đoạn trích; thêm dự phòng: khi đoạn trích không chứa từ nội dung nào của câu hỏi, hoặc khối evidence của một ý rỗng, đưa thêm cả chunk | **3** |
+| C | Câu hỏi ghép: một ý hỏng là từ chối cả câu | 0 trên dev (không có ca) | 6 ca; xem số đo `partial` bên dưới | Chính sách trả lời một phần (owner duyệt) + bổ sung câu ghép "nửa trả lời được" vào dev trước khi code | **4** |
+| D | Route deterministic theo cue | chưa ablate; 75/100 UAT đi route này | 6/6 sai ở 4b; `strict` đã giảm | Bộ phân loại ý định (mục 4); trước đó bật thử `RAG_STRICT_OUTCOME_CUES_EXACT_ENABLED` | 5 (NLU) |
+| F | So số "01"/"1" ở validator | **0** trên 5 bộ | HO-012, HO-013 | Flag giữ tắt; hàm chuẩn hoá dùng lại cho R | gộp vào 1 |
+| A | Bộ lọc tài liệu khớp từ vựng thấp | gỡ hẳn: UAT **−2**, 0 câu được cứu | 5 ca | Không gỡ. Chỉ làm bản "cứu bằng ngữ nghĩa" sau khi có ca dev tái hiện được (nhóm L của v2 không tái hiện: gold vẫn vào context) | 6 |
+| B | `group_hits[:2]` | nới thành 5: UAT **−6**, relevance −1 | HO-002, HO-033 | Không nới với model 3B. Xem lại khi đổi LLM | không làm |
+| Rk | Reranker thật | **0 câu đổi** ở cả hai model; bge +100 s/câu trên CPU | — | Vô nghĩa cho tới khi thứ tự xếp hạng dùng điểm cross-encoder (`reranker_first`); nếu thử thì dùng mMiniLMv2 (≈ +9 s/câu), không dùng bge trên CPU | sau 1–4, tuỳ owner |
+| E, M3 | Tiếng Anh, đồng nghĩa | nhóm E của v2: 3/4 từ chối sai | HO-035, HO-036 | NLU (mục 4) | NLU |
+| Emb | Fine-tune embedding | oracle context không cải thiện đáng kể → retrieval không phải điểm nghẽn | HO-010 (1 ca retrieval) | **Không cần trước held-out v2.** Lợi ích kỳ vọng nằm ở câu hỏi không dấu (chưa đo trong PROMPT 6) | sau NLU |
+
+**Lập luận thứ tự:** sửa nơi mất nhiều nhất mà rủi ro thấp nhất trước. R đứng đầu vì câu trả lời bị mất ở đó **đã qua validator**, nên giữ lại nó không nới validator; và nó giải thích cả các ca F. V đứng thứ hai vì trả lời sai nặng hơn từ chối sai, nhưng cần mô hình và dữ liệu nên lâu hơn. A, B và reranker bị đẩy xuống vì ablation cho thấy gỡ chúng chỉ gây hại trên dev.
+
+**Giới hạn của kết luận:** dev nhỏ (20–36 câu mỗi bộ, trừ UAT), UAT là điểm proxy và 75/100 câu đi route deterministic nên kém nhạy với thay đổi ở nhánh LLM. Held-out v1 chỉ là trace một lượt trên CPU. Mọi con số là của `qwen2.5:3b`; với LLM mạnh hơn, B và X có thể đảo chiều.
+
+### Chính sách cho câu hỏi ghép: số đo của hai hướng
+
+- **Trên dev (5 bộ, 2 lượt):** hai hướng cho kết quả **giống hệt nhau**, 0 câu đổi, vì không câu ghép nào của dev hỏng một phần (nhóm C của v2: 4 câu đúng cả hai ý, 2 câu sai tiền đề cả hai ý). Dev hiện **không đo được** chính sách này.
+- **Trên held-out v1 (chỉ chẩn đoán, 8 câu ghép, một cặp job `43251294483` / `43251334025`, CPU):**
+
+| Câu | Từ chối cả câu (hiện tại) | Trả lời một phần | Nhận xét so với gold |
+|---|---|---|---|
+| HO-025 | NO_ANSWER | "Phụ cấp đi lại/gửi xe là 300.000 đ/tháng. Tài liệu … không đề cập: phụ cấp trách nhiệm quản lý…" | ý 1 đúng; **câu "không đề cập" sai**: tài liệu có nêu (1–5 triệu) |
+| HO-032 | NO_ANSWER | "Phiếu lương điện tử được phát hành trước hoặc cùng ngày trả lương. Tài liệu … không đề cập: Bộ phận nào khóa kỳ công" | ý 2 đúng; **câu "không đề cập" sai**: tài liệu có nêu (HR) |
+| HO-028 | NO_ANSWER | một mức thưởng đúng, kèm hai câu "không được quy định" do LLM viết và câu cố định của server | 1/3 ý đúng; phần còn lại nói sai là không có |
+| HO-031 | NO_ANSWER | NO_ANSWER | không ý nào được xác thực |
+| HO-001, 033, 037, 038 | ANSWERED | ANSWERED (giống hệt) | không vào nhánh; HO-001 vẫn sai ở cả hai hướng |
+
+**Kết luận:** trả lời một phần trả lại được phần đúng ở 3/4 ca đang bị từ chối, và không tạo ra con số hay sự kiện sai nào. Nhưng ở **cả 3 ca**, câu "tài liệu không đề cập" là **sai sự thật**: tài liệu có nêu, hệ thống chỉ không xác thực được. Nếu làm, câu cố định phải nói đúng điều hệ thống biết, ví dụ "Chưa xác minh được từ tài liệu bạn được phép truy cập: …", không khẳng định tài liệu thiếu. Số đo này là một lượt trên 8 câu chẩn đoán; cần ca dev trước khi quyết định bằng DEC-013.
+
+## 6. Quyết định cần owner duyệt
+
+1. **Câu hỏi ghép:** (a) giữ "từ chối cả câu"; (b) trả lời một phần với câu "tài liệu không đề cập" như yêu cầu ban đầu; (c) trả lời một phần với câu "chưa xác minh được…". Đề xuất (c), kèm việc bổ sung câu ghép "nửa trả lời được" vào một bộ dev mới trước khi code (dev hiện không đo được).
+2. **Thứ tự cơ chế:** đề xuất R (vòng thử lại sau check độ đầy đủ) → V (độ đáp ứng, học được) → X (dự phòng cho đoạn trích) → C; A, B không làm lúc này. Thứ tự này khác thứ tự F → C → A đã giao ở FIX 3c.
+3. **F:** không đạt DEC-013 (0 câu đổi). Giữ flag tắt trên nhánh `feat/fix-3c-f`, hay merge dạng flag tắt như FIX 3a để R dùng lại hàm chuẩn hoá?
+4. **Cross-encoder:** đề xuất **chưa dùng** ở Actions lẫn production: 0 câu đổi vì thứ hạng alignment đứng trước; bge thêm ~100 s/câu trên CPU. Nếu muốn thử `reranker_first` sau này thì dùng mMiniLMv2-L12.
+5. **Fine-tune embedding trước held-out v2:** đề xuất **không**. Oracle context cho thấy retrieval không phải điểm nghẽn.
+6. **Bộ dev:** có soạn thêm bộ câu ghép "nửa trả lời được" và ca tái hiện cơ chế A không (nhóm L của v2 không tái hiện được A)?
