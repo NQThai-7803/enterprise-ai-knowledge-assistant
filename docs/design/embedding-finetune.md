@@ -70,3 +70,11 @@ A candidate model is proposed for the app only if all of these hold:
 - **Reproducibility.** Training on CPU and GPU, or in fp16 and fp32, gives slightly different weights. The config records the device, GPU, precision and versions, and `requirements-train.lock` pins every library except torch, whose build is chosen per host (cu126 locally, CPU on Actions). Numbers from different hosts are never compared (DEC-017).
 - **Library versions differ from the app.** The training lock follows `.venv-nlp` (sentence-transformers 6.2.0, transformers 5.22.2); the app image has 6.1.0 and 5.19.0. `eval_retrieval.py` scores the base model and the candidate in the same environment, but before a switch the candidate must also load and embed identically in the app image.
 - **Licence.** multilingual-e5-small is MIT-licensed. A fine-tuned copy stays internal.
+
+## 8. Priority after PROMPT 6 (2026-11-12)
+
+Measured in `docs/design/pipeline-loss-fix-plan.md` (PR #20, DEC-020), on 5 dev sets on GitHub Actions:
+
+- **Oracle context barely helps.** Passing the gold chunks straight to the prompt leaves RBAC at 10 of 18 controls refused and changes the other sets by 0 to 2 cases. Retrieval is not where dev answers are lost; the loss is after the context (completeness-check retries, lenient validator).
+- **Proposed order:** the fine-tune comes after the post-context fixes and the NLU work, and is **not required before the held-out v2 measurement**. This is a proposal for the owner (decision 5 of the plan).
+- **What this does not show:** PROMPT 6 did not measure questions without diacritics, the case this fine-tune targets (section 1). `eval_retrieval.py` on the unaccented UAT questions is still the measurement that decides whether training is worth running.
