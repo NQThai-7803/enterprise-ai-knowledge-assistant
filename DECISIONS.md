@@ -158,3 +158,13 @@ Set by the owner on 2026-11-09. Amends DEC-018.
 - **No merge without the 4 checks green**, as under DEC-016 and DEC-018.
 - **The PR says so:** a PR verified this way states "verified by CI (DEC-019), local eaka-verify not run" and gives the RAM readings that kept the gate closed.
 - Local eaka-verify stays the default whenever the gate opens.
+
+## DEC-020 — PROMPT 6 findings; what stays as it is until the owner decides
+
+Recorded on 2026-11-12 from the ablation batches on GitHub Actions (`docs/design/pipeline-loss-fix-plan.md`). Proposals in that document wait for the owner; this entry fixes only what the measurements settle.
+
+- **F (`RAG_NUMBER_NORMALIZATION_ENABLED`) does not meet DEC-013:** 0 cases changed on all 5 dev sets. The flag stays off and unmerged (branch `feat/fix-3c-f`).
+- **No default changes from the ablations.** Removing the low-alignment document filter, widening `group_hits[:2]` to 5, or passing whole chunks instead of query-focused excerpts each regress UAT (−2, −6, −8) and help no set on balance. They are not to be shipped as fixes with `qwen2.5:3b`.
+- **A real cross-encoder changes no answer** (bge-reranker-v2-m3 and mMiniLMv2-L12, `reranker_mode=cross_encoder` verified) because prompt ranking puts the lexical alignment order first. Earlier `lexical_fallback` measurements therefore stand. bge adds about 100 s per UAT question on a CPU runner.
+- **Oracle context (gold chunks straight to the prompt) barely improves any dev set.** The loss is after the context: the 3B model, the validator, and the retry forced by the completeness checks. Retrieval and embeddings are not the bottleneck on dev, so the embedding fine-tune is not required before held-out v2.
+- **Diagnostic tooling** (`scripts/diagnostics/ablation_patches.py`, `EVAL_ABLATION`) lives on branch `feat/prompt6-ablation`; it patches the eval API process only and is not part of `app/`.
