@@ -1,6 +1,6 @@
 # Kế hoạch sửa các tầng làm mất chứng cứ (PROMPT 6)
 
-Trạng thái: bản nháp, đang đo. Nhánh `feat/prompt6-ablation`. Không sửa `app/`, trừ việc bật F nếu F đạt DEC-013 (PR riêng).
+Trạng thái: đã đo xong, chờ owner duyệt (mục 6). Nhánh `feat/prompt6-ablation`. Không sửa `app/`, trừ việc bật F nếu F đạt DEC-013 (PR riêng).
 
 ## 1. Thiết kế đợt đo (ghi trước khi đo)
 
@@ -131,25 +131,6 @@ Số dòng tính trên `main` `c3f55cd`. "gas" là `app/services/grounded_answer
   3. Chỉ chặn khi kết hợp nhiều tín hiệu yếu (cosine thấp *và* thiếu cụm được hỏi).
 - **Đo:** `oracle`/`oracle_full` cho biết phần trả lời sai còn lại khi context đã đúng.
 
-## 4. NLU: thiết kế, chưa làm
-
-**Mục tiêu:** thay các rule viết theo cue bằng mô hình nhỏ, học được và đo được, nhưng không bỏ các bất biến an toàn (lọc quyền trước, citation chỉ từ chunk đã được phép, validator ở cuối).
-
-**Dữ liệu huấn luyện (mọi phần):**
-- Chỉ sinh từ chunk của corpus, theo DEC-015. Dùng lại `ml/embedding_finetune/generate_queries.py`: câu hỏi sinh từ chunk, kèm các biến thể không dấu, dấu một phần, lỗi gõ, tiếng Anh.
-- Mọi câu đều đi qua kiểm fingerprint với các bộ được bảo vệ, như với fine-tune.
-- Bộ dev chỉ dùng để đánh giá. Held-out không dùng cho việc gì.
-
-| Thành phần | Thay cho | Mô hình đề xuất | Nhãn sinh thế nào | Đánh giá | Đưa vào app |
-|---|---|---|---|---|---|
-| Phân loại ý định / loại câu trả lời | cue trong `analyze_question` và route deterministic (D) | đầu phân loại trên encoder e5-small (dùng chung model embedding, thêm vài trăm nghìn tham số) | LLM gán loại (PERSON, AMOUNT, COUNT, DURATION, CONDITION, YES_NO, DEFINITION, …) cho câu hỏi sinh từ chunk; câu nào hai lần gán khác nhau thì bỏ | độ chính xác trên nhãn tay của Q001-Q100 và các bộ relevance (chỉ đánh giá) | flag; khi bật, route deterministic chỉ chạy nếu ý định là CONDITION/VALUE với độ tin cậy ≥ ngưỡng |
-| Tách câu hỏi ghép | regex trong `subclaims.py` (C) | sinh có ràng buộc: LLM tách, server chỉ nhận các ý ghép được từ chính từ của người dùng (như quy tắc hiện tại) | ghép hai câu hỏi sinh từ hai chunk thành một câu, nhãn là hai câu gốc | khớp ý trên câu ghép của UAT, nhóm C của `false_refusal_dev_v2` | flag; regex giữ lại làm dự phòng |
-| Kiểm độ đáp ứng | M1a/M1b (V) | cross-encoder (câu hỏi, câu evidence) → "trả lời đúng điều được hỏi" | dương: (câu hỏi sinh từ câu s, s); âm: (câu hỏi đó, câu bên cạnh s′ trong cùng tài liệu), đúng là kiểu lỗi M1 | **hiệu chỉnh và kiểm trên UAT** cùng relevance và false_refusal v1/v2; điều kiện bắt buộc là không hồi quy UAT (bài học FIX 3a) | flag, sau validator hiện có; chỉ chuyển SUPPORTED thành NO_ANSWER, không bao giờ ngược lại |
-| E: câu hỏi tiếng Anh | cue tiếng Việt, check "who" phải có tên người | ý định đa ngôn ngữ (cùng bộ phân loại), check độ đầy đủ theo ý định thay vì theo từ | biến thể tiếng Anh của câu hỏi sinh từ chunk | nhóm E của `false_refusal_dev_v2`, câu tiếng Anh của UAT | cùng flag với bộ phân loại ý định |
-| M3: đồng nghĩa ("đồng ý"/"phê duyệt") | so khớp từ trong đoạn trích, repair PERSON | chọn câu bằng cross-encoder, thay cho chọn dòng theo từ | các cặp diễn đạt lại do LLM viết từ câu trong chunk | FR-A01 và nhóm A của `false_refusal_dev_v1`, nhóm L của v2 | flag ở `query_focused_excerpt` |
-
-**Thứ tự đề xuất:** (1) kiểm độ đáp ứng, vì nó chặn trả lời sai, lỗi nặng hơn từ chối sai; (2) phân loại ý định, thay route deterministic; (3) tách câu hỏi ghép; (4) E và M3. Thứ tự cuối cùng chốt sau khi có số đo ablation (mục 3).
-
 ## 3. Kết quả ablation (GitHub Actions, CPU, Ollama 0.40.15, 2026-11-10)
 
 Mỗi ô: **đúng / từ chối sai / trả lời sai / sai khác** (c/fr/fa/w), lượt 1 và lượt 2 khi khác nhau. Rò rỉ = 0 ở **mọi** cấu hình, mọi bộ (API và retrieval). Số câu đổi là số câu đổi ở cả 2 lượt (DEC-011). Run ID trong `artifacts/prompt6/runs.txt` và `runs2.txt`; tổng hợp bằng `scripts/diagnostics/summarize_ablation.py`.
@@ -173,7 +154,7 @@ Mỗi ô: **đúng / từ chối sai / trả lời sai / sai khác** (c/fr/fa/w)
 | `excerpt_off` (nguyên chunk) | **−8** (5 từ chối sai, 3 sai) | **−5 control** (04, 05, 11, 15 →từ chối sai; 16 →sai) | +1 (REL-403 fa→đúng) | ±: A01 fr→đúng, N05 đúng→fr | +2 fa→đúng (C05, L06), −2 fr (C04, L03) | đoạn trích theo từ vựng vừa là lý do dev đạt 100 vừa là nguyên nhân FR-A01 |
 | `numnorm` (F) | 0 | 0 | 0 | 0 | 0 | **không chạm ca nào**: F01, F02 của v2 không bị chặn bởi `_numbers_are_contradicted` (xem trace) |
 | `partial` (C) | 0 | 0 | 0 | 0 | 0 | không có câu ghép nào trên dev hỏng *một phần*; chính sách chỉ đo được trên held-out v1 (diagnostic, bên dưới) |
-| `ce_bge` (bge-reranker-v2-m3, thật) | (đang chạy) | 0 | 0 | 0 | 0 | `reranker_mode=cross_encoder` ở mọi lượt, 0 timeout |
+| `ce_bge` (bge-reranker-v2-m3, thật) | 98 ở lượt 1 (Q071 sai, Q097 hết giờ 420 s); lượt 2 không xong | 0 | 0 | 0 | 0 | `reranker_mode=cross_encoder` ở mọi lượt, 0 timeout |
 | `ce_mmarco` (mMiniLMv2-L12) | 0 | 0 | 0 | 0 | 0 | như trên |
 
 **Cross-encoder thật không đổi một câu nào.** Lý do nằm ở code, không ở model: `_prepare_prompt_retrieval_hits` (gas:1746–1749) xếp lại toàn bộ theo alignment (`_rank_hits_for_prompt`) rồi `_merge_retrieval_hits(ranked_hits, reranked_hits)` đặt thứ hạng alignment **trước**; điểm cross-encoder chỉ còn vai trò nối đuôi. Vì vậy mọi số đo từ trước tới nay (tất cả đều `lexical_fallback`) **không lệch** so với khi có reranker thật, và việc có cross-encoder hay không là vô nghĩa cho tới khi đổi thứ tự xếp hạng (PROMPT 6 cũ, `reranker_first`).
@@ -184,13 +165,61 @@ Mỗi ô: **đúng / từ chối sai / trả lời sai / sai khác** (c/fr/fa/w)
 |---|---|---|---|
 | RAM dùng đỉnh của runner (MB) | 5 900–6 800 | 6 150–7 350 | 6 400–7 200 |
 | Độ trễ trung vị, relevance (ms) | 11 000–12 300 | 17 300 | 12 000 |
-| Độ trễ trung vị, UAT (ms) | 1 100 | (đang chạy) | 9 800 |
+| Độ trễ trung vị, UAT (ms) | 1 100 | **101 600** (1 lượt; job bị huỷ ở giới hạn 340 phút) | 9 800 |
 | `RERANKER_TIMEOUT` | — | 0 | 0 |
 
 UAT baseline nhanh (1,1 s) vì 75/100 câu đi route deterministic không gọi LLM; cross-encoder chạy trước route đó nên cộng thẳng ~8–9 s mỗi câu.
 
-### Việc còn mở (2026-11-10, tạm dừng vì hết hạn mức phiên)
+### Oracle context: trần của các tầng sau retrieval (nhóm A4, sau khi sửa lỗi `top_k`)
 
-- **`oracle` lần 1 hỏng** vì `ORACLE_TOP_K=200` vượt `hybrid_retrieval_max_top_k=50` → 503 ở mọi câu có gold. Đã sửa (`1af0890`) và chạy lại nhóm A4 trên 5 bộ (`artifacts/prompt6/runs4.txt`); chưa có kết quả.
-- **`partial` chưa từng chạy vào nhánh bắt lỗi** (0 dòng `ABLATION partial` trong mọi job, kể cả trace held-out `42802915105`), dù `_compound_draft_with_claim_repair` chỉ có một lối ra ném `CitationValidationFailedApplicationError` (gas:1427). Nguyên nhân chưa rõ; cần tái hiện local với một câu ghép giả lập trước khi tin bất kỳ số đo nào của `partial`. Trong trace đó, HO-033/037/038 đổi thành ANSWERED đúng gold **mà không do patch**: nhánh câu hỏi ghép dao động giữa các lượt (đã ghi ở 4b cho HO-037).
-- **Chưa có:** kết quả `uat R1` (ce_bge trên UAT, run `42767230504`), trace v2 (`42802589033`, giải thích FR2-F01/F02 và nhóm E), bảng cơ chế × đóng góp × thứ tự, DEC mới, ADR fine-tune, PR tài liệu.
+`oracle` = chỉ chunk gold, vẫn qua đoạn trích; `oracle_full` = chunk gold nguyên văn. Mọi câu có gold đều được khớp (UAT: 104/104 lần truy hồi, 0 miss; RBAC: 18 control khớp, 18 negative không thấy gold vì ngoài quyền, đúng thiết kế).
+
+| Bộ | base | `oracle` | `oracle_full` |
+|---|---|---|---|
+| UAT | 98–99/1/0/0–1 | 96/3/1/0 (Q015, Q045 →từ chối sai; Q018 →trả lời sai) | **84/15/0/1** (14 câu đúng →từ chối sai) |
+| RBAC | 23/12/0/1 | **26/10/0/0** (control 08, 12, 18 được cứu) | 17/18/1/0 (5 control mất, RBD-03 negative →trả lời sai) |
+| relevance | 17/3/5/0 | 17/2/6/0 | 19/2/4/0 |
+| FR v1 | 13/1/6/0 | 13/1/6/0 | 14/1/5/0 (A01 được cứu, N05 mất) |
+| FR v2 | 13/5/5/1 | 15/4/5/0 | 17/4/3/0 |
+
+**Đọc kết quả:**
+- **Đưa đúng chunk gold cho LLM gần như không giúp gì.** RBAC vẫn còn 10/18 control bị từ chối, FR v2 còn 4, relevance còn 2. Phần mất nằm **sau** context: LLM 3B, validator, kiểm độ đầy đủ và vòng thử lại. Retrieval, xếp hạng và embedding không phải điểm nghẽn trên dev.
+- **Chunk nguyên văn làm UAT tệ đi 14 câu.** Model 3B cần đoạn trích đã thu hẹp; nhưng chính bộ chọn dòng theo từ vựng đó làm hỏng FR-A01. Đây là đánh đổi cốt lõi: không thể bỏ đoạn trích, phải làm nó chọn đúng hơn.
+- Trả lời sai gần như không đổi dưới oracle (FR v1 vẫn 5–6, relevance 4–6): chúng là câu **phải từ chối** mà LLM chép câu bên cạnh và validator cho qua (cơ chế V), không liên quan đến context.
+
+### Trace `false_refusal_dev_v2` (run `42802589033`): vì sao F không chạm ca nào
+
+| Câu | Bị chặn ở | Chi tiết |
+|---|---|---|
+| FR2-F01 | kiểm độ đầy đủ | Câu trả lời đầu **đúng và SUPPORTED** ("01 lần/năm"). `_yes_no_answer_missing_polarity` (gas:3472) coi "mấy lần một năm" là yes/no thiếu cực → thử lại → LLM trả `"answer": [SOURCE_1]` → lỗi citation. |
+| FR2-F02 | đơn vị + kiểm độ đầy đủ | Câu trả lời đầu đúng ("2 lần mỗi tháng"). `_quantity_answer_missing_source_number` vì nguồn viết "02" → thử lại → LLM chép số của tài liệu khác → `answer_missing_requested_unit`. |
+| FR2-E01 | kiểm độ đầy đủ | Câu trả lời đầu đúng ("2.500 kg"). `_numeric_answer_missing_source_unit` (gas:3551) → thử lại hỏng định dạng. |
+| FR2-E02 | validator | Câu trả lời tiếng Việt đúng, 3 lần liền INSUFFICIENT: đoạn trích theo câu hỏi tiếng Anh không chứa dòng đáp án. |
+| FR2-E04 | validator | "24 hours" so với "24 giờ" → `_numbers_are_contradicted` (đơn vị khác ngôn ngữ). |
+| FR2-L03 | kiểm độ đầy đủ | Câu trả lời đầu đúng và SUPPORTED; `_quantity_answer_missing_source_number` ép thử lại → LLM trả 4 con số của tài liệu khác → **được chấp nhận** (trả lời sai). |
+
+**Mẫu chung, quan trọng nhất của PROMPT 6:** ở 5/6 ca, câu trả lời **đầu tiên của LLM đã đúng**; một check "độ đầy đủ" (`_should_retry_incomplete_answer`, gas:3455) bác nó, và vòng thử lại với model 3B cho ra kết quả tệ hơn (sai định dạng, hoặc chép số khác). Số "01"/"1" làm hỏng ở **check độ đầy đủ** (so chuỗi số với nguồn), không phải ở `_numbers_are_contradicted` mà F sửa. Cùng mẫu với HO-035, HO-036 (4b) và FR-A08 (FIX 3a).
+
+### Đính chính trong quá trình đo
+- Cấu hình `oracle` của nhóm A1/A3 hỏng (503) vì `top_k=200` vượt `hybrid_retrieval_max_top_k=50`; các số oracle ở trên là của nhóm A4 sau khi sửa (`1af0890`).
+- Commit `2073002` ghi "oracle chỉ khớp 52/98 câu UAT": **sai**, tôi chưa kiểm khi viết. Kiểm lại: 104/104 lần truy hồi khớp. Thay đổi trong commit đó (khoá theo câu hỏi gốc) vô hại; phần còn lại của commit (giữ `PYTHONPATH` khi trace) là bản sửa thật.
+- `partial` không có số đo trên dev vì không câu ghép nào của dev hỏng một phần; trace held-out lần đầu chạy không có patch (thiếu `PYTHONPATH`). Số đo đúng ở mục dưới.
+
+## 4. NLU: thiết kế, chưa làm
+
+**Mục tiêu:** thay các rule viết theo cue bằng mô hình nhỏ, học được và đo được, nhưng không bỏ các bất biến an toàn (lọc quyền trước, citation chỉ từ chunk đã được phép, validator ở cuối).
+
+**Dữ liệu huấn luyện (mọi phần):**
+- Chỉ sinh từ chunk của corpus, theo DEC-015. Dùng lại `ml/embedding_finetune/generate_queries.py`: câu hỏi sinh từ chunk, kèm các biến thể không dấu, dấu một phần, lỗi gõ, tiếng Anh.
+- Mọi câu đều đi qua kiểm fingerprint với các bộ được bảo vệ, như với fine-tune.
+- Bộ dev chỉ dùng để đánh giá. Held-out không dùng cho việc gì.
+
+| Thành phần | Thay cho | Mô hình đề xuất | Nhãn sinh thế nào | Đánh giá | Đưa vào app |
+|---|---|---|---|---|---|
+| Phân loại ý định / loại câu trả lời | cue trong `analyze_question` và route deterministic (D) | đầu phân loại trên encoder e5-small (dùng chung model embedding, thêm vài trăm nghìn tham số) | LLM gán loại (PERSON, AMOUNT, COUNT, DURATION, CONDITION, YES_NO, DEFINITION, …) cho câu hỏi sinh từ chunk; câu nào hai lần gán khác nhau thì bỏ | độ chính xác trên nhãn tay của Q001-Q100 và các bộ relevance (chỉ đánh giá) | flag; khi bật, route deterministic chỉ chạy nếu ý định là CONDITION/VALUE với độ tin cậy ≥ ngưỡng |
+| Tách câu hỏi ghép | regex trong `subclaims.py` (C) | sinh có ràng buộc: LLM tách, server chỉ nhận các ý ghép được từ chính từ của người dùng (như quy tắc hiện tại) | ghép hai câu hỏi sinh từ hai chunk thành một câu, nhãn là hai câu gốc | khớp ý trên câu ghép của UAT, nhóm C của `false_refusal_dev_v2` | flag; regex giữ lại làm dự phòng |
+| Kiểm độ đáp ứng | M1a/M1b (V) | cross-encoder (câu hỏi, câu evidence) → "trả lời đúng điều được hỏi" | dương: (câu hỏi sinh từ câu s, s); âm: (câu hỏi đó, câu bên cạnh s′ trong cùng tài liệu), đúng là kiểu lỗi M1 | **hiệu chỉnh và kiểm trên UAT** cùng relevance và false_refusal v1/v2; điều kiện bắt buộc là không hồi quy UAT (bài học FIX 3a) | flag, sau validator hiện có; chỉ chuyển SUPPORTED thành NO_ANSWER, không bao giờ ngược lại |
+| E: câu hỏi tiếng Anh | cue tiếng Việt, check "who" phải có tên người | ý định đa ngôn ngữ (cùng bộ phân loại), check độ đầy đủ theo ý định thay vì theo từ | biến thể tiếng Anh của câu hỏi sinh từ chunk | nhóm E của `false_refusal_dev_v2`, câu tiếng Anh của UAT | cùng flag với bộ phân loại ý định |
+| M3: đồng nghĩa ("đồng ý"/"phê duyệt") | so khớp từ trong đoạn trích, repair PERSON | chọn câu bằng cross-encoder, thay cho chọn dòng theo từ | các cặp diễn đạt lại do LLM viết từ câu trong chunk | FR-A01 và nhóm A của `false_refusal_dev_v1`, nhóm L của v2 | flag ở `query_focused_excerpt` |
+
+**Thứ tự đề xuất:** (1) kiểm độ đáp ứng, vì nó chặn trả lời sai, lỗi nặng hơn từ chối sai; (2) phân loại ý định, thay route deterministic; (3) tách câu hỏi ghép; (4) E và M3. Thứ tự cuối cùng chốt sau khi có số đo ablation (mục 3).
