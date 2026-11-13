@@ -1,6 +1,6 @@
 # Kế hoạch sửa các tầng làm mất chứng cứ (PROMPT 6)
 
-Trạng thái: đã đo xong, chờ owner duyệt (mục 6). Nhánh `feat/prompt6-ablation`. Không sửa `app/`, trừ việc bật F nếu F đạt DEC-013 (PR riêng).
+Trạng thái: đã đo xong; owner đã duyệt ngày 2026-11-12 (mục 6, DEC-021). Công cụ đo (`scripts/diagnostics/ablation_patches.py`, `build_oracle.py`, `summarize_ablation.py`) và flag F nằm trên nhánh `feat/prompt6-ablation`, chưa merge. Không sửa `app/`, trừ việc bật F nếu F đạt DEC-013 (PR riêng).
 
 ## 1. Thiết kế đợt đo (ghi trước khi đo)
 
@@ -259,7 +259,7 @@ UAT baseline nhanh (1,1 s) vì 75/100 câu đi route deterministic không gọi 
 | HO-031 | NO_ANSWER | NO_ANSWER | không ý nào được xác thực |
 | HO-001, 033, 037, 038 | ANSWERED | ANSWERED (giống hệt) | không vào nhánh; HO-001 vẫn sai ở cả hai hướng |
 
-**Kết luận:** trả lời một phần trả lại được phần đúng ở 3/4 ca đang bị từ chối, và không tạo ra con số hay sự kiện sai nào. Nhưng ở **cả 3 ca**, câu "tài liệu không đề cập" là **sai sự thật**: tài liệu có nêu, hệ thống chỉ không xác thực được. Nếu làm, câu cố định phải nói đúng điều hệ thống biết, ví dụ "Chưa xác minh được từ tài liệu bạn được phép truy cập: …", không khẳng định tài liệu thiếu. Số đo này là một lượt trên 8 câu chẩn đoán; cần ca dev trước khi quyết định bằng DEC-013.
+**Kết luận:** trả lời một phần trả lại được phần đúng ở 3/4 ca đang bị từ chối, và không tạo ra con số hay sự kiện sai nào. Nhưng ở **cả 3 ca**, câu "tài liệu không đề cập" là **sai sự thật**: tài liệu có nêu, hệ thống chỉ không xác thực được. Nếu làm, câu cố định phải nói đúng điều hệ thống biết, ví dụ "Chưa xác minh được từ tài liệu bạn được phép truy cập: …", không khẳng định tài liệu thiếu. Cặp job thứ hai (`43251374823` / `43251411622`) cho đúng kết quả đó ở HO-025, 028, 031, 032 và ba câu không vào nhánh; riêng HO-001 dao động giữa hai job (từ chối ở base, trả lời sai ở partial, không qua nhánh trả lời một phần). Đây là 2 lượt trên 8 câu chẩn đoán; cần ca dev trước khi quyết định bằng DEC-013.
 
 ## 6. Quyết định cần owner duyệt
 
@@ -269,3 +269,12 @@ UAT baseline nhanh (1,1 s) vì 75/100 câu đi route deterministic không gọi 
 4. **Cross-encoder:** đề xuất **chưa dùng** ở Actions lẫn production: 0 câu đổi vì thứ hạng alignment đứng trước; bge thêm ~100 s/câu trên CPU. Nếu muốn thử `reranker_first` sau này thì dùng mMiniLMv2-L12.
 5. **Fine-tune embedding trước held-out v2:** đề xuất **không**. Oracle context cho thấy retrieval không phải điểm nghẽn.
 6. **Bộ dev:** có soạn thêm bộ câu ghép "nửa trả lời được" và ca tái hiện cơ chế A không (nhóm L của v2 không tái hiện được A)?
+
+### Owner đã quyết định (2026-11-12, DEC-021)
+
+1. Câu hỏi ghép: trả lời một phần với câu "chưa xác minh được…"; không dùng "tài liệu không đề cập".
+2. Thứ tự: (i) vòng thử lại sau check độ đầy đủ → (ii) kiểm độ đáp ứng, hiệu chỉnh trên UAT → (iii) dự phòng đoạn trích → (iv) C. Không làm A, B.
+3. F: merge dạng flag tắt; dùng lại hàm chuẩn hoá số trong check độ đầy đủ.
+4. Cross-encoder: chưa dùng; tài liệu ghi rõ reranker hiện không ảnh hưởng kết quả.
+5. Fine-tune embedding: không làm trước held-out v2; PR #14 giữ mở.
+6. Soạn bộ dev câu ghép "nửa trả lời được" trước khi code C.

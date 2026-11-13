@@ -8,6 +8,12 @@
 3. **Embedding fine-tune** (`docs/design/embedding-finetune.md` and DEC-015 on branch `feat/embedding-finetune-infra`): infrastructure only so far; the baseline measurement and training come after FIX 3.
 4. The final held-out v2 measurement, once, after the choices above are made (DEC-012).
 
+## PROMPT 6 pipeline-loss analysis -- 2026-11-12 (WAITING FOR OWNER)
+
+- **DONE: ablations and real rerankers measured on Actions, 5 dev sets, 2 runs** (`docs/design/pipeline-loss-fix-plan.md`, DEC-020). F: 0 cases changed, flag stays off. Low-alignment filter off, `group_hits[:5]`, whole chunks: all regress UAT. Cross-encoders: 0 answers changed. Oracle context: almost no gain, the loss is after the context.
+- **Main finding:** in 5 of 6 traced `false_refusal_dev_v2` failures the first LLM answer was right and validated; a completeness check forced a retry that the 3B model failed.
+- **WAITING FOR OWNER:** the 6 decisions in section 6 of the plan (compound-question policy, mechanism order, F, cross-encoder, embedding fine-tune, new dev cases). FIX 3c C and A are not coded.
+
 ## FIX 3b re-diagnosis of false refusals -- 2026-11-09
 
 - **DONE: held-out v1 false refusals traced on Actions** (run `42581562670`, CPU, diagnostic only, DEC-008): 13/14 still refused. Mechanisms: A, answer document dropped by `_filter_low_alignment_documents` after the lexical-fallback rerank (5); C, a two-part question refused when one part's evidence is empty or wrong (6); F, zero-padded counts with slash units among other numbers read as contradicted (2); E, English questions over Vietnamese sources (2). `docs/eval/runs/fix3b-diagnosis.md`.
