@@ -4308,21 +4308,62 @@ def _fold_for_person_match(text: str) -> str:
     return "".join(character for character in normalized if not unicodedata.combining(character))
 
 
-# Words that turn a restatement into a different claim; folded.
+# Words that turn a restatement into a different claim.
 _RESTATEMENT_BLOCKING_WORDS = frozenset(
-    {"khong", "chua", "chang", "cam", "not", "no", "never", "cannot", "without"}
+    {"không", "chưa", "chẳng", "cấm", "not", "no", "never", "cannot", "without"}
 )
 
 
+def _answer_clauses(text: str) -> list[list[str]]:
+    """Words of each clause, diacritics kept ("kế" is not "kê")."""
+    parts = re.split(r"[,;.:!?](?!\d)|\n", text.casefold())  # not "450.000"
+    return [words for part in parts if (words := re.findall(r"\w+", part))]
+
+
+def _clause_restates(words: list[str], clause: list[str], earlier_words: set[str]) -> bool:
+    """True when words are the clause's words with only insertions: each extra run sits
+    between two words the clause has side by side, or before its first / after its last
+    word, and holds no number, no negation and at most one word new to the earlier answer."""
+    present = set(clause)
+    pairs = set(zip(clause, clause[1:], strict=False))
+    new_words = 0
+    index = 0
+    while index < len(words):
+        if words[index] in present:
+            index += 1
+            continue
+        stop = index
+        while stop < len(words) and words[stop] not in present:
+            stop += 1
+        run = words[index:stop]
+        if any(word.isdigit() or word in _RESTATEMENT_BLOCKING_WORDS for word in run):
+            return False
+        new_words += sum(word not in earlier_words for word in run)
+        left = words[index - 1] if index > 0 else None
+        right = words[stop] if stop < len(words) else None
+        if left is not None and right is not None:
+            attached = (left, right) in pairs  # inserted, not put in place of a word
+        elif right is not None:
+            attached = clause[0] == right
+        elif left is not None:
+            attached = clause[-1] == left
+        else:
+            attached = False
+        if not attached:
+            return False
+        index = stop
+    return new_words <= 1
+
+
 def _restates(answer: str, earlier: str) -> bool:
-    """True when every word of answer is in earlier, but for one word that is no number or
-    negation ("tự trả phí" vs "tự trả lệ phí")."""
-    words = set(re.findall(r"\w+", _fold_for_person_match(answer)))
-    missing = words - set(re.findall(r"\w+", _fold_for_person_match(earlier)))
-    return (
-        len(words) >= 5
-        and len(missing) <= 1
-        and not any(word.isdigit() or word in _RESTATEMENT_BLOCKING_WORDS for word in missing)
+    """True when every clause of answer restates one clause of the earlier answer
+    ("tự trả phí" / "tự trả lệ phí"); another subject in the same words is not a restatement."""
+    clauses = _answer_clauses(answer)
+    earlier_clauses = _answer_clauses(earlier)
+    earlier_words = {word for clause in earlier_clauses for word in clause}
+    return sum(map(len, clauses)) >= 5 and all(
+        any(_clause_restates(clause, other, earlier_words) for other in earlier_clauses)
+        for clause in clauses
     )
 
 
