@@ -13,6 +13,7 @@ from uuid import UUID
 
 import pytest
 
+import app.services.grounded_answer_service as grounded_answer_module
 from app.chat.models import GroundingStatus
 from app.citations.models import PromptSource, PromptSourceRegistry
 from app.core.config import Settings
@@ -42,10 +43,12 @@ from app.retrieval.models import HybridRetrievalHit, HybridRetrievalResult
 from app.services.grounded_answer_service import (
     GroundedAnswerService,
     _focused_retry_requirements,
+    _numeric_answer_missing_source_unit,
     _person_name_sequences_near_terms,
     _preserve_reranked_hit_order,
     _rank_hits_for_prompt,
     _refusal_names_what_the_answer_omits,
+    _retry_abandons_validated_answer,
     _role_terms_for_prompt_question,
     _short_explicit_topic_phrases,
     _shortest_source_clause_for_groups,
@@ -3818,6 +3821,8 @@ def test_reselection_is_counted_with_the_strong_support_flag_off() -> None:
         "refusal_phrase_extended": 0,
         "question_head_missing": 0,
         "question_evidence_dissimilar": 0,
+        "first_answer_kept": 0,
+        "retry_abandoned_first": 0,
     }
     GLOBAL_METRICS.reset()
 
@@ -3851,6 +3856,8 @@ def test_reselection_guard_is_not_counted_when_the_source_holds_the_answer() -> 
         "refusal_phrase_extended": 0,
         "question_head_missing": 0,
         "question_evidence_dissimilar": 0,
+        "first_answer_kept": 0,
+        "retry_abandoned_first": 0,
     }
     GLOBAL_METRICS.reset()
 
@@ -4058,4 +4065,91 @@ def test_answer_checks_do_nothing_with_their_flags_off() -> None:
             source_registry=_registry("Nhân viên kho phải đội mũ bảo hộ."),
             cited_source_labels=("SOURCE_1",),
         )
+    )
+
+
+# FIX 4 (i): the completeness checks and the retry they force. Invented texts only.
+HOIST_TEXT = (
+    "Quy dinh xe toi. Tai trong toi da cua xe toi la 2.500 kg. Day cap duoc kiem tra 2 lan moi quy."
+)
+HOIST_QUESTION = "Xe toi co tai trong toi da the nao?"
+HOIST_ANSWER = '{"answer":"Tai trong toi da cua xe toi la 2.500 kg.","citations":["SOURCE_1"]}'
+
+
+def _generation(content: str) -> LLMGenerationResult:
+    return LLMGenerationResult(
+        content=content, model="fake", finish_reason="stop", prompt_tokens=1,
+        completion_tokens=1, response_time_ms=1,
+    )  # fmt: skip
+
+
+async def _hoist_answer(*contents: str, **flags: Any) -> tuple[Any, FakeLLMProvider]:
+    llm = SequentialFakeLLMProvider(*(_generation(content) for content in contents))
+    service, _, _, _, resolved_llm, _, _ = make_service(
+        retrieval=FakeRetrievalService(retrieval_result(hit(HOIST_TEXT))),
+        llm=llm,
+        settings_obj=settings(**flags),
+    )
+    result = await service.answer_question(
+        current_user=user(), session_id=chat_session().id, question=HOIST_QUESTION
+    )
+    return result, resolved_llm
+
+
+def test_grouped_number_is_two_numbers_for_the_unit_check_until_the_flag_is_on(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    registry = _registry(HOIST_TEXT)
+    answer = "Tai trong toi da cua xe toi la 2.500 kg."
+    for flag, missing in ((False, True), (True, False)):
+        monkeypatch.setattr(
+            grounded_answer_module,
+            "get_settings",
+            lambda flag=flag: SimpleNamespace(rag_completeness_number_normalization_enabled=flag),
+        )
+        assert (
+            _numeric_answer_missing_source_unit(answer=answer, source_registry=registry) is missing
+        )
+
+
+def test_validated_first_answer_survives_a_failed_retry_only_with_the_flag() -> None:
+    GLOBAL_METRICS.reset()
+    refused, llm = asyncio.run(_hoist_answer(HOIST_ANSWER, "__NO_ANSWER__", "__NO_ANSWER__"))
+    assert llm.calls >= 2 and refused.grounding_status == GroundingStatus.NO_ANSWER
+
+    kept, _ = asyncio.run(
+        _hoist_answer(
+            HOIST_ANSWER,
+            "__NO_ANSWER__",
+            "__NO_ANSWER__",
+            rag_keep_validated_first_answer_enabled=True,
+        )
+    )
+    assert kept.grounding_status == GroundingStatus.ANSWERED
+    assert "2.500 kg" in kept.assistant_message.content
+    assert GLOBAL_METRICS.answer_branch_counts()["first_answer_kept"] == 1
+    GLOBAL_METRICS.reset()
+
+
+def _draft(content: str, chunk: int) -> Any:
+    return SimpleNamespace(
+        content=content,
+        grounding_status=GroundingStatus.ANSWERED,
+        citations=(SimpleNamespace(chunk_id=UUID(int=chunk)),),
+    )
+
+
+def test_retry_abandons_the_first_answer_only_with_other_values_from_other_chunks() -> None:
+    first = _draft("Ban ve duoc luu tai phong ho so 36 gio.", 1)
+    assert _retry_abandons_validated_answer(
+        first=first, retry=_draft("18 thang ke tu ngay ky; 750 kg.", 2)
+    )
+    assert not _retry_abandons_validated_answer(
+        first=first, retry=_draft("Toi thieu 36 gio truoc khi huy.", 2)
+    )
+    assert not _retry_abandons_validated_answer(
+        first=first, retry=_draft("Phong ho so mo cua 8 gio moi ngay.", 1)
+    )
+    assert not _retry_abandons_validated_answer(
+        first=_draft("Truong kho phe duyet.", 1), retry=_draft("500 kg.", 2)
     )

@@ -18,12 +18,17 @@ BRANCH_RESELECT_GUARD_WOULD_CHANGE = "reselect_guard_would_change"
 BRANCH_REFUSAL_PHRASE_EXTENDED = "refusal_phrase_extended"
 BRANCH_QUESTION_HEAD_MISSING = "question_head_missing"
 BRANCH_QUESTION_EVIDENCE_DISSIMILAR = "question_evidence_dissimilar"
+# FIX 4 (i): a validated first answer kept after a failed retry, or over a retry that left it.
+BRANCH_FIRST_ANSWER_KEPT = "first_answer_kept"
+BRANCH_RETRY_ABANDONED_FIRST = "retry_abandoned_first"
 ANSWER_BRANCHES = (
     BRANCH_RESELECT_AFTER_REJECTION,
     BRANCH_RESELECT_GUARD_WOULD_CHANGE,
     BRANCH_REFUSAL_PHRASE_EXTENDED,
     BRANCH_QUESTION_HEAD_MISSING,
     BRANCH_QUESTION_EVIDENCE_DISSIMILAR,
+    BRANCH_FIRST_ANSWER_KEPT,
+    BRANCH_RETRY_ABANDONED_FIRST,
 )
 _UUID_SEGMENT_PATTERN = re.compile(
     r"(?<=/)[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"

@@ -155,6 +155,12 @@ class Settings(BaseSettings):
     rag_question_evidence_min_similarity: float = Field(default=0.85, ge=0.0, le=1.0)
     # FIX 3c F: numbers are compared once written one way (01 = 1, 1,2 trieu = 1.200.000).
     rag_number_normalization_enabled: bool = False
+    # FIX 4 (i), completeness checks: a grouped number is one number in the unit check; a
+    # validated first answer rejected only for its form survives a failed retry; a retry
+    # may not replace it with other values from other chunks.
+    rag_completeness_number_normalization_enabled: bool = False
+    rag_keep_validated_first_answer_enabled: bool = False
+    rag_retry_must_keep_validated_values_enabled: bool = False
     reranker_enabled: bool = True
     reranker_provider: Literal["sentence_transformers", "heuristic"] = "sentence_transformers"
     reranker_model: str = Field(default="BAAI/bge-reranker-v2-m3", min_length=1)
