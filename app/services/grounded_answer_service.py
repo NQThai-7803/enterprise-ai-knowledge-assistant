@@ -4308,21 +4308,34 @@ def _fold_for_person_match(text: str) -> str:
     return "".join(character for character in normalized if not unicodedata.combining(character))
 
 
+# Words that turn a restatement into a different claim; folded.
+_RESTATEMENT_BLOCKING_WORDS = frozenset(
+    {"khong", "chua", "chang", "cam", "not", "no", "never", "cannot", "without"}
+)
+
+
+def _restates(answer: str, earlier: str) -> bool:
+    """True when every word of answer is in earlier, but for one word that is no number or
+    negation ("tự trả phí" vs "tự trả lệ phí")."""
+    words = set(re.findall(r"\w+", _fold_for_person_match(answer)))
+    missing = words - set(re.findall(r"\w+", _fold_for_person_match(earlier)))
+    return (
+        len(words) >= 5
+        and len(missing) <= 1
+        and not any(word.isdigit() or word in _RESTATEMENT_BLOCKING_WORDS for word in missing)
+    )
+
+
 def _join_claim_answers(claims: Sequence[StructuredGroundedClaim], *, dedupe: bool) -> str:
     """Join sub-claim answers, leaving out one that only restates an earlier answer."""
     kept: list[StructuredGroundedClaim] = []
     for claim in claims:
-        words = set(re.findall(r"\w+", _fold_for_person_match(claim.answer)))
         # shortcut: compares words, not meaning; a short answer ("Có.") is always kept.
         # Upgrade if a dev set shows a dropped answer that carried its own fact.
-        restated = (
-            dedupe
-            and len(words) >= 5
-            and any(
-                words <= set(re.findall(r"\w+", _fold_for_person_match(earlier.answer)))
-                and set(claim.citations) <= set(earlier.citations)
-                for earlier in kept
-            )
+        restated = dedupe and any(
+            _restates(claim.answer, earlier.answer)
+            and set(claim.citations) <= set(earlier.citations)
+            for earlier in kept
         )
         if not restated:
             kept.append(claim)

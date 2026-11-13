@@ -33,3 +33,12 @@ def test_new_facts_short_answers_and_other_sources_are_kept() -> None:
     other_source = claim("CLAIM_4", "Thợ hàn tự trả 450.000 đồng/bộ từ bộ thứ tư", "SOURCE_2")
     claims = (FIRST, new_fact, short, other_source)
     assert _join_claim_answers(claims, dedupe=True) == " ".join(c.answer for c in claims)
+
+
+def test_one_extra_word_is_still_a_restatement_but_not_a_number_or_negation() -> None:
+    reworded = claim("CLAIM_2", "Thợ hàn tự trả tiền 450.000 đồng/bộ từ bộ thứ tư", "SOURCE_1")
+    assert _join_claim_answers((FIRST, reworded), dedupe=True) == FIRST.answer
+    new_number = claim("CLAIM_2", "Thợ hàn tự trả 450.000 đồng/bộ từ bộ thứ 5", "SOURCE_1")
+    negated = claim("CLAIM_3", "Thợ hàn không tự trả 450.000 đồng/bộ từ bộ thứ tư", "SOURCE_1")
+    for kept in (new_number, negated):
+        assert _join_claim_answers((FIRST, kept), dedupe=True) == f"{FIRST.answer} {kept.answer}"
