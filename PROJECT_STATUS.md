@@ -1,5 +1,9 @@
 # Project Status
 
+## D2 display text -- 2026-11-13
+
+- Three general display defects fixed, one commit each: the no-answer sentence had no diacritics; server-built answers copied values from accent-folded text ("40 gio/tuan", "10 ngay lam viec"); a sub-claim answer that restated the previous one was appended (cause: the plain join of validated sub-claim answers in `grounded_answer_service`). Two flags, both on by default, so a batch can measure the old wording as its baseline.
+
 ## PROMPT 6 -- 2026-11-12 (waiting for owner)
 
 - **Pipeline-loss analysis done** (`docs/design/pipeline-loss-fix-plan.md`, DEC-020): ablations, oracle context and two real cross-encoders on 5 dev sets. No ablation is a fix; F changes nothing; rerankers change no answer; the loss sits after the context (completeness-check retries, lenient validator). Six decisions wait for the owner.

@@ -8,6 +8,11 @@
 3. **Embedding fine-tune** (`docs/design/embedding-finetune.md` and DEC-015 on branch `feat/embedding-finetune-infra`): infrastructure only so far; the baseline measurement and training come after FIX 3.
 4. The final held-out v2 measurement, once, after the choices above are made (DEC-012).
 
+## D2 display text -- 2026-11-13
+
+- **DONE (code, unit tests):** accented no-answer sentence; source diacritics restored in server-built answers (`_restore_source_diacritics`, flag on); restated sub-claim answers left out (`_join_claim_answers`, flag on). Wording only.
+- **Measurement:** 5 dev sets, one batch each, `base` (both flags off) vs `display` (defaults); status and citations must not change. Results in `PROJECT_STATUS.md` when the batch ends.
+
 ## PROMPT 6 pipeline-loss analysis -- 2026-11-12 (WAITING FOR OWNER)
 
 - **DONE: ablations and real rerankers measured on Actions, 5 dev sets, 2 runs** (`docs/design/pipeline-loss-fix-plan.md`, DEC-020). F: 0 cases changed, flag stays off. Low-alignment filter off, `group_hits[:5]`, whole chunks: all regress UAT. Cross-encoders: 0 answers changed. Oracle context: almost no gain, the loss is after the context.
