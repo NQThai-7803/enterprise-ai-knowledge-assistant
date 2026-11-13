@@ -26,3 +26,12 @@ Viết 2026-11-14, **trước mọi lần đo** của mục này.
 - Bộ: UAT (báo tách route), RBAC, relevance, FR v1, FR v2, compound.
 - **Chọn theo DEC-013**, "trả lời nhầm giá trị" tính là trả lời sai (owner, 2026-11-14): 0 rò rỉ; UAT không hồi quy quá 1 câu, và phần đi đường LLM được báo riêng; trả lời sai không tăng ở bộ nào; thắng khi không tệ hơn ở bộ nào và tốt hơn ở ít nhất một bộ (ít trả lời sai hơn, rồi nhiều câu đúng hơn). Báo số ca vào nhánh (`question_evidence_dissimilar`).
 - Thắng thì bật `RAG_RESPONSIVENESS_CHECK_ENABLED` với `t`; không thì giữ tắt.
+
+## Kết quả hiệu chỉnh (Actions run `43498479733`, commit `736f854`, 2026-11-14)
+
+- UAT 100/100 ở cả `base` và `probe`, 2 lượt: **75 câu đi route deterministic, 25 câu đi đường LLM**, đúng hết. `probe` không đổi trạng thái hay citation câu nào (Q033, Q096 chỉ đổi chữ).
+- S = 18 câu (đi LLM, đúng, có cosine ở cả 2 lượt). Phân bố (ô thấp hơn của 2 lượt): 0,81 (Q007); 0,82 (Q002, Q034); 0,84 (Q004, Q009, Q011, Q012); 0,85 (Q008, Q014, Q015, Q033); 0,86 (Q055, Q058, Q091, Q095); 0,87 (Q092); 0,89 (Q094); 0,90 (Q070).
+- 7 câu đi LLM không có cosine (Q013, Q018, Q071, Q073, Q096, Q097, Q100: câu hỏi nhiều ý hoặc không tìm được câu evidence), nên check không chạm chúng.
+- Route deterministic: 74/75 câu có cosine, thấp nhất 0,78; (ii) không kiểm route này.
+- **t = 0,81.** Ngưỡng cũ 0,85 của M1b chặn 7/18 câu đúng của phần LLM, cộng các câu deterministic dưới 0,85: khớp với 43 câu hồi quy của FIX 3a.
+- Commit hiệu chỉnh chưa có `RAG_COMPLETENESS_NUMBER_NORMALIZATION_ENABLED` (bật sau, PR #25); flag đó chỉ đổi FR2-E01 trong đợt của nó, không đổi câu UAT nào.
