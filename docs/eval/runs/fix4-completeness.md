@@ -52,7 +52,7 @@ Mỗi bộ một job, 5 cấu hình, 2 lượt xen kẽ. Ô: đúng / từ chố
 | relevance (`43362243822`) | 17/3/5/0 | = | = | = | = |
 | FR v1 (`43362268077`) | 13/1/6/0 | = | 12/1/**7**/0 (**FR-A10** đúng → trả lời sai) | = | 12/1/7/0 (FR-A10) |
 | FR v2 (`43362293934`) | 13/5/5/1 | 14/4/5/1 (E01) | 16/2/5/1 (E01, F01, F02) | 14/5/5/**0** (L03 sai → đúng) | 17/2/5/0 |
-| compound (`43362318803`) | 4/3/1/4 | = | = | = | = |
+| compound (`43362318803`) | 4/3/4/1 | = | = | = | = |
 
 `=` = giống `base` từng câu. Rò rỉ: 0 ở mọi bộ, mọi cấu hình. Độ trễ trung vị và RAM không khác `base` quá dao động (peak 5,8-6,8 GB, còn trống ≥ 9,1 GB).
 
@@ -68,6 +68,7 @@ Mỗi bộ một job, 5 cấu hình, 2 lượt xen kẽ. Ô: đúng / từ chố
 - **Chọn: `c3`**, `RAG_RETRY_MUST_KEEP_VALIDATED_VALUES_ENABLED=true`. (1) và (2) giữ tắt để rollback và đo tiếp.
 - `c1` + `c3` cùng bật chưa được đo; không bật chung khi chưa có đợt đo.
 - Bộ compound: không đổi ở mọi cấu hình, đúng dự đoán (chưa có code trả lời một phần).
+- **Đính chính (2026-11-14):** hàng compound lúc đầu ghi 4/3/1/4, vì tôi tóm tắt bằng `summarize_ablation.py` của một nhánh chưa có quy tắc "câu nửa trả lời được mà trả lời đủ hai phần là trả lời sai". Tóm tắt lại bằng bản hiện tại: 4/3/4/1 ở mọi cấu hình. Quyết định không đổi, vì các cấu hình vẫn giống hệt nhau.
 
 
 ## Đợt bổ sung 2026-11-14 (viết trước khi đo)
