@@ -155,6 +155,8 @@ class Settings(BaseSettings):
     rag_question_evidence_min_similarity: float = Field(default=0.85, ge=0.0, le=1.0)
     # FIX 3c F: numbers are compared once written one way (01 = 1, 1,2 trieu = 1.200.000).
     rag_number_normalization_enabled: bool = False
+    # D2: values in server-built answers are shown with the diacritics of the cited source.
+    rag_restore_source_diacritics_enabled: bool = True
     reranker_enabled: bool = True
     reranker_provider: Literal["sentence_transformers", "heuristic"] = "sentence_transformers"
     reranker_model: str = Field(default="BAAI/bge-reranker-v2-m3", min_length=1)

@@ -4237,6 +4237,78 @@ def _fold_for_person_match(text: str) -> str:
     return "".join(character for character in normalized if not unicodedata.combining(character))
 
 
+def _folded_with_offsets(text: str) -> tuple[str, list[int]]:
+    """Fold like _fold_for_person_match, keeping the original index of every folded character."""
+    folded: list[str] = []
+    offsets: list[int] = []
+    for index, character in enumerate(text):
+        for folded_character in _fold_for_person_match(character):
+            folded.append(folded_character)
+            offsets.append(index)
+    return "".join(folded), offsets
+
+
+def _source_wording(phrase: str, sources: Sequence[tuple[str, str, list[int]]]) -> str | None:
+    """The sources' own spelling of an unaccented phrase, when every occurrence agrees."""
+    words = _fold_for_person_match(phrase).split()
+    pattern = re.compile(r"(?<!\w)" + r"\s+".join(map(re.escape, words)) + r"(?!\w)")
+    forms: set[str] = set()
+    for text, folded, offsets in sources:
+        for match in pattern.finditer(folded):
+            end = offsets[match.end() - 1] + 1
+            while end < len(text) and unicodedata.combining(text[end]):
+                end += 1
+            original = unicodedata.normalize("NFC", text[offsets[match.start()] : end])
+            forms.add(" ".join(original.split()))
+    if len({form.casefold() for form in forms}) != 1:
+        return None  # absent, or "nam" spelled both "năm" and "Nam": keep the phrase
+    form = forms.pop()
+    phrase = " ".join(phrase.split())
+    if len(form) != len(phrase):
+        return None
+    return "".join(
+        source.upper() if wanted.isupper() else source.lower() if wanted.islower() else source
+        for source, wanted in zip(form, phrase, strict=True)
+    )
+
+
+def _restore_source_diacritics(answer: str, source_texts: Sequence[str]) -> str:
+    """Put back the diacritics of unaccented runs of words copied from the cited sources."""
+    sources = [(text, *_folded_with_offsets(text)) for text in source_texts]
+    tokens = list(re.finditer(r"\S+", answer))
+    pieces: list[str] = []
+    cursor = 0
+    index = 0
+    while index < len(tokens):
+        stop = index
+        while stop < len(tokens) and tokens[stop].group(0).isascii():
+            stop += 1
+        replaced = False
+        for end in range(stop, index, -1):  # longest run of unaccented words first
+            start_at = tokens[index].start()
+            end_at = tokens[end - 1].end()
+            while start_at < end_at and not answer[start_at].isalnum():
+                start_at += 1
+            while end_at > start_at and not answer[end_at - 1].isalnum():
+                end_at -= 1
+            phrase = answer[start_at:end_at]
+            if not any(character.isalpha() for character in phrase):
+                continue
+            wording = _source_wording(phrase, sources)
+            if wording is None or wording == phrase:
+                continue
+            pieces.append(answer[cursor:start_at])
+            pieces.append(wording)
+            cursor = end_at
+            index = end
+            replaced = True
+            break
+        if not replaced:
+            index += 1
+    pieces.append(answer[cursor:])
+    return "".join(pieces)
+
+
 def _quantity_answer_missing_source_number(
     *,
     question: str,
@@ -7667,6 +7739,12 @@ def _structured_value_repair_generation(
         return None
     answer, source_labels = structured_answer
     citations = [source_labels] if isinstance(source_labels, str) else list(source_labels)
+    if get_settings().rag_restore_source_diacritics_enabled:
+        # The builders copy values from folded text; show them as the source writes them.
+        answer = _restore_source_diacritics(
+            answer,
+            [source.text for source in source_registry.sources if source.label in citations],
+        )
     return LLMGenerationResult(
         content=json.dumps(
             {"answer": answer, "citations": citations},
@@ -9027,7 +9105,7 @@ def _structured_proportional_leave_answer(
         if condition is None:
             continue
         if match := relation.search(folded_source):
-            answer = f"Chua du {condition.group('months')} thang: phep nam {match.group(0)}."
+            answer = f"Chưa đủ {condition.group('months')} tháng: phép năm {match.group(0)}."
             return answer, source.label
     return None
 
