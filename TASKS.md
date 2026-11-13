@@ -17,7 +17,7 @@
 ## D2 display text -- 2026-11-13
 
 - **DONE (code, unit tests):** accented no-answer sentence; source diacritics restored in server-built answers (`_restore_source_diacritics`, flag on); restated sub-claim answers left out (`_join_claim_answers`, flag on). Wording only.
-- **Measurement:** 5 dev sets, one batch each, `base` (both flags off) vs `display` (defaults); status and citations must not change. Results in `PROJECT_STATUS.md` when the batch ends.
+- **DONE: measured** on 5 dev sets (`base` both flags off vs `display`, runs 43474139609, 43474157960, 43474177047, 43474195099, 43474216008): status and citations unchanged everywhere; only wording changed (details in `PROJECT_STATUS.md`). PR #23 waits for the owner.
 
 ## PROMPT 6 pipeline-loss analysis -- 2026-11-12 (WAITING FOR OWNER)
 

@@ -9,6 +9,8 @@
 ## D2 display text -- 2026-11-13
 
 - Three general display defects fixed, one commit each: the no-answer sentence had no diacritics; server-built answers copied values from accent-folded text ("40 gio/tuan", "10 ngay lam viec"); a sub-claim answer that restated the previous one was appended (cause: the plain join of validated sub-claim answers in `grounded_answer_service`). Two flags, both on by default, so a batch can measure the old wording as its baseline.
+- **Batch on 5 dev sets** (Actions, commit `d32e94a`, `base` = both flags off vs `display`, 2 runs): 0 status changes, 0 citation changes, 0 leaks, category counts identical. Wording changed in both runs on UAT 30 questions, FR v1 1, relevance 1, FR v2 2 (FR2-C03 no longer repeats its sentence), RBAC 0. Every other difference appears only in base run 1 and matches the other base run, so it is Ollama variation.
+- The first batch (`20185ed`) showed FR2-C03 still repeating ("tự trả phí" vs "tự trả lệ phí"); the rule now allows one extra word that is neither a number nor a negation (`d32e94a`).
 
 ## PROMPT 6 -- 2026-11-12 (waiting for owner)
 
