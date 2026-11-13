@@ -79,3 +79,18 @@ Mỗi bộ một job, 5 cấu hình, 2 lượt xen kẽ. Ô: đúng / từ chố
 - `c13` thắng khi không tệ hơn `base` ở bộ nào và tốt hơn ở ít nhất một bộ (ít trả lời sai hơn, rồi nhiều câu đúng hơn). Thắng thì bật `RAG_COMPLETENESS_NUMBER_NORMALIZATION_ENABLED`; không thì giữ tắt.
 
 **qwen2.5:7b với retrieval thật** (không oracle): `base` (3B) và `q7b` (`EVAL_LLM_MODEL=qwen2.5:7b`), cùng job, 2 lượt, trên RBAC, relevance, FR v1, FR v2, compound; UAT một job riêng. Chỉ đo, **không đổi model mặc định**; báo đúng / từ chối sai / trả lời sai, độ trễ, RAM.
+
+### Kết quả c1 + c3 (Actions, commit `225e721`, 2026-11-14)
+
+Ô: đúng / từ chối sai / trả lời sai / sai; hai lượt mỗi bên. 0 rò rỉ ở mọi ô.
+
+| Bộ (run) | `base` (c3) | `c13` (c1 + c3) |
+|---|---|---|
+| UAT (`43493611575`) | 98/1/0/1, 99/1/0/0 (Q002 dao động ở lượt 1) | 99/1/0/0 |
+| RBAC (`43493635637`) | 22/12/1/1 | = |
+| relevance (`43493659384`) | 17/3/5/0 | = |
+| FR v1 (`43493682283`) | 13/1/6/0 | = |
+| FR v2 (`43493707147`) | 14/5/5/0 | **15**/4/5/0 (FR2-E01 từ chối sai → đúng) |
+| compound (`43493730412`) | 4/3/4/1 | = |
+
+Thay đổi ở cả 2 lượt: chỉ FR2-E01. Trả lời sai (kể cả nhầm giá trị) không tăng ở bộ nào, UAT không hồi quy. **`c13` thắng theo DEC-013: `RAG_COMPLETENESS_NUMBER_NORMALIZATION_ENABLED` bật mặc định.** `RAG_KEEP_VALIDATED_FIRST_ANSWER_ENABLED` vẫn tắt.
