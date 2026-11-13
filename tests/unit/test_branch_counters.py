@@ -27,3 +27,16 @@ def test_delta_is_not_measured_when_a_side_is_missing_or_the_counter_fell() -> N
     assert branch_counters.delta(None, {"a": 1}) is None
     assert branch_counters.delta({"a": 1}, None) is None
     assert branch_counters.delta({"a": 5}, {"a": 1}) is None
+
+
+def test_similarity_buckets_are_read_and_one_moved_bucket_is_the_case_value() -> None:
+    text = (
+        'enterprise_ai_rag_answer_branch_total{branch="route_llm"} 3\n'
+        'enterprise_ai_rag_question_evidence_similarity_total{bucket="0.83"} 2\n'
+        'enterprise_ai_rag_question_evidence_similarity_total{bucket="0.91"} 1\n'
+    )
+    before = branch_counters.parse(text)
+    assert before == {"route_llm": 3, "similarity_0.83": 2, "similarity_0.91": 1}
+    after = dict(before, route_llm=4, **{"similarity_0.83": 3})
+    assert branch_counters.similarity(branch_counters.delta(before, after)) == 0.83
+    assert branch_counters.similarity(branch_counters.delta(before, before)) is None

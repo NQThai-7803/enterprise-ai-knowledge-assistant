@@ -51,3 +51,12 @@ def test_prometheus_sample_uses_safe_metric_format() -> None:
     )
 
     assert sample == 'enterprise_ai_component_up{component="postgres"} 1'
+
+
+def test_similarity_is_counted_in_its_floored_bucket() -> None:
+    registry = MetricsRegistry()
+    for value in (0.839, 0.83, 1.2, -0.1):
+        registry.record_question_evidence_similarity(value)
+    assert registry.question_evidence_similarity_counts() == {"0.00": 1, "0.83": 2, "1.00": 1}
+    registry.reset()
+    assert registry.question_evidence_similarity_counts() == {}

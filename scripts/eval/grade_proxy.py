@@ -84,6 +84,7 @@ def grade(reference, v2_manifest, run_manifest, run):
                 "execution_status": case.get("execution_status"),
                 "attempts": case.get("attempts", 1),
                 "answer_route": case.get("answer_route"),
+                "evidence_similarity": case.get("evidence_similarity"),
             }
         )
     excluded = [r["id"] for r in rows if r["proxy_match"] is None]

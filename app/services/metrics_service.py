@@ -136,6 +136,19 @@ class PrometheusMetricsService:
                     )
                     for branch, count in self.registry.answer_branch_counts().items()
                 ),
+                "# HELP enterprise_ai_rag_question_evidence_similarity_total "
+                "Question/evidence cosines computed by the responsiveness check, per 0.01 bucket.",
+                "# TYPE enterprise_ai_rag_question_evidence_similarity_total counter",
+                *(
+                    prometheus_sample(
+                        "enterprise_ai_rag_question_evidence_similarity_total",
+                        count,
+                        {"bucket": bucket},
+                    )
+                    for bucket, count in (
+                        self.registry.question_evidence_similarity_counts().items()
+                    )
+                ),
             ]
         )
 
