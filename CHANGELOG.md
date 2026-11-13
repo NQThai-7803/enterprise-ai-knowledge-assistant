@@ -6,6 +6,11 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### UAT split by answer route -- 2026-11-14
+
+- `GET /metrics` counts every persisted answer as `route_deterministic` (server-built) or `route_llm`. The UAT runner records each case's `answer_route`; `grade_proxy.py`, `scripts/eval/metrics.py` (`by_route`, `score.md`) and `summarize_ablation.py` report correct and wrong per route. The UAT total mostly measures the deterministic route.
+- DEC-023: wording-only fixes may ship with their flag on. The sub-claim restatement check keeps a sentence about another subject in the same words.
+
 ### FIX 4 (i) completeness retry -- 2026-11-13
 
 - Three flags on the retry forced by the completeness checks, measured in one batch per set on 6 dev sets. `RAG_RETRY_MUST_KEEP_VALIDATED_VALUES_ENABLED` is now on by default (fixes FR2-L03, worse nowhere); `RAG_COMPLETENESS_NUMBER_NORMALIZATION_ENABLED` and `RAG_KEEP_VALIDATED_FIRST_ANSWER_ENABLED` stay off (the second adds a false answer, FR-A10).

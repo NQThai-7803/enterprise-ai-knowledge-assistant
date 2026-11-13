@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from scripts.diagnostics.summarize_ablation import categories, stable_changes
+from scripts.diagnostics.summarize_ablation import categories, route_counts, stable_changes
 
 
 def test_categories_follow_each_set_kind() -> None:
@@ -31,3 +31,19 @@ def test_a_change_counts_only_when_both_sides_agree_with_themselves() -> None:
     base = [{"x": "false_refusal", "y": "correct"}, {"x": "false_refusal", "y": "wrong"}]
     flag = [{"x": "correct", "y": "correct"}, {"x": "correct", "y": "correct"}]
     assert stable_changes(base, flag) == [("x", "false_refusal", "correct")]
+
+
+def test_uat_categories_are_split_by_answer_route() -> None:
+    uat = {"cases": [
+        {"id": "q1", "proxy_match": True, "answer_route": "deterministic"},
+        {"id": "q2", "proxy_match": False, "reference_status": "ANSWERED",
+         "grounding_status": "NO_ANSWER", "answer_route": "llm"},
+        {"id": "q3", "proxy_match": True, "answer_route": "llm"},
+    ]}  # fmt: skip
+    assert route_counts("uat", uat, categories("uat", uat)) == {
+        "deterministic": {"correct": 1},
+        "llm": {"false_refusal": 1, "correct": 1},
+    }
+    assert route_counts("relevance", uat, {}) is None
+    no_route = {"cases": [{"id": "q", "proxy_match": True}]}
+    assert route_counts("uat", no_route, categories("uat", no_route)) is None

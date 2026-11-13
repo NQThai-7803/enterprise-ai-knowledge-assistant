@@ -231,3 +231,33 @@ def test_markdown_shows_null_and_ids_without_any_text_field() -> None:
     assert "null (not measured)" in text
     assert "null (0/0)" in text
     assert "100.0% (1/1)" in text
+
+
+def test_uat_score_splits_correct_and_wrong_by_answer_route() -> None:
+    def row(case_id: str, match: bool, route: str | None) -> dict[str, object]:
+        return {
+            "id": case_id,
+            "reference_status": "ANSWERED",
+            "grounding_status": "ANSWERED",
+            "cited_codes": ["DOC-A"] if match else ["DOC-B"],
+            "reference_cited_codes": ["DOC-A"],
+            "proxy_match": match,
+            "execution_status": "OK",
+            "answer_route": route,
+        }
+
+    graded = {"cases": [row("Q1", True, "deterministic"), row("Q2", False, "deterministic"),
+                        row("Q3", True, "llm"), row("Q4", True, None)]}  # fmt: skip
+    result = metrics.score(
+        metrics.proxy_records(graded), grade_source=metrics.PROXY, leak_measured=False
+    )
+    assert result["by_route"] == {
+        "deterministic": {"cases": 2, "correct": ["Q1"], "wrong": ["Q2"]},
+        "llm": {"cases": 1, "correct": ["Q3"], "wrong": []},
+        "unknown": {"cases": 1, "correct": ["Q4"], "wrong": []},
+    }
+    text = metrics.render_markdown({"run1": result})
+    assert "| route deterministic | 1 correct, 1 wrong |" in text
+    without = metrics.score([_yes("A1")], grade_source=metrics.PROXY, leak_measured=False)
+    assert without["by_route"] is None
+    assert "| route " not in metrics.render_markdown({"run1": without})

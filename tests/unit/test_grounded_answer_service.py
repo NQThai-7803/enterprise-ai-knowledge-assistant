@@ -3823,6 +3823,8 @@ def test_reselection_is_counted_with_the_strong_support_flag_off() -> None:
         "question_evidence_dissimilar": 0,
         "first_answer_kept": 0,
         "retry_abandoned_first": 0,
+        "route_deterministic": 0,
+        "route_llm": 0,
     }
     GLOBAL_METRICS.reset()
 
@@ -3858,6 +3860,8 @@ def test_reselection_guard_is_not_counted_when_the_source_holds_the_answer() -> 
         "question_evidence_dissimilar": 0,
         "first_answer_kept": 0,
         "retry_abandoned_first": 0,
+        "route_deterministic": 0,
+        "route_llm": 0,
     }
     GLOBAL_METRICS.reset()
 
@@ -4153,3 +4157,28 @@ def test_retry_abandons_the_first_answer_only_with_other_values_from_other_chunk
     assert not _retry_abandons_validated_answer(
         first=_draft("Truong kho phe duyet.", 1), retry=_draft("500 kg.", 2)
     )
+
+
+def test_every_persisted_answer_counts_its_route(monkeypatch: pytest.MonkeyPatch) -> None:
+    GLOBAL_METRICS.reset()
+    llm_answer, _ = asyncio.run(
+        _hoist_answer(HOIST_ANSWER, "__NO_ANSWER__", rag_keep_validated_first_answer_enabled=True)
+    )
+    assert llm_answer.grounding_status == GroundingStatus.ANSWERED
+    assert GLOBAL_METRICS.answer_branch_counts()["route_llm"] == 1
+
+    def local_generation(**_: Any) -> LLMGenerationResult:
+        return LLMGenerationResult(
+            content=HOIST_ANSWER, model="local-structured-value-repair", finish_reason="stop",
+            prompt_tokens=0, completion_tokens=0, response_time_ms=0, provider="local",
+        )  # fmt: skip
+
+    monkeypatch.setattr(
+        grounded_answer_module, "_structured_value_repair_generation", local_generation
+    )
+    GLOBAL_METRICS.reset()
+    built, llm = asyncio.run(_hoist_answer(HOIST_ANSWER))
+    counts = GLOBAL_METRICS.answer_branch_counts()
+    assert built.grounding_status == GroundingStatus.ANSWERED and llm.calls == 0
+    assert (counts["route_deterministic"], counts["route_llm"]) == (1, 0)
+    GLOBAL_METRICS.reset()

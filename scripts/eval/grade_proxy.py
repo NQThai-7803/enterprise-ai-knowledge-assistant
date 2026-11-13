@@ -83,6 +83,7 @@ def grade(reference, v2_manifest, run_manifest, run):
                 "latency_ms": case.get("latency_ms"),
                 "execution_status": case.get("execution_status"),
                 "attempts": case.get("attempts", 1),
+                "answer_route": case.get("answer_route"),
             }
         )
     excluded = [r["id"] for r in rows if r["proxy_match"] is None]
@@ -96,6 +97,14 @@ def grade(reference, v2_manifest, run_manifest, run):
         "status_counts": dict(Counter(r["grounding_status"] for r in rows)),
         "answer_identical_to_reference": sum(r["answer_identical_to_reference"] for r in scored),
         "retried_cases": sum(int(r["attempts"] or 1) > 1 for r in rows),
+        # Server-built answers vs the LLM path; None = the stack did not report the route.
+        "by_route": {
+            str(route): {
+                "cases": sum(r["answer_route"] == route for r in scored),
+                "proxy_match": sum(r["proxy_match"] for r in scored if r["answer_route"] == route),
+            }
+            for route in sorted({r["answer_route"] for r in scored}, key=str)
+        },
         "note": (
             "proxy vs TASK-035.3B manual grade (status + cited document codes); "
             "not a semantic grade; proxy_match counts scored_cases only"

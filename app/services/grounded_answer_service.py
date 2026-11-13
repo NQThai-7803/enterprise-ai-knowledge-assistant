@@ -80,6 +80,8 @@ from app.observability.metrics import (
     BRANCH_RESELECT_AFTER_REJECTION,
     BRANCH_RESELECT_GUARD_WOULD_CHANGE,
     BRANCH_RETRY_ABANDONED_FIRST,
+    BRANCH_ROUTE_DETERMINISTIC,
+    BRANCH_ROUTE_LLM,
     GLOBAL_METRICS,
 )
 from app.repositories import (
@@ -572,6 +574,8 @@ class _AnswerDraft:
     citations: tuple[object, ...] = ()
     citation_failure: _CitationFailure | None = None
     llm_refused: bool = False
+    # The answer text came from a server-built (local) generation, not from the LLM.
+    deterministic: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -2519,6 +2523,7 @@ class GroundedAnswerService:
             prompt_tokens=generation.prompt_tokens,
             completion_tokens=generation.completion_tokens,
             citations=validated.citations,
+            deterministic=generation.provider == "local",
         )
 
     async def _persist_message_pair(
@@ -2597,6 +2602,9 @@ class GroundedAnswerService:
             except Exception as exc:
                 await session.rollback()
                 raise InternalServerError() from exc
+        GLOBAL_METRICS.record_answer_branch(
+            BRANCH_ROUTE_DETERMINISTIC if draft.deterministic else BRANCH_ROUTE_LLM
+        )
         return ChatAnswerResult(
             session_id=session_id,
             user_message=_detach_message(user_message),

@@ -21,6 +21,9 @@ BRANCH_QUESTION_EVIDENCE_DISSIMILAR = "question_evidence_dissimilar"
 # FIX 4 (i): a validated first answer kept after a failed retry, or over a retry that left it.
 BRANCH_FIRST_ANSWER_KEPT = "first_answer_kept"
 BRANCH_RETRY_ABANDONED_FIRST = "retry_abandoned_first"
+# Every persisted answer, by who wrote it: a server-built answer or the LLM path.
+BRANCH_ROUTE_DETERMINISTIC = "route_deterministic"
+BRANCH_ROUTE_LLM = "route_llm"
 ANSWER_BRANCHES = (
     BRANCH_RESELECT_AFTER_REJECTION,
     BRANCH_RESELECT_GUARD_WOULD_CHANGE,
@@ -29,6 +32,8 @@ ANSWER_BRANCHES = (
     BRANCH_QUESTION_EVIDENCE_DISSIMILAR,
     BRANCH_FIRST_ANSWER_KEPT,
     BRANCH_RETRY_ABANDONED_FIRST,
+    BRANCH_ROUTE_DETERMINISTIC,
+    BRANCH_ROUTE_LLM,
 )
 _UUID_SEGMENT_PATTERN = re.compile(
     r"(?<=/)[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
