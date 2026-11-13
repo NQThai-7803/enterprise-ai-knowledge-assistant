@@ -218,7 +218,22 @@ Mỗi bộ một job, 2 lượt xen kẽ; hai lượt giống hệt nhau ở m�
 
 **Đọc kết quả:**
 - Với cùng context gold, 7B bớt trả lời sai ở 3/4 bộ (FR v2 5 → 2, FR v1 6 → 4, RBAC 1 → 0) nhưng thêm 1 ở relevance; câu đúng tăng ở RBAC (+4) và FR v2 (+5). Phần lớn lợi ích nằm ở **model**, không ở context: `o3b` chỉ cứu được ít hơn.
-- Giá: độ trễ 2,2-2,8 lần trên CPU, RAM gần gấp đôi. Chưa đo 7B với retrieval thật và chưa đo UAT với 7B.
+- Giá: độ trễ 2,2-2,8 lần trên CPU, RAM gần gấp đôi.
+
+### qwen2.5:7b với retrieval thật (đợt 2026-11-14, commit `225e721`/`867cb4b`; chỉ đo, model mặc định giữ 3B)
+
+Mỗi bộ một job, `base` (3B) và `q7b` (`EVAL_LLM_MODEL=qwen2.5:7b`), 2 lượt; hai lượt giống hệt nhau ở mọi ô. Ô: đúng / từ chối sai / trả lời sai / sai (nhầm giá trị). 0 rò rỉ.
+
+| Bộ (run) | `base` 3B | `q7b` | Trung vị mỗi câu 3B → 7B | RAM đỉnh 7B (còn trống thấp nhất) |
+|---|---|---|---|---|
+| UAT (`43497256962`) | 98/1/0/1; LLM: 23/1/0/1 | 98/2/0/0; LLM: 23/2/0/0 (Q002 sai → đúng; Q033 đúng → từ chối) | phần LLM 26,3 s → 53,0 s; deterministic 0,8 s | 10,9 GB (5,1 GB) |
+| RBAC (`43493755308`) | 22/12/1/1 | 23/13/0/0 (RBD-03 negative hết trả lời sai; RBD-13 sai → từ chối) | 36,7 s → 103,9 s | 11,3 GB (4,7 GB) |
+| relevance (`43493778732`) | 17/3/5/0 | 16/3/5/1 (REL-101, 403 hết trả lời sai; REL-303, 402 → trả lời sai; REL-405 → sai) | 19,7 s → 42,7 s | 11,3 GB (4,7 GB) |
+| FR v1 (`43493803065`) | 13/1/6/0 | 14/2/4/0 (A08, N08 hết trả lời sai; N05 → từ chối) | 19,2 s → 41,9 s | 11,3 GB (4,7 GB) |
+| FR v2 (`43493825433`) | 14/5/5/0 | 15/6/3/0 (C05, F06 hết trả lời sai; L03 → từ chối) | 30,9 s → 65,4 s | 12,6 GB (3,1 GB) |
+| compound (`43493848355`) | 4/3/4/1 | 4/4/3/1 (P02, P03 hết trả lời sai nhưng thành từ chối; P06 → trả lời sai) | 24,0 s → 46,1 s | 13,0 GB (3,0 GB) |
+
+**Đọc kết quả:** với retrieval thật, 7B bớt trả lời sai (tính cả nhầm giá trị) ở UAT (−1), RBAC (−2), FR v1 (−2), FR v2 (−2), compound (−1), và thêm 1 ở relevance (5+0 → 5+1). Câu đúng gần như không tăng (+1 ở RBAC, FR v1, FR v2; −1 ở relevance): phần lớn câu 7B không trả lời sai nữa thì thành từ chối. Giá là 2,1-2,8 lần độ trễ trên CPU và RAM đỉnh 11-13 GB trên runner 16 GB. Không đổi model mặc định.
 
 
 | Câu | Bị chặn ở | Chi tiết |
