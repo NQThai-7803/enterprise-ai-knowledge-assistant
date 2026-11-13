@@ -4116,7 +4116,15 @@ def test_grouped_number_is_two_numbers_for_the_unit_check_until_the_flag_is_on(
         )
 
 
-def test_validated_first_answer_survives_a_failed_retry_only_with_the_flag() -> None:
+def test_validated_first_answer_survives_a_failed_retry_only_with_the_flag(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The grouped-number flag (on by default) would accept "2.500 kg" without a retry.
+    monkeypatch.setattr(
+        grounded_answer_module,
+        "get_settings",
+        lambda: Settings(_env_file=None, rag_completeness_number_normalization_enabled=False),
+    )
     GLOBAL_METRICS.reset()
     refused, llm = asyncio.run(_hoist_answer(HOIST_ANSWER, "__NO_ANSWER__", "__NO_ANSWER__"))
     assert llm.calls >= 2 and refused.grounding_status == GroundingStatus.NO_ANSWER
