@@ -69,3 +69,12 @@ Mỗi bộ một job, 5 cấu hình, 2 lượt xen kẽ. Ô: đúng / từ chố
 - `c1` + `c3` cùng bật chưa được đo; không bật chung khi chưa có đợt đo.
 - Bộ compound: không đổi ở mọi cấu hình, đúng dự đoán (chưa có code trả lời một phần).
 
+
+## Đợt bổ sung 2026-11-14 (viết trước khi đo)
+
+**c1 + c3.** Mặc định hiện tại đã có `c3`. Cấu hình `base` (mặc định: `c3` bật) và `c13` (`base` + `EVAL_COMPLETENESS_NUMBERS=true`), cùng job, 2 lượt xen kẽ, trên UAT, RBAC, relevance, FR v1, FR v2, compound.
+- Theo DEC-013 và quy tắc ở trên, với một điểm owner chốt (2026-11-14): **"trả lời nhầm giá trị" (nhóm *sai*) tính là trả lời sai**, cùng nhóm "phải từ chối mà trả lời".
+- Bắt buộc: 0 rò rỉ; UAT không hồi quy quá 1 câu; trả lời sai (hai nhóm trên cộng lại) không tăng ở bộ nào.
+- `c13` thắng khi không tệ hơn `base` ở bộ nào và tốt hơn ở ít nhất một bộ (ít trả lời sai hơn, rồi nhiều câu đúng hơn). Thắng thì bật `RAG_COMPLETENESS_NUMBER_NORMALIZATION_ENABLED`; không thì giữ tắt.
+
+**qwen2.5:7b với retrieval thật** (không oracle): `base` (3B) và `q7b` (`EVAL_LLM_MODEL=qwen2.5:7b`), cùng job, 2 lượt, trên RBAC, relevance, FR v1, FR v2, compound; UAT một job riêng. Chỉ đo, **không đổi model mặc định**; báo đúng / từ chối sai / trả lời sai, độ trễ, RAM.
