@@ -515,6 +515,8 @@ Hybrid candidate retrieval
 
 Prompt-ranking heuristics must not reorder already-selected reranker hits ahead of the reranker.
 
+**Measured state (2026-11-12, DEC-020, DEC-021): the code does not follow this contract.** `_prepare_prompt_retrieval_hits` re-ranks the whole pool by lexical alignment (`_rank_hits_for_prompt`) and then calls `_merge_retrieval_hits(ranked_hits, reranked_hits)`, so the alignment order comes first and the cross-encoder score only orders what is left. With a real cross-encoder (`BAAI/bge-reranker-v2-m3` and `cross-encoder/mmarco-mMiniLMv2-L12-H384-v1`, `reranker_mode=cross_encoder` verified) no answer changed on any of the 5 dev sets. The reranker therefore does not affect results today, and no cross-encoder is used for now (`docs/design/pipeline-loss-fix-plan.md`).
+
 Current runtime note: the configured cross-encoder may fall back to `HeuristicRetrievalReranker` when the local model cannot be loaded. The fallback is part of the supported design, but its output must still remain authoritative over later prompt ranking.
 
 ### Answer completeness and evidence UX refinement
