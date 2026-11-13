@@ -48,6 +48,8 @@ def categories(kind: str, results: dict[str, Any]) -> dict[str, str]:
             )
         elif case["expect"] == "refuse":
             category = "false_answer" if answered else "correct"
+        elif case.get("false_answer"):  # a half-answerable question answered in full
+            category = "false_answer"
         else:
             category = "correct" if case["passed"] else "wrong" if answered else "false_refusal"
         out[case["id"] + case.get("kind", "")] = category

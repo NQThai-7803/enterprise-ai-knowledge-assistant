@@ -155,6 +155,12 @@ class Settings(BaseSettings):
     rag_question_evidence_min_similarity: float = Field(default=0.85, ge=0.0, le=1.0)
     # FIX 3c F: numbers are compared once written one way (01 = 1, 1,2 trieu = 1.200.000).
     rag_number_normalization_enabled: bool = False
+    # FIX 4 (i), completeness checks: a grouped number is one number in the unit check; a
+    # validated first answer rejected only for its form survives a failed retry; a retry
+    # may not replace it with other values from other chunks (on: chosen in the FIX 4 batch).
+    rag_completeness_number_normalization_enabled: bool = False
+    rag_keep_validated_first_answer_enabled: bool = False
+    rag_retry_must_keep_validated_values_enabled: bool = True
     # D2: values in server-built answers are shown with the diacritics of the cited source.
     rag_restore_source_diacritics_enabled: bool = True
     # D2: a sub-claim answer that only restates an earlier one is not shown twice.

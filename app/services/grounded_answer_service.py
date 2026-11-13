@@ -73,11 +73,13 @@ from app.llm.errors import LLMError, LLMFailureCode
 from app.llm.models import LLMGenerationResult, LLMMessage
 from app.models import ChatMessage, ChatMessageRole, Document, DocumentChunk, DocumentStatus, User
 from app.observability.metrics import (
+    BRANCH_FIRST_ANSWER_KEPT,
     BRANCH_QUESTION_EVIDENCE_DISSIMILAR,
     BRANCH_QUESTION_HEAD_MISSING,
     BRANCH_REFUSAL_PHRASE_EXTENDED,
     BRANCH_RESELECT_AFTER_REJECTION,
     BRANCH_RESELECT_GUARD_WOULD_CHANGE,
+    BRANCH_RETRY_ABANDONED_FIRST,
     GLOBAL_METRICS,
 )
 from app.repositories import (
@@ -126,6 +128,7 @@ from app.services.claim_evidence_validation_service import (
     ClaimRepairFeedback,
     _evidence_for_labels,
     answer_missing_requested_unit,
+    canonical_number_unit_pairs,
     infer_yes_no_polarity,
     question_content_terms,
     question_head_in_evidence,
@@ -961,11 +964,19 @@ class GroundedAnswerService:
                             completion_tokens=retry_draft.completion_tokens,
                         )
                     return retry_draft
-                if _should_retry_incomplete_answer(
+                first_reason = _incomplete_answer_reason(
                     question=grounding_question,
                     answer=draft.content,
                     source_registry=source_registry,
-                ):
+                )
+                if first_reason is not None:
+                    # FIX 4 (i): a validated first answer rejected only for its form is kept
+                    # when the retry gives nothing better.
+                    keep_first = (
+                        self.settings.rag_keep_validated_first_answer_enabled
+                        and draft.grounding_status == GroundingStatus.ANSWERED
+                        and first_reason in _FORM_ONLY_COMPLETENESS_REASONS
+                    )
                     retry_generation = await provider.generate(
                         messages=_answer_quality_retry_messages(
                             messages,
@@ -985,6 +996,9 @@ class GroundedAnswerService:
                             grounding_question=grounding_question,
                         )
                     except CitationValidationFailedApplicationError as citation_error:
+                        if keep_first:
+                            GLOBAL_METRICS.record_answer_branch(BRANCH_FIRST_ANSWER_KEPT)
+                            return draft
                         return _no_answer_draft(
                             self.settings.chat_no_answer_message,
                             selected_chunk_count=len(source_registry.sources),
@@ -995,11 +1009,25 @@ class GroundedAnswerService:
                                 citation_error, raw_output=retry_generation.content
                             ),
                         )
-                    if _should_retry_incomplete_answer(
+                    retry_incomplete = _should_retry_incomplete_answer(
                         question=grounding_question,
                         answer=retry_draft.content,
                         source_registry=source_registry,
+                    )
+                    if keep_first and (
+                        retry_incomplete
+                        or retry_draft.grounding_status == GroundingStatus.NO_ANSWER
                     ):
+                        GLOBAL_METRICS.record_answer_branch(BRANCH_FIRST_ANSWER_KEPT)
+                        return draft
+                    if (
+                        self.settings.rag_retry_must_keep_validated_values_enabled
+                        and not retry_incomplete
+                        and _retry_abandons_validated_answer(first=draft, retry=retry_draft)
+                    ):
+                        GLOBAL_METRICS.record_answer_branch(BRANCH_RETRY_ABANDONED_FIRST)
+                        return draft
+                    if retry_incomplete:
                         if information_needs:
                             return _no_answer_draft(
                                 self.settings.chat_no_answer_message,
@@ -3455,24 +3483,52 @@ def _contains_folded_phrase(text: str, phrase: str) -> bool:
     return re.search(pattern, text) is not None
 
 
-def _should_retry_incomplete_answer(
+# FIX 4 (i): checks on the form of an answer whose value claim validation already accepted.
+# The other reasons (mismatched rows, missing names, placeholders) say the content is wrong.
+_FORM_ONLY_COMPLETENESS_REASONS = frozenset(
+    {"yes_no_missing_leading_polarity", "missing_quantity_number", "missing_numeric_unit"}
+)
+
+
+def _retry_abandons_validated_answer(*, first: _AnswerDraft, retry: _AnswerDraft) -> bool:
+    """True when a retry drops the validated first answer for other values from other chunks."""
+    if (
+        first.grounding_status != GroundingStatus.ANSWERED
+        or retry.grounding_status != GroundingStatus.ANSWERED
+    ):
+        return False
+    first_values = {
+        pair
+        for pair in canonical_number_unit_pairs(_fold_for_person_match(first.content))
+        if pair[1]
+    }
+    retry_values = set(canonical_number_unit_pairs(_fold_for_person_match(retry.content)))
+    if not first_values or first_values & retry_values:
+        return False
+    first_chunks = {getattr(citation, "chunk_id", None) for citation in first.citations}
+    retry_chunks = {getattr(citation, "chunk_id", None) for citation in retry.citations}
+    return first_chunks.isdisjoint(retry_chunks)
+
+
+def _incomplete_answer_reason(
     *,
     question: str,
     answer: str,
     source_registry: PromptSourceRegistry,
-) -> bool:
+) -> str | None:
+    """Why the completeness checks reject the answer; None when they accept it."""
     clean_answer = _strip_public_citation_markers(answer)
 
     if _is_placeholder_like_json_answer(clean_answer):
         logger.warning("RAG completeness diagnostics: reason=placeholder")
-        return True
+        return "placeholder"
 
     if _yes_no_answer_missing_polarity(
         question=question,
         answer=clean_answer,
     ):
         logger.warning("RAG completeness diagnostics: reason=yes_no_missing_leading_polarity")
-        return True
+        return "yes_no_missing_leading_polarity"
 
     if _limit_answer_missing_limit_cue(
         question=question,
@@ -3480,7 +3536,7 @@ def _should_retry_incomplete_answer(
         source_registry=source_registry,
     ):
         logger.warning("RAG completeness diagnostics: reason=missing_limit")
-        return True
+        return "missing_limit"
 
     if _multi_value_answer_missing_source_distinctions(
         question=question,
@@ -3488,7 +3544,7 @@ def _should_retry_incomplete_answer(
         source_registry=source_registry,
     ):
         logger.warning("RAG completeness diagnostics: reason=missing_multi_value_distinctions")
-        return True
+        return "missing_multi_value_distinctions"
 
     if _open_person_answer_has_negative_polarity(
         question=question,
@@ -3496,7 +3552,7 @@ def _should_retry_incomplete_answer(
         source_registry=source_registry,
     ):
         logger.warning("RAG completeness diagnostics: reason=open_person_negative_polarity")
-        return True
+        return "open_person_negative_polarity"
 
     if _person_answer_missing_source_name(
         question=question,
@@ -3504,7 +3560,7 @@ def _should_retry_incomplete_answer(
         source_registry=source_registry,
     ):
         logger.warning("RAG completeness diagnostics: reason=missing_person_name")
-        return True
+        return "missing_person_name"
 
     if _quantity_answer_missing_source_number(
         question=question,
@@ -3512,7 +3568,7 @@ def _should_retry_incomplete_answer(
         source_registry=source_registry,
     ):
         logger.warning("RAG completeness diagnostics: reason=missing_quantity_number")
-        return True
+        return "missing_quantity_number"
 
     if _leave_duration_answer_mismatches_bound_row(
         question=question,
@@ -3520,7 +3576,7 @@ def _should_retry_incomplete_answer(
         source_registry=source_registry,
     ):
         logger.warning("RAG completeness diagnostics: reason=leave_duration_row_mismatch")
-        return True
+        return "leave_duration_row_mismatch"
 
     if _annual_leave_answer_mismatches_bound_relation(
         question=question,
@@ -3528,7 +3584,7 @@ def _should_retry_incomplete_answer(
         source_registry=source_registry,
     ):
         logger.warning("RAG completeness diagnostics: reason=annual_leave_relation_mismatch")
-        return True
+        return "annual_leave_relation_mismatch"
 
     if _leave_policy_answer_mismatches_bound_clause(
         question=question,
@@ -3536,7 +3592,7 @@ def _should_retry_incomplete_answer(
         source_registry=source_registry,
     ):
         logger.warning("RAG completeness diagnostics: reason=leave_policy_clause_mismatch")
-        return True
+        return "leave_policy_clause_mismatch"
 
     if _time_answer_missing_source_time_range(
         question=question,
@@ -3544,14 +3600,14 @@ def _should_retry_incomplete_answer(
         source_registry=source_registry,
     ):
         logger.warning("RAG completeness diagnostics: reason=missing_time_range")
-        return True
+        return "missing_time_range"
 
     if _numeric_answer_missing_source_unit(
         answer=clean_answer,
         source_registry=source_registry,
     ):
         logger.warning("RAG completeness diagnostics: reason=missing_numeric_unit")
-        return True
+        return "missing_numeric_unit"
 
     if _full_range_answer_missing_bound(
         question=question,
@@ -3559,7 +3615,7 @@ def _should_retry_incomplete_answer(
         source_registry=source_registry,
     ):
         logger.warning("RAG completeness diagnostics: reason=missing_range_bound")
-        return True
+        return "missing_range_bound"
 
     if _change_answer_missing_source_change(
         question=question,
@@ -3567,7 +3623,7 @@ def _should_retry_incomplete_answer(
         source_registry=source_registry,
     ):
         logger.warning("RAG completeness diagnostics: reason=missing_change_value")
-        return True
+        return "missing_change_value"
 
     if _compound_answer_missing_need_value(
         question=question,
@@ -3575,9 +3631,21 @@ def _should_retry_incomplete_answer(
         source_registry=source_registry,
     ):
         logger.warning("RAG completeness diagnostics: reason=missing_compound_need_value")
-        return True
+        return "missing_compound_need_value"
 
-    return False
+    return None
+
+
+def _should_retry_incomplete_answer(
+    *,
+    question: str,
+    answer: str,
+    source_registry: PromptSourceRegistry,
+) -> bool:
+    return (
+        _incomplete_answer_reason(question=question, answer=answer, source_registry=source_registry)
+        is not None
+    )
 
 
 def _annual_leave_answer_mismatches_bound_relation(
@@ -4445,14 +4513,30 @@ def _time_range_occurs_in_answer(time_range: str, folded_answer: str) -> bool:
     return all(clock in folded_answer for clock in clocks)
 
 
+_GROUPED_NUMBER_WITH_UNIT = re.compile(r"(?<![\d.,])\d{1,3}(?:[.,]\d{3})+(?!\d)[^\n]{0,24}")
+
+
 def _numeric_answer_missing_source_unit(
     *,
     answer: str,
     source_registry: PromptSourceRegistry,
 ) -> bool:
     folded_answer = _fold_for_person_match(answer)
+    grouped_spans: list[tuple[int, int]] = []
+    if get_settings().rag_completeness_number_normalization_enabled:
+        # "2.500 kg" is one number, not "2" and "500": skip it when the sources hold that value.
+        source_values = set(
+            canonical_number_unit_pairs(
+                _fold_for_person_match("\n".join(s.text for s in source_registry.sources))
+            )
+        )
+        for grouped in _GROUPED_NUMBER_WITH_UNIT.finditer(folded_answer):
+            if set(canonical_number_unit_pairs(grouped.group(0))[:1]) & source_values:
+                grouped_spans.append(grouped.span())
     for match in re.finditer(r"\d+", folded_answer):
         number = match.group(0)
+        if any(start <= match.start() < end for start, end in grouped_spans):
+            continue
         if (
             _looks_like_year_number(number)
             or _number_match_is_identifier_component(folded_answer, match)

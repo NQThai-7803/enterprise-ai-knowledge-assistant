@@ -187,6 +187,10 @@ def test_default_llm_and_chat_answer_settings() -> None:
     assert settings.chat_history_max_tokens == 1200
     assert settings.chat_context_max_tokens == 6000
     assert settings.chat_no_answer_message.strip()
+    # FIX 4 (i): the one completeness flag the batch chose; the other two stay off.
+    assert settings.rag_retry_must_keep_validated_values_enabled is True
+    assert settings.rag_keep_validated_first_answer_enabled is False
+    assert settings.rag_completeness_number_normalization_enabled is False
     # Users read this sentence: it is written with full Vietnamese diacritics.
     assert settings.chat_no_answer_message.startswith("Không tìm thấy đủ thông tin")
 

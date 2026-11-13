@@ -98,7 +98,7 @@ Số dòng tính trên `main` `c3f55cd`. "gas" là `app/services/grounded_answer
   1. Cue so cả dấu (`RAG_STRICT_OUTCOME_CUES_EXACT_ENABLED` đã có, FIX 2b, đang tắt).
   2. Chỉ cho route chạy khi cửa sổ dòng chứa từ chủ đề của câu hỏi.
   3. Thay cue bằng bộ phân loại ý định (mục 4).
-- **Đo:** chưa có ablation riêng trong đợt này; số câu đi route deterministic lấy từ trace (`route`).
+- **Đo:** ablation `deterministic_off` (2026-11-13), mục 3, "Route deterministic tắt".
 
 ### F. So số và đơn vị
 - **Code:** `_numbers_are_contradicted` (cev:2696) so chuỗi số thô, nên "1" khác "01", và "1.200.000" bị regex cắt thành "1.200" và "000".
@@ -187,7 +187,37 @@ UAT baseline nhanh (1,1 s) vì 75/100 câu đi route deterministic không gọi 
 - **Chunk nguyên văn làm UAT tệ đi 14 câu.** Model 3B cần đoạn trích đã thu hẹp; nhưng chính bộ chọn dòng theo từ vựng đó làm hỏng FR-A01. Đây là đánh đổi cốt lõi: không thể bỏ đoạn trích, phải làm nó chọn đúng hơn.
 - Trả lời sai gần như không đổi dưới oracle (FR v1 vẫn 5–6, relevance 4–6): chúng là câu **phải từ chối** mà LLM chép câu bên cạnh và validator cho qua (cơ chế V), không liên quan đến context.
 
-### Trace `false_refusal_dev_v2` (run `42802589033`): vì sao F không chạm ca nào
+### Route deterministic tắt và oracle với 3B/7B (đợt 2026-11-13, commit `93a961a`)
+
+Mỗi bộ một job, 2 lượt xen kẽ; hai lượt giống hệt nhau ở mọi ô trừ UAT `base` (Q002). Ô: đúng / từ chối sai / trả lời sai (phải từ chối mà trả lời) / sai (trả lời nhầm). Rò rỉ: 0 ở mọi ô.
+
+`deterministic_off` = mọi câu trả lời dựng sẵn từ bảng (`_structured_value_repair_generation` và route điều kiện) bị tắt, câu nào cũng qua LLM.
+
+| Bộ (run) | `base` | `deterministic_off` |
+|---|---|---|
+| UAT (`43360466544`) | 98-99/1/0/0-1, trung vị 0,6 s | **61/35/0/4**, trung vị 14,8 s: 34 câu → từ chối sai, Q016, Q043, Q044 → sai |
+| RBAC (`43360494544`) | 23/12/0/1 | 21/14/0/1 (control RBD-04, RBD-05 → từ chối sai) |
+| relevance (`43360519325`) | 17/3/5/0 | = |
+| FR v1 (`43360543690`) | 13/1/6/0 | = |
+| FR v2 (`43360568048`) | 13/5/5/1 | = |
+
+**Đọc kết quả:** 37 câu UAT đúng **chỉ nhờ** câu trả lời dựng sẵn; ngoài UAT route này gần như không chạy (RBAC 2 câu, ba bộ còn lại 0). Điểm UAT phần lớn đo route deterministic chứ không đo LLM + validator. Khớp với 4b: trên held-out route chạy 6/40 câu và sai cả 6.
+
+`o3b` = oracle (chunk gold, qua đoạn trích) với qwen2.5:3b; `o7b` = cùng oracle với qwen2.5:7b (`EVAL_LLM_MODEL`). `base` = 3B, retrieval thật.
+
+| Bộ (run) | `base` | `o3b` | `o7b` |
+|---|---|---|---|
+| RBAC (`43360592606`) | 22/12/1/1, 38 s | 25/10/1/0, 35 s (control 08, 12, 18 cứu; 13 sai → từ chối) | **26/10/0/0**, 106 s (thêm RBD-03 negative hết trả lời sai) |
+| relevance (`43360618591`) | 17/3/5/0, 32 s | 16/2/6/1, 32 s (REL-304 cứu; REL-101 → trả lời sai; REL-404 → sai) | 17/2/6/0, 79 s (REL-201 hết trả lời sai, REL-304 cứu; REL-101, REL-303 → trả lời sai) |
+| FR v1 (`43360643014`) | 13/1/6/0, 19 s | = , 18 s | 14/2/**4**/0, 42 s (A08, N08 hết trả lời sai; N05 → từ chối sai) |
+| FR v2 (`43360666643`) | 13/5/5/1, 35 s | 15/4/5/0, 27 s (E01, F02 cứu; L03 sai → đúng; C01 → từ chối sai) | **18/4/2/0**, 69 s (C05, C06, F06 hết trả lời sai; E01, F02, L03; C04 → từ chối sai) |
+
+Độ trễ là trung vị mỗi câu. RAM: 3B đỉnh ~6,3-6,9 GB; 7B đỉnh 11,1-12,4 GB, còn trống thấp nhất 3,6 GB (runner 16 GB). `base` của nhóm này đỉnh 11 GB vì 7B còn nằm trong RAM từ lượt trước (keep-alive), không phải do 3B.
+
+**Đọc kết quả:**
+- Với cùng context gold, 7B bớt trả lời sai ở 3/4 bộ (FR v2 5 → 2, FR v1 6 → 4, RBAC 1 → 0) nhưng thêm 1 ở relevance; câu đúng tăng ở RBAC (+4) và FR v2 (+5). Phần lớn lợi ích nằm ở **model**, không ở context: `o3b` chỉ cứu được ít hơn.
+- Giá: độ trễ 2,2-2,8 lần trên CPU, RAM gần gấp đôi. Chưa đo 7B với retrieval thật và chưa đo UAT với 7B.
+
 
 | Câu | Bị chặn ở | Chi tiết |
 |---|---|---|

@@ -1,5 +1,11 @@
 # Project Status
 
+## FIX 4 (i) -- 2026-11-13
+
+- **Completeness retry:** a retry may no longer replace a validated first answer with other values from other chunks (`RAG_RETRY_MUST_KEEP_VALIDATED_VALUES_ENABLED`, on). Batch on 6 dev sets: FR v2 one wrong answer fixed, every other set identical, 0 leaks. Keeping a form-rejected first answer would add a false answer (FR-A10) and stays off.
+- **Deterministic route:** with it off, UAT falls from 98-99 to 61 while RBAC loses 2 and the other three sets do not move: the UAT score mostly measures server-built answers.
+- **3B vs 7B on gold context:** 7B cuts false answers (FR v2 5 to 2, FR v1 6 to 4, RBAC 1 to 0; relevance +1) and costs 2.2-2.8x latency and ~11-12 GB RAM on CPU.
+
 ## D2 display text -- 2026-11-13
 
 - Three general display defects fixed, one commit each: the no-answer sentence had no diacritics; server-built answers copied values from accent-folded text ("40 gio/tuan", "10 ngay lam viec"); a sub-claim answer that restated the previous one was appended (cause: the plain join of validated sub-claim answers in `grounded_answer_service`). Two flags, both on by default, so a batch can measure the old wording as its baseline.

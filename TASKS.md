@@ -8,6 +8,12 @@
 3. **Embedding fine-tune** (`docs/design/embedding-finetune.md` and DEC-015 on branch `feat/embedding-finetune-infra`): infrastructure only so far; the baseline measurement and training come after FIX 3.
 4. The final held-out v2 measurement, once, after the choices above are made (DEC-012).
 
+## FIX 4 (i) completeness retry -- 2026-11-13
+
+- **DONE:** three flags measured (`docs/eval/runs/fix4-completeness.md`); `c3` (retry may not drop validated values) chosen and on by default; `c1` and `c2` stay off. `c1` + `c3` together not measured.
+- **DONE:** `deterministic_off` and oracle 3B/7B measured (plan section 3): 37 UAT questions are right only through server-built answers; 7B with gold context removes most false answers at 2-3x the latency.
+- **Next (owner order, DEC-021):** (ii) responsiveness calibrated on UAT, (iii) excerpt fallback, (iv) C partial answers. Not started.
+
 ## D2 display text -- 2026-11-13
 
 - **DONE (code, unit tests):** accented no-answer sentence; source diacritics restored in server-built answers (`_restore_source_diacritics`, flag on); restated sub-claim answers left out (`_join_claim_answers`, flag on). Wording only.
