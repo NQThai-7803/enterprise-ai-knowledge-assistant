@@ -1,5 +1,9 @@
 # Project Status
 
+## PROMPT 6 -- 2026-11-12 (waiting for owner)
+
+- **Pipeline-loss analysis done** (`docs/design/pipeline-loss-fix-plan.md`, DEC-020): ablations, oracle context and two real cross-encoders on 5 dev sets. No ablation is a fix; F changes nothing; rerankers change no answer; the loss sits after the context (completeness-check retries, lenient validator). Six decisions wait for the owner.
+
 ## DEC-019 -- 2026-11-09
 
 - CI may stand in for local eaka-verify when the RAM gate stays closed for 15 minutes; merges still need the 4 checks green. FIX 3a accepted as not met (flags off); lesson recorded in `docs/eval/runs/fix3a-false-answers.md`.

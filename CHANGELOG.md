@@ -6,6 +6,10 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### PROMPT 6 -- 2026-11-12
+
+- `docs/design/pipeline-loss-fix-plan.md` and DEC-020: per-mechanism analysis, ablation and reranker measurements, NLU design, decisions for the owner. No `app/` change.
+
 ### Verification fallback -- 2026-11-09
 
 - DEC-019: when the 1000 MB RAM gate stays closed for 15 minutes, CI may stand in for local eaka-verify; no merge without the 4 checks green, and the PR says so.
