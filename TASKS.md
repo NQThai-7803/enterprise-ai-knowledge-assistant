@@ -14,6 +14,11 @@
 - **DONE:** `deterministic_off` and oracle 3B/7B measured (plan section 3): 37 UAT questions are right only through server-built answers; 7B with gold context removes most false answers at 2-3x the latency.
 - **Next (owner order, DEC-021):** (ii) responsiveness calibrated on UAT, (iii) excerpt fallback, (iv) C partial answers. Not started.
 
+## D2 display text -- 2026-11-13
+
+- **DONE (code, unit tests):** accented no-answer sentence; source diacritics restored in server-built answers (`_restore_source_diacritics`, flag on); restated sub-claim answers left out (`_join_claim_answers`, flag on). Wording only.
+- **DONE: measured** on 5 dev sets (`base` both flags off vs `display`, runs 43474139609, 43474157960, 43474177047, 43474195099, 43474216008): status and citations unchanged everywhere; only wording changed (details in `PROJECT_STATUS.md`). PR #23 waits for the owner.
+
 ## PROMPT 6 pipeline-loss analysis -- 2026-11-12 (WAITING FOR OWNER)
 
 - **DONE: ablations and real rerankers measured on Actions, 5 dev sets, 2 runs** (`docs/design/pipeline-loss-fix-plan.md`, DEC-020). F: 0 cases changed, flag stays off. Low-alignment filter off, `group_hits[:5]`, whole chunks: all regress UAT. Cross-encoders: 0 answers changed. Oracle context: almost no gain, the loss is after the context.

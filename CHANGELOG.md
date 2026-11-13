@@ -12,6 +12,12 @@ Format follows a simplified Keep a Changelog style.
 - New dev set `compound_partial_dev_v1` (12 half-answerable two-part questions; content pending owner review), runnable as `eval.yml` `set=compound`.
 - `docs/design/pipeline-loss-fix-plan.md`: `deterministic_off` ablation and oracle with qwen2.5 3B vs 7B.
 
+### D2 display text -- 2026-11-13
+
+- The fixed no-answer sentence is written with Vietnamese diacritics ("Không tìm thấy đủ thông tin…").
+- `RAG_RESTORE_SOURCE_DIACRITICS_ENABLED` (default on): values in server-built answers are shown as the cited source writes them ("40 giờ/tuần", not "40 gio/tuan").
+- `RAG_DEDUPE_CLAIM_ANSWERS_ENABLED` (default on): a sub-claim answer that only restates an earlier one is no longer shown twice; citations unchanged.
+
 ### PROMPT 6 tooling and F flag -- 2026-11-13
 
 - `RAG_NUMBER_NORMALIZATION_ENABLED` (FIX 3c F), off by default: measured, 0 cases changed; merged flag-off (DEC-021).

@@ -404,7 +404,7 @@ def test_unpaid_leave_notice_repair_reads_named_or_narrative_policy_deadline() -
             source_registry=source(policy),
         )
         assert generation is not None
-        assert "08 ngay lam viec" in json.loads(generation.content)["answer"]
+        assert "08 ngày làm việc" in json.loads(generation.content)["answer"]
 
 
 def test_hospitalization_intent_does_not_depend_on_plan_brand() -> None:
@@ -2989,7 +2989,7 @@ def test_partial_year_leave_repair_uses_source_relation_without_full_year_value(
 
     assert generation is not None
     answer = json.loads(generation.content)["answer"]
-    assert "tinh theo ty le tuong ung voi thoi gian lam viec" in answer.lower()
+    assert "tính theo tỷ lệ tương ứng với thời gian làm việc" in answer.lower()
     assert "15" not in answer
     assert analyze_question("Gio cot loi la may gio?").answer_type == "TIME_RANGE"
 
@@ -3767,7 +3767,7 @@ def test_structured_repair_keeps_requested_condition_bound_to_preceding_outcome(
     assert generation is not None
     answer = json.loads(generation.content)["answer"].casefold()
     assert "ty le tuong ung" in answer
-    assert "chua du 12 thang" in answer
+    assert "chưa đủ 12 tháng" in answer
     assert "05 nam" not in answer
     assert "01 ngay" not in answer
 
@@ -3937,11 +3937,11 @@ def test_structured_duration_repair_binds_requested_unit_and_period() -> None:
     )
 
     assert weekly is not None
-    assert "40 gio/tuan" in json.loads(weekly.content)["answer"]
+    assert "40 giờ/tuần" in json.loads(weekly.content)["answer"]
     assert daily is not None
-    assert "08 gio/ngay" in json.loads(daily.content)["answer"]
+    assert "08 giờ/ngày" in json.loads(daily.content)["answer"]
     assert lunch is not None
-    assert "60 phut" in json.loads(lunch.content)["answer"]
+    assert "60 phút" in json.loads(lunch.content)["answer"]
 
 
 def test_leave_duration_repair_binds_personal_event_and_notice_band() -> None:
@@ -3971,13 +3971,13 @@ def test_leave_duration_repair_binds_personal_event_and_notice_band() -> None:
     )
 
     assert own is not None
-    assert "03 ngay" in json.loads(own.content)["answer"]
+    assert "03 ngày" in json.loads(own.content)["answer"]
     assert child is not None
-    assert "01 ngay" in json.loads(child.content)["answer"]
+    assert "01 ngày" in json.loads(child.content)["answer"]
     assert bereavement is not None
-    assert "03 ngay" in json.loads(bereavement.content)["answer"]
+    assert "03 ngày" in json.loads(bereavement.content)["answer"]
     assert notice is not None
-    assert "05 ngay lam viec" in json.loads(notice.content)["answer"]
+    assert "05 ngày làm việc" in json.loads(notice.content)["answer"]
 
 
 def test_bereavement_focus_keeps_paid_parent_row_separate_from_unpaid_event() -> None:
@@ -3999,7 +3999,7 @@ def test_bereavement_focus_keeps_paid_parent_row_separate_from_unpaid_event() ->
     assert "03 ngày" in focused.text
     assert "01 ngày" not in focused.text
     assert generation is not None
-    assert "03 ngay" in json.loads(generation.content)["answer"]
+    assert "03 ngày" in json.loads(generation.content)["answer"]
 
 
 def test_marriage_focus_keeps_event_value_out_of_adjacent_notice_row() -> None:
@@ -4060,7 +4060,7 @@ def test_leave_notice_uses_source_bands_instead_of_fixture_thresholds() -> None:
         )
         assert generation is not None
         answer = json.loads(generation.content)["answer"]
-        assert f"{expected} ngay lam viec" in answer
+        assert f"{expected} ngày làm việc" in answer
         assert "02 ngay lam viec" not in answer
 
 
@@ -4094,9 +4094,9 @@ def test_leave_notice_repair_handles_pdf_dash_noise_and_strictly_over_threshold(
     )
 
     assert two_days is not None
-    assert "04 ngay lam viec" in json.loads(two_days.content)["answer"]
+    assert "04 ngày làm việc" in json.loads(two_days.content)["answer"]
     assert more_than_five is not None
-    assert "12 ngay lam viec" in json.loads(more_than_five.content)["answer"]
+    assert "12 ngày làm việc" in json.loads(more_than_five.content)["answer"]
 
 
 def test_remote_registration_deadline_uses_source_clock_not_fixture_time() -> None:

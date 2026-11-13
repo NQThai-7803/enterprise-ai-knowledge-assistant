@@ -191,6 +191,8 @@ def test_default_llm_and_chat_answer_settings() -> None:
     assert settings.rag_retry_must_keep_validated_values_enabled is True
     assert settings.rag_keep_validated_first_answer_enabled is False
     assert settings.rag_completeness_number_normalization_enabled is False
+    # Users read this sentence: it is written with full Vietnamese diacritics.
+    assert settings.chat_no_answer_message.startswith("Không tìm thấy đủ thông tin")
 
 
 def test_llm_selected_provider_config_required_only_when_enabled() -> None:

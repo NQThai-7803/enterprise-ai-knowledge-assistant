@@ -161,6 +161,10 @@ class Settings(BaseSettings):
     rag_completeness_number_normalization_enabled: bool = False
     rag_keep_validated_first_answer_enabled: bool = False
     rag_retry_must_keep_validated_values_enabled: bool = True
+    # D2: values in server-built answers are shown with the diacritics of the cited source.
+    rag_restore_source_diacritics_enabled: bool = True
+    # D2: a sub-claim answer that only restates an earlier one is not shown twice.
+    rag_dedupe_claim_answers_enabled: bool = True
     reranker_enabled: bool = True
     reranker_provider: Literal["sentence_transformers", "heuristic"] = "sentence_transformers"
     reranker_model: str = Field(default="BAAI/bge-reranker-v2-m3", min_length=1)
@@ -245,8 +249,8 @@ class Settings(BaseSettings):
     chat_context_max_tokens: int = Field(default=6000, gt=0)
     chat_no_answer_message: str = Field(
         default=(
-            "Khong tim thay du thong tin trong cac tai lieu ban duoc phep truy cap "
-            "de tra loi cau hoi nay."
+            "Không tìm thấy đủ thông tin trong các tài liệu bạn được phép truy cập "
+            "để trả lời câu hỏi này."
         ),
         min_length=1,
     )

@@ -2286,7 +2286,10 @@ class GroundedAnswerService:
                         if claim_validation.status != ClaimEvidenceStatus.SUPPORTED:
                             raise ValueError(f"Unsupported structured claim: {claim.claim_id}")
                 grounded_output = GroundedLLMOutput(
-                    answer=" ".join(claim.answer for claim in structured_output.claims),
+                    answer=_join_claim_answers(
+                        structured_output.claims,
+                        dedupe=self.settings.rag_dedupe_claim_answers_enabled,
+                    ),
                     citations=tuple(
                         dict.fromkeys(
                             citation
@@ -4303,6 +4306,153 @@ def _fold_for_person_match(text: str) -> str:
         text.casefold().replace("\u0111", "d").replace("\u0110", "d"),
     )
     return "".join(character for character in normalized if not unicodedata.combining(character))
+
+
+# Words that turn a restatement into a different claim.
+_RESTATEMENT_BLOCKING_WORDS = frozenset(
+    {"không", "chưa", "chẳng", "cấm", "not", "no", "never", "cannot", "without"}
+)
+
+
+def _answer_clauses(text: str) -> list[list[str]]:
+    """Words of each clause, diacritics kept ("kế" is not "kê")."""
+    parts = re.split(r"[,;.:!?](?!\d)|\n", text.casefold())  # not "450.000"
+    return [words for part in parts if (words := re.findall(r"\w+", part))]
+
+
+def _clause_restates(words: list[str], clause: list[str], earlier_words: set[str]) -> bool:
+    """True when words are the clause's words with only insertions: each extra run sits
+    between two words the clause has side by side, or before its first / after its last
+    word, and holds no number, no negation and at most one word new to the earlier answer."""
+    present = set(clause)
+    pairs = set(zip(clause, clause[1:], strict=False))
+    new_words = 0
+    index = 0
+    while index < len(words):
+        if words[index] in present:
+            index += 1
+            continue
+        stop = index
+        while stop < len(words) and words[stop] not in present:
+            stop += 1
+        run = words[index:stop]
+        if any(word.isdigit() or word in _RESTATEMENT_BLOCKING_WORDS for word in run):
+            return False
+        new_words += sum(word not in earlier_words for word in run)
+        left = words[index - 1] if index > 0 else None
+        right = words[stop] if stop < len(words) else None
+        if left is not None and right is not None:
+            attached = (left, right) in pairs  # inserted, not put in place of a word
+        elif right is not None:
+            attached = clause[0] == right
+        elif left is not None:
+            attached = clause[-1] == left
+        else:
+            attached = False
+        if not attached:
+            return False
+        index = stop
+    return new_words <= 1
+
+
+def _restates(answer: str, earlier: str) -> bool:
+    """True when every clause of answer restates one clause of the earlier answer
+    ("tự trả phí" / "tự trả lệ phí"); another subject in the same words is not a restatement."""
+    clauses = _answer_clauses(answer)
+    earlier_clauses = _answer_clauses(earlier)
+    earlier_words = {word for clause in earlier_clauses for word in clause}
+    return sum(map(len, clauses)) >= 5 and all(
+        any(_clause_restates(clause, other, earlier_words) for other in earlier_clauses)
+        for clause in clauses
+    )
+
+
+def _join_claim_answers(claims: Sequence[StructuredGroundedClaim], *, dedupe: bool) -> str:
+    """Join sub-claim answers, leaving out one that only restates an earlier answer."""
+    kept: list[StructuredGroundedClaim] = []
+    for claim in claims:
+        # shortcut: compares words, not meaning; a short answer ("Có.") is always kept.
+        # Upgrade if a dev set shows a dropped answer that carried its own fact.
+        restated = dedupe and any(
+            _restates(claim.answer, earlier.answer)
+            and set(claim.citations) <= set(earlier.citations)
+            for earlier in kept
+        )
+        if not restated:
+            kept.append(claim)
+    return " ".join(claim.answer for claim in kept)
+
+
+def _folded_with_offsets(text: str) -> tuple[str, list[int]]:
+    """Fold like _fold_for_person_match, keeping the original index of every folded character."""
+    folded: list[str] = []
+    offsets: list[int] = []
+    for index, character in enumerate(text):
+        for folded_character in _fold_for_person_match(character):
+            folded.append(folded_character)
+            offsets.append(index)
+    return "".join(folded), offsets
+
+
+def _source_wording(phrase: str, sources: Sequence[tuple[str, str, list[int]]]) -> str | None:
+    """The sources' own spelling of an unaccented phrase, when every occurrence agrees."""
+    words = _fold_for_person_match(phrase).split()
+    pattern = re.compile(r"(?<!\w)" + r"\s+".join(map(re.escape, words)) + r"(?!\w)")
+    forms: set[str] = set()
+    for text, folded, offsets in sources:
+        for match in pattern.finditer(folded):
+            end = offsets[match.end() - 1] + 1
+            while end < len(text) and unicodedata.combining(text[end]):
+                end += 1
+            original = unicodedata.normalize("NFC", text[offsets[match.start()] : end])
+            forms.add(" ".join(original.split()))
+    if len({form.casefold() for form in forms}) != 1:
+        return None  # absent, or "nam" spelled both "năm" and "Nam": keep the phrase
+    form = forms.pop()
+    phrase = " ".join(phrase.split())
+    if len(form) != len(phrase):
+        return None
+    return "".join(
+        source.upper() if wanted.isupper() else source.lower() if wanted.islower() else source
+        for source, wanted in zip(form, phrase, strict=True)
+    )
+
+
+def _restore_source_diacritics(answer: str, source_texts: Sequence[str]) -> str:
+    """Put back the diacritics of unaccented runs of words copied from the cited sources."""
+    sources = [(text, *_folded_with_offsets(text)) for text in source_texts]
+    tokens = list(re.finditer(r"\S+", answer))
+    pieces: list[str] = []
+    cursor = 0
+    index = 0
+    while index < len(tokens):
+        stop = index
+        while stop < len(tokens) and tokens[stop].group(0).isascii():
+            stop += 1
+        replaced = False
+        for end in range(stop, index, -1):  # longest run of unaccented words first
+            start_at = tokens[index].start()
+            end_at = tokens[end - 1].end()
+            while start_at < end_at and not answer[start_at].isalnum():
+                start_at += 1
+            while end_at > start_at and not answer[end_at - 1].isalnum():
+                end_at -= 1
+            phrase = answer[start_at:end_at]
+            if not any(character.isalpha() for character in phrase):
+                continue
+            wording = _source_wording(phrase, sources)
+            if wording is None or wording == phrase:
+                continue
+            pieces.append(answer[cursor:start_at])
+            pieces.append(wording)
+            cursor = end_at
+            index = end
+            replaced = True
+            break
+        if not replaced:
+            index += 1
+    pieces.append(answer[cursor:])
+    return "".join(pieces)
 
 
 def _quantity_answer_missing_source_number(
@@ -7751,6 +7901,12 @@ def _structured_value_repair_generation(
         return None
     answer, source_labels = structured_answer
     citations = [source_labels] if isinstance(source_labels, str) else list(source_labels)
+    if get_settings().rag_restore_source_diacritics_enabled:
+        # The builders copy values from folded text; show them as the source writes them.
+        answer = _restore_source_diacritics(
+            answer,
+            [source.text for source in source_registry.sources if source.label in citations],
+        )
     return LLMGenerationResult(
         content=json.dumps(
             {"answer": answer, "citations": citations},
@@ -9111,7 +9267,7 @@ def _structured_proportional_leave_answer(
         if condition is None:
             continue
         if match := relation.search(folded_source):
-            answer = f"Chua du {condition.group('months')} thang: phep nam {match.group(0)}."
+            answer = f"Chưa đủ {condition.group('months')} tháng: phép năm {match.group(0)}."
             return answer, source.label
     return None
 

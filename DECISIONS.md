@@ -187,3 +187,12 @@ Recorded on 2026-11-12 at the owner's instruction.
 - **The record of that run is not in the repository** and is not used to design any fix. The implementer (Claude Code) does not read it and does not ask for it.
 - Only three general display defects were taken from that run, and nothing else: the fixed no-answer sentence is written without Vietnamese diacritics; answer templates print unaccented Vietnamese (units such as "trieu/thang"); an answer can repeat one sentence twice.
 - **Any report of held-out v2 results must state this event.**
+
+## DEC-023 — Wording-only fixes may ship with their flag on
+
+Recorded on 2026-11-14 at the owner's instruction, after D2 (PR #23).
+
+- **Exception to the change guard's "a new flag keeps the old behaviour by default":** a fix that changes only the wording of answers may be on by default when one batch on the 5 dev sets (UAT, RBAC, relevance, FR v1, FR v2; 2 runs, same job as the baseline) shows no change of status and no change of cited documents for any question.
+- **The flag stays** so a later batch can run the old wording as its baseline.
+- First use: `RAG_RESTORE_SOURCE_DIACRITICS_ENABLED` and `RAG_DEDUPE_CLAIM_ANSWERS_ENABLED`.
+- Any change that can alter status, citations or which facts an answer states still follows the guard and DEC-013.

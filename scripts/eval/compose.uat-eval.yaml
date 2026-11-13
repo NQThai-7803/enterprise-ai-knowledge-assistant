@@ -48,5 +48,7 @@ services:
       RERANKER_MODEL_CACHE_PATH: ${EVAL_RERANKER_CACHE:-/app/data/models}
       RERANKER_TIMEOUT_SECONDS: ${EVAL_RERANKER_TIMEOUT:-10}
       LLM_SEED: ${EVAL_LLM_SEED:-20261031}
+      RAG_RESTORE_SOURCE_DIACRITICS_ENABLED: ${EVAL_SOURCE_DIACRITICS:-true}
+      RAG_DEDUPE_CLAIM_ANSWERS_ENABLED: ${EVAL_DEDUPE_CLAIMS:-true}
       # Point at scripts/eval/ollama_usage_proxy.py to record token usage per call.
       LLM_OLLAMA_BASE_URL: ${EVAL_OLLAMA_BASE_URL:-http://host.docker.internal:11434}
