@@ -233,7 +233,7 @@ Mỗi bộ một job, `base` (3B) và `q7b` (`EVAL_LLM_MODEL=qwen2.5:7b`), 2 lư
 | FR v2 (`43493825433`) | 14/5/5/0 | 15/6/3/0 (C05, F06 hết trả lời sai; L03 → từ chối) | 30,9 s → 65,4 s | 12,6 GB (3,1 GB) |
 | compound (`43493848355`) | 4/3/4/1 | 4/4/3/1 (P02, P03 hết trả lời sai nhưng thành từ chối; P06 → trả lời sai) | 24,0 s → 46,1 s | 13,0 GB (3,0 GB) |
 
-**Đọc kết quả:** với retrieval thật, 7B bớt trả lời sai (tính cả nhầm giá trị) ở UAT (−1), RBAC (−2), FR v1 (−2), FR v2 (−2), compound (−1), và thêm 1 ở relevance (5+0 → 5+1). Câu đúng gần như không tăng (+1 ở RBAC, FR v1, FR v2; −1 ở relevance): phần lớn câu 7B không trả lời sai nữa thì thành từ chối. Giá là 2,1-2,8 lần độ trễ trên CPU và RAM đỉnh 11-13 GB trên runner 16 GB. Không đổi model mặc định.
+**Đọc kết quả:** với retrieval thật, 7B bớt trả lời sai (tính cả nhầm giá trị) ở UAT (−1), RBAC (−2), FR v1 (−2), FR v2 (−2), compound (−1), và thêm 1 ở relevance (5+0 → 5+1). Câu đúng gần như không tăng (+1 ở RBAC, FR v1, FR v2; −1 ở relevance): phần lớn câu 7B không trả lời sai nữa thì thành từ chối. Giá là 1,9-2,8 lần độ trễ trên CPU và RAM đỉnh 11-13 GB trên runner 16 GB. Không đổi model mặc định.
 
 
 | Câu | Bị chặn ở | Chi tiết |
