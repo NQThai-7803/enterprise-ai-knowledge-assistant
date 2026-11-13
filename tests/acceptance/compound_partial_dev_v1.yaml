@@ -1,0 +1,127 @@
+# Half-answerable two-part questions (DEC-021). Synthetic documents and questions for an
+# isolated stack only, never the main corpus. Written without looking at any held-out question.
+# expect: partial - one part is stated in the documents, the other is not. The answer must hold
+#   the fact of the stated part, cite its document, and say the other part could not be verified
+#   (the fixed sentence holds "chưa xác minh được"). Answering both parts is a false answer.
+# expect: answer  - both parts are stated (fact and also_facts must all be in the answer).
+# expect: refuse  - neither part is stated.
+# Frozen by compound_partial_dev_v1.lock: any edit needs v1.1 and a new lock.
+version: compound_partial_dev_v1
+documents:
+  - code: CP1-TVN-001
+    title: Noi quy thu vien noi bo
+    scope: ORGANIZATION
+    text: |
+      VIỆN NGHIÊN CỨU THỦY SẢN SÔNG TIỀN - TÀI LIỆU NỘI BỘ - Trang 1
+      Nội quy thư viện nội bộ.
+      Mỗi cán bộ được mượn tối đa 06 cuốn sách cùng lúc.
+      Thời hạn mượn sách là 21 ngày và được gia hạn 01 lần.
+      Sách tham khảo quý chỉ được đọc tại chỗ.
+      Trả sách trễ bị tạm dừng quyền mượn trong 14 ngày.
+      Thư viện mở cửa từ thứ Hai đến thứ Sáu.
+      Thủ thư trực quầy chịu trách nhiệm ghi sổ mượn trả.
+  - code: CP1-BNC-001
+    title: Quy dinh be nuoi thu nghiem
+    scope: ORGANIZATION
+    text: |
+      VIỆN NGHIÊN CỨU THỦY SẢN SÔNG TIỀN - TÀI LIỆU NỘI BỘ - Trang 1
+      Quy định vận hành bể nuôi thử nghiệm.
+      Nước bể nuôi được thay 30% thể tích mỗi tuần.
+      Độ mặn của bể cá chẽm được giữ ở mức 15 phần nghìn.
+      Máy sục khí phải chạy liên tục và được vệ sinh 02 lần/tháng.
+      Mỗi bể có một sổ theo dõi do kỹ thuật viên trực ca ghi.
+      Cá chết phải được vớt và báo cho trưởng trại trong vòng 02 giờ.
+      Thức ăn công nghiệp được bảo quản trong kho khô, cách sàn 20 cm.
+  - code: CP1-HNK-001
+    title: Quy che hoi thao khoa hoc
+    scope: ORGANIZATION
+    text: |
+      VIỆN NGHIÊN CỨU THỦY SẢN SÔNG TIỀN - TÀI LIỆU NỘI BỘ - Trang 1
+      Quy chế tham dự hội thảo khoa học.
+      Mỗi cán bộ được cử dự tối đa 02 hội thảo trong nước mỗi năm.
+      Hồ sơ đăng ký phải nộp cho phòng Khoa học trước ngày khai mạc 30 ngày.
+      Viện chi trả lệ phí hội thảo tối đa 4.000.000 đồng mỗi lần.
+      Báo cáo sau hội thảo phải nộp trong 10 ngày làm việc.
+      Bài trình bày phải được trưởng bộ môn thông qua trước khi gửi.
+items:
+  # One part stated, the other not.
+  - id: CP1-P01
+    group: P
+    expect: partial
+    document: CP1-TVN-001
+    question: Mỗi cán bộ được mượn tối đa mấy cuốn sách và tiền đặt cọc là bao nhiêu?
+    fact: 6 cuốn
+    fact_alternatives: [06 cuốn, sáu cuốn]
+  - id: CP1-P02
+    group: P
+    expect: partial
+    document: CP1-TVN-001
+    question: Sách được mượn trong bao nhiêu ngày và làm mất sách thì bồi thường thế nào?
+    fact: 21 ngày
+  - id: CP1-P03
+    group: P
+    expect: partial
+    document: CP1-BNC-001
+    question: Nước bể nuôi được thay bao nhiêu phần trăm mỗi tuần và nhiệt độ nước phải giữ ở mức nào?
+    fact: 30%
+    fact_alternatives: [30 phần trăm]
+  - id: CP1-P04
+    group: P
+    expect: partial
+    document: CP1-BNC-001
+    question: Máy sục khí được vệ sinh mấy lần mỗi tháng và ai là người ký biên bản bảo trì?
+    fact: 2 lần
+    fact_alternatives: [02 lần, hai lần]
+  - id: CP1-P05
+    group: P
+    expect: partial
+    document: CP1-HNK-001
+    question: Viện chi trả lệ phí hội thảo tối đa bao nhiêu và tiền vé máy bay được thanh toán thế nào?
+    fact: "4.000.000"
+    fact_alternatives: ["4 triệu"]
+  - id: CP1-P06
+    group: P
+    expect: partial
+    document: CP1-HNK-001
+    question: Báo cáo sau hội thảo phải nộp trong bao lâu và ai chấm điểm báo cáo đó?
+    fact: 10 ngày
+  # Both parts stated.
+  - id: CP1-A01
+    group: A
+    expect: answer
+    document: CP1-TVN-001
+    question: Sách được mượn trong bao nhiêu ngày và trả trễ thì bị dừng quyền mượn bao lâu?
+    fact: 21 ngày
+    also_facts:
+      - fact: 14 ngày
+  - id: CP1-A02
+    group: A
+    expect: answer
+    document: CP1-BNC-001
+    question: Độ mặn bể cá chẽm được giữ ở mức nào và cá chết phải báo trong vòng bao lâu?
+    fact: 15 phần nghìn
+    also_facts:
+      - fact: 2 giờ
+        fact_alternatives: [02 giờ, hai giờ]
+  - id: CP1-A03
+    group: A
+    expect: answer
+    document: CP1-HNK-001
+    question: Mỗi cán bộ được dự tối đa mấy hội thảo trong nước mỗi năm và hồ sơ phải nộp trước bao nhiêu ngày?
+    fact: 30 ngày
+    also_facts:
+      - fact: 2 hội thảo
+        fact_alternatives: [02 hội thảo, hai hội thảo]
+  # Neither part stated.
+  - id: CP1-R01
+    group: R
+    expect: refuse
+    question: Thư viện có bao nhiêu máy tính tra cứu và mỗi lượt được dùng bao lâu?
+  - id: CP1-R02
+    group: R
+    expect: refuse
+    question: Bể nuôi tôm hùm được thay nước mấy lần mỗi tuần và độ mặn giữ ở mức nào?
+  - id: CP1-R03
+    group: R
+    expect: refuse
+    question: Với hội thảo tổ chức ở nước ngoài, viện đài thọ mức nào và visa do ai lo?

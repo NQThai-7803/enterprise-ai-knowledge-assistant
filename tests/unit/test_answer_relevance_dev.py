@@ -151,3 +151,30 @@ def test_every_also_fact_must_be_in_the_answer() -> None:
     }
     assert relevance.states_fact(item, "Khóa học 40 giờ, cần làm việc từ 06 tháng.")
     assert not relevance.states_fact(item, "Khóa học kéo dài 40 giờ.")
+
+
+def test_compound_partial_set_matches_its_lock_and_its_facts_are_in_the_documents() -> None:
+    source = relevance.ROOT / "tests" / "acceptance" / "compound_partial_dev_v1.yaml"
+    lock = relevance.verify_frozen(source, source.with_suffix(".lock"))
+    data = run_rbac_dev.load_set(source)
+    assert lock["items"] == len(data["items"]) == 12
+    documents = {doc["code"]: doc["text"] for doc in data["documents"]}
+    expects = sorted(item["expect"] for item in data["items"])
+    assert expects == ["answer"] * 3 + ["partial"] * 6 + ["refuse"] * 3
+    for item in data["items"]:
+        if item["expect"] != "refuse":
+            assert relevance.states_fact(item, documents[item["document"]]), item["id"]
+
+
+def test_half_answerable_question_needs_the_fact_and_the_unverified_sentence() -> None:
+    item = {"id": "P", "group": "P", "expect": "partial", "document": "DOC-1", "fact": "6 cuốn"}
+    partial = relevance.grade_case(
+        _case("ANSWERED", "Được mượn 6 cuốn. Chưa xác minh được: tiền đặt cọc.", True), item, CODES
+    )
+    full = relevance.grade_case(
+        _case("ANSWERED", "Được mượn 6 cuốn, đặt cọc 50.000 đồng.", True), item, CODES
+    )
+    refused = relevance.grade_case(_case("NO_ANSWER"), item, CODES)
+    assert partial["passed"] and not partial["false_answer"]
+    assert full["false_answer"] and not full["passed"]
+    assert not refused["passed"] and not refused["false_answer"]

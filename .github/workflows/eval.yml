@@ -8,7 +8,8 @@ name: Eval
 # Sets: `uat` (Q001-Q100 from eval-data/, corpus V2 PDFs from eval-data/corpus-v2, proxy grade
 # against eval-data/uat/reference-grade.json), `rbac` (tests/acceptance/rbac_dev_v1.yaml, with the
 # retrieval-level leak check), `relevance` (answer_relevance_dev_v1), `false_refusal`
-# (false_refusal_dev_v1) and `false_refusal_v2` (false_refusal_dev_v2). Never runs held-out v2 (DEC-012). Held-out v1 only through
+# (false_refusal_dev_v1), `false_refusal_v2` (false_refusal_dev_v2) and `compound`
+# (compound_partial_dev_v1, half-answerable two-part questions). Never runs held-out v2 (DEC-012). Held-out v1 only through
 # `trace_heldout_v1`, a layer-by-layer diagnostic trace that is not scored (DEC-008).
 on:
   workflow_dispatch:
@@ -16,7 +17,7 @@ on:
       set:
         description: "Question set"
         type: choice
-        options: [uat, rbac, relevance, false_refusal, false_refusal_v2]
+        options: [uat, rbac, relevance, false_refusal, false_refusal_v2, compound]
         default: relevance
       configs:
         description: "Configurations, ';'-separated, baseline first: name or name:EVAL_VAR=value,..."
