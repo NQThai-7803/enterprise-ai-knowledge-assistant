@@ -6,6 +6,12 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### FIX 4 (i) completeness retry -- 2026-11-13
+
+- Three flags on the retry forced by the completeness checks, measured in one batch per set on 6 dev sets. `RAG_RETRY_MUST_KEEP_VALIDATED_VALUES_ENABLED` is now on by default (fixes FR2-L03, worse nowhere); `RAG_COMPLETENESS_NUMBER_NORMALIZATION_ENABLED` and `RAG_KEEP_VALIDATED_FIRST_ANSWER_ENABLED` stay off (the second adds a false answer, FR-A10).
+- New dev set `compound_partial_dev_v1` (12 half-answerable two-part questions; content pending owner review), runnable as `eval.yml` `set=compound`.
+- `docs/design/pipeline-loss-fix-plan.md`: `deterministic_off` ablation and oracle with qwen2.5 3B vs 7B.
+
 ### PROMPT 6 tooling and F flag -- 2026-11-13
 
 - `RAG_NUMBER_NORMALIZATION_ENABLED` (FIX 3c F), off by default: measured, 0 cases changed; merged flag-off (DEC-021).

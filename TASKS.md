@@ -8,6 +8,12 @@
 3. **Embedding fine-tune** (`docs/design/embedding-finetune.md` and DEC-015 on branch `feat/embedding-finetune-infra`): infrastructure only so far; the baseline measurement and training come after FIX 3.
 4. The final held-out v2 measurement, once, after the choices above are made (DEC-012).
 
+## FIX 4 (i) completeness retry -- 2026-11-13
+
+- **DONE:** three flags measured (`docs/eval/runs/fix4-completeness.md`); `c3` (retry may not drop validated values) chosen and on by default; `c1` and `c2` stay off. `c1` + `c3` together not measured.
+- **DONE:** `deterministic_off` and oracle 3B/7B measured (plan section 3): 37 UAT questions are right only through server-built answers; 7B with gold context removes most false answers at 2-3x the latency.
+- **Next (owner order, DEC-021):** (ii) responsiveness calibrated on UAT, (iii) excerpt fallback, (iv) C partial answers. Not started.
+
 ## PROMPT 6 pipeline-loss analysis -- 2026-11-12 (WAITING FOR OWNER)
 
 - **DONE: ablations and real rerankers measured on Actions, 5 dev sets, 2 runs** (`docs/design/pipeline-loss-fix-plan.md`, DEC-020). F: 0 cases changed, flag stays off. Low-alignment filter off, `group_hits[:5]`, whole chunks: all regress UAT. Cross-encoders: 0 answers changed. Oracle context: almost no gain, the loss is after the context.

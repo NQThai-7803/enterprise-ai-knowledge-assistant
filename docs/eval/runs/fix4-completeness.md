@@ -20,7 +20,7 @@ Nhánh `feat/fix-4-completeness`. Chẩn đoán gốc: `docs/design/pipeline-los
 
 **Đính chính so với kế hoạch PROMPT 6:** check số lượng đã bỏ số 0 ở đầu (`int()`), nên "01"/"1" không phải nguyên nhân ở F02; nguyên nhân là chọn nhầm cặp số của tài liệu khác.
 
-## Flag (mặc định tắt)
+## Flag (viết lúc cả ba đang tắt; (3) bật sau đợt đo, xem cuối file)
 
 | Flag | Biến eval | Hành vi |
 |---|---|---|
@@ -40,3 +40,32 @@ Nhánh `feat/fix-4-completeness`. Chẩn đoán gốc: `docs/design/pipeline-los
 - **Bắt buộc:** 0 rò rỉ; UAT không hồi quy (dung sai 1 câu); trả lời sai không tăng ở **bất kỳ** bộ nào.
 - **So từng bộ với `base`:** (a) ít trả lời sai hơn, rồi (b) nhiều câu đúng hơn. Thắng khi không tệ hơn ở mọi bộ và tốt hơn ở ít nhất một bộ. Chỉ tính thay đổi ở cả 2 lượt; báo id mọi câu tệ đi và số ca vào nhánh (counter).
 - **Chọn mặc định:** cấu hình thắng `base` và không thua cấu hình thắng nào khác ở bộ nào. Ưu tiên `all` nếu nó thắng và không thua từng flag riêng; nếu không có cấu hình trội thì owner quyết định. Flag giữ lại để rollback.
+
+## Kết quả (GitHub Actions, CPU, Ollama 0.40.15, commit `e6015ce`, 2026-11-13)
+
+Mỗi bộ một job, 5 cấu hình, 2 lượt xen kẽ. Ô: đúng / từ chối sai / trả lời sai (phải từ chối mà trả lời) / sai (trả lời nhầm). Hai lượt giống hệt nhau ở mọi ô; không câu nào lúc đúng lúc sai.
+
+| Bộ (run) | `base` | `c1` | `c2` | `c3` | `all` |
+|---|---|---|---|---|---|
+| UAT Q001-Q100 (`43362195388`) | 100/0/0/0 | 100/0/0/0 | 100/0/0/0 | 100/0/0/0 | 100/0/0/0 |
+| RBAC dev (`43362220516`) | 22/12/1/1 | = | **25**/9/1/1 (control 08, 12, 18 được cứu) | = | 25/9/1/1 |
+| relevance (`43362243822`) | 17/3/5/0 | = | = | = | = |
+| FR v1 (`43362268077`) | 13/1/6/0 | = | 12/1/**7**/0 (**FR-A10** đúng → trả lời sai) | = | 12/1/7/0 (FR-A10) |
+| FR v2 (`43362293934`) | 13/5/5/1 | 14/4/5/1 (E01) | 16/2/5/1 (E01, F01, F02) | 14/5/5/**0** (L03 sai → đúng) | 17/2/5/0 |
+| compound (`43362318803`) | 4/3/1/4 | = | = | = | = |
+
+`=` = giống `base` từng câu. Rò rỉ: 0 ở mọi bộ, mọi cấu hình. Độ trễ trung vị và RAM không khác `base` quá dao động (peak 5,8-6,8 GB, còn trống ≥ 9,1 GB).
+
+**Counter** (cả 2 lượt như nhau): `first_answer_kept` = 3 (RBAC, `c2` và `all`), 1 (FR v1), 3 ở `c2` / 2 ở `all` (FR v2); `retry_abandoned_first` = 1 (FR v2, `c3` và `all`). `c1` không có counter. Runner UAT không ghi counter.
+
+**FR-A10 ở `c2`:** câu đầu ("… cam kết làm việc thêm 12 tháng. Do đó … cần thâm niên ít nhất 12 tháng") là câu phải từ chối, đã qua claim validation và bị check độ đầy đủ bác vì hình thức. (2) giữ nó lại. Đây đúng là rủi ro của (2): check độ đầy đủ đôi khi chặn một câu sai mà validator để lọt.
+
+**Áp quy tắc (viết trước khi đo):**
+- `c2`, `all`: loại, vì trả lời sai tăng ở FR v1.
+- `c1`: thắng `base` (FR v2 +1, không tệ hơn ở bộ nào).
+- `c3`: thắng `base` (FR v2: bớt 1 câu trả lời sai, không tệ hơn ở bộ nào).
+- `c1` với `c3`: tiêu chí (a) "ít trả lời sai hơn" đứng trước. Tôi đọc "trả lời sai" gồm cả nhóm *sai* (trả lời nhầm giá trị, như L03), nên `c3` hơn `c1` ở FR v2 theo (a), và không thua ở bộ nào. Nếu owner đọc (a) chỉ là nhóm "phải từ chối mà trả lời" thì hai cấu hình hoà ở (a); khi đó `c1` hơn ở (b), không cấu hình nào trội, và owner quyết định.
+- **Chọn: `c3`**, `RAG_RETRY_MUST_KEEP_VALIDATED_VALUES_ENABLED=true`. (1) và (2) giữ tắt để rollback và đo tiếp.
+- `c1` + `c3` cùng bật chưa được đo; không bật chung khi chưa có đợt đo.
+- Bộ compound: không đổi ở mọi cấu hình, đúng dự đoán (chưa có code trả lời một phần).
+

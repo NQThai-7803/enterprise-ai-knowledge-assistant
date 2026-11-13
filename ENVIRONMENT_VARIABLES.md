@@ -236,7 +236,7 @@ RAG_QUESTION_EVIDENCE_MIN_SIMILARITY=0.85
 RAG_NUMBER_NORMALIZATION_ENABLED=false
 RAG_COMPLETENESS_NUMBER_NORMALIZATION_ENABLED=false
 RAG_KEEP_VALIDATED_FIRST_ANSWER_ENABLED=false
-RAG_RETRY_MUST_KEEP_VALIDATED_VALUES_ENABLED=false
+RAG_RETRY_MUST_KEEP_VALIDATED_VALUES_ENABLED=true
 ```
 
 Retrieval variable rules:
@@ -270,10 +270,10 @@ Retrieval variable rules:
 - `RAG_QUESTION_HEAD_IN_EVIDENCE_ENABLED` (boolean, default `false`, stays off: 47 UAT regressions; FIX 3a M1a): on a question with one information need, the most specific words of the phrase the question word attaches to (diacritics kept, classifiers dropped) must occur in the cited evidence; otherwise the answer becomes NO_ANSWER.
 - `RAG_QUESTION_EVIDENCE_SIMILARITY_ENABLED` (boolean, default `false`, stays off: 43 UAT regressions; FIX 3a M1b) and `RAG_QUESTION_EVIDENCE_MIN_SIMILARITY` (float 0-1, default `0.85`, calibrated in `docs/eval/runs/fix3a-false-answers.md`): the e5 cosine between the question and the evidence sentence the answer rests on must reach the threshold; otherwise NO_ANSWER. Adds one query and one passage embedding per checked answer.
 - `RAG_NUMBER_NORMALIZATION_ENABLED` (boolean, default `false`, stays off: 0 cases changed in its DEC-013 batch; FIX 3c F): the validator compares numbers once each is written one way: leading zeros dropped (`01` = `1`), thousands separators removed (`1.200.000` = `1200000`), a decimal comma read as a point, scale words applied (`1,2 triệu` = `1.200.000`, `300 nghìn`, `tỷ`, `million`), and `đ`/`đồng`/`VND`/`₫` treated as one unit. A period after the unit (`/năm`, `mỗi năm`) is not compared.
-- FIX 4 (i), the retry forced by the completeness checks (all boolean, default `false`):
-  - `RAG_COMPLETENESS_NUMBER_NORMALIZATION_ENABLED`: in the numeric-unit check a thousands-grouped number (`2.500 kg`) is one number when the sources hold that value, not `2` and `500`.
-  - `RAG_KEEP_VALIDATED_FIRST_ANSWER_ENABLED`: when the first answer passed citation and claim validation and was rejected only for its form (yes/no polarity, quantity number, numeric unit), and the retry fails, refuses or is still incomplete, the first answer is returned instead of NO_ANSWER. Content reasons (mismatched rows, missing names, placeholders) are not covered.
-  - `RAG_RETRY_MUST_KEEP_VALIDATED_VALUES_ENABLED`: a retry that passes the checks but shares no value with the validated first answer and cites other chunks does not replace it.
+- FIX 4 (i), the retry forced by the completeness checks (all boolean; measured in one batch per set, `docs/eval/runs/fix4-completeness.md`):
+  - `RAG_COMPLETENESS_NUMBER_NORMALIZATION_ENABLED` (default `false`; won one case, but loses to the retry flag below on `false_refusal_dev_v2`): in the numeric-unit check a thousands-grouped number (`2.500 kg`) is one number when the sources hold that value, not `2` and `500`.
+  - `RAG_KEEP_VALIDATED_FIRST_ANSWER_ENABLED` (default `false`; adds a false answer on `false_refusal_dev_v1`, FR-A10): when the first answer passed citation and claim validation and was rejected only for its form (yes/no polarity, quantity number, numeric unit), and the retry fails, refuses or is still incomplete, the first answer is returned instead of NO_ANSWER. Content reasons (mismatched rows, missing names, placeholders) are not covered.
+  - `RAG_RETRY_MUST_KEEP_VALIDATED_VALUES_ENABLED` (default `true` since the FIX 4 batch: fixes one wrong answer, FR2-L03, worse nowhere): a retry that passes the checks but shares no value with the validated first answer and cites other chunks does not replace it.
 - Hybrid RRF scores are ranking scores, not probabilities.
 - These retrieval values are not secrets.
 - `RERANKER_ENABLED` enables the document/chunk reranking layer after hybrid retrieval and before final context packing.
