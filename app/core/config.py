@@ -239,8 +239,8 @@ class Settings(BaseSettings):
     chat_context_max_tokens: int = Field(default=6000, gt=0)
     chat_no_answer_message: str = Field(
         default=(
-            "Khong tim thay du thong tin trong cac tai lieu ban duoc phep truy cap "
-            "de tra loi cau hoi nay."
+            "Không tìm thấy đủ thông tin trong các tài liệu bạn được phép truy cập "
+            "để trả lời câu hỏi này."
         ),
         min_length=1,
     )

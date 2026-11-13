@@ -230,7 +230,7 @@ def test_feedback_on_no_answer_message_is_allowed(
         create_chat_message_record(
             async_session_factory_for_tests,
             owner=owner,
-            content="Khong tim thay du thong tin.",
+            content="Không tìm thấy đủ thông tin.",
         )
     )
 

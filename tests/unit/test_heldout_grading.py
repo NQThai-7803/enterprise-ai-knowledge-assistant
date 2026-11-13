@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from scripts.eval import heldout_grading as grading
 
-FIXED = "Khong tim thay du thong tin."
+FIXED = "Không tìm thấy đủ thông tin."
 CODES = {"d-org": "ND-HR-003", "d-restricted": "UAT-GROUNDING-001"}
 ITEM = {
     "id": "HO-X",
