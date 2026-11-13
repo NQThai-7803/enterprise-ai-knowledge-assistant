@@ -39,6 +39,7 @@ services:
       # PROMPT 6 ablations and rerankers (scripts/diagnostics/ablation_patches.py); inert by default.
       PYTHONPATH: /app/scripts/diagnostics/ablation_site:/app
       EVAL_ABLATION: ${EVAL_ABLATION:-}
+      LLM_OLLAMA_MODEL: ${EVAL_LLM_MODEL:-qwen2.5:3b}
       EVAL_ORACLE_FILE: ${EVAL_ORACLE_FILE:-}
       RERANKER_MODEL: ${EVAL_RERANKER_MODEL:-BAAI/bge-reranker-v2-m3}
       RERANKER_MODEL_CACHE_PATH: ${EVAL_RERANKER_CACHE:-/app/data/models}

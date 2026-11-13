@@ -73,9 +73,9 @@ run_one() {  # $1 = config index, $2 = run number
   IFS=',' read -r -a PAIRS <<< "$vars"
   for pair in "${PAIRS[@]}"; do export "${pair?}"; done
   docker inspect "$PROJECT-api-1" --format '{{range .Config.Env}}{{println .}}{{end}}' \
-    | grep -E '^(RAG_|RERANKER_|EVAL_ABLATION|EVAL_ORACLE)' | sort > "$dir/flags.txt"
+    | grep -E '^(RAG_|RERANKER_|EVAL_ABLATION|EVAL_ORACLE|LLM_OLLAMA_MODEL)' | sort > "$dir/flags.txt"
   python scripts/eval/ollama_warmup.py "$dir/warmup.json" --base-url http://127.0.0.1:11434 \
-    --model qwen2.5:3b --num-ctx 8192 --keep-alive 10m --seed 20261031 >/dev/null
+    --model "${EVAL_LLM_MODEL:-qwen2.5:3b}" --num-ctx 8192 --keep-alive 10m --seed 20261031 >/dev/null
   local started; started=$(date +%s)
   case "$SET" in
     uat)

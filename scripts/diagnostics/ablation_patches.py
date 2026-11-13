@@ -4,6 +4,9 @@ Loaded by scripts/diagnostics/ablation_site/sitecustomize.py when EVAL_ABLATION 
 more names joined by "." select what is patched:
 
   low_alignment_off   _filter_low_alignment_documents keeps every document (mechanism A).
+  deterministic_off   no deterministic answer or repair: _structured_value_repair_generation
+                      and _structured_policy_clause_repair_generation return nothing, so every
+                      answer comes from the LLM path.
   excerpt_off         each prompt source is its whole chunk, not query_focused_excerpt's
                       lexically chosen lines ("oracle.excerpt_off" is the full oracle).
   group5              the per-question cut of prepared hits keeps 5 instead of 2 (group_hits[:2]).
@@ -60,7 +63,8 @@ def selected() -> frozenset[str]:
 def apply(names: frozenset[str]) -> None:
     import app.services.grounded_answer_service as gas
 
-    unknown = names - {"low_alignment_off", "excerpt_off", "group5", "partial_compound", "oracle"}
+    known = {"low_alignment_off", "excerpt_off", "group5", "partial_compound", "oracle"}
+    unknown = names - known - {"deterministic_off"}
     if unknown:
         raise RuntimeError(f"unknown ablation(s): {sorted(unknown)}")
     service = gas.GroundedAnswerService
@@ -81,6 +85,9 @@ def apply(names: frozenset[str]) -> None:
 
     if "low_alignment_off" in names:
         gas._filter_low_alignment_documents = lambda scored_hits: scored_hits
+    if "deterministic_off" in names:
+        gas._structured_value_repair_generation = lambda **_: None
+        gas._structured_policy_clause_repair_generation = lambda **_: None
     if "excerpt_off" in names:
         import app.chat.context_builder as context_builder
 

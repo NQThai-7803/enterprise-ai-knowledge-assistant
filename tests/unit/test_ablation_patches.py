@@ -141,7 +141,7 @@ def test_every_ablation_applies_to_the_current_service(tmp_path: Path) -> None:
     oracle.write_text(json.dumps({"Câu hỏi?": [{"document": "D", "pages": [1]}]}), "utf-8")
     site = ROOT / "scripts" / "diagnostics" / "ablation_site"
     env = {**os.environ, "EVAL_ABLATION": "oracle.partial_compound.group5.low_alignment_off"}
-    env["EVAL_ABLATION"] += ".excerpt_off"
+    env["EVAL_ABLATION"] += ".excerpt_off.deterministic_off"
     env["EVAL_ORACLE_FILE"] = str(oracle)
     env["PYTHONPATH"] = os.pathsep.join([str(site), str(ROOT)])
     code = (
