@@ -2258,7 +2258,10 @@ class GroundedAnswerService:
                         if claim_validation.status != ClaimEvidenceStatus.SUPPORTED:
                             raise ValueError(f"Unsupported structured claim: {claim.claim_id}")
                 grounded_output = GroundedLLMOutput(
-                    answer=" ".join(claim.answer for claim in structured_output.claims),
+                    answer=_join_claim_answers(
+                        structured_output.claims,
+                        dedupe=self.settings.rag_dedupe_claim_answers_enabled,
+                    ),
                     citations=tuple(
                         dict.fromkeys(
                             citation
@@ -4235,6 +4238,27 @@ def _fold_for_person_match(text: str) -> str:
         text.casefold().replace("\u0111", "d").replace("\u0110", "d"),
     )
     return "".join(character for character in normalized if not unicodedata.combining(character))
+
+
+def _join_claim_answers(claims: Sequence[StructuredGroundedClaim], *, dedupe: bool) -> str:
+    """Join sub-claim answers, leaving out one that only restates an earlier answer."""
+    kept: list[StructuredGroundedClaim] = []
+    for claim in claims:
+        words = set(re.findall(r"\w+", _fold_for_person_match(claim.answer)))
+        # shortcut: compares words, not meaning; a short answer ("Có.") is always kept.
+        # Upgrade if a dev set shows a dropped answer that carried its own fact.
+        restated = (
+            dedupe
+            and len(words) >= 5
+            and any(
+                words <= set(re.findall(r"\w+", _fold_for_person_match(earlier.answer)))
+                and set(claim.citations) <= set(earlier.citations)
+                for earlier in kept
+            )
+        )
+        if not restated:
+            kept.append(claim)
+    return " ".join(claim.answer for claim in kept)
 
 
 def _folded_with_offsets(text: str) -> tuple[str, list[int]]:

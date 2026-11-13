@@ -157,6 +157,8 @@ class Settings(BaseSettings):
     rag_number_normalization_enabled: bool = False
     # D2: values in server-built answers are shown with the diacritics of the cited source.
     rag_restore_source_diacritics_enabled: bool = True
+    # D2: a sub-claim answer that only restates an earlier one is not shown twice.
+    rag_dedupe_claim_answers_enabled: bool = True
     reranker_enabled: bool = True
     reranker_provider: Literal["sentence_transformers", "heuristic"] = "sentence_transformers"
     reranker_model: str = Field(default="BAAI/bge-reranker-v2-m3", min_length=1)

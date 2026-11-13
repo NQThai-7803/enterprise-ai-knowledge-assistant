@@ -235,6 +235,7 @@ RAG_QUESTION_EVIDENCE_SIMILARITY_ENABLED=false
 RAG_QUESTION_EVIDENCE_MIN_SIMILARITY=0.85
 RAG_NUMBER_NORMALIZATION_ENABLED=false
 RAG_RESTORE_SOURCE_DIACRITICS_ENABLED=true
+RAG_DEDUPE_CLAIM_ANSWERS_ENABLED=true
 ```
 
 Retrieval variable rules:
@@ -269,6 +270,7 @@ Retrieval variable rules:
 - `RAG_QUESTION_EVIDENCE_SIMILARITY_ENABLED` (boolean, default `false`, stays off: 43 UAT regressions; FIX 3a M1b) and `RAG_QUESTION_EVIDENCE_MIN_SIMILARITY` (float 0-1, default `0.85`, calibrated in `docs/eval/runs/fix3a-false-answers.md`): the e5 cosine between the question and the evidence sentence the answer rests on must reach the threshold; otherwise NO_ANSWER. Adds one query and one passage embedding per checked answer.
 - `RAG_NUMBER_NORMALIZATION_ENABLED` (boolean, default `false`, stays off: 0 cases changed in its DEC-013 batch; FIX 3c F): the validator compares numbers once each is written one way: leading zeros dropped (`01` = `1`), thousands separators removed (`1.200.000` = `1200000`), a decimal comma read as a point, scale words applied (`1,2 triệu` = `1.200.000`, `300 nghìn`, `tỷ`, `million`), and `đ`/`đồng`/`VND`/`₫` treated as one unit. A period after the unit (`/năm`, `mỗi năm`) is not compared.
 - `RAG_RESTORE_SOURCE_DIACRITICS_ENABLED` (boolean, default `true`; D2 display fix): an answer the server builds itself (`local-structured-value-repair`) copies its values from accent-folded source text, so it showed `40 gio/tuan` or `10 ngay lam viec`. With the flag on, every run of unaccented words in that answer that occurs in a cited source is written as the source writes it (`40 giờ/tuần`); a word the sources spell two ways (`năm`, `Nam`) is left as it is. Wording only: status and citations do not change. `false` restores the old output and is the baseline of the D2 batch (`EVAL_SOURCE_DIACRITICS=false`).
+- `RAG_DEDUPE_CLAIM_ANSWERS_ENABLED` (boolean, default `true`; D2 display fix): a question split into sub-claims is answered by joining the validated sub-claim answers. When the answer to an earlier sub-claim already covers a later one, the later answer restated it ("…phải tự trả lệ phí 500.000 đồng/lần. Học viên phải tự trả lệ phí 500.000 đồng/lần từ lần thứ hai"). With the flag on, a sub-claim answer of at least 5 words whose words and citations all appear in an earlier kept answer is left out of the text. The citations stay the union of every sub-claim. `false` is the batch baseline (`EVAL_DEDUPE_CLAIMS=false`).
 - Hybrid RRF scores are ranking scores, not probabilities.
 - These retrieval values are not secrets.
 - `RERANKER_ENABLED` enables the document/chunk reranking layer after hybrid retrieval and before final context packing.
