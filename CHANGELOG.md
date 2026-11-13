@@ -6,6 +6,12 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### PROMPT 6 tooling and F flag -- 2026-11-13
+
+- `RAG_NUMBER_NORMALIZATION_ENABLED` (FIX 3c F), off by default: measured, 0 cases changed; merged flag-off (DEC-021).
+- Eval-only ablations (`scripts/diagnostics/ablation_patches.py`, `EVAL_ABLATION`), `build_oracle.py`, `summarize_ablation.py`; `eval.yml` caches and mounts cross-encoder models; the RBAC dev runner logs in again when its token expires.
+- `README.md` and `RAG_DESIGN.md` state that the reranker does not affect answers today.
+
 ### PROMPT 6 -- 2026-11-12
 
 - `docs/design/pipeline-loss-fix-plan.md` and DEC-020: per-mechanism analysis, ablation and reranker measurements, NLU design, decisions for the owner. No `app/` change.

@@ -35,6 +35,15 @@ services:
       RAG_QUESTION_HEAD_IN_EVIDENCE_ENABLED: ${EVAL_QUESTION_HEAD_IN_EVIDENCE:-false}
       RAG_QUESTION_EVIDENCE_SIMILARITY_ENABLED: ${EVAL_QUESTION_EVIDENCE_SIMILARITY:-false}
       RAG_QUESTION_EVIDENCE_MIN_SIMILARITY: ${EVAL_QUESTION_EVIDENCE_MIN_SIMILARITY:-0.85}
+      RAG_NUMBER_NORMALIZATION_ENABLED: ${EVAL_NUMBER_NORMALIZATION:-false}
+      # PROMPT 6 ablations and rerankers (scripts/diagnostics/ablation_patches.py); inert by default.
+      PYTHONPATH: /app/scripts/diagnostics/ablation_site:/app
+      EVAL_ABLATION: ${EVAL_ABLATION:-}
+      LLM_OLLAMA_MODEL: ${EVAL_LLM_MODEL:-qwen2.5:3b}
+      EVAL_ORACLE_FILE: ${EVAL_ORACLE_FILE:-}
+      RERANKER_MODEL: ${EVAL_RERANKER_MODEL:-BAAI/bge-reranker-v2-m3}
+      RERANKER_MODEL_CACHE_PATH: ${EVAL_RERANKER_CACHE:-/app/data/models}
+      RERANKER_TIMEOUT_SECONDS: ${EVAL_RERANKER_TIMEOUT:-10}
       LLM_SEED: ${EVAL_LLM_SEED:-20261031}
       # Point at scripts/eval/ollama_usage_proxy.py to record token usage per call.
       LLM_OLLAMA_BASE_URL: ${EVAL_OLLAMA_BASE_URL:-http://host.docker.internal:11434}

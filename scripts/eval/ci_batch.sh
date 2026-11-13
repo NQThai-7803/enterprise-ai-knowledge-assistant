@@ -31,7 +31,9 @@ for entry in "${ENTRIES[@]}"; do
   [[ "$name" =~ ^[a-z0-9_-]{1,32}$ ]] || { echo "bad config name: $name"; exit 2; }
   IFS=',' read -r -a PAIRS <<< "$vars"
   for pair in "${PAIRS[@]}"; do
-    [[ "$pair" =~ ^EVAL_[A-Z0-9_]+=[A-Za-z0-9_.-]+$ ]] || { echo "bad setting: $pair"; exit 2; }
+    [[ "$pair" =~ ^EVAL_[A-Z0-9_]+=[A-Za-z0-9_./:-]+$ ]] || { echo "bad setting: $pair"; exit 2; }
+    # Git Bash rewrites /path arguments to C:/Program Files/Git/path when dispatching from Windows.
+    [[ "${pair#*=}" =~ ^[A-Za-z]:/ ]] && { echo "host-rewritten path in $pair (MSYS_NO_PATHCONV=1)"; exit 2; }
   done
   NAMES+=("$name"); ENVS+=("$vars")
 done
@@ -63,10 +65,17 @@ run_one() {  # $1 = config index, $2 = run number
   local name="${NAMES[$1]}" vars="${ENVS[$1]}" dir
   dir="$OUT/$name/run$2"; mkdir -p "$dir"
   start_api "$vars" || return 1
+  if [[ ",$vars," == *",EVAL_ABLATION="* ]] \
+    && ! docker logs "$PROJECT-api-1" 2>&1 | grep -q "ABLATION applied"; then
+    echo "ablation not applied in the API" | tee "$dir/runner.log"; return 1
+  fi
+  ( # the runner sees the configuration too (e.g. EVAL_EXPECTED_RERANKER_MODE)
+  IFS=',' read -r -a PAIRS <<< "$vars"
+  for pair in "${PAIRS[@]}"; do export "${pair?}"; done
   docker inspect "$PROJECT-api-1" --format '{{range .Config.Env}}{{println .}}{{end}}' \
-    | grep -E '^RAG_' | sort > "$dir/flags.txt"
+    | grep -E '^(RAG_|RERANKER_|EVAL_ABLATION|EVAL_ORACLE|LLM_OLLAMA_MODEL)' | sort > "$dir/flags.txt"
   python scripts/eval/ollama_warmup.py "$dir/warmup.json" --base-url http://127.0.0.1:11434 \
-    --model qwen2.5:3b --num-ctx 8192 --keep-alive 10m --seed 20261031 >/dev/null
+    --model "${EVAL_LLM_MODEL:-qwen2.5:3b}" --num-ctx 8192 --keep-alive 10m --seed 20261031 >/dev/null
   local started; started=$(date +%s)
   case "$SET" in
     uat)
@@ -94,9 +103,15 @@ run_one() {  # $1 = config index, $2 = run number
         || echo "runner exit $?" >> "$dir/runner.log" ;;
   esac
   echo "seconds=$(( $(date +%s) - started ))" > "$dir/timing.txt"
+  )
   echo "$(date -u +%FT%TZ) $name run$2 $(cat "$dir/timing.txt") $(tail -1 "$dir/runner.log")" \
     | tee -a "$OUT/batch.log"
 }
+
+if [[ "$CONFIGS" == *EVAL_ABLATION=*oracle* ]]; then  # gold map, mounted read-only at /oracle
+  python scripts/diagnostics/build_oracle.py --set "$SET" --output "${ORACLE_DIR:?}/oracle.json" \
+    | tee -a "$OUT/batch.log"
+fi
 
 python - "$OUT/batch.json" "$SET" "$CONFIGS" "$RUNS" "$(backend)" <<'PY'
 import json, subprocess, sys

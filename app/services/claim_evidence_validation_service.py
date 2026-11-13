@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from dataclasses import dataclass
+from decimal import Decimal
 from enum import StrEnum
 
 from app.citations.models import PromptSourceRegistry
@@ -2693,7 +2694,58 @@ def _normalize_broken_number_groups(text: str) -> str:
     return re.sub(r"(?<=\d)([.,])\s*-\s*(?=\d{3}\b)", r"\1", text)
 
 
+# FIX 3c F: a value written another way is the same value ("01 lần/năm" = "1 lần mỗi năm",
+# "1.200.000 đ" = "1,2 triệu đồng"). Thousands groups are three digits after "." or ",".
+_CANONICAL_NUMBER_UNIT_RE = re.compile(
+    r"(?<![\d.,])(\d{1,3}(?:[.,]\d{3})+|\d+(?:[.,]\d+)?)(?![\d])\s*(?:\([^)]{1,80}\)\s*)?"
+    r"(?:(nghin|ngan|trieu|ty(?!\s*le)|thousand|million|billion)(?![^\W\d_])\s*)?"
+    r"([^\W\d_/%]+|%|₫)?"
+)
+_SCALES = {
+    "nghin": 1000, "ngan": 1000, "thousand": 1000,
+    "trieu": 10**6, "million": 10**6, "ty": 10**9, "billion": 10**9,
+}  # fmt: skip
+_CURRENCY_UNITS = frozenset({"d", "dong", "vnd", "₫"})
+
+
+def canonical_number_unit_pairs(folded_text: str) -> tuple[tuple[str, str], ...]:
+    """(value, unit) for every number of a folded text, with the value written one way only.
+
+    Leading zeros and thousands separators go, a decimal comma becomes a point, a scale word
+    multiplies ("1,5 trieu" -> "1500000"), and every currency spelling is "dong". The unit is
+    the word right after the number (or its scale word), "" when there is none; a period such
+    as "/nam" or "moi nam" is not part of it, so both spellings compare equal.
+    """
+    pairs = []
+    for match in _CANONICAL_NUMBER_UNIT_RE.finditer(folded_text):
+        raw, scale, unit = match.group(1), match.group(2), match.group(3) or ""
+        if re.fullmatch(r"\d{1,3}(?:[.,]\d{3})+", raw):
+            value = Decimal(raw.replace(".", "").replace(",", ""))
+        else:
+            value = Decimal(raw.replace(",", "."))
+        value *= _SCALES.get(scale or "", 1)
+        unit = "dong" if unit in _CURRENCY_UNITS else unit
+        pairs.append((format(value.normalize(), "f"), unit))
+    return tuple(pairs)
+
+
+def _canonical_numbers_are_contradicted(answer: str, evidence: str) -> bool:
+    answer_pairs = canonical_number_unit_pairs(answer)
+    evidence_pairs = canonical_number_unit_pairs(evidence)
+    with_unit = {pair for pair in answer_pairs if pair[1]}
+    evidence_with_unit = {pair for pair in evidence_pairs if pair[1]}
+    if with_unit and evidence_with_unit and with_unit.isdisjoint(evidence_with_unit):
+        return True
+    values = {value for value, _ in answer_pairs}
+    evidence_values = {value for value, _ in evidence_pairs}
+    return bool(values and evidence_values and values.isdisjoint(evidence_values))
+
+
 def _numbers_are_contradicted(answer: str, evidence: str) -> bool:
+    if not re.search(r"\d", answer):
+        return False  # nothing to compare; the rest needs the answer's numbers too
+    if get_settings().rag_number_normalization_enabled:
+        return _canonical_numbers_are_contradicted(answer, evidence)
     answer_pairs = set(_number_unit_pairs(answer))
     evidence_pairs = set(_number_unit_pairs(evidence))
     if answer_pairs and evidence_pairs and answer_pairs.isdisjoint(evidence_pairs):

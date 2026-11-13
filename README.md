@@ -315,4 +315,6 @@ Current local status: Ollama `qwen3:4b` connectivity and SSE streaming have been
 
 ## Reranker status
 
+**The reranker does not affect answers today (measured 2026-11-12).** Prompt ranking puts the lexical alignment order before the cross-encoder score, so running a real cross-encoder changed no answer on the 5 dev sets, while `BAAI/bge-reranker-v2-m3` added about 100 s per question on a CPU runner. No cross-encoder is used for now (DEC-021); details in `docs/design/pipeline-loss-fix-plan.md`.
+
 A cross-encoder is configured, but the system currently ranks with a lexical fallback. The configured cross-encoder `BAAI/bge-reranker-v2-m3` has not run in any measurement we have verified. On 2026-11-05 the model caches of `eaka-p3d-uat` and `enterprise-ai-uat-v2` held no weights for it, and the `eaka-p3d-uat` API log shows the fallback. Baseline v2 and held-out v1 ran on `eaka-p3d-uat`, so they ranked with `lexical_fallback`: the `reranker_score` values there are alignment scores. The five other model cache volumes were not checked. Check the live mode with `GET /health/ready` (`reranker_mode`).
