@@ -1,0 +1,9 @@
+{
+ "version": "compound_partial_dev_v1",
+ "file": "tests/acceptance/compound_partial_dev_v1.yaml",
+ "sha256": "e5bd889b9fe87a8cd8456c613718a5baa0dfd08eb05b5ccd0fb690dca300b135",
+ "frozen_at": "2026-11-13",
+ "items": 12,
+ "approved_by": "requested by the owner 2026-11-12 (DEC-021); content pending owner review",
+ "rule": "any edit needs v1.1 with a new lock"
+}

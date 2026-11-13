@@ -35,7 +35,14 @@ if str(ROOT) not in sys.path:
 
 from scripts.eval import branch_counters, reranker_check, run_rbac_dev  # noqa: E402
 
-SETS = ("answer_relevance_dev_v1", "false_refusal_dev_v1", "false_refusal_dev_v2")
+SETS = (
+    "answer_relevance_dev_v1",
+    "false_refusal_dev_v1",
+    "false_refusal_dev_v2",
+    "compound_partial_dev_v1",
+)
+# DEC-021: the fixed sentence for a part of a two-part question that could not be verified.
+UNVERIFIED_MARKER = "chưa xác minh được"
 SOURCE = ROOT / "tests" / "acceptance" / "answer_relevance_dev_v1.yaml"
 LOCK = ROOT / "tests" / "acceptance" / "answer_relevance_dev_v1.lock"
 ROLE = "staff"
@@ -77,12 +84,14 @@ def grade_case(
 ) -> dict[str, Any]:
     cited = run_rbac_dev.cited_codes(case, codes)
     answered = case.get("status") == ANSWERED
+    answer = case.get("answer") or ""
+    says_unverified = run_rbac_dev._fold(UNVERIFIED_MARKER) in run_rbac_dev._fold(answer)
     if item["expect"] == "refuse":
         passed = case.get("status") == "NO_ANSWER"
     else:
-        passed = (
-            answered and item["document"] in cited and states_fact(item, case.get("answer") or "")
-        )
+        passed = answered and item["document"] in cited and states_fact(item, answer)
+        if item["expect"] == "partial":  # one part stated, the other must be named unverified
+            passed = passed and says_unverified
     return {
         "id": item["id"],
         "group": item["group"],
@@ -93,7 +102,8 @@ def grade_case(
         "latency_ms": case.get("latency_ms"),
         "answer": case.get("answer"),
         "passed": passed,
-        "false_answer": item["expect"] == "refuse" and answered,
+        "false_answer": answered
+        and (item["expect"] == "refuse" or (item["expect"] == "partial" and not says_unverified)),
     }
 
 
@@ -103,7 +113,7 @@ def summarize(cases: Iterable[Mapping[str, Any]]) -> dict[str, Any]:
         "false_answer": sorted(row["id"] for row in rows if row["false_answer"]),
         "correct": sorted(row["id"] for row in rows if row["passed"]),
         "lost_answers": sorted(
-            row["id"] for row in rows if row["expect"] == "answer" and not row["passed"]
+            row["id"] for row in rows if row["expect"] != "refuse" and not row["passed"]
         ),
         "infra_error": sorted(
             row["id"] for row in rows if row["execution_status"] == "INFRA_ERROR"
