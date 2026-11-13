@@ -16,6 +16,9 @@ Each run is scored on its own and its grade source is recorded: `manual` (the ow
 - citation_accuracy is at document level: every required document cited and nothing outside the
   allowed list.
 - Output holds ids and counts only, never question, answer or gold text.
+- by_route (UAT proxy runs that record `answer_route`): correct and incorrect per route, because
+  most of Q001-Q100 is answered by server-built answers, not by the LLM: the UAT total mostly
+  measures the deterministic route.
 """
 
 from __future__ import annotations
@@ -61,6 +64,7 @@ class CaseRecord:
     allowed_docs: frozenset[str] = frozenset()
     limited_ok: bool = False
     leak_reasons: tuple[str, ...] = ()
+    route: str | None = None  # "deterministic", "llm", or None when not recorded
 
     @property
     def infra_error(self) -> bool:
@@ -111,7 +115,20 @@ def score(
         "citation_accuracy": _rate(
             [c.id for c in both if c.required_docs <= c.cited_docs <= c.allowed_docs], len(both)
         ),
+        "by_route": by_route(cases),
     }
+
+
+def by_route(cases: Sequence[CaseRecord]) -> dict[str, dict[str, Any]] | None:
+    """Correct (PASS) and incorrect ids per answer route; None when no case recorded one."""
+    if all(case.route is None for case in cases):
+        return None
+    routes: dict[str, dict[str, Any]] = {}
+    for case in cases:
+        entry = routes.setdefault(case.route or "unknown", {"cases": 0, "correct": [], "wrong": []})
+        entry["cases"] += 1
+        entry["correct" if case.grade == PASS else "wrong"].append(case.id)
+    return {route: routes[route] for route in sorted(routes)}
 
 
 def resolve_labels(rows: Sequence[Mapping[str, str]], run_index: int) -> dict[str, str | None]:
@@ -219,6 +236,7 @@ def proxy_records(graded: Mapping[str, Any]) -> list[CaseRecord]:
                 cited_docs=frozenset(row.get("cited_codes", [])),
                 required_docs=reference,
                 allowed_docs=reference,
+                route=row.get("answer_route"),
             )
         )
     return records
@@ -298,6 +316,17 @@ def render_markdown(results: Mapping[str, Mapping[str, Any]]) -> str:
     ]
     for rate in RATES:
         lines.append(f"| {rate} | " + " | ".join(_fmt_rate(results[n][rate]) for n in names) + " |")
+    routes = sorted({r for n in names for r in (results[n].get("by_route") or {})})
+    for route in routes:
+        cells = []
+        for name in names:
+            entry = (results[name].get("by_route") or {}).get(route)
+            cells.append(
+                "-"
+                if entry is None
+                else f"{len(entry['correct'])} correct, {len(entry['wrong'])} wrong"
+            )
+        lines.append(f"| route {route} | " + " | ".join(cells) + " |")
     lines.append("")
     for name in names:
         result = results[name]

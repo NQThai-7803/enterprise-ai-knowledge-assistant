@@ -189,3 +189,31 @@ def test_proxy_grade_excludes_infra_error_and_reports_the_count() -> None:
     assert summary["excluded_infra_error"] == 1
     assert summary["excluded_infra_error_ids"] == ["Q002"]
     assert summary["retried_cases"] == 1
+
+
+def test_each_case_records_the_route_its_answer_took(tmp_path: Path) -> None:
+    counters = {"route_deterministic": 0, "route_llm": 0}
+    routes = iter(["route_deterministic", "route_llm", None])
+
+    class RoutingClient(FakeClient):
+        def ask(self, session_id: str, question: str) -> eval_client.AskResult:
+            branch = next(routes)
+            if branch:
+                counters[branch] += 1
+            return super().ask(session_id, question)
+
+    fake = RoutingClient({"q1": [OK], "q2": [OK], "q3": [OK]})
+    output = tmp_path / "runtime_results.json"
+    runner.run(
+        selected_ids=set(),
+        output=output,
+        resume=False,
+        delay_seconds=0.0,
+        client_factory=lambda _credentials: fake,
+        benchmark_loader=lambda: (("e", "p"), BENCHMARK),
+        route_reader=lambda: dict(counters),
+    )
+    cases = json.loads(output.read_text(encoding="utf-8"))["cases"]
+    # No counter moved for q3, so its route is unknown rather than guessed.
+    assert [case["answer_route"] for case in cases] == ["deterministic", "llm", None]
+    assert runner.answer_route(None, counters) is None

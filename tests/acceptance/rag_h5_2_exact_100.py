@@ -17,7 +17,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from scripts.eval import reranker_check  # noqa: E402
+from scripts.eval import branch_counters, reranker_check  # noqa: E402
 from scripts.eval.eval_client import (  # noqa: E402
     INFRA_ERROR,
     OK,
@@ -121,6 +121,20 @@ def _ask_case(
     return result
 
 
+def answer_route(before: dict[str, int] | None, after: dict[str, int] | None) -> str | None:
+    """`deterministic` or `llm` from the route counters around one question; None if unknown."""
+    delta = branch_counters.delta(before, after)
+    if delta is None:
+        return None
+    deterministic = delta.get("route_deterministic", 0)
+    llm = delta.get("route_llm", 0)
+    if (deterministic, llm) == (1, 0):
+        return "deterministic"
+    if (deterministic, llm) == (0, 1):
+        return "llm"
+    return None
+
+
 def _is_final(case: dict[str, Any]) -> bool:
     """A checkpointed case that --resume keeps: anything but an INFRA_ERROR not yet retried."""
     return case.get("execution_status") != INFRA_ERROR or int(case.get("attempts", 1)) > 1
@@ -137,6 +151,7 @@ def run(
         _load_benchmark
     ),
     run_metadata: dict[str, Any] | None = None,
+    route_reader: Callable[[], dict[str, int] | None] = lambda: None,
 ) -> int:
     credentials, benchmark = benchmark_loader()
     selected = tuple(row for row in benchmark if not selected_ids or row[0] in selected_ids)
@@ -174,7 +189,9 @@ def run(
                 continue
             if results and delay_seconds > 0:
                 time.sleep(delay_seconds)
+            before = route_reader()
             result = _ask_case(client, case_id, category, question, attempts=1)
+            result["answer_route"] = answer_route(before, route_reader())
             results.append(result)
             checkpoint(results, "IN_PROGRESS")
             print(
@@ -189,7 +206,9 @@ def run(
                 continue
             if delay_seconds > 0:
                 time.sleep(delay_seconds)
+            before = route_reader()
             retry = _ask_case(client, case["id"], case["category"], case["question"], attempts=2)
+            retry["answer_route"] = answer_route(before, route_reader())
             retry["first_attempt_failure_class"] = case.get("failure_class")
             results[position] = retry
             checkpoint(results, "IN_PROGRESS")
@@ -227,6 +246,7 @@ def main() -> int:
         resume=args.resume,
         delay_seconds=max(0.0, args.delay_seconds),
         run_metadata=reranker,
+        route_reader=lambda: branch_counters.read(base_url),
     )
     return reranker_check.finish(args.output, reranker, base_url, code)
 

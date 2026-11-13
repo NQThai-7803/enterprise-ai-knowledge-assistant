@@ -203,6 +203,8 @@ Mỗi bộ một job, 2 lượt xen kẽ; hai lượt giống hệt nhau ở m�
 
 **Đọc kết quả:** 37 câu UAT đúng **chỉ nhờ** câu trả lời dựng sẵn; ngoài UAT route này gần như không chạy (RBAC 2 câu, ba bộ còn lại 0). Điểm UAT phần lớn đo route deterministic chứ không đo LLM + validator. Khớp với 4b: trên held-out route chạy 6/40 câu và sai cả 6.
 
+**Từ 2026-11-14, báo cáo UAT tách hai phần:** số câu đi route deterministic (đúng/sai) và số câu đi đường LLM (đúng/sai). **Tổng UAT chủ yếu phản ánh route deterministic**; một thay đổi ở LLM, validator hay retrieval phải được đọc trên phần đi đường LLM. Mỗi câu trả lời được lưu tăng một trong hai bộ đếm `route_deterministic` / `route_llm` (`GET /metrics`); runner UAT ghi `answer_route` cho từng câu; `scripts/eval/metrics.py` (`by_route`, dòng `route …` trong `score.md`) và `summarize_ablation.py` (`by_route`) tách theo route.
+
 `o3b` = oracle (chunk gold, qua đoạn trích) với qwen2.5:3b; `o7b` = cùng oracle với qwen2.5:7b (`EVAL_LLM_MODEL`). `base` = 3B, retrieval thật.
 
 | Bộ (run) | `base` | `o3b` | `o7b` |

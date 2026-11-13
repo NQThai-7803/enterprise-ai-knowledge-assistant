@@ -112,12 +112,26 @@ def memory_windows(batch_dir: Path) -> dict[str, dict[str, int]]:
     return windows
 
 
+def route_counts(kind: str, results: Any, cats: dict[str, str]) -> dict[str, dict[str, int]] | None:
+    """UAT categories per answer route (deterministic / llm); None when no case recorded one."""
+    if kind != UAT:
+        return None
+    rows = results if isinstance(results, list) else results.get("cases", [])
+    routes = {row["id"]: row.get("answer_route") for row in rows}
+    if not any(routes.values()):
+        return None
+    out: dict[str, Counter[str]] = {}
+    for case_id, category in cats.items():
+        out.setdefault(routes.get(case_id) or "unknown", Counter())[category] += 1
+    return {route: dict(counter) for route, counter in sorted(out.items())}
+
+
 def summarize_batch(kind: str, batch_dir: Path) -> dict[str, Any]:
     meta = json.loads((batch_dir / "batch.json").read_text(encoding="utf-8"))
     names = [entry.split(":", 1)[0] for entry in meta["configs"].split(";") if entry]
     configs: dict[str, Any] = {}
     for name in names:
-        runs, leak, lat, modes = [], 0, [], set()
+        runs, leak, lat, modes, routes = [], 0, [], set(), []
         for run in (1, 2):
             run_dir = batch_dir / name / f"run{run}"
             path = run_dir / "results.json"
@@ -125,6 +139,7 @@ def summarize_batch(kind: str, batch_dir: Path) -> dict[str, Any]:
                 continue
             results = json.loads(path.read_text(encoding="utf-8-sig"))
             runs.append(categories(kind, results))
+            routes.append(route_counts(kind, results, runs[-1]))
             leak += leaks(kind, run_dir, results)
             lat += latencies(kind, run_dir, results)
             runtime = run_dir / "runtime_results.json"
@@ -136,6 +151,7 @@ def summarize_batch(kind: str, batch_dir: Path) -> dict[str, Any]:
         configs[name] = {
             "runs": len(runs),
             "counts": [dict(Counter(run.values())) for run in runs],
+            "by_route": routes if any(routes) else None,
             "leaks": leak,
             "latency_median_ms": int(statistics.median(lat)) if lat else None,
             "reranker_mode": sorted(m for m in modes if m),
