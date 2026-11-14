@@ -29,6 +29,10 @@ BRANCH_ROUTE_LLM = "route_llm"
 BRANCH_TERMINAL_BLOCK = "terminal_block"
 # A compound question answered in part, with the fixed unverified-part sentence.
 BRANCH_COMPOUND_PARTIAL_ANSWER = "compound_partial_answer"
+# A prompt source given whole because its query-focused excerpt missed the question.
+BRANCH_EXCERPT_FALLBACK = "excerpt_fallback"
+# A compound claim dropped by the responsiveness check on the claim itself.
+BRANCH_CLAIM_UNRESPONSIVE = "claim_unresponsive"
 ANSWER_BRANCHES = (
     BRANCH_RESELECT_AFTER_REJECTION,
     BRANCH_RESELECT_GUARD_WOULD_CHANGE,
@@ -41,6 +45,8 @@ ANSWER_BRANCHES = (
     BRANCH_ROUTE_LLM,
     BRANCH_TERMINAL_BLOCK,
     BRANCH_COMPOUND_PARTIAL_ANSWER,
+    BRANCH_EXCERPT_FALLBACK,
+    BRANCH_CLAIM_UNRESPONSIVE,
 )
 _UUID_SEGMENT_PATTERN = re.compile(
     r"(?<=/)[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
@@ -75,7 +81,7 @@ class MetricsRegistry:
         self._http_latency_sum: defaultdict[HTTPMetricKey, float] = defaultdict(float)
         self._http_latency_max: defaultdict[HTTPMetricKey, float] = defaultdict(float)
         self._answer_branch_counts: defaultdict[str, int] = defaultdict(int)
-        self._similarity_counts: defaultdict[str, int] = defaultdict(int)
+        self._similarity_counts: defaultdict[tuple[str, str], int] = defaultdict(int)
 
     def record_http_request(
         self,
@@ -100,13 +106,15 @@ class MetricsRegistry:
         with self._lock:
             self._answer_branch_counts[branch] += 1
 
-    def record_question_evidence_similarity(self, similarity: float) -> None:
-        """Count one computed question/evidence cosine in its 0.01 bucket (floored)."""
+    def record_question_evidence_similarity(self, similarity: float, *, llm_route: bool) -> None:
+        """Count one computed question/evidence cosine in its 0.01 bucket (floored), per route:
+        "llm" for a draft the LLM wrote, "local" for a server-built candidate."""
         bucket = f"{math.floor(min(max(similarity, 0.0), 1.0) * 100) / 100:.2f}"
         with self._lock:
-            self._similarity_counts[bucket] += 1
+            self._similarity_counts[("llm" if llm_route else "local", bucket)] += 1
 
-    def question_evidence_similarity_counts(self) -> dict[str, int]:
+    def question_evidence_similarity_counts(self) -> dict[tuple[str, str], int]:
+        """(route, bucket) -> count."""
         with self._lock:
             return dict(sorted(self._similarity_counts.items()))
 

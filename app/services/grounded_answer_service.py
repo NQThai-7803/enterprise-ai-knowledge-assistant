@@ -73,6 +73,7 @@ from app.llm.errors import LLMError, LLMFailureCode
 from app.llm.models import LLMGenerationResult, LLMMessage
 from app.models import ChatMessage, ChatMessageRole, Document, DocumentChunk, DocumentStatus, User
 from app.observability.metrics import (
+    BRANCH_CLAIM_UNRESPONSIVE,
     BRANCH_COMPOUND_PARTIAL_ANSWER,
     BRANCH_FIRST_ANSWER_KEPT,
     BRANCH_QUESTION_EVIDENCE_DISSIMILAR,
@@ -1353,6 +1354,8 @@ class GroundedAnswerService:
         )
         partial = self.settings.rag_compound_partial_answer_enabled
         terminal = self._content_block_is_terminal(generation)
+        needs_by_id = dict(zip(expected_ids, information_needs, strict=True))
+        local_claim_ids: set[str] = set()  # claims a server-built repair wrote
         if content_failures and terminal and not partial:
             raise _TerminalBlock("claim")
         failed_ids = tuple(
@@ -1494,6 +1497,7 @@ class GroundedAnswerService:
                             answer=structured_output.answer,
                             citations=structured_output.citations,
                         )
+                        local_claim_ids.add(claim_id)
                         break
 
             logger.info(
@@ -1506,6 +1510,24 @@ class GroundedAnswerService:
                     ],
                 },
             )
+
+        if partial and self.settings.rag_responsiveness_check_enabled:
+            # (iv) with (ii): every kept LLM claim must also address its own part of the
+            # question; one that does not goes into the unverified sentence.
+            for claim_id in list(validated_claims):
+                if claim_id in local_claim_ids:
+                    continue
+                claim = validated_claims[claim_id]
+                if not await self._answer_addresses_question(
+                    question=needs_by_id[claim_id],
+                    answer=claim.answer,
+                    source_registry=source_registry,
+                    cited_source_labels=claim.citations,
+                ):
+                    GLOBAL_METRICS.record_answer_branch(BRANCH_CLAIM_UNRESPONSIVE)
+                    del validated_claims[claim_id]
+            if not validated_claims:
+                raise _TerminalBlock("responsiveness")
 
         if any(claim_id not in validated_claims for claim_id in expected_ids):
             if partial and validated_claims:
@@ -2348,7 +2370,7 @@ class GroundedAnswerService:
         query = await anyio.to_thread.run_sync(provider.embed_query, question)
         passage = await anyio.to_thread.run_sync(provider.embed_passages, [sentence])
         similarity = _cosine(query.values, passage.vectors[0].values)
-        GLOBAL_METRICS.record_question_evidence_similarity(similarity)
+        GLOBAL_METRICS.record_question_evidence_similarity(similarity, llm_route=llm_route)
         threshold = max(
             settings.rag_question_evidence_min_similarity
             if settings.rag_question_evidence_similarity_enabled

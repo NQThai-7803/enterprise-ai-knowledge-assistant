@@ -56,3 +56,18 @@ Trả lời sai (cả hai nhóm) theo bộ: UAT 0 → 0, RBAC 1 → 1, relevance
 **Hai điều đợt đo cho thấy:**
 1. **NO_ANSWER do check tạo ra chưa phải là điểm dừng.** RBD-03 negative: check chặn câu trả lời đầu (bộ đếm `question_evidence_dissimilar` = 5 trên RBAC), pipeline sinh lại, và một câu lạc đề từ tài liệu được phép ("báo cho lễ tân tầng 1", RBAC-ORG-001, không rò rỉ) qua được ngưỡng. Muốn check chỉ chặn mà không mở đường trả lời khác, câu bị chặn phải dừng ở NO_ANSWER, không đi vào vòng thử lại.
 2. **Hiệu chỉnh chỉ phủ các câu tính đúng một cosine.** Q071 không có trong S vì check chạy nhiều lần cho câu này (mỗi lần sinh một lần); một lần sinh trung gian dưới 0,81 đã bị chặn. Câu hỏi tiếng Anh (E01, E03) có cosine thấp hơn với evidence tiếng Việt; UAT gần như không có câu loại này nên ngưỡng lấy từ UAT không phủ chúng.
+
+
+## Hiệu chỉnh lại trên mọi lần sinh (viết 2026-11-14, trước khi đo)
+
+- **Lý do:** đợt đầu chỉ lấy câu có đúng một cosine; Q071 bị chặn ở một lần sinh trung gian. Với điểm dừng (`respt`), chặn ở **bất kỳ** lần sinh LLM nào cũng là NO_ANSWER, nên ngưỡng phải nằm dưới mọi cosine của mọi lần sinh LLM của các câu đúng.
+- **Thu thập:** bộ đếm cosine giờ tách route (`llm` / `local`); runner UAT ghi `evidence_similarities` = mọi cosine trên bản nháp LLM của câu đó, kể cả lần trung gian. Đợt hiệu chỉnh: chỉ UAT, `base` và `probe` (`EVAL_QUESTION_EVIDENCE_SIMILARITY=true`, `EVAL_QUESTION_EVIDENCE_MIN_SIMILARITY=0.0`), 2 lượt.
+- **Quy tắc chọn t mới:** S' = các câu UAT đi đường LLM ở cả 2 lượt `probe`, đúng ở cả 2 lượt, có ít nhất một cosine LLM; giá trị của mỗi câu là cosine **nhỏ nhất trên mọi lần sinh của cả 2 lượt**. t = min(S'). Không câu đúng nào bị chặn ở bất kỳ lần sinh nào. Ghi t và |S'| trước đợt đo.
+- **Giới hạn:** UAT chỉ có ~25 câu đi đường LLM, không có câu tiếng Anh; câu hỏi nhiều ý không được kiểm (check bỏ qua chúng), nên t không được hiệu chỉnh cho kiểm độ đáp ứng trên từng ý của (iv).
+
+## Đợt đo cuối của giai đoạn 1 (viết trước khi đo)
+
+- Cấu hình, cùng job, 2 lượt xen kẽ, 6 bộ (UAT tách route, RBAC, relevance, FR v1, FR v2, compound): `base` (mặc định hiện tại); `respt` = `EVAL_RESPONSIVENESS=true`, `EVAL_RESPONSIVENESS_MIN=t`, `EVAL_RESP_TERMINAL=true`; `respt_cpa` = `respt` + `EVAL_COMPOUND_PARTIAL=true` (trả lời một phần, mỗi ý LLM được giữ phải qua kiểm độ đáp ứng với cùng t; ý không đạt → câu "chưa xác minh được"; không ý nào đạt → NO_ANSWER, không thử lại).
+- **DEC-013, "nhầm giá trị" tính là trả lời sai:** 0 rò rỉ; UAT không hồi quy quá 1 câu, phần LLM báo riêng; trả lời sai không tăng ở bộ nào; thắng khi không tệ hơn `base` ở bộ nào (ít trả lời sai hơn trước, rồi nhiều câu đúng hơn) và tốt hơn ở ít nhất một bộ.
+- Hai cấu hình cùng thắng: chọn cái không thua cái kia ở bộ nào; `respt_cpa` chỉ được bật cùng `respt`. Không cái nào thắng: mọi flag giữ tắt.
+- Báo riêng: Q071, RBD-03, CP1-R03, CP1-P01/P05/P06, FR2-E01/E03, và các bộ đếm `terminal_block`, `claim_unresponsive`, `excerpt_fallback`.

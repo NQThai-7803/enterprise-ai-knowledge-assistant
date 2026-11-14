@@ -8,6 +8,7 @@ from app.chat.models import SelectedContext, SelectedContextItem
 from app.citations.models import PromptSource
 from app.document_processing.tokenization.base import TokenCounter
 from app.models import CitationSourceType
+from app.observability.metrics import BRANCH_EXCERPT_FALLBACK, GLOBAL_METRICS
 from app.retrieval.leave_relations import (
     annual_leave_relation_intent,
     annual_leave_seniority_increment,
@@ -166,6 +167,7 @@ def select_context_for_prompt(
         if excerpt_fallback and excerpt_misses_question(
             source_text, hit.text, question=question, information_needs=information_needs
         ):
+            GLOBAL_METRICS.record_answer_branch(BRANCH_EXCERPT_FALLBACK)
             source_text = _collapse_whitespace(hit.text)
         candidate_text = render_hit_source_context_item(
             len(selected) + 1,
