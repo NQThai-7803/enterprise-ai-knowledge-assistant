@@ -16,3 +16,5 @@ Viết 2026-11-14, **trước mọi lần đo** của mục này.
 - Bộ: UAT (báo tách route), RBAC, relevance, FR v1, FR v2, compound.
 - **DEC-013, "nhầm giá trị" tính là trả lời sai:** 0 rò rỉ; UAT không hồi quy quá 1 câu, phần đi LLM báo riêng; trả lời sai không tăng ở bộ nào. Thắng khi không tệ hơn `base` ở bộ nào (ít trả lời sai hơn trước, rồi nhiều câu đúng hơn) và tốt hơn ở ít nhất một bộ.
 - Thắng thì bật mặc định; không thì giữ tắt.
+
+**Bổ sung trước khi đo (2026-11-14):** (iii) và (iv) đo chung một job với cùng `base`: cấu hình `base`, `xfb` (iii), `cpa` (iv), `both` (iii + iv). Mỗi flag được chọn bằng so sánh của chính nó với `base`. Nếu cả hai cùng thắng, bật cả hai chỉ khi `both` cũng thắng `base` và không thua `xfb` hay `cpa` ở bộ nào; nếu không, bật cái thắng mà không thua cái kia, hoặc để owner quyết định.

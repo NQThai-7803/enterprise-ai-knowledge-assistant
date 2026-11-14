@@ -16,3 +16,5 @@ Viết 2026-11-14, **trước mọi lần đo** của mục này.
 - **DEC-013, "nhầm giá trị" tính là trả lời sai:** 0 rò rỉ; UAT không hồi quy quá 1 câu (phần LLM báo riêng); trả lời sai không tăng ở bộ nào. Thắng khi không tệ hơn `base` ở bộ nào và tốt hơn ở ít nhất một bộ (ít trả lời sai hơn trước, rồi nhiều câu đúng hơn).
 - Ở RBAC, một câu negative có câu "chưa xác minh được" vẫn là ANSWERED, nên runner tính là trả lời sai nếu có phần nào được trả lời: quy tắc trên chặn việc trả lời một phần làm lộ tài liệu hay trả lời câu phải từ chối.
 - Nội dung bộ compound còn chờ owner duyệt (lock ghi "content pending owner review"); số đo trên bộ này báo kèm ghi chú đó.
+
+**Bổ sung trước khi đo (2026-11-14):** (iii) và (iv) đo chung một job với cùng `base`: cấu hình `base`, `xfb` (iii), `cpa` (iv), `both` (iii + iv). Mỗi flag được chọn bằng so sánh của chính nó với `base`. Nếu cả hai cùng thắng, bật cả hai chỉ khi `both` cũng thắng `base` và không thua `xfb` hay `cpa` ở bộ nào; nếu không, bật cái thắng mà không thua cái kia, hoặc để owner quyết định.
