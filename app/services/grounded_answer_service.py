@@ -82,6 +82,7 @@ from app.observability.metrics import (
     BRANCH_RETRY_ABANDONED_FIRST,
     BRANCH_ROUTE_DETERMINISTIC,
     BRANCH_ROUTE_LLM,
+    BRANCH_TERMINAL_BLOCK,
     GLOBAL_METRICS,
 )
 from app.repositories import (
@@ -586,6 +587,17 @@ class _CitationFailure:
     marker_count: int
 
 
+class _TerminalBlock(Exception):  # noqa: N818 - a control-flow signal, not an error
+    """A content block on an LLM answer that ends at NO_ANSWER, without regenerating.
+
+    Not a CitationValidationFailedApplicationError, so no retry handler catches it.
+    """
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
+
+
 class _ClaimValidationRepairRequired(CitationValidationFailedApplicationError):
     """Carries bounded validator feedback across the structured retry boundary."""
 
@@ -974,6 +986,11 @@ class GroundedAnswerService:
                     source_registry=source_registry,
                 )
                 if first_reason is not None:
+                    if (
+                        self.settings.rag_content_blocks_terminal_enabled
+                        and draft.grounding_status == GroundingStatus.ANSWERED
+                    ):
+                        raise _TerminalBlock("completeness")
                     # FIX 4 (i): a validated first answer rejected only for its form is kept
                     # when the retry gives nothing better.
                     keep_first = (
@@ -1199,6 +1216,11 @@ class GroundedAnswerService:
                     answer=retry_draft.content,
                     source_registry=source_registry,
                 ):
+                    if (
+                        self.settings.rag_content_blocks_terminal_enabled
+                        and retry_draft.grounding_status == GroundingStatus.ANSWERED
+                    ):
+                        raise _TerminalBlock("completeness") from None
                     quality_retry_generation = await provider.generate(
                         messages=_answer_quality_retry_messages(
                             messages,
@@ -1261,6 +1283,15 @@ class GroundedAnswerService:
                 selected_chunk_count=len(source_registry.sources),
             )
 
+        except _TerminalBlock as block:
+            GLOBAL_METRICS.record_answer_branch(BRANCH_TERMINAL_BLOCK)
+            if self.settings.rag_diagnostics_enabled:
+                _log_no_answer_diagnostics(reason=f"terminal_{block.reason}")
+            return _no_answer_draft(
+                self.settings.chat_no_answer_message,
+                selected_chunk_count=len(source_registry.sources),
+            )
+
         except ApplicationError:
             raise
 
@@ -1306,12 +1337,16 @@ class GroundedAnswerService:
         grounding_question: str,
     ) -> _AnswerDraft:
         expected_ids = tuple(f"CLAIM_{index}" for index in range(1, len(information_needs) + 1))
+        content_failures: list[str] = []
         validated_claims = await self._validated_structured_claims(
             generation.content,
             expected_claim_ids=expected_ids,
             information_needs=information_needs,
             source_registry=source_registry,
+            content_failures=content_failures,
         )
+        if content_failures and self._content_block_is_terminal(generation):
+            raise _TerminalBlock("claim")
         failed_ids = tuple(
             claim_id for claim_id in expected_ids if claim_id not in validated_claims
         )
@@ -1355,7 +1390,10 @@ class GroundedAnswerService:
                 information_needs=tuple(needs_by_id[claim_id] for claim_id in failed_ids),
                 source_registry=source_registry,
                 allowed_source_labels_by_claim=repair_source_labels,
+                content_failures=content_failures,
             )
+            if content_failures and self._content_block_is_terminal(repair_generation):
+                raise _TerminalBlock("claim")
             validated_claims.update(repaired_claims)
             logger.info(
                 "RAG focused claim repair validation completed.",
@@ -1510,7 +1548,9 @@ class GroundedAnswerService:
         information_needs: tuple[str, ...],
         source_registry: PromptSourceRegistry,
         allowed_source_labels_by_claim: dict[str, tuple[str, ...]] | None = None,
+        content_failures: list[str] | None = None,
     ) -> dict[str, StructuredGroundedClaim]:
+        """Valid claims; claims rejected for their content are added to content_failures."""
         if content.strip() == self.settings.llm_no_answer_sentinel:
             if self.settings.rag_diagnostics_enabled:
                 logger.warning(
@@ -1590,6 +1630,8 @@ class GroundedAnswerService:
                 )
             if result.status == ClaimEvidenceStatus.SUPPORTED and not incomplete_reason:
                 validated[claim.claim_id] = claim
+            elif content_failures is not None:
+                content_failures.append(claim.claim_id)
         return validated
 
     async def _structured_value_answer_draft(
@@ -2253,6 +2295,10 @@ class GroundedAnswerService:
             _log_no_answer_diagnostics(reason="question_evidence_dissimilar")
         return False
 
+    def _content_block_is_terminal(self, generation: LLMGenerationResult) -> bool:
+        """(b): a content block on an LLM answer ends the answer; server-built ones never do."""
+        return self.settings.rag_content_blocks_terminal_enabled and generation.provider != "local"
+
     async def _draft_from_generation(
         self,
         generation: LLMGenerationResult,
@@ -2295,6 +2341,8 @@ class GroundedAnswerService:
                             cited_source_labels=claim.citations,
                         )
                         if claim_validation.status != ClaimEvidenceStatus.SUPPORTED:
+                            if self._content_block_is_terminal(generation):
+                                raise _TerminalBlock("claim")
                             raise ValueError(f"Unsupported structured claim: {claim.claim_id}")
                 grounded_output = GroundedLLMOutput(
                     answer=_join_claim_answers(
@@ -2358,6 +2406,11 @@ class GroundedAnswerService:
             cited_source_labels=tuple(grounded_output.citations),
             llm_route=generation.provider != "local",
         ):
+            if generation.provider != "local" and (
+                self.settings.rag_responsiveness_block_terminal_enabled
+                or self.settings.rag_content_blocks_terminal_enabled
+            ):
+                raise _TerminalBlock("responsiveness")
             return _no_answer_draft(
                 self.settings.chat_no_answer_message,
                 selected_chunk_count=selected_chunk_count,
@@ -2401,6 +2454,8 @@ class GroundedAnswerService:
         ):
             if self.settings.rag_diagnostics_enabled:
                 _log_no_answer_diagnostics(reason="answer_missing_requested_unit")
+            if self._content_block_is_terminal(generation):
+                raise _TerminalBlock("completeness")
             raise _ClaimValidationRepairRequired(None)
 
         if self.settings.claim_validation_enabled and not claims_already_validated:
@@ -2505,6 +2560,8 @@ class GroundedAnswerService:
                     _log_no_answer_diagnostics(
                         reason=(f"claim_validation_{claim_validation.status.value.lower()}"),
                     )
+                if self._content_block_is_terminal(generation):
+                    raise _TerminalBlock("claim")
                 raise _ClaimValidationRepairRequired(claim_validation.repair_feedback)
 
             validated_yes_no_polarity = claim_validation.polarity

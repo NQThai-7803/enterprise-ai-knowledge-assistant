@@ -3825,6 +3825,7 @@ def test_reselection_is_counted_with_the_strong_support_flag_off() -> None:
         "retry_abandoned_first": 0,
         "route_deterministic": 0,
         "route_llm": 0,
+        "terminal_block": 0,
     }
     GLOBAL_METRICS.reset()
 
@@ -3862,6 +3863,7 @@ def test_reselection_guard_is_not_counted_when_the_source_holds_the_answer() -> 
         "retry_abandoned_first": 0,
         "route_deterministic": 0,
         "route_llm": 0,
+        "terminal_block": 0,
     }
     GLOBAL_METRICS.reset()
 
@@ -4226,3 +4228,140 @@ def test_responsiveness_check_applies_to_llm_answers_with_its_own_threshold(
     computed = flags and (llm_route or "rag_question_evidence_similarity_enabled" in flags)
     assert GLOBAL_METRICS.question_evidence_similarity_counts() == ({"0.60": 1} if computed else {})
     GLOBAL_METRICS.reset()
+
+
+TERMINAL_WRONG = '{"answer":"Tai trong toi da cua xe toi la 9.900 kg.","citations":["SOURCE_1"]}'
+
+
+async def _terminal_answer(
+    first: str, *, low_similarity: bool = False, **flags: Any
+) -> tuple[Any, Any]:
+    llm = SequentialFakeLLMProvider(*(_generation(c) for c in (first, HOIST_ANSWER, HOIST_ANSWER)))
+    service, _, _, retrieval, resolved_llm, _, _ = make_service(
+        retrieval=FakeRetrievalService(retrieval_result(hit(HOIST_TEXT))),
+        llm=llm,
+        settings_obj=settings(**flags),
+    )
+    if low_similarity:  # cosine 0.6 for every sentence
+        retrieval.semantic_retrieval_service = SimpleNamespace(
+            embedding_provider=_FixedEmbeddings((1.0, 0.0), (0.6, 0.8))
+        )
+    result = await service.answer_question(
+        current_user=user(), session_id=chat_session().id, question=HOIST_QUESTION
+    )
+    return result, resolved_llm
+
+
+RESPONSIVENESS = {
+    "rag_responsiveness_check_enabled": True,
+    "rag_responsiveness_min_similarity": 0.7,
+}
+
+
+@pytest.mark.parametrize(
+    ("first", "low_similarity", "flags", "status", "calls", "terminal"),
+    [
+        # Responsiveness block: regenerated without a flag, final with (a) or (b).
+        (HOIST_ANSWER, True, RESPONSIVENESS, GroundingStatus.NO_ANSWER, 2, 0),
+        (HOIST_ANSWER, True, {**RESPONSIVENESS, "rag_responsiveness_block_terminal_enabled": True},
+         GroundingStatus.NO_ANSWER, 1, 1),
+        (HOIST_ANSWER, True, {**RESPONSIVENESS, "rag_content_blocks_terminal_enabled": True},
+         GroundingStatus.NO_ANSWER, 1, 1),
+        # A claim the source contradicts: repaired without (b), final with (b); (a) leaves it.
+        (TERMINAL_WRONG, False, {}, GroundingStatus.ANSWERED, 2, 0),
+        (TERMINAL_WRONG, False, {"rag_responsiveness_block_terminal_enabled": True},
+         GroundingStatus.ANSWERED, 2, 0),
+        (TERMINAL_WRONG, False, {"rag_content_blocks_terminal_enabled": True},
+         GroundingStatus.NO_ANSWER, 1, 1),
+        # A format error is still retried under (b).
+        ('{"answer": oops', False, {"rag_content_blocks_terminal_enabled": True},
+         GroundingStatus.ANSWERED, 2, 0),
+    ],
+)  # fmt: skip
+def test_a_content_block_on_an_llm_answer_is_final_only_with_its_flag(
+    first: str,
+    low_similarity: bool,
+    flags: dict[str, Any],
+    status: GroundingStatus,
+    calls: int,
+    terminal: int,
+) -> None:
+    GLOBAL_METRICS.reset()
+    result, llm = asyncio.run(_terminal_answer(first, low_similarity=low_similarity, **flags))
+    assert result.grounding_status == status
+    assert llm.calls == calls
+    assert GLOBAL_METRICS.answer_branch_counts()["terminal_block"] == terminal
+    GLOBAL_METRICS.reset()
+
+
+def test_a_blocked_server_built_answer_is_not_final(monkeypatch: pytest.MonkeyPatch) -> None:
+    def wrong_local_generation(**_: Any) -> LLMGenerationResult:
+        return LLMGenerationResult(
+            content=TERMINAL_WRONG, model="local-structured-value-repair", finish_reason="stop",
+            prompt_tokens=0, completion_tokens=0, response_time_ms=0, provider="local",
+        )  # fmt: skip
+
+    monkeypatch.setattr(
+        grounded_answer_module, "_structured_value_repair_generation", wrong_local_generation
+    )
+    GLOBAL_METRICS.reset()
+    result, llm = asyncio.run(
+        _terminal_answer(HOIST_ANSWER, rag_content_blocks_terminal_enabled=True)
+    )
+    # The server-built candidate fails validation; the LLM path still runs and answers.
+    assert result.grounding_status == GroundingStatus.ANSWERED and llm.calls >= 1
+    assert GLOBAL_METRICS.answer_branch_counts()["terminal_block"] == 0
+    GLOBAL_METRICS.reset()
+
+
+@pytest.mark.parametrize(("terminal", "status", "calls"), [
+    (False, GroundingStatus.ANSWERED, 2),
+    (True, GroundingStatus.NO_ANSWER, 1),
+])  # fmt: skip
+def test_compound_claim_rejected_for_its_content_is_final_with_content_terminal(
+    terminal: bool, status: GroundingStatus, calls: int
+) -> None:
+    def generation(content: str) -> LLMGenerationResult:
+        return LLMGenerationResult(
+            content=content, model="fake", finish_reason="stop", prompt_tokens=1,
+            completion_tokens=1, response_time_ms=1,
+        )  # fmt: skip
+
+    async def scenario() -> tuple[Any, Any]:
+        second_hit = replace(
+            hit("Security timeout is 15 minutes."),
+            chunk_id=UUID("00000000-0000-0000-0000-000000000102"),
+            document_id=UUID("00000000-0000-0000-0000-000000000202"),
+            document_title="Security policy",
+        )
+        llm = SequentialFakeLLMProvider(
+            generation(
+                '{"claims":[{"claim_id":"CLAIM_1","answer":"Remote limit is 2 days.",'
+                '"citations":["SOURCE_1","SOURCE_2"]},'
+                '{"claim_id":"CLAIM_2","answer":"Security timeout is 5 minutes.",'
+                '"citations":["SOURCE_1","SOURCE_2"]}]}'
+            ),
+            generation(
+                '{"claims":[{"claim_id":"CLAIM_2","answer":"Security timeout is 15 minutes.",'
+                '"citations":["SOURCE_1"]}]}'
+            ),
+        )
+        service, _, _, _, resolved_llm, _, _ = make_service(
+            retrieval=FakeRetrievalService(
+                (retrieval_result(hit("Remote limit is 2 days.")), retrieval_result(second_hit))
+            ),
+            llm=llm,
+            citation_validation=FakeCitationValidationService(),
+            settings_obj=settings(rag_content_blocks_terminal_enabled=terminal),
+        )
+        result = await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question="What is the remote limit and how many minutes is security timeout?",
+        )
+        return result, resolved_llm
+
+    result, llm = asyncio.run(scenario())
+    # "5 minutes" contradicts the source: a content failure, so (b) does not repair it.
+    assert result.grounding_status == status
+    assert llm.calls == calls
