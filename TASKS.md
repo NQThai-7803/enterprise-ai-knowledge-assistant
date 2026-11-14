@@ -8,6 +8,14 @@
 3. **Embedding fine-tune** (`docs/design/embedding-finetune.md` and DEC-015 on branch `feat/embedding-finetune-infra`): infrastructure only so far; the baseline measurement and training come after FIX 3.
 4. The final held-out v2 measurement, once, after the choices above are made (DEC-012).
 
+## Owner round 2026-11-14 (STOPPED for report before (iii), (iv))
+
+- **DONE:** PR #23 merged; DEC-023 (wording-only fixes may ship on); restatement check keeps another subject.
+- **DONE:** UAT reports split by answer route (PR #24): 75 deterministic / 25 LLM on Q001-Q100.
+- **DONE:** c1 + c3 measured, c1 on by default (PR #25). qwen2.5:7b with real retrieval measured on 6 sets; default model stays 3B.
+- **DONE: FIX 4 (ii)** responsiveness check on LLM answers, t = 0.81 from UAT; measured, **stays off** (UAT and RBAC each lose one correct answer). PR #26.
+- **NEXT (waiting for owner):** (iii) excerpt fallback, (iv) compound partial answers. Open question from (ii): stop a blocked answer at NO_ANSWER instead of retrying.
+
 ## FIX 4 (i) completeness retry -- 2026-11-13
 
 - **DONE:** three flags measured (`docs/eval/runs/fix4-completeness.md`); `c3` (retry may not drop validated values) chosen and on by default; `c1` and `c2` stay off. `c1` + `c3` together not measured.
