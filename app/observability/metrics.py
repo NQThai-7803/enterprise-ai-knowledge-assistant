@@ -27,6 +27,8 @@ BRANCH_ROUTE_DETERMINISTIC = "route_deterministic"
 BRANCH_ROUTE_LLM = "route_llm"
 # A content block on an LLM answer that ended at NO_ANSWER instead of a regeneration.
 BRANCH_TERMINAL_BLOCK = "terminal_block"
+# A compound question answered in part, with the fixed unverified-part sentence.
+BRANCH_COMPOUND_PARTIAL_ANSWER = "compound_partial_answer"
 ANSWER_BRANCHES = (
     BRANCH_RESELECT_AFTER_REJECTION,
     BRANCH_RESELECT_GUARD_WOULD_CHANGE,
@@ -38,6 +40,7 @@ ANSWER_BRANCHES = (
     BRANCH_ROUTE_DETERMINISTIC,
     BRANCH_ROUTE_LLM,
     BRANCH_TERMINAL_BLOCK,
+    BRANCH_COMPOUND_PARTIAL_ANSWER,
 )
 _UUID_SEGMENT_PATTERN = re.compile(
     r"(?<=/)[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"

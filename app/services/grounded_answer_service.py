@@ -73,6 +73,7 @@ from app.llm.errors import LLMError, LLMFailureCode
 from app.llm.models import LLMGenerationResult, LLMMessage
 from app.models import ChatMessage, ChatMessageRole, Document, DocumentChunk, DocumentStatus, User
 from app.observability.metrics import (
+    BRANCH_COMPOUND_PARTIAL_ANSWER,
     BRANCH_FIRST_ANSWER_KEPT,
     BRANCH_QUESTION_EVIDENCE_DISSIMILAR,
     BRANCH_QUESTION_HEAD_MISSING,
@@ -585,6 +586,10 @@ class _CitationFailure:
 
     reason: str
     marker_count: int
+
+
+# DEC-021: what the system knows about a part it could not validate; never "not mentioned".
+_UNVERIFIED_PART_SENTENCE = "Chưa xác minh được từ tài liệu bạn được phép truy cập: {need}."
 
 
 class _TerminalBlock(Exception):  # noqa: N818 - a control-flow signal, not an error
@@ -1346,10 +1351,16 @@ class GroundedAnswerService:
             source_registry=source_registry,
             content_failures=content_failures,
         )
-        if content_failures and self._content_block_is_terminal(generation):
+        partial = self.settings.rag_compound_partial_answer_enabled
+        terminal = self._content_block_is_terminal(generation)
+        if content_failures and terminal and not partial:
             raise _TerminalBlock("claim")
         failed_ids = tuple(
-            claim_id for claim_id in expected_ids if claim_id not in validated_claims
+            claim_id
+            for claim_id in expected_ids
+            if claim_id not in validated_claims
+            # (b) with partial answers: a claim rejected for its content is final, not repaired.
+            and not (terminal and claim_id in content_failures)
         )
         logger.info(
             "RAG structured claim validation completed.",
@@ -1394,7 +1405,9 @@ class GroundedAnswerService:
                 content_failures=content_failures,
             )
             if content_failures and self._content_block_is_terminal(repair_generation):
-                raise _TerminalBlock("claim")
+                if not partial:
+                    raise _TerminalBlock("claim")
+                failed_ids = tuple(i for i in failed_ids if i not in content_failures)
             validated_claims.update(repaired_claims)
             logger.info(
                 "RAG focused claim repair validation completed.",
@@ -1495,6 +1508,18 @@ class GroundedAnswerService:
             )
 
         if any(claim_id not in validated_claims for claim_id in expected_ids):
+            if partial and validated_claims:
+                return await self._partial_compound_draft(
+                    generation,
+                    expected_ids=expected_ids,
+                    information_needs=information_needs,
+                    validated_claims=validated_claims,
+                    source_registry=source_registry,
+                    current_user=current_user,
+                    grounding_question=grounding_question,
+                )
+            if content_failures and terminal:
+                raise _TerminalBlock("claim")
             raise CitationValidationFailedApplicationError()
 
         ordered_claims = tuple(validated_claims[claim_id] for claim_id in expected_ids)
@@ -1535,6 +1560,47 @@ class GroundedAnswerService:
         )
         return await self._draft_from_generation(
             combined_generation,
+            source_registry=source_registry,
+            current_user=current_user,
+            grounding_question=grounding_question,
+            claims_already_validated=True,
+        )
+
+    async def _partial_compound_draft(
+        self,
+        generation: LLMGenerationResult,
+        *,
+        expected_ids: tuple[str, ...],
+        information_needs: tuple[str, ...],
+        validated_claims: dict[str, StructuredGroundedClaim],
+        source_registry: PromptSourceRegistry,
+        current_user: User,
+        grounding_question: str,
+    ) -> _AnswerDraft:
+        """FIX 4 (iv), DEC-021: answer the validated parts; each other part gets a fixed
+        sentence saying it could not be verified. Nothing is said about the missing part."""
+        parts = [validated_claims[i].answer for i in expected_ids if i in validated_claims]
+        parts += [
+            _UNVERIFIED_PART_SENTENCE.format(need=need.strip().rstrip(" ?.").strip())
+            for claim_id, need in zip(expected_ids, information_needs, strict=True)
+            if claim_id not in validated_claims
+        ]
+        citations = list(
+            dict.fromkeys(
+                citation
+                for claim_id in expected_ids
+                if claim_id in validated_claims
+                for citation in validated_claims[claim_id].citations
+            )
+        )
+        GLOBAL_METRICS.record_answer_branch(BRANCH_COMPOUND_PARTIAL_ANSWER)
+        return await self._draft_from_generation(
+            replace(
+                generation,
+                content=json.dumps(
+                    {"answer": " ".join(parts), "citations": citations}, ensure_ascii=False
+                ),
+            ),
             source_registry=source_registry,
             current_user=current_user,
             grounding_question=grounding_question,
