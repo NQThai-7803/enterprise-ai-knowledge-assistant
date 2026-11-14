@@ -35,3 +35,24 @@ Viết 2026-11-14, **trước mọi lần đo** của mục này.
 - Route deterministic: 74/75 câu có cosine, thấp nhất 0,78; (ii) không kiểm route này.
 - **t = 0,81.** Ngưỡng cũ 0,85 của M1b chặn 7/18 câu đúng của phần LLM, cộng các câu deterministic dưới 0,85: khớp với 43 câu hồi quy của FIX 3a.
 - Commit hiệu chỉnh chưa có `RAG_COMPLETENESS_NUMBER_NORMALIZATION_ENABLED` (bật sau, PR #25); flag đó chỉ đổi FR2-E01 trong đợt của nó, không đổi câu UAT nào.
+
+## Kết quả đợt đo (Actions, commit `6ea71d5`, t = 0,81, 2026-11-14)
+
+Ô: đúng / từ chối sai / trả lời sai / sai (nhầm giá trị); hai lượt mỗi bên giống hệt nhau. 0 rò rỉ ở mọi ô.
+
+| Bộ (run) | `base` | `resp` | Thay đổi ở cả 2 lượt |
+|---|---|---|---|
+| UAT (`43517483428`) | 100/0/0/0; deterministic 75/75, LLM 25/25 | 99/1/0/0; deterministic 75/75, LLM 24/25 | Q071 đúng → từ chối sai |
+| RBAC (`43517521598`) | 23/12/0/1 | 22/13/1/0 | RBD-13 control sai → từ chối; **RBD-03 negative đúng → trả lời sai** |
+| relevance (`43517558708`) | 17/3/5/0 | **19**/3/**3**/0 | REL-401, REL-403 trả lời sai → đúng |
+| FR v1 (`43517595504`) | 13/1/6/0 | = | |
+| FR v2 (`43517631924`) | 15/4/5/0 | 14/6/4/0 | FR2-E05 trả lời sai → đúng; FR2-E01, E03 (câu hỏi tiếng Anh) đúng → từ chối |
+| compound (`43517669294`) | 4/3/4/1 | = | |
+
+Trả lời sai (cả hai nhóm) theo bộ: UAT 0 → 0, RBAC 1 → 1, relevance 5 → 3, FR v1 6 → 6, FR v2 5 → 4, compound 5 → 5. Câu đúng: UAT −1, RBAC −1, relevance +2, FR v2 −1.
+
+**Áp quy tắc:** không rò rỉ, trả lời sai không tăng ở bộ nào, UAT trong dung sai 1 câu. Nhưng ở UAT và RBAC, `resp` có cùng số trả lời sai và **ít hơn 1 câu đúng**, ổn định ở cả 2 lượt: tệ hơn `base` ở hai bộ. **Không thắng; `RAG_RESPONSIVENESS_CHECK_ENABLED` giữ tắt.** Code và bộ đếm cosine được merge (flag tắt), như F.
+
+**Hai điều đợt đo cho thấy:**
+1. **NO_ANSWER do check tạo ra chưa phải là điểm dừng.** RBD-03 negative: check chặn câu trả lời đầu (bộ đếm `question_evidence_dissimilar` = 5 trên RBAC), pipeline sinh lại, và một câu lạc đề từ tài liệu được phép ("báo cho lễ tân tầng 1", RBAC-ORG-001, không rò rỉ) qua được ngưỡng. Muốn check chỉ chặn mà không mở đường trả lời khác, câu bị chặn phải dừng ở NO_ANSWER, không đi vào vòng thử lại.
+2. **Hiệu chỉnh chỉ phủ các câu tính đúng một cosine.** Q071 không có trong S vì check chạy nhiều lần cho câu này (mỗi lần sinh một lần); một lần sinh trung gian dưới 0,81 đã bị chặn. Câu hỏi tiếng Anh (E01, E03) có cosine thấp hơn với evidence tiếng Việt; UAT gần như không có câu loại này nên ngưỡng lấy từ UAT không phủ chúng.
