@@ -145,6 +145,7 @@ def select_context_for_prompt(
     system_prompt: str,
     token_counter: TokenCounter,
     max_tokens: int,
+    excerpt_fallback: bool = False,
 ) -> SelectedContext:
     if max_tokens <= 0:
         raise ValueError("max_tokens must be greater than zero.")
@@ -162,6 +163,10 @@ def select_context_for_prompt(
             question,
             information_needs=information_needs,
         )
+        if excerpt_fallback and excerpt_misses_question(
+            source_text, hit.text, question=question, information_needs=information_needs
+        ):
+            source_text = _collapse_whitespace(hit.text)
         candidate_text = render_hit_source_context_item(
             len(selected) + 1,
             hit,
@@ -216,6 +221,30 @@ def select_context_for_prompt(
         selected_chunk_count=len(selected),
         estimated_token_count=used_tokens,
     )
+
+
+def excerpt_misses_question(
+    excerpt: str,
+    text: str,
+    *,
+    question: str,
+    information_needs: Sequence[str] = (),
+) -> bool:
+    """FIX 4 (iii): True when the excerpt likely left out what was asked, so the whole chunk
+    is used instead: no content word of the question in it, or no evidence block for one of
+    the claims of a compound question."""
+    if excerpt == _collapse_whitespace(text):
+        return False
+    if len(information_needs) > 1 and excerpt.startswith("Claim-focused evidence:"):
+        return any(
+            f"CLAIM_{index} evidence:" not in excerpt
+            for index in range(1, len(information_needs) + 1)
+        )
+    _, terms, _ = _query_needles(question)
+    if not terms:
+        return False
+    folded_excerpt = _fold_text(excerpt)
+    return not any(re.search(rf"\b{re.escape(term)}\b", folded_excerpt) for term in terms)
 
 
 def query_focused_excerpt(

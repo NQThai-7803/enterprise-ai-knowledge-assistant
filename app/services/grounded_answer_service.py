@@ -831,6 +831,7 @@ class GroundedAnswerService:
             system_prompt=system_prompt,
             token_counter=self.token_counter,
             max_tokens=self.settings.chat_context_max_tokens,
+            excerpt_fallback=self.settings.rag_excerpt_fallback_enabled,
         )
         source_registry = build_prompt_source_registry(
             context_items=selected_context.items,
