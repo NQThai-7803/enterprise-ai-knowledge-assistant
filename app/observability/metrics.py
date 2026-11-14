@@ -25,6 +25,8 @@ BRANCH_RETRY_ABANDONED_FIRST = "retry_abandoned_first"
 # Every persisted answer, by who wrote it: a server-built answer or the LLM path.
 BRANCH_ROUTE_DETERMINISTIC = "route_deterministic"
 BRANCH_ROUTE_LLM = "route_llm"
+# A content block on an LLM answer that ended at NO_ANSWER instead of a regeneration.
+BRANCH_TERMINAL_BLOCK = "terminal_block"
 ANSWER_BRANCHES = (
     BRANCH_RESELECT_AFTER_REJECTION,
     BRANCH_RESELECT_GUARD_WOULD_CHANGE,
@@ -35,6 +37,7 @@ ANSWER_BRANCHES = (
     BRANCH_RETRY_ABANDONED_FIRST,
     BRANCH_ROUTE_DETERMINISTIC,
     BRANCH_ROUTE_LLM,
+    BRANCH_TERMINAL_BLOCK,
 )
 _UUID_SEGMENT_PATTERN = re.compile(
     r"(?<=/)[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"

@@ -157,6 +157,11 @@ class Settings(BaseSettings):
     # calibrated on the LLM-route part of UAT (docs/eval/runs/fix4-responsiveness.md).
     rag_responsiveness_check_enabled: bool = False
     rag_responsiveness_min_similarity: float = Field(default=0.0, ge=0.0, le=1.0)
+    # A block on an LLM answer ends at NO_ANSWER instead of a regeneration:
+    # (a) only the responsiveness block; (b) every content block (responsiveness, claim not
+    # SUPPORTED, missing unit, completeness). Format errors are still retried.
+    rag_responsiveness_block_terminal_enabled: bool = False
+    rag_content_blocks_terminal_enabled: bool = False
     # FIX 3c F: numbers are compared once written one way (01 = 1, 1,2 trieu = 1.200.000).
     rag_number_normalization_enabled: bool = False
     # FIX 4 (i), completeness checks: a grouped number is one number in the unit check; a

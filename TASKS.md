@@ -8,6 +8,12 @@
 3. **Embedding fine-tune** (`docs/design/embedding-finetune.md` and DEC-015 on branch `feat/embedding-finetune-infra`): infrastructure only so far; the baseline measurement and training come after FIX 3.
 4. The final held-out v2 measurement, once, after the choices above are made (DEC-012).
 
+## Terminal blocks and phase 2 model -- 2026-11-14
+
+- **DONE:** retry-site inventory (content vs format) in `docs/design/pipeline-loss-fix-plan.md`; (a) `respt` and (b) `contt` measured, **both stay off** (UAT −1 / −4).
+- **DONE:** ADR 0003 (DEC-024): keep qwen2.5:3b; revisit with a GPU of at least 8 GB VRAM; t = 0.81 rests on 18 answers.
+- **NEXT:** (iii) excerpt fallback and (iv) compound partial answers, coded flag-off on `feat/compound-partial`, measured next.
+
 ## Owner round 2026-11-14 (STOPPED for report before (iii), (iv))
 
 - **DONE:** PR #23 merged; DEC-023 (wording-only fixes may ship on); restatement check keeps another subject.

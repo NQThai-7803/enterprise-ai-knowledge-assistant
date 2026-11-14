@@ -196,3 +196,11 @@ Recorded on 2026-11-14 at the owner's instruction, after D2 (PR #23).
 - **The flag stays** so a later batch can run the old wording as its baseline.
 - First use: `RAG_RESTORE_SOURCE_DIACRITICS_ENABLED` and `RAG_DEDUPE_CLAIM_ANSWERS_ENABLED`.
 - Any change that can alter status, citations or which facts an answer states still follows the guard and DEC-013.
+
+## DEC-024 — Phase 2 model: keep qwen2.5:3b
+
+Recorded on 2026-11-14 at the owner's instruction. Full record: `adr/0003-phase-2-llm-model.md`.
+
+- qwen2.5:7b was measured against 3B on 6 dev sets, with gold context and with real retrieval, on CPU. It removes some false answers (5 of 6 sets with real retrieval, one more on relevance) but adds almost no correct answers, at 1.9-2.8x the latency and 11-13 GB peak RAM on a 16 GB runner.
+- **Keep qwen2.5:3b. Revisit when a GPU with at least 8 GB VRAM is available,** with the same 6 sets in one batch.
+- Limit recorded: the responsiveness threshold t = 0.81 was calibrated on 18 LLM-route UAT answers with 3B; a model change needs a new calibration.
