@@ -1,5 +1,9 @@
 # Project Status
 
+## Terminal blocks -- 2026-11-14
+
+- Making the responsiveness block final (a) stops the off-topic answer that a regeneration produced (RBD-03), but UAT still loses Q071 to the 0.81 threshold, so (a) does not win; making every content block final (b) loses 4 UAT questions. Both stay off. 3B stays the model (ADR 0003).
+
 ## Owner round -- 2026-11-14
 
 - **UAT by route:** of Q001-Q100, 75 are answered by server-built answers and 25 by the LLM path; reports now show both parts. The UAT total mostly measures the deterministic route.
