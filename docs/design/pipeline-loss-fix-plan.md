@@ -252,6 +252,50 @@ Mỗi bộ một job, `base` (3B) và `q7b` (`EVAL_LLM_MODEL=qwen2.5:7b`), 2 lư
 - Commit `2073002` ghi "oracle chỉ khớp 52/98 câu UAT": **sai**, tôi chưa kiểm khi viết. Kiểm lại: 104/104 lần truy hồi khớp. Thay đổi trong commit đó (khoá theo câu hỏi gốc) vô hại; phần còn lại của commit (giữ `PYTHONPATH` khi trace) là bản sửa thật.
 - `partial` không có số đo trên dev vì không câu ghép nào của dev hỏng một phần; trace held-out lần đầu chạy không có patch (thiếu `PYTHONPATH`). Số đo đúng ở mục dưới.
 
+### Chỗ nào sinh lại sau khi bị chặn (2026-11-14, `app/services/grounded_answer_service.py` ở commit `9b67c5c`)
+
+Viết trước khi code `resp_terminal` / `content_terminal`. "Chặn" là một check bác câu trả lời đã sinh. **Nội dung** = check nói câu trả lời sai hoặc không trả lời đúng điều được hỏi. **Định dạng** = output không đọc được hoặc trích dẫn sai cách (marker, JSON, rỗng). LLM tự từ chối (sentinel, câu kiểu "không có thông tin") **không phải** một lần chặn.
+
+**Các kiểu chặn trong `_draft_from_generation` (2256-2535):**
+
+| Dòng | Chặn | Kết quả hiện tại | Loại |
+|---|---|---|---|
+| 2267, 2326-2351 | LLM trả sentinel / câu từ chối | NO_ANSWER, `llm_refused` | không phải chặn |
+| 2322-2323 | JSON/marker không parse được (`ValueError`) | `CitationValidationFailed` | định dạng |
+| 2297-2298 | câu hỏi nhiều ý: một claim không SUPPORTED (ném `ValueError`) | `CitationValidationFailed` | **nội dung** |
+| 2324-2325 | sentinel nằm trong JSON | `CitationValidationFailed` | định dạng |
+| 2352-2353 | câu trả lời là placeholder | `CitationValidationFailed` | định dạng |
+| 2354-2367 | độ đáp ứng (M1a/M1b, FIX 4 (ii)) | NO_ANSWER, không `llm_refused` | **nội dung** |
+| 2376-2385, 2466-2477 | kiểm lại quyền của citation | NO_ANSWER | an ninh (giữ nguyên) |
+| 2386-2391, 2478-2481 | marker citation sai / không còn citation hợp lệ | `CitationValidationFailed` / `CitationMappingFailed` | định dạng |
+| 2394-2404 | thiếu đơn vị được hỏi (`answer_missing_requested_unit`) | `_ClaimValidationRepairRequired` | **nội dung** (độ đầy đủ) |
+| 2423-2501 | claim không SUPPORTED → chọn lại citation, cùng câu trả lời | không sinh lại | (không phải sinh lại) |
+| 2503-2508 | claim CONTRADICTED / INSUFFICIENT sau khi chọn lại | `_ClaimValidationRepairRequired` | **nội dung** |
+
+**Các chỗ sinh lại hoặc thay câu trả lời sau khi bị chặn (`_prepare_answer_draft`, 724-1296, và các hàm nó gọi):**
+
+| # | Dòng | Kích hoạt | Sinh lại bằng | Chặn kích hoạt thuộc loại |
+|---|---|---|---|---|
+| R1 | 924-970 | câu đầu NO_ANSWER và `_should_retry_no_answer` | `_no_answer_retry_messages`, rồi R6 | LLM từ chối; **độ đáp ứng** (đường của RBD-03); quyền |
+| R2 | 971-1085 | `_incomplete_answer_reason` của câu đầu | `_answer_quality_retry_messages` (984), rồi `_answer_quality_repair_messages` (1043), rồi R6 | **nội dung** (độ đầy đủ) |
+| R3 | 1087-1144 | `CitationValidationFailed` của câu đầu | `_structured_output_retry_messages` (1089), `_structured_output_repair_messages` (1111), rồi repair deterministic (1130) | định dạng **hoặc** nội dung (claim, đơn vị) |
+| R4 | 1145-1196 | câu thử lại của R3 là NO_ANSWER | `_no_answer_retry_messages`, rồi R6 | như R1 |
+| R5 | 1197-1245 | câu thử lại của R3 thiếu độ đầy đủ | `_answer_quality_retry_messages`, rồi R6 | **nội dung** |
+| R6 | 1619-1687 | trong mọi lần thử lại: NO_ANSWER hoặc `CitationValidationFailed` | repair deterministic (1643, 1670, 1680); `_answer_quality_repair_messages` (1651) | như trên |
+| R7 | 1298-1440 | câu hỏi ghép: claim hỏng (`_validated_structured_claims`, 1505-1593) | `build_failed_claim_repair_prompt` (1340), rồi repair deterministic từng claim (1388-1440) | định dạng (thiếu claim, parse hỏng, citation ngoài phạm vi) **hoặc** nội dung (claim không SUPPORTED 1591, thiếu độ đầy đủ 1569-1576) |
+
+Câu trả lời dựng sẵn (route deterministic, `provider="local"`) là ứng viên: nếu bị chặn thì đường LLM chạy tiếp như cũ. Chỉ một lần chặn trên câu **do LLM sinh ra** mới có thể là điểm dừng.
+
+**Hai biến thể (mỗi cái một flag, mặc định tắt):**
+- **(a) `RAG_RESPONSIVENESS_BLOCK_TERMINAL_ENABLED`:** chặn vì độ đáp ứng (2354-2367) trên câu LLM là điểm dừng: NO_ANSWER, không vào R1/R6.
+- **(b) `RAG_CONTENT_BLOCKS_TERMINAL_ENABLED`:** mọi chặn vì nội dung trên câu LLM là điểm dừng: độ đáp ứng; claim không SUPPORTED (2297-2298, 2503-2508); thiếu đơn vị (2394-2404); độ đầy đủ (R2 971, R5 1197); claim nội dung hỏng ở câu hỏi ghép (R7). Lỗi định dạng vẫn đi R3, R6, R7 như cũ.
+
+**Quy tắc chọn (viết trước khi đo; DEC-013, "nhầm giá trị" tính là trả lời sai):**
+- Cùng job, 2 lượt xen kẽ, 6 bộ (UAT tách route, RBAC, relevance, FR v1, FR v2, compound). Cấu hình: `base` (mặc định hiện tại); `resp` = (ii) t = 0,81 như PR #26, để so cơ chế; `respt` = `resp` + (a); `contt` = `resp` + (b).
+- Bắt buộc: 0 rò rỉ; UAT không hồi quy quá 1 câu, báo riêng phần LLM; trả lời sai (hai nhóm) không tăng ở bộ nào so với `base`.
+- Một cấu hình thắng khi không tệ hơn `base` ở bộ nào và tốt hơn ở ít nhất một bộ: so từng bộ, ít trả lời sai hơn trước, rồi nhiều câu đúng hơn. Hai cấu hình cùng thắng thì chọn cái không thua cái kia ở bộ nào; không có cái trội thì owner quyết định.
+- Báo riêng RBD-03, Q071, FR2-E01, FR2-E03 ở mỗi cấu hình, và số ca vào nhánh dừng (`terminal_block`).
+
 ## 4. NLU: thiết kế, chưa làm
 
 **Mục tiêu:** thay các rule viết theo cue bằng mô hình nhỏ, học được và đo được, nhưng không bỏ các bất biến an toàn (lọc quyền trước, citation chỉ từ chunk đã được phép, validator ở cuối).
