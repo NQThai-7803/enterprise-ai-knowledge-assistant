@@ -71,3 +71,11 @@ Trả lời sai (cả hai nhóm) theo bộ: UAT 0 → 0, RBAC 1 → 1, relevance
 - **DEC-013, "nhầm giá trị" tính là trả lời sai:** 0 rò rỉ; UAT không hồi quy quá 1 câu, phần LLM báo riêng; trả lời sai không tăng ở bộ nào; thắng khi không tệ hơn `base` ở bộ nào (ít trả lời sai hơn trước, rồi nhiều câu đúng hơn) và tốt hơn ở ít nhất một bộ.
 - Hai cấu hình cùng thắng: chọn cái không thua cái kia ở bộ nào; `respt_cpa` chỉ được bật cùng `respt`. Không cái nào thắng: mọi flag giữ tắt.
 - Báo riêng: Q071, RBD-03, CP1-R03, CP1-P01/P05/P06, FR2-E01/E03, và các bộ đếm `terminal_block`, `claim_unresponsive`, `excerpt_fallback`.
+
+### Kết quả hiệu chỉnh lại (Actions run `43607041349`, commit `06856ee`, ghi trước đợt đo)
+
+- UAT `base` 98-99/1/0/0-1 và `probe` 99/1/0/0, 2 lượt; route: 75 deterministic, 25 LLM. `probe` không đổi trạng thái hay citation câu nào so với `base`, trừ Q002 dao động ở `base` lượt 1.
+- **Q071 từ chối sai ở cả `base` lẫn `probe`, cả 2 lượt** (3 lần sinh mỗi lượt, mọi cosine 0,80). Ở các đợt trước nó đúng ở `base`. Code của commit này chỉ đổi hành vi khi bật cả (iv) và kiểm độ đáp ứng, nên đây là dao động giữa các job, ổn định trong một job; Q071 không vào S'.
+- **S' = 20 câu** (đi LLM, đúng ở cả 2 lượt, có cosine). Cosine nhỏ nhất trên mọi lần sinh của 2 lượt: 0,80 (Q018, có lần sinh trung gian); 0,81 (Q007, Q012); 0,82 (Q002, Q033, Q034); 0,84 (Q004, Q009, Q011, Q073); 0,85 (Q008, Q014, Q015, Q091); 0,86 (Q055, Q058, Q095); 0,87 (Q092); 0,89 (Q094); 0,90 (Q070). Q018 và Q073 có 2 lần sinh mỗi lượt; các câu khác 1.
+- 4 câu đi LLM, đúng, không có cosine (Q013, Q096, Q097, Q100): câu hỏi nhiều ý, check không chạm.
+- **t mới = 0,80.** Đợt đo dùng `EVAL_RESPONSIVENESS_MIN=0.80`.
