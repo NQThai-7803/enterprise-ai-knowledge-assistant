@@ -721,3 +721,48 @@ def test_attendance_deadline_excerpt_keeps_value_after_interleaved_table_label()
     )
     assert "lịch cố" in excerpt
     assert "định của bộ phận" in excerpt
+
+
+CHUNK = (
+    "Quy dinh bao tri may nen khi.\n"
+    "May nen khi duoc kiem tra moi 3 thang.\n"
+    "Truong ca ky bien ban sau khi kiem tra."
+)
+
+
+def test_excerpt_misses_question_when_no_content_word_of_the_question_is_in_it() -> None:
+    from app.chat.context_builder import excerpt_misses_question
+
+    question = "Ai ky bien ban kiem tra may nen khi?"
+    assert excerpt_misses_question("Quy dinh bao tri.", CHUNK, question=question)
+    assert not excerpt_misses_question(
+        "Truong ca ky bien ban sau khi kiem tra.", CHUNK, question=question
+    )
+    assert not excerpt_misses_question(CHUNK, CHUNK, question=question)  # already whole
+    needs = ("May nen khi kiem tra may thang?", "Ai ky bien ban?")
+    one_block = "Claim-focused evidence:\nCLAIM_1 evidence:\nMay nen khi duoc kiem tra moi 3 thang."
+    both = one_block + "\nCLAIM_2 evidence:\nTruong ca ky bien ban sau khi kiem tra."
+    assert excerpt_misses_question(one_block, CHUNK, question=question, information_needs=needs)
+    assert not excerpt_misses_question(both, CHUNK, question=question, information_needs=needs)
+
+
+@pytest.mark.parametrize("fallback", [False, True])
+def test_excerpt_fallback_gives_the_whole_chunk_only_with_the_flag(
+    fallback: bool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.chat import context_builder
+
+    monkeypatch.setattr(
+        context_builder, "query_focused_excerpt", lambda text, question, **_: "Quy dinh bao tri."
+    )
+    selected = select_context_for_prompt(
+        hits=(hit(0, CHUNK),),
+        history_messages=(),
+        question="Ai ky bien ban kiem tra may nen khi?",
+        system_prompt="system",
+        token_counter=FakeCounter(),
+        max_tokens=500,
+        excerpt_fallback=fallback,
+    )
+    expected = context_builder._collapse_whitespace(CHUNK) if fallback else "Quy dinh bao tri."
+    assert [item.text for item in selected.items] == [expected]

@@ -6,6 +6,11 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### FIX 4 (iii) on, (iv) off -- 2026-11-14
+
+- `RAG_EXCERPT_FALLBACK_ENABLED` (on): a source is given whole when its query-focused excerpt holds no content word of the question, or lacks the evidence block of one claim of a compound question. One fewer false answer on the compound set; the other 5 sets unchanged.
+- `RAG_COMPOUND_PARTIAL_ANSWER_ENABLED` (off): partial answers with "Chưa xác minh được từ tài liệu bạn được phép truy cập: …" recover 3 half-answerable questions but answer one question that must be refused (CP1-R03, a part the validator wrongly accepted), so it stays off.
+
 ### Terminal content blocks -- 2026-11-14 (measured, stay off)
 
 - `RAG_RESPONSIVENESS_BLOCK_TERMINAL_ENABLED` (a) and `RAG_CONTENT_BLOCKS_TERMINAL_ENABLED` (b): a block on an LLM answer ends at NO_ANSWER instead of a regeneration; format errors are still retried. Measured on 6 dev sets: (a) fixes RBD-03 and keeps the (ii) gains, but UAT still loses Q071; (b) loses 4 UAT questions. Both stay off.

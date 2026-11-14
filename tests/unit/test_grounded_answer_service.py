@@ -3826,6 +3826,7 @@ def test_reselection_is_counted_with_the_strong_support_flag_off() -> None:
         "route_deterministic": 0,
         "route_llm": 0,
         "terminal_block": 0,
+        "compound_partial_answer": 0,
     }
     GLOBAL_METRICS.reset()
 
@@ -3864,6 +3865,7 @@ def test_reselection_guard_is_not_counted_when_the_source_holds_the_answer() -> 
         "route_deterministic": 0,
         "route_llm": 0,
         "terminal_block": 0,
+        "compound_partial_answer": 0,
     }
     GLOBAL_METRICS.reset()
 
@@ -4365,3 +4367,86 @@ def test_compound_claim_rejected_for_its_content_is_final_with_content_terminal(
     # "5 minutes" contradicts the source: a content failure, so (b) does not repair it.
     assert result.grounding_status == status
     assert llm.calls == calls
+
+
+def _compound_partial_scenario(claims_json: str, *responses: str, **flags: Any) -> Any:
+    def generation(content: str) -> LLMGenerationResult:
+        return LLMGenerationResult(
+            content=content, model="fake", finish_reason="stop", prompt_tokens=1,
+            completion_tokens=1, response_time_ms=1,
+        )  # fmt: skip
+
+    async def scenario() -> tuple[Any, Any]:
+        second_hit = replace(
+            hit("Security timeout is 15 minutes."),
+            chunk_id=UUID("00000000-0000-0000-0000-000000000102"),
+            document_id=UUID("00000000-0000-0000-0000-000000000202"),
+        )
+        llm = SequentialFakeLLMProvider(*(generation(c) for c in (claims_json, *responses)))
+        service, _, _, _, resolved_llm, _, _ = make_service(
+            retrieval=FakeRetrievalService(
+                (retrieval_result(hit("Remote limit is 2 days.")), retrieval_result(second_hit))
+            ),
+            llm=llm,
+            citation_validation=FakeCitationValidationService(),
+            settings_obj=settings(**flags),
+        )
+        result = await service.answer_question(
+            current_user=user(),
+            session_id=chat_session().id,
+            question="What is the remote limit and how many minutes is security timeout?",
+        )
+        return result, resolved_llm
+
+    return asyncio.run(scenario())
+
+
+ONLY_CLAIM_1 = (
+    '{"claims":[{"claim_id":"CLAIM_1","answer":"Remote limit is 2 days.",'
+    '"citations":["SOURCE_1","SOURCE_2"]}]}'
+)
+
+
+def test_compound_partial_answer_states_the_validated_part_and_flags_the_other() -> None:
+    GLOBAL_METRICS.reset()
+    result, llm = _compound_partial_scenario(
+        ONLY_CLAIM_1, "__NO_ANSWER__", rag_compound_partial_answer_enabled=True
+    )
+    content = result.assistant_message.content
+    assert result.grounding_status == GroundingStatus.ANSWERED and llm.calls == 2
+    assert content.startswith("Remote limit is 2 days.")
+    assert "Chưa xác minh được từ tài liệu bạn được phép truy cập:" in content
+    assert "minutes" in content and "15" not in content  # nothing made up for the open part
+    assert GLOBAL_METRICS.answer_branch_counts()["compound_partial_answer"] == 1
+    GLOBAL_METRICS.reset()
+
+
+def test_compound_partial_answer_needs_one_validated_part() -> None:
+    nothing_valid = (
+        '{"claims":[{"claim_id":"CLAIM_1","answer":"Remote limit is 9 days.",'
+        '"citations":["SOURCE_1"]}]}'
+    )
+    result, _ = _compound_partial_scenario(
+        nothing_valid, "__NO_ANSWER__", rag_compound_partial_answer_enabled=True
+    )
+    assert result.grounding_status == GroundingStatus.NO_ANSWER
+
+
+def test_compound_partial_with_content_terminal_does_not_regenerate_a_content_failure() -> None:
+    contradicted = (
+        '{"claims":[{"claim_id":"CLAIM_1","answer":"Remote limit is 2 days.",'
+        '"citations":["SOURCE_1","SOURCE_2"]},{"claim_id":"CLAIM_2",'
+        '"answer":"Security timeout is 5 minutes.","citations":["SOURCE_1","SOURCE_2"]}]}'
+    )
+    result, llm = _compound_partial_scenario(
+        contradicted,
+        '{"claims":[{"claim_id":"CLAIM_2","answer":"Security timeout is 15 minutes.",'
+        '"citations":["SOURCE_2"]}]}',
+        rag_compound_partial_answer_enabled=True,
+        rag_content_blocks_terminal_enabled=True,
+    )
+    # CLAIM_2 contradicts its source: not repaired, reported as unverified.
+    assert llm.calls == 1
+    assert result.grounding_status == GroundingStatus.ANSWERED
+    assert "5 minutes" not in result.assistant_message.content
+    assert "Chưa xác minh được" in result.assistant_message.content
