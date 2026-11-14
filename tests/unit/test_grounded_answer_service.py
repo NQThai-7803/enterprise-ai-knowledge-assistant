@@ -4190,3 +4190,39 @@ def test_every_persisted_answer_counts_its_route(monkeypatch: pytest.MonkeyPatch
     assert built.grounding_status == GroundingStatus.ANSWERED and llm.calls == 0
     assert (counts["route_deterministic"], counts["route_llm"]) == (1, 0)
     GLOBAL_METRICS.reset()
+
+
+@pytest.mark.parametrize(
+    ("llm_route", "flags", "addresses"),
+    [
+        (True, {"rag_responsiveness_check_enabled": True}, False),  # 0.6 < 0.7: blocked
+        (False, {"rag_responsiveness_check_enabled": True}, True),  # server-built: not checked
+        (True, {}, True),  # flag off
+        # M1b at 0.0 only measures: the cosine is counted, nothing is blocked.
+        (True, {"rag_question_evidence_similarity_enabled": True,
+                "rag_question_evidence_min_similarity": 0.0}, True),
+    ],
+)  # fmt: skip
+def test_responsiveness_check_applies_to_llm_answers_with_its_own_threshold(
+    llm_route: bool, flags: dict[str, Any], addresses: bool
+) -> None:
+    GLOBAL_METRICS.reset()
+    service, _, _, retrieval, _, _, _ = make_service(
+        settings_obj=settings(rag_responsiveness_min_similarity=0.7, **flags)
+    )
+    retrieval.semantic_retrieval_service = SimpleNamespace(
+        embedding_provider=_FixedEmbeddings((1.0, 0.0), (0.6, 0.8))
+    )
+    result = asyncio.run(
+        service._answer_addresses_question(
+            question=UNIFORM_QUESTION,
+            answer=UNIFORM_ANSWER,
+            source_registry=_registry("Quy định kho. Nhân viên kho phải đội mũ bảo hộ."),
+            cited_source_labels=("SOURCE_1",),
+            llm_route=llm_route,
+        )
+    )
+    assert result is addresses
+    computed = flags and (llm_route or "rag_question_evidence_similarity_enabled" in flags)
+    assert GLOBAL_METRICS.question_evidence_similarity_counts() == ({"0.60": 1} if computed else {})
+    GLOBAL_METRICS.reset()

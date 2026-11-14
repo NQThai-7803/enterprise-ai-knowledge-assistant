@@ -233,6 +233,8 @@ RAG_REFUSAL_PHRASES_EXTENDED_ENABLED=false
 RAG_QUESTION_HEAD_IN_EVIDENCE_ENABLED=false
 RAG_QUESTION_EVIDENCE_SIMILARITY_ENABLED=false
 RAG_QUESTION_EVIDENCE_MIN_SIMILARITY=0.85
+RAG_RESPONSIVENESS_CHECK_ENABLED=false
+RAG_RESPONSIVENESS_MIN_SIMILARITY=0.0
 RAG_NUMBER_NORMALIZATION_ENABLED=false
 RAG_COMPLETENESS_NUMBER_NORMALIZATION_ENABLED=true
 RAG_KEEP_VALIDATED_FIRST_ANSWER_ENABLED=false
@@ -271,6 +273,7 @@ Retrieval variable rules:
 - `RAG_REFUSAL_PHRASES_EXTENDED_ENABLED` (boolean, default `false`, stays off after its DEC-013 batch; FIX 3a M2): with `RAG_PARTIAL_REFUSAL_NO_ANSWER_ENABLED`, a refusal sentence is also recognised by grammar-built phrases (`không`/`chưa` + optional `được` + a verb of stating such as `nêu`, `đề cập`, `quy định`, `cụ thể hóa`; `không có thông tin`), in accented, generated unaccented and English forms (`not specified`, `does not mention`).
 - `RAG_QUESTION_HEAD_IN_EVIDENCE_ENABLED` (boolean, default `false`, stays off: 47 UAT regressions; FIX 3a M1a): on a question with one information need, the most specific words of the phrase the question word attaches to (diacritics kept, classifiers dropped) must occur in the cited evidence; otherwise the answer becomes NO_ANSWER.
 - `RAG_QUESTION_EVIDENCE_SIMILARITY_ENABLED` (boolean, default `false`, stays off: 43 UAT regressions; FIX 3a M1b) and `RAG_QUESTION_EVIDENCE_MIN_SIMILARITY` (float 0-1, default `0.85`, calibrated in `docs/eval/runs/fix3a-false-answers.md`): the e5 cosine between the question and the evidence sentence the answer rests on must reach the threshold; otherwise NO_ANSWER. Adds one query and one passage embedding per checked answer.
+- `RAG_RESPONSIVENESS_CHECK_ENABLED` (boolean, default `false`) and `RAG_RESPONSIVENESS_MIN_SIMILARITY` (float 0-1, default `0.0`; FIX 4 (ii)): the M1b check (e5 cosine between the question and the evidence sentence the answer rests on) applied to answers from the LLM path only, with its own threshold, calibrated on the LLM-route part of UAT (`docs/eval/runs/fix4-responsiveness.md`). Server-built answers are not checked. Every computed cosine, from either flag, is counted per 0.01 bucket as `enterprise_ai_rag_question_evidence_similarity_total` on `GET /metrics`; the UAT runner records it per case as `evidence_similarity`. M1b with `RAG_QUESTION_EVIDENCE_MIN_SIMILARITY=0.0` therefore measures without blocking.
 - `RAG_NUMBER_NORMALIZATION_ENABLED` (boolean, default `false`, stays off: 0 cases changed in its DEC-013 batch; FIX 3c F): the validator compares numbers once each is written one way: leading zeros dropped (`01` = `1`), thousands separators removed (`1.200.000` = `1200000`), a decimal comma read as a point, scale words applied (`1,2 triệu` = `1.200.000`, `300 nghìn`, `tỷ`, `million`), and `đ`/`đồng`/`VND`/`₫` treated as one unit. A period after the unit (`/năm`, `mỗi năm`) is not compared.
 - FIX 4 (i), the retry forced by the completeness checks (all boolean; measured in one batch per set, `docs/eval/runs/fix4-completeness.md`):
   - `RAG_COMPLETENESS_NUMBER_NORMALIZATION_ENABLED` (default `true` since the c1+c3 batch of 2026-11-14: with the retry flag on, it fixes FR2-E01 and changes nothing else): in the numeric-unit check a thousands-grouped number (`2.500 kg`) is one number when the sources hold that value, not `2` and `500`.

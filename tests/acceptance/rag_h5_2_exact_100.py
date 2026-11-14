@@ -135,6 +135,14 @@ def answer_route(before: dict[str, int] | None, after: dict[str, int] | None) ->
     return None
 
 
+def _record_counters(
+    result: dict[str, Any], before: dict[str, int] | None, after: dict[str, int] | None
+) -> None:
+    result["answer_route"] = answer_route(before, after)
+    # FIX 4 (ii) calibration: the question/evidence cosine the check computed, if one.
+    result["evidence_similarity"] = branch_counters.similarity(branch_counters.delta(before, after))
+
+
 def _is_final(case: dict[str, Any]) -> bool:
     """A checkpointed case that --resume keeps: anything but an INFRA_ERROR not yet retried."""
     return case.get("execution_status") != INFRA_ERROR or int(case.get("attempts", 1)) > 1
@@ -191,7 +199,7 @@ def run(
                 time.sleep(delay_seconds)
             before = route_reader()
             result = _ask_case(client, case_id, category, question, attempts=1)
-            result["answer_route"] = answer_route(before, route_reader())
+            _record_counters(result, before, route_reader())
             results.append(result)
             checkpoint(results, "IN_PROGRESS")
             print(
@@ -208,7 +216,7 @@ def run(
                 time.sleep(delay_seconds)
             before = route_reader()
             retry = _ask_case(client, case["id"], case["category"], case["question"], attempts=2)
-            retry["answer_route"] = answer_route(before, route_reader())
+            _record_counters(retry, before, route_reader())
             retry["first_attempt_failure_class"] = case.get("failure_class")
             results[position] = retry
             checkpoint(results, "IN_PROGRESS")

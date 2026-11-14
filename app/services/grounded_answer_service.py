@@ -2203,14 +2203,14 @@ class GroundedAnswerService:
         answer: str,
         source_registry: PromptSourceRegistry,
         cited_source_labels: tuple[str, ...],
+        llm_route: bool = True,
     ) -> bool:
-        """FIX 3a M1: False when a cited, supported answer does not address what was asked."""
+        """FIX 3a M1 / FIX 4 (ii): False when a supported answer does not address the question."""
         settings = self.settings
+        responsiveness = settings.rag_responsiveness_check_enabled and llm_route
+        similarity_check = settings.rag_question_evidence_similarity_enabled or responsiveness
         if (
-            not (
-                settings.rag_question_head_in_evidence_enabled
-                or settings.rag_question_evidence_similarity_enabled
-            )
+            not (settings.rag_question_head_in_evidence_enabled or similarity_check)
             or len(information_need_queries(question)) > 1
         ):
             return True
@@ -2226,7 +2226,7 @@ class GroundedAnswerService:
             if settings.rag_diagnostics_enabled:
                 _log_no_answer_diagnostics(reason="question_head_missing_from_evidence")
             return False
-        if not settings.rag_question_evidence_similarity_enabled:
+        if not similarity_check:
             return True
         sentence = supporting_sentence(answer=answer, evidence=evidence)
         provider = getattr(
@@ -2239,7 +2239,14 @@ class GroundedAnswerService:
         query = await anyio.to_thread.run_sync(provider.embed_query, question)
         passage = await anyio.to_thread.run_sync(provider.embed_passages, [sentence])
         similarity = _cosine(query.values, passage.vectors[0].values)
-        if similarity >= settings.rag_question_evidence_min_similarity:
+        GLOBAL_METRICS.record_question_evidence_similarity(similarity)
+        threshold = max(
+            settings.rag_question_evidence_min_similarity
+            if settings.rag_question_evidence_similarity_enabled
+            else 0.0,
+            settings.rag_responsiveness_min_similarity if responsiveness else 0.0,
+        )
+        if similarity >= threshold:
             return True
         GLOBAL_METRICS.record_answer_branch(BRANCH_QUESTION_EVIDENCE_DISSIMILAR)
         if settings.rag_diagnostics_enabled:
@@ -2349,6 +2356,7 @@ class GroundedAnswerService:
             answer=grounded_output.answer,
             source_registry=source_registry,
             cited_source_labels=tuple(grounded_output.citations),
+            llm_route=generation.provider != "local",
         ):
             return _no_answer_draft(
                 self.settings.chat_no_answer_message,

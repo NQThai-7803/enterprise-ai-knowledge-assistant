@@ -1,5 +1,12 @@
 # Project Status
 
+## Owner round -- 2026-11-14
+
+- **UAT by route:** of Q001-Q100, 75 are answered by server-built answers and 25 by the LLM path; reports now show both parts. The UAT total mostly measures the deterministic route.
+- **Completeness:** grouped numbers now count as one number (fixes FR2-E01); with the retry flag, both FIX 4 (i) flags that won are on.
+- **7B with real retrieval:** fewer false answers on 5 of 6 sets (relevance +1), almost no more correct answers, 1.9-2.8x latency, 11-13 GB RAM. Not adopted.
+- **FIX 4 (ii):** the responsiveness check (threshold 0.81 from the LLM part of UAT) cuts false answers on relevance (5 to 3) and FR v2 (5 to 4) but costs one correct answer on UAT and on RBAC, and its blocked answers can be replaced by a retry (RBD-03). Stays off.
+
 ## FIX 4 (i) -- 2026-11-13
 
 - **Completeness retry:** a retry may no longer replace a validated first answer with other values from other chunks (`RAG_RETRY_MUST_KEEP_VALIDATED_VALUES_ENABLED`, on). Batch on 6 dev sets: FR v2 one wrong answer fixed, every other set identical, 0 leaks. Keeping a form-rejected first answer would add a false answer (FR-A10) and stays off.

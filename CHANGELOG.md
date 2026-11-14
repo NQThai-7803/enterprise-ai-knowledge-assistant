@@ -6,6 +6,11 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### FIX 4 (ii) responsiveness check -- 2026-11-14 (measured, stays off)
+
+- `RAG_RESPONSIVENESS_CHECK_ENABLED` / `RAG_RESPONSIVENESS_MIN_SIMILARITY`: the e5 question/evidence check on LLM answers only, threshold 0.81 calibrated on the LLM-route part of UAT. Measured on 6 dev sets: relevance false answers 5 to 3 and FR v2 5 to 4, but UAT and RBAC each lose one correct answer, so it stays off (DEC-013). `enterprise_ai_rag_question_evidence_similarity_total` counts every computed cosine; the UAT runner records it per case.
+- `docs/design/pipeline-loss-fix-plan.md`: qwen2.5:7b with real retrieval (measured, default model unchanged).
+
 ### Completeness: grouped numbers on -- 2026-11-14
 
 - `RAG_COMPLETENESS_NUMBER_NORMALIZATION_ENABLED` is on by default: in the batch with the retry flag already on (c1 + c3, 6 dev sets) it fixes FR2-E01 and changes nothing else, 0 leaks.

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import re
 from collections import defaultdict
 from collections.abc import Mapping
@@ -68,6 +69,7 @@ class MetricsRegistry:
         self._http_latency_sum: defaultdict[HTTPMetricKey, float] = defaultdict(float)
         self._http_latency_max: defaultdict[HTTPMetricKey, float] = defaultdict(float)
         self._answer_branch_counts: defaultdict[str, int] = defaultdict(int)
+        self._similarity_counts: defaultdict[str, int] = defaultdict(int)
 
     def record_http_request(
         self,
@@ -91,6 +93,16 @@ class MetricsRegistry:
     def record_answer_branch(self, branch: str) -> None:
         with self._lock:
             self._answer_branch_counts[branch] += 1
+
+    def record_question_evidence_similarity(self, similarity: float) -> None:
+        """Count one computed question/evidence cosine in its 0.01 bucket (floored)."""
+        bucket = f"{math.floor(min(max(similarity, 0.0), 1.0) * 100) / 100:.2f}"
+        with self._lock:
+            self._similarity_counts[bucket] += 1
+
+    def question_evidence_similarity_counts(self) -> dict[str, int]:
+        with self._lock:
+            return dict(sorted(self._similarity_counts.items()))
 
     def answer_branch_counts(self) -> dict[str, int]:
         """Every known branch, at 0 when unused, so a missing line means an older stack."""
@@ -120,6 +132,7 @@ class MetricsRegistry:
             self._http_latency_sum.clear()
             self._http_latency_max.clear()
             self._answer_branch_counts.clear()
+            self._similarity_counts.clear()
 
 
 GLOBAL_METRICS = MetricsRegistry()
