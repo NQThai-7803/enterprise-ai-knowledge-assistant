@@ -4,6 +4,6 @@
  "sha256": "e5bd889b9fe87a8cd8456c613718a5baa0dfd08eb05b5ccd0fb690dca300b135",
  "frozen_at": "2026-11-13",
  "items": 12,
- "approved_by": "requested by the owner 2026-11-12 (DEC-021); content pending owner review",
+ "approved_by": "requested by the owner 2026-11-12 (DEC-021); accepted by the owner 2026-11-14 as a dev set (no gold review, unlike held-out)",
  "rule": "any edit needs v1.1 with a new lock"
 }

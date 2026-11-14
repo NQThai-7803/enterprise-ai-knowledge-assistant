@@ -3827,6 +3827,8 @@ def test_reselection_is_counted_with_the_strong_support_flag_off() -> None:
         "route_llm": 0,
         "terminal_block": 0,
         "compound_partial_answer": 0,
+        "excerpt_fallback": 0,
+        "claim_unresponsive": 0,
     }
     GLOBAL_METRICS.reset()
 
@@ -3866,6 +3868,8 @@ def test_reselection_guard_is_not_counted_when_the_source_holds_the_answer() -> 
         "route_llm": 0,
         "terminal_block": 0,
         "compound_partial_answer": 0,
+        "excerpt_fallback": 0,
+        "claim_unresponsive": 0,
     }
     GLOBAL_METRICS.reset()
 
@@ -4001,7 +4005,11 @@ def test_answer_without_the_asked_phrase_in_its_evidence_becomes_no_answer() -> 
 
     async def scenario() -> Any:
         service, _, _, _, _, _, _ = make_service(
-            settings_obj=settings(rag_question_head_in_evidence_enabled=True)
+            # M1a on its own: the responsiveness stop (on by default) would raise instead.
+            settings_obj=settings(
+                rag_question_head_in_evidence_enabled=True,
+                rag_responsiveness_block_terminal_enabled=False,
+            )
         )
         return await service._draft_from_generation(
             _fake_generation(
@@ -4201,9 +4209,10 @@ def test_every_persisted_answer_counts_its_route(monkeypatch: pytest.MonkeyPatch
     [
         (True, {"rag_responsiveness_check_enabled": True}, False),  # 0.6 < 0.7: blocked
         (False, {"rag_responsiveness_check_enabled": True}, True),  # server-built: not checked
-        (True, {}, True),  # flag off
+        (True, {"rag_responsiveness_check_enabled": False}, True),  # flag off
         # M1b at 0.0 only measures: the cosine is counted, nothing is blocked.
-        (True, {"rag_question_evidence_similarity_enabled": True,
+        (True, {"rag_responsiveness_check_enabled": False,
+                "rag_question_evidence_similarity_enabled": True,
                 "rag_question_evidence_min_similarity": 0.0}, True),
     ],
 )  # fmt: skip
@@ -4227,8 +4236,11 @@ def test_responsiveness_check_applies_to_llm_answers_with_its_own_threshold(
         )
     )
     assert result is addresses
-    computed = flags and (llm_route or "rag_question_evidence_similarity_enabled" in flags)
-    assert GLOBAL_METRICS.question_evidence_similarity_counts() == ({"0.60": 1} if computed else {})
+    computed = (flags.get("rag_responsiveness_check_enabled") and llm_route) or flags.get(
+        "rag_question_evidence_similarity_enabled"
+    )
+    expected = {("llm" if llm_route else "local", "0.60"): 1} if computed else {}
+    assert GLOBAL_METRICS.question_evidence_similarity_counts() == expected
     GLOBAL_METRICS.reset()
 
 
@@ -4264,7 +4276,8 @@ RESPONSIVENESS = {
     ("first", "low_similarity", "flags", "status", "calls", "terminal"),
     [
         # Responsiveness block: regenerated without a flag, final with (a) or (b).
-        (HOIST_ANSWER, True, RESPONSIVENESS, GroundingStatus.NO_ANSWER, 2, 0),
+        (HOIST_ANSWER, True, {**RESPONSIVENESS, "rag_responsiveness_block_terminal_enabled": False},
+         GroundingStatus.NO_ANSWER, 2, 0),
         (HOIST_ANSWER, True, {**RESPONSIVENESS, "rag_responsiveness_block_terminal_enabled": True},
          GroundingStatus.NO_ANSWER, 1, 1),
         (HOIST_ANSWER, True, {**RESPONSIVENESS, "rag_content_blocks_terminal_enabled": True},
@@ -4369,7 +4382,9 @@ def test_compound_claim_rejected_for_its_content_is_final_with_content_terminal(
     assert llm.calls == calls
 
 
-def _compound_partial_scenario(claims_json: str, *responses: str, **flags: Any) -> Any:
+def _compound_partial_scenario(
+    claims_json: str, *responses: str, embeddings: Any = None, **flags: Any
+) -> Any:
     def generation(content: str) -> LLMGenerationResult:
         return LLMGenerationResult(
             content=content, model="fake", finish_reason="stop", prompt_tokens=1,
@@ -4383,7 +4398,7 @@ def _compound_partial_scenario(claims_json: str, *responses: str, **flags: Any) 
             document_id=UUID("00000000-0000-0000-0000-000000000202"),
         )
         llm = SequentialFakeLLMProvider(*(generation(c) for c in (claims_json, *responses)))
-        service, _, _, _, resolved_llm, _, _ = make_service(
+        service, _, _, retrieval, resolved_llm, _, _ = make_service(
             retrieval=FakeRetrievalService(
                 (retrieval_result(hit("Remote limit is 2 days.")), retrieval_result(second_hit))
             ),
@@ -4391,6 +4406,8 @@ def _compound_partial_scenario(claims_json: str, *responses: str, **flags: Any) 
             citation_validation=FakeCitationValidationService(),
             settings_obj=settings(**flags),
         )
+        if embeddings is not None:
+            retrieval.semantic_retrieval_service = SimpleNamespace(embedding_provider=embeddings)
         result = await service.answer_question(
             current_user=user(),
             session_id=chat_session().id,
@@ -4450,3 +4467,65 @@ def test_compound_partial_with_content_terminal_does_not_regenerate_a_content_fa
     assert result.grounding_status == GroundingStatus.ANSWERED
     assert "5 minutes" not in result.assistant_message.content
     assert "Chưa xác minh được" in result.assistant_message.content
+
+
+class _RemoteOnlyEmbeddings:
+    """Cosine 1.0 for evidence about the remote limit, 0.6 for any other sentence."""
+
+    def embed_query(self, text: str) -> Any:
+        return SimpleNamespace(values=(1.0, 0.0))
+
+    def embed_passages(self, texts: Any) -> Any:
+        vector = (1.0, 0.0) if "Remote" in texts[0] else (0.6, 0.8)
+        return SimpleNamespace(vectors=[SimpleNamespace(values=vector)])
+
+
+BOTH_CLAIMS_VALID = (
+    '{"claims":[{"claim_id":"CLAIM_1","answer":"Remote limit is 2 days.",'
+    '"citations":["SOURCE_1","SOURCE_2"]},{"claim_id":"CLAIM_2",'
+    '"answer":"Security timeout is 15 minutes.","citations":["SOURCE_1","SOURCE_2"]}]}'
+)
+PER_CLAIM = {
+    "rag_compound_partial_answer_enabled": True,
+    "rag_responsiveness_check_enabled": True,
+    "rag_responsiveness_min_similarity": 0.7,
+}
+
+
+def test_each_kept_claim_must_address_its_own_part() -> None:
+    GLOBAL_METRICS.reset()
+    result, llm = _compound_partial_scenario(
+        BOTH_CLAIMS_VALID, embeddings=_RemoteOnlyEmbeddings(), **PER_CLAIM
+    )
+    content = result.assistant_message.content
+    # CLAIM_2 passed the validator but its evidence is too far from its part (0.6 < 0.7).
+    assert result.grounding_status == GroundingStatus.ANSWERED and llm.calls == 1
+    assert content.startswith("Remote limit is 2 days.")
+    assert "15 minutes" not in content and "Chưa xác minh được" in content
+    assert GLOBAL_METRICS.answer_branch_counts()["claim_unresponsive"] == 1
+    GLOBAL_METRICS.reset()
+
+
+def test_no_responsive_claim_ends_at_no_answer_without_a_retry() -> None:
+    GLOBAL_METRICS.reset()
+    result, llm = _compound_partial_scenario(
+        BOTH_CLAIMS_VALID,
+        BOTH_CLAIMS_VALID,
+        embeddings=_FixedEmbeddings((1.0, 0.0), (0.6, 0.8)),
+        **PER_CLAIM,
+    )
+    counts = GLOBAL_METRICS.answer_branch_counts()
+    assert result.grounding_status == GroundingStatus.NO_ANSWER and llm.calls == 1
+    assert (counts["claim_unresponsive"], counts["terminal_block"]) == (2, 1)
+    GLOBAL_METRICS.reset()
+
+
+def test_claims_are_not_checked_one_by_one_without_partial_answers() -> None:
+    result, _ = _compound_partial_scenario(
+        BOTH_CLAIMS_VALID,
+        embeddings=_FixedEmbeddings((1.0, 0.0), (0.6, 0.8)),
+        rag_responsiveness_check_enabled=True,
+        rag_responsiveness_min_similarity=0.7,
+    )
+    assert result.grounding_status == GroundingStatus.ANSWERED
+    assert "15 minutes" in result.assistant_message.content

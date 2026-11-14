@@ -56,7 +56,13 @@ def test_prometheus_sample_uses_safe_metric_format() -> None:
 def test_similarity_is_counted_in_its_floored_bucket() -> None:
     registry = MetricsRegistry()
     for value in (0.839, 0.83, 1.2, -0.1):
-        registry.record_question_evidence_similarity(value)
-    assert registry.question_evidence_similarity_counts() == {"0.00": 1, "0.83": 2, "1.00": 1}
+        registry.record_question_evidence_similarity(value, llm_route=True)
+    registry.record_question_evidence_similarity(0.5, llm_route=False)
+    assert registry.question_evidence_similarity_counts() == {
+        ("llm", "0.00"): 1,
+        ("llm", "0.83"): 2,
+        ("llm", "1.00"): 1,
+        ("local", "0.50"): 1,
+    }
     registry.reset()
     assert registry.question_evidence_similarity_counts() == {}

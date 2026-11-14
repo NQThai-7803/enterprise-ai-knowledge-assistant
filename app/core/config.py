@@ -155,12 +155,13 @@ class Settings(BaseSettings):
     rag_question_evidence_min_similarity: float = Field(default=0.85, ge=0.0, le=1.0)
     # FIX 4 (ii): the same e5 check, on answers from the LLM path only, with a threshold
     # calibrated on the LLM-route part of UAT (docs/eval/runs/fix4-responsiveness.md).
-    rag_responsiveness_check_enabled: bool = False
-    rag_responsiveness_min_similarity: float = Field(default=0.0, ge=0.0, le=1.0)
+    # On since the phase 1 final batch (2026-11-15): t = 0.80 from every LLM draft of UAT.
+    rag_responsiveness_check_enabled: bool = True
+    rag_responsiveness_min_similarity: float = Field(default=0.80, ge=0.0, le=1.0)
     # A block on an LLM answer ends at NO_ANSWER instead of a regeneration:
     # (a) only the responsiveness block; (b) every content block (responsiveness, claim not
     # SUPPORTED, missing unit, completeness). Format errors are still retried.
-    rag_responsiveness_block_terminal_enabled: bool = False
+    rag_responsiveness_block_terminal_enabled: bool = True
     rag_content_blocks_terminal_enabled: bool = False
     # FIX 4 (iii): a source whose query-focused excerpt holds no content word of the question
     # (or no evidence block for one claim of a compound question) is given whole.

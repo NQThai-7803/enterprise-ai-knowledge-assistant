@@ -12,9 +12,12 @@ from urllib.error import URLError
 from urllib.request import urlopen
 
 _SAMPLE = re.compile(r'^enterprise_ai_rag_answer_branch_total\{branch="([^"]+)"\} (\d+)$', re.M)
-# Question/evidence cosines, one counter per 0.01 bucket, read as "similarity_<bucket>".
+# Question/evidence cosines, one counter per route and 0.01 bucket,
+# read as "similarity_<route>_<bucket>" (route: llm or local).
 _SIMILARITY = re.compile(
-    r'^enterprise_ai_rag_question_evidence_similarity_total\{bucket="([^"]+)"\} (\d+)$', re.M
+    r"^enterprise_ai_rag_question_evidence_similarity_total"
+    r'\{bucket="([^"]+)",route="([^"]+)"\} (\d+)$',
+    re.M,
 )
 
 
@@ -22,16 +25,24 @@ def parse(text: str) -> dict[str, int] | None:
     counts = {branch: int(value) for branch, value in _SAMPLE.findall(text)}
     if not counts:
         return None
-    counts.update({f"similarity_{b}": int(value) for b, value in _SIMILARITY.findall(text)})
+    counts.update(
+        {f"similarity_{route}_{b}": int(value) for b, route, value in _SIMILARITY.findall(text)}
+    )
     return counts
 
 
-def similarity(delta: Mapping[str, int] | None) -> float | None:
-    """The bucket of the one cosine computed in a delta; None when none or several."""
-    moved = [key for key, value in (delta or {}).items() if key.startswith("similarity_") and value]
-    if len(moved) != 1 or delta[moved[0]] != 1:
+def similarities(delta: Mapping[str, int] | None, route: str = "llm") -> list[float] | None:
+    """Every cosine one route computed in a delta, lowest first, with repeats; None when the
+    delta is unknown."""
+    if delta is None:
         return None
-    return float(moved[0].removeprefix("similarity_"))
+    prefix = f"similarity_{route}_"
+    return sorted(
+        float(key.removeprefix(prefix))
+        for key, count in delta.items()
+        if key.startswith(prefix)
+        for _ in range(count)
+    )
 
 
 def read(base_url: str, timeout: float = 30.0) -> dict[str, int] | None:

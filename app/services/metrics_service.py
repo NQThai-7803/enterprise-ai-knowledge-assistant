@@ -143,9 +143,9 @@ class PrometheusMetricsService:
                     prometheus_sample(
                         "enterprise_ai_rag_question_evidence_similarity_total",
                         count,
-                        {"bucket": bucket},
+                        {"bucket": bucket, "route": route},
                     )
-                    for bucket, count in (
+                    for (route, bucket), count in (
                         self.registry.question_evidence_similarity_counts().items()
                     )
                 ),

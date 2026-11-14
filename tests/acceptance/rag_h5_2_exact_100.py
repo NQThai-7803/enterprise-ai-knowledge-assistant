@@ -139,8 +139,11 @@ def _record_counters(
     result: dict[str, Any], before: dict[str, int] | None, after: dict[str, int] | None
 ) -> None:
     result["answer_route"] = answer_route(before, after)
-    # FIX 4 (ii) calibration: the question/evidence cosine the check computed, if one.
-    result["evidence_similarity"] = branch_counters.similarity(branch_counters.delta(before, after))
+    # FIX 4 (ii) calibration: every question/evidence cosine the check computed on an LLM
+    # draft of this question, intermediate drafts included.
+    result["evidence_similarities"] = branch_counters.similarities(
+        branch_counters.delta(before, after)
+    )
 
 
 def _is_final(case: dict[str, Any]) -> bool:

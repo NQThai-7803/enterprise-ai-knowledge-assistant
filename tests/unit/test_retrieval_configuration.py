@@ -192,6 +192,11 @@ def test_default_llm_and_chat_answer_settings() -> None:
     # FIX 4 (iii) on, (iv) off after their batch.
     assert settings.rag_excerpt_fallback_enabled is True
     assert settings.rag_compound_partial_answer_enabled is False
+    # FIX 4 (ii) with its terminal stop, from the phase 1 final batch.
+    assert settings.rag_responsiveness_check_enabled is True
+    assert settings.rag_responsiveness_min_similarity == 0.80
+    assert settings.rag_responsiveness_block_terminal_enabled is True
+    assert settings.rag_content_blocks_terminal_enabled is False
     assert settings.rag_keep_validated_first_answer_enabled is False
     assert settings.rag_completeness_number_normalization_enabled is True
     # Users read this sentence: it is written with full Vietnamese diacritics.

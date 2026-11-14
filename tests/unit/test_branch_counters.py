@@ -29,14 +29,19 @@ def test_delta_is_not_measured_when_a_side_is_missing_or_the_counter_fell() -> N
     assert branch_counters.delta({"a": 5}, {"a": 1}) is None
 
 
-def test_similarity_buckets_are_read_and_one_moved_bucket_is_the_case_value() -> None:
-    text = (
-        'enterprise_ai_rag_answer_branch_total{branch="route_llm"} 3\n'
-        'enterprise_ai_rag_question_evidence_similarity_total{bucket="0.83"} 2\n'
-        'enterprise_ai_rag_question_evidence_similarity_total{bucket="0.91"} 1\n'
+def test_similarity_buckets_are_read_per_route_with_every_cosine_of_a_case() -> None:
+    text = "\n".join(
+        (
+            'enterprise_ai_rag_answer_branch_total{branch="route_llm"} 3',
+            'enterprise_ai_rag_question_evidence_similarity_total{bucket="0.83",route="llm"} 2',
+            'enterprise_ai_rag_question_evidence_similarity_total{bucket="0.91",route="local"} 1',
+        )
     )
     before = branch_counters.parse(text)
-    assert before == {"route_llm": 3, "similarity_0.83": 2, "similarity_0.91": 1}
-    after = dict(before, route_llm=4, **{"similarity_0.83": 3})
-    assert branch_counters.similarity(branch_counters.delta(before, after)) == 0.83
-    assert branch_counters.similarity(branch_counters.delta(before, before)) is None
+    assert before == {"route_llm": 3, "similarity_llm_0.83": 2, "similarity_local_0.91": 1}
+    after = dict(before, **{"similarity_llm_0.83": 4, "similarity_llm_0.79": 1})
+    delta = branch_counters.delta(before, after)
+    # An intermediate draft at 0.79 and two at 0.83; the server-built 0.91 is not an LLM draft.
+    assert branch_counters.similarities(delta) == [0.79, 0.83, 0.83]
+    assert branch_counters.similarities(branch_counters.delta(before, before)) == []
+    assert branch_counters.similarities(None) is None

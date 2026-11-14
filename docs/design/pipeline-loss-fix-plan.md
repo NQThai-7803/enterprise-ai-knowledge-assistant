@@ -392,3 +392,70 @@ Mỗi bộ một job, 4 cấu hình, 2 lượt; hai lượt giống hệt nhau �
 4. Cross-encoder: chưa dùng; tài liệu ghi rõ reranker hiện không ảnh hưởng kết quả.
 5. Fine-tune embedding: không làm trước held-out v2; PR #14 giữ mở.
 6. Soạn bộ dev câu ghép "nửa trả lời được" trước khi code C.
+
+## 7. Đóng giai đoạn 1 (2026-11-15)
+
+### Flag RAG lúc đóng giai đoạn (mặc định)
+
+| Flag | Mặc định | Từ bước | Số đo quyết định |
+|---|---|---|---|
+| `RAG_SEMANTIC_EXACT_PERMITTED_KNN_ENABLED` | bật | PROMPT 3f | retrieval chính xác trên tập được phép |
+| `RAG_DETERMINISTIC_ROUTE_MODE` | `strict` | FIX 1, DEC-010 | |
+| `RAG_ANSWER_UNIT_GUARD_ENABLED` | bật | FIX 2 nhóm 2, DEC-011 | |
+| `RAG_PARTIAL_REFUSAL_NO_ANSWER_ENABLED` | bật | FIX 2b (REL-402) | |
+| `RAG_SHORT_ANSWER_QUESTION_TERMS_ENABLED` | bật | FIX 2d (REL-303), DEC-013 | |
+| `RAG_RETRY_MUST_KEEP_VALIDATED_VALUES_ENABLED` | bật | FIX 4 (i) c3 | FR2-L03 |
+| `RAG_COMPLETENESS_NUMBER_NORMALIZATION_ENABLED` | bật | FIX 4 (i) c1 | FR2-E01 |
+| `RAG_RESTORE_SOURCE_DIACRITICS_ENABLED` | bật | D2, DEC-023 | chỉ đổi chữ |
+| `RAG_DEDUPE_CLAIM_ANSWERS_ENABLED` | bật | D2, DEC-023 | chỉ đổi chữ |
+| `RAG_EXCERPT_FALLBACK_ENABLED` | bật | FIX 4 (iii) | CP1-P02 |
+| `RAG_RESPONSIVENESS_CHECK_ENABLED` + `RAG_RESPONSIVENESS_MIN_SIMILARITY=0.80` + `RAG_RESPONSIVENESS_BLOCK_TERMINAL_ENABLED` | bật | FIX 4 (ii) + (a), đợt cuối | RBAC, relevance, FR v2 |
+| `RERANKER_ENABLED` | bật, chạy `lexical_fallback` | — | không đổi câu nào (ADR 0004) |
+| `RAG_REPAIR_AFTER_LLM_REFUSAL_ENABLED` | tắt | FIX 2 nhóm 1, DEC-011 | |
+| `RAG_RESELECT_REQUIRES_STRONG_SUPPORT_ENABLED` | tắt | FIX 2 nhóm 4a | |
+| `RAG_STRICT_OUTCOME_CUES_EXACT_ENABLED` | tắt | FIX 2b | |
+| `RAG_REFUSAL_PHRASES_EXTENDED_ENABLED` (M2) | tắt | FIX 3a | không cải thiện bộ nào |
+| `RAG_QUESTION_HEAD_IN_EVIDENCE_ENABLED` (M1a) | tắt | FIX 3a | UAT −47 |
+| `RAG_QUESTION_EVIDENCE_SIMILARITY_ENABLED` (M1b) | tắt | FIX 3a | UAT −43 |
+| `RAG_NUMBER_NORMALIZATION_ENABLED` (F) | tắt | FIX 3c | 0 câu đổi |
+| `RAG_KEEP_VALIDATED_FIRST_ANSWER_ENABLED` (c2) | tắt | FIX 4 (i) | FR-A10 thành trả lời sai |
+| `RAG_CONTENT_BLOCKS_TERMINAL_ENABLED` (b) | tắt | điểm dừng | UAT −4 |
+| `RAG_COMPOUND_PARTIAL_ANSWER_ENABLED` (iv) | tắt | FIX 4 (iv), đo 2 lần | CP1-R03 thành trả lời sai |
+
+Model: qwen2.5:3b (ADR 0003). Embedding: multilingual-e5-small, chưa fine-tune (PR #14 mở, DEC-021).
+
+### Kết quả từng bước của giai đoạn này (từ PROMPT 6)
+
+| Bước | Thay đổi | Kết quả (DEC-013, 2 lượt cùng job) | Mặc định |
+|---|---|---|---|
+| PROMPT 6 | ablation, oracle, cross-encoder thật | phần mất nằm sau context; cross-encoder không đổi câu nào; 37 câu UAT chỉ đúng nhờ câu dựng sẵn | — |
+| FIX 4 (i) | 3 flag cho vòng thử lại sau check độ đầy đủ | c3 thắng (FR2-L03); c2 thêm trả lời sai | c3 bật |
+| D2 | câu no-answer có dấu, dấu của giá trị, bỏ câu lặp | chỉ đổi chữ ở 5 bộ | bật (DEC-023) |
+| tách route UAT | bộ đếm `route_deterministic` / `route_llm` | 75-76 câu deterministic, 24-25 câu LLM | — |
+| c1 + c3 | số có nhóm hàng nghìn là một số | FR2-E01 | c1 bật |
+| 7B | qwen2.5:7b, oracle và retrieval thật | bớt trả lời sai ở 5/6 bộ, câu đúng gần như không tăng, chậm 1,9-2,8 lần | giữ 3B |
+| (ii) t = 0,81 | kiểm độ đáp ứng trên câu LLM | relevance, FR v2 tốt hơn; UAT, RBAC −1 (Q071, RBD-03) | tắt |
+| điểm dừng (a)/(b) | chặn là dừng, không sinh lại | (a) sửa RBD-03 nhưng UAT vẫn −1 (Q071); (b) UAT −4 | tắt |
+| (iii) | cả chunk khi đoạn trích trượt câu hỏi | compound −1 trả lời sai, 5 bộ không đổi | bật |
+| (iv) | trả lời một phần câu hỏi ghép | +3 câu đúng nhưng CP1-R03 thành trả lời sai | tắt |
+| (ii) t = 0,80 + (a) | hiệu chỉnh trên mọi lần sinh | RBAC, relevance, FR v2 tốt hơn; không bộ nào tệ hơn | **bật** |
+| (iv) + kiểm từng ý | mỗi ý LLM phải qua t | +4 câu đúng nhưng CP1-R03 vẫn trả lời sai | tắt |
+
+Số cuối giai đoạn (`base` của đợt cuối, commit `a4dbfab`, trước khi bật (ii)): UAT 100/0/0/0, RBAC 23/12/0/1, relevance 17/3/5/0, FR v1 13/1/6/0, FR v2 15/4/5/0, compound 4/5/2/1. Sau khi bật (ii) + (a): RBAC 23/13/0/0, relevance 18/3/4/0, FR v2 14/6/4/0, các bộ khác như trên. 0 rò rỉ ở mọi đợt.
+
+### Rủi ro khớp quá mức với bộ dev
+
+Số đợt đo trên GitHub Actions mà kết quả đã được tải về (`artifacts/`, gồm cả ablation chẩn đoán), không tính các vòng FIX 1-2 chạy trên stack local trước đó:
+
+| Bộ | Số đợt | Ghi chú |
+|---|---|---|
+| UAT Q001-Q100 | 25 | dùng để **hiệu chỉnh** ngưỡng t (hai lần), và là bộ có nhiều vòng nhất; 75-76 câu đi route deterministic được viết dần trên chính bộ này qua PROMPT 3-5 |
+| relevance (`answer_relevance_dev_v1`) | 19 | 25 câu; mọi thay đổi gần đây chỉ di chuyển REL-401..405 |
+| FR v1 (`false_refusal_dev_v1`) | 18 | 20 câu; 6 câu trả lời sai không đổi qua mọi bước của giai đoạn này |
+| FR v2 (`false_refusal_dev_v2`) | 18 | 24 câu; dựng từ các cơ chế chẩn đoán trên held-out v1 |
+| RBAC dev | 17 | 18 negative + 18 control |
+| compound (`compound_partial_dev_v1`) | 7 | 12 câu; dựng sau khi thấy kiểu lỗi câu ghép |
+
+- **Rủi ro cao nhất là UAT:** ngưỡng t lấy trực tiếp từ UAT (20 câu), và các quy tắc deterministic được viết qua nhiều vòng trên cùng 100 câu. Tổng UAT 100/100 không nói gì về câu hỏi mới; phần đi LLM (24-25 câu) mới là tín hiệu.
+- **Các bộ nhỏ:** mỗi thay đổi được giữ lại thường chỉ dựa trên 1-3 câu (FR2-L03, FR2-E01, CP1-P02, REL-403, RBD-13). Dung sai 1 câu của DEC-013 bằng đúng cỡ của các cải thiện này.
+- **Held-out v2 chưa được chạy** theo DEC-012 (ngoài lần chạy tay của owner, DEC-022, không được dùng để thiết kế). Đó là phép đo duy nhất không bị khớp quá mức, và nên chạy một lần ở mốc release trước khi công bố con số nào.
