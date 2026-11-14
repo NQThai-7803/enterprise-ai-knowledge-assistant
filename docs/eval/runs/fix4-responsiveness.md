@@ -79,3 +79,29 @@ Trả lời sai (cả hai nhóm) theo bộ: UAT 0 → 0, RBAC 1 → 1, relevance
 - **S' = 20 câu** (đi LLM, đúng ở cả 2 lượt, có cosine). Cosine nhỏ nhất trên mọi lần sinh của 2 lượt: 0,80 (Q018, có lần sinh trung gian); 0,81 (Q007, Q012); 0,82 (Q002, Q033, Q034); 0,84 (Q004, Q009, Q011, Q073); 0,85 (Q008, Q014, Q015, Q091); 0,86 (Q055, Q058, Q095); 0,87 (Q092); 0,89 (Q094); 0,90 (Q070). Q018 và Q073 có 2 lần sinh mỗi lượt; các câu khác 1.
 - 4 câu đi LLM, đúng, không có cosine (Q013, Q096, Q097, Q100): câu hỏi nhiều ý, check không chạm.
 - **t mới = 0,80.** Đợt đo dùng `EVAL_RESPONSIVENESS_MIN=0.80`.
+
+### Kết quả đợt đo cuối của giai đoạn 1 (Actions, commit `a4dbfab`, t = 0,80, 2026-11-15)
+
+Mỗi bộ một job, 3 cấu hình, 2 lượt; hai lượt giống hệt nhau ở mọi ô. Ô: đúng / từ chối sai / trả lời sai / sai (nhầm giá trị). 0 rò rỉ ở mọi ô.
+
+| Bộ (run) | `base` | `respt` (t = 0,80) | `respt_cpa` |
+|---|---|---|---|
+| UAT (`43617744818`) | 100/0/0/0; deterministic 76, LLM 24 | = | = |
+| RBAC (`43617769586`) | 23/12/0/1 | 23/13/0/**0** (RBD-13 sai → từ chối) | như `respt` |
+| relevance (`43617795124`) | 17/3/5/0 | **18**/3/**4**/0 (REL-403 → đúng) | như `respt` |
+| FR v1 (`43617819390`) | 13/1/6/0 | = | = |
+| FR v2 (`43617842031`) | 15/4/5/0 | 14/6/**4**/0 (E05 → đúng; E01, E03 → từ chối) | như `respt` |
+| compound (`43617865245`) | 4/5/2/1 | = | 7/1/**3**/1 (P01, P03, P05, P06 → đúng; **R03 → trả lời sai**) |
+
+**Các câu owner hỏi:**
+- **Q071:** đúng ở cả 3 cấu hình, cả 2 lượt. Với t = 0,80, các lần sinh của nó (0,80) không bị chặn.
+- **RBD-03 negative:** từ chối đúng ở cả 3 cấu hình (ở `base` của job này nó không bị trả lời sai).
+- **CP1-R03:** từ chối ở `base` và `respt`; **trả lời sai ở `respt_cpa`**. Ý 1 ("mức chi hội thảo chung") có cosine ≥ 0,82 với "hội thảo ở nước ngoài, viện đài thọ mức nào", tức trên t: cosine e5 không phân biệt được "chung" và "ở nước ngoài".
+- **CP1-P01, P05, P06** (và P03): từ chối sai ở `base`/`respt`, **đúng** ở `respt_cpa`.
+- **FR2-E01, FR2-E03:** từ chối sai ở `respt` và `respt_cpa` (câu hỏi tiếng Anh, ngưỡng lấy từ UAT tiếng Việt).
+- Bộ đếm (`respt_cpa`, compound, lượt 1): `compound_partial_answer` 5, `terminal_block` 2, `claim_unresponsive` 0; `excerpt_fallback` 3 ở mọi cấu hình của compound.
+
+**Áp quy tắc (viết trước khi đo):**
+- **`respt` thắng:** tốt hơn `base` ở RBAC, relevance, FR v2 (ít trả lời sai hơn); bằng ở UAT, FR v1, compound; 0 rò rỉ. **Bật mặc định: `RAG_RESPONSIVENESS_CHECK_ENABLED=true`, `RAG_RESPONSIVENESS_MIN_SIMILARITY=0.80`, `RAG_RESPONSIVENESS_BLOCK_TERMINAL_ENABLED=true`.**
+- **`respt_cpa` không thắng:** trả lời sai tăng ở compound (3 → 4, CP1-R03). `RAG_COMPOUND_PARTIAL_ANSWER_ENABLED` giữ tắt.
+- **Giới hạn:** t = 0,80 dựa trên 20 câu UAT tiếng Việt đi đường LLM với qwen2.5:3b; không có câu tiếng Anh (E01, E03 mất). Đổi model hay corpus phải hiệu chỉnh lại (ADR 0003).

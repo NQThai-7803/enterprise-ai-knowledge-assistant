@@ -1,5 +1,10 @@
 # Project Status
 
+## Phase 1 closed -- 2026-11-15
+
+- **Responsiveness check on:** LLM answers whose evidence sentence is too far from the question (cosine < 0.80) end at NO_ANSWER. Fewer false answers on RBAC (1 to 0), relevance (5 to 4) and FR v2 (5 to 4); UAT 100/100 and the other sets unchanged. English questions (FR2-E01, E03) are now refused: the threshold comes from Vietnamese UAT.
+- **Phase 1 summary, flags and overfitting risk:** `docs/design/pipeline-loss-fix-plan.md` section 7. Reranker options for phase 2: ADR 0004.
+
 ## FIX 4 (iii), (iv) -- 2026-11-14
 
 - **(iii) excerpt fallback is on:** a chunk whose excerpt misses every content word of the question is given whole. One fewer false answer on the compound set, nothing else changes.

@@ -6,6 +6,13 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### Phase 1 closed -- 2026-11-15
+
+- The responsiveness check is on for LLM answers, with t = 0.80 recalibrated on every LLM draft of UAT (20 answers) and the terminal stop (`RAG_RESPONSIVENESS_CHECK_ENABLED`, `RAG_RESPONSIVENESS_MIN_SIMILARITY=0.80`, `RAG_RESPONSIVENESS_BLOCK_TERMINAL_ENABLED`): fewer false answers on RBAC, relevance and FR v2, no set worse.
+- Partial compound answers with a per-claim responsiveness check stay off (CP1-R03).
+- New counters: `excerpt_fallback`, `claim_unresponsive`; cosines per route. The compound dev set is accepted by the owner.
+- `docs/design/pipeline-loss-fix-plan.md` section 7 closes phase 1; ADR 0004 proposes the reranker options; HANDOFF updated.
+
 ### FIX 4 (iii) on, (iv) off -- 2026-11-14
 
 - `RAG_EXCERPT_FALLBACK_ENABLED` (on): a source is given whole when its query-focused excerpt holds no content word of the question, or lacks the evidence block of one claim of a compound question. One fewer false answer on the compound set; the other 5 sets unchanged.

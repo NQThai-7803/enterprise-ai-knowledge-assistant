@@ -8,6 +8,12 @@
 3. **Embedding fine-tune** (`docs/design/embedding-finetune.md` and DEC-015 on branch `feat/embedding-finetune-infra`): infrastructure only so far; the baseline measurement and training come after FIX 3.
 4. The final held-out v2 measurement, once, after the choices above are made (DEC-012).
 
+## Phase 1 final round -- 2026-11-15 (STOPPED for report; phase 1 closed)
+
+- **DONE:** (ii) recalibrated on every LLM draft (t = 0.80, 20 answers) and on by default with the terminal stop; (iv) with per-claim responsiveness measured, stays off (CP1-R03).
+- **DONE:** `excerpt_fallback` counter; compound set accepted; phase 1 summary (plan section 7); HANDOFF; ADR 0004 (reranker, proposed).
+- **NEXT (owner):** choose ADR 0004 (a) or (b); held-out v2 at release (DEC-012).
+
 ## FIX 4 (iii), (iv) -- 2026-11-14 (STOPPED for report)
 
 - **DONE: (iii)** excerpt fallback measured on 6 sets, **on by default**.

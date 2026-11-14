@@ -4005,7 +4005,11 @@ def test_answer_without_the_asked_phrase_in_its_evidence_becomes_no_answer() -> 
 
     async def scenario() -> Any:
         service, _, _, _, _, _, _ = make_service(
-            settings_obj=settings(rag_question_head_in_evidence_enabled=True)
+            # M1a on its own: the responsiveness stop (on by default) would raise instead.
+            settings_obj=settings(
+                rag_question_head_in_evidence_enabled=True,
+                rag_responsiveness_block_terminal_enabled=False,
+            )
         )
         return await service._draft_from_generation(
             _fake_generation(
@@ -4205,9 +4209,10 @@ def test_every_persisted_answer_counts_its_route(monkeypatch: pytest.MonkeyPatch
     [
         (True, {"rag_responsiveness_check_enabled": True}, False),  # 0.6 < 0.7: blocked
         (False, {"rag_responsiveness_check_enabled": True}, True),  # server-built: not checked
-        (True, {}, True),  # flag off
+        (True, {"rag_responsiveness_check_enabled": False}, True),  # flag off
         # M1b at 0.0 only measures: the cosine is counted, nothing is blocked.
-        (True, {"rag_question_evidence_similarity_enabled": True,
+        (True, {"rag_responsiveness_check_enabled": False,
+                "rag_question_evidence_similarity_enabled": True,
                 "rag_question_evidence_min_similarity": 0.0}, True),
     ],
 )  # fmt: skip
@@ -4231,7 +4236,9 @@ def test_responsiveness_check_applies_to_llm_answers_with_its_own_threshold(
         )
     )
     assert result is addresses
-    computed = flags and (llm_route or "rag_question_evidence_similarity_enabled" in flags)
+    computed = (flags.get("rag_responsiveness_check_enabled") and llm_route) or flags.get(
+        "rag_question_evidence_similarity_enabled"
+    )
     expected = {("llm" if llm_route else "local", "0.60"): 1} if computed else {}
     assert GLOBAL_METRICS.question_evidence_similarity_counts() == expected
     GLOBAL_METRICS.reset()
@@ -4269,7 +4276,8 @@ RESPONSIVENESS = {
     ("first", "low_similarity", "flags", "status", "calls", "terminal"),
     [
         # Responsiveness block: regenerated without a flag, final with (a) or (b).
-        (HOIST_ANSWER, True, RESPONSIVENESS, GroundingStatus.NO_ANSWER, 2, 0),
+        (HOIST_ANSWER, True, {**RESPONSIVENESS, "rag_responsiveness_block_terminal_enabled": False},
+         GroundingStatus.NO_ANSWER, 2, 0),
         (HOIST_ANSWER, True, {**RESPONSIVENESS, "rag_responsiveness_block_terminal_enabled": True},
          GroundingStatus.NO_ANSWER, 1, 1),
         (HOIST_ANSWER, True, {**RESPONSIVENESS, "rag_content_blocks_terminal_enabled": True},
