@@ -296,6 +296,29 @@ Câu trả lời dựng sẵn (route deterministic, `provider="local"`) là ứn
 - Một cấu hình thắng khi không tệ hơn `base` ở bộ nào và tốt hơn ở ít nhất một bộ: so từng bộ, ít trả lời sai hơn trước, rồi nhiều câu đúng hơn. Hai cấu hình cùng thắng thì chọn cái không thua cái kia ở bộ nào; không có cái trội thì owner quyết định.
 - Báo riêng RBD-03, Q071, FR2-E01, FR2-E03 ở mỗi cấu hình, và số ca vào nhánh dừng (`terminal_block`).
 
+### Kết quả `resp_terminal` / `content_terminal` (Actions, commit `4308c67`, 2026-11-14)
+
+Mỗi bộ một job, 4 cấu hình, 2 lượt; hai lượt giống hệt nhau ở mọi ô. Ô: đúng / từ chối sai / trả lời sai / sai (nhầm giá trị). 0 rò rỉ ở mọi ô. `resp` = (ii) t = 0,81; `respt` = `resp` + (a); `contt` = `resp` + (b).
+
+| Bộ (run) | `base` | `resp` | `respt` | `contt` |
+|---|---|---|---|---|
+| UAT (`43542607872`) | 100/0/0/0; LLM 25/25 | 99/1/0/0; LLM 24/25 (Q071) | 99/1/0/0; LLM 24/25 (Q071) | **96/4/0/0**; LLM 21/25 (Q071, Q073, Q096, Q097) |
+| RBAC (`43542630931`) | 23/12/0/1 | 22/13/1/0 (RBD-03 → trả lời sai) | 23/13/0/0 (RBD-13 sai → từ chối) | 23/13/0/0 |
+| relevance (`43542654449`) | 17/3/5/0 | **20/3/2/0** (REL-401, 402, 403) | 20/3/2/0 | 20/3/2/0 |
+| FR v1 (`43542679449`) | 13/1/6/0 | = | = | 12/2/6/0 (FR-N05 → từ chối) |
+| FR v2 (`43542705425`) | 15/4/5/0 | 14/6/4/0 (E05 → đúng; E01, E03 → từ chối) | như `resp` | 12/8/4/0 (thêm C03, L03 → từ chối) |
+| compound (`43542730933`) | 4/3/4/1 | = | = | 4/4/3/1 (P02 → từ chối) |
+
+**Các câu owner hỏi:**
+- **RBD-03 negative:** `resp` trả lời sai (lặp lại đợt trước); `respt` và `contt` **từ chối đúng**. Lần chặn đầu giờ là điểm dừng, nên câu lạc đề của lần sinh lại không còn.
+- **Q071 (UAT):** từ chối sai ở cả `resp`, `respt`, `contt`. Câu này bị chặn ở một lần sinh có cosine dưới 0,81, và điểm dừng không đổi được điều đó. Đây là lỗ hổng của đợt hiệu chỉnh (Q071 không có trong S, vì check chạy nhiều lần cho nó).
+- **FR2-E01, FR2-E03 (câu hỏi tiếng Anh):** từ chối sai ở cả ba cấu hình; cosine giữa câu hỏi tiếng Anh và evidence tiếng Việt thấp hơn ngưỡng lấy từ UAT.
+
+**Áp quy tắc (viết trước khi đo):**
+- `contt`: loại. UAT hồi quy 4 câu (quá dung sai 1 câu) và tệ hơn `base` ở FR v1.
+- `respt`: tốt hơn `base` ở RBAC (hết câu nhầm giá trị), relevance (trả lời sai 5 → 2) và FR v2 (5 → 4); bằng ở FR v1 và compound; nhưng ở **UAT cùng số trả lời sai và ít hơn 1 câu đúng** (Q071, ổn định cả 2 lượt). Quy tắc đòi "không tệ hơn ở bộ nào", nên **không thắng**.
+- **Cả hai flag giữ tắt.** So với `resp`, `respt` không tệ hơn ở bộ nào và tốt hơn ở RBAC: điểm dừng sửa đúng lỗi nó nhắm tới. Phần còn chặn (ii) là Q071, tức là đợt hiệu chỉnh, không phải điểm dừng.
+
 ## 4. NLU: thiết kế, chưa làm
 
 **Mục tiêu:** thay các rule viết theo cue bằng mô hình nhỏ, học được và đo được, nhưng không bỏ các bất biến an toàn (lọc quyền trước, citation chỉ từ chunk đã được phép, validator ở cuối).

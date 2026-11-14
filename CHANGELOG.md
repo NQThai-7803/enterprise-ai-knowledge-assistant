@@ -6,6 +6,11 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### Terminal content blocks -- 2026-11-14 (measured, stay off)
+
+- `RAG_RESPONSIVENESS_BLOCK_TERMINAL_ENABLED` (a) and `RAG_CONTENT_BLOCKS_TERMINAL_ENABLED` (b): a block on an LLM answer ends at NO_ANSWER instead of a regeneration; format errors are still retried. Measured on 6 dev sets: (a) fixes RBD-03 and keeps the (ii) gains, but UAT still loses Q071; (b) loses 4 UAT questions. Both stay off.
+- ADR 0003 / DEC-024: keep qwen2.5:3b until a GPU with 8 GB VRAM.
+
 ### FIX 4 (ii) responsiveness check -- 2026-11-14 (measured, stays off)
 
 - `RAG_RESPONSIVENESS_CHECK_ENABLED` / `RAG_RESPONSIVENESS_MIN_SIMILARITY`: the e5 question/evidence check on LLM answers only, threshold 0.81 calibrated on the LLM-route part of UAT. Measured on 6 dev sets: relevance false answers 5 to 3 and FR v2 5 to 4, but UAT and RBAC each lose one correct answer, so it stays off (DEC-013). `enterprise_ai_rag_question_evidence_similarity_total` counts every computed cosine; the UAT runner records it per case.
