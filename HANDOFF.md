@@ -27,17 +27,19 @@ docker compose --profile frontend up -d frontend
 - **Held-out:** v1 là diagnostic (DEC-008). v2 chưa chạy theo quy trình (DEC-012); owner đã chạy tay một lần ngoài quy trình (DEC-022), bản ghi không có trong repo và không dùng để thiết kế; mọi báo cáo held-out v2 phải nêu sự kiện này.
 - **Fine-tune embedding:** hạ tầng ở PR #14 (mở); không fine-tune trước held-out v2 (DEC-021).
 
-## Test (2026-11-09, `315efd6`, image build từ git export, pgvector/Redis tạm, chạy local)
+## Test (2026-11-15)
 
-| Lane | Pass | Fail | Xfail | Skip |
-|---|---:|---:|---:|---:|
-| `tests/unit`, mount `docs/` chỉ đọc | 1698 | 0 | 16 | 8 |
-| `tests/api` không integration | 51 | 0 | 0 | 0 |
-| `tests/api` integration | 245 | 0 | 0 | 0 |
-| `tests/integration` | 404 | 0 | 3 | 0 |
-| LLM provider | 3 | 0 | 0 | 0 |
+Image build từ git export, pgvector/Redis tạm (`scripts/test/compose.integration.yaml`), chạy local:
 
-Lane Celery (4 pass ngày 2026-11-08) không chạy trong lượt này; các lane cần model thật chỉ chạy trên CI.
+| Lane | `06856ee` (code cuối, đủ lane) | `b120b5d` (bật (ii)) |
+|---|---|---|
+| `tests/unit`, mount `docs/` chỉ đọc | 1795 pass, 16 xfail, 8 skip | 1795 pass, 16 xfail, 8 skip |
+| `tests/api` không integration | 51 | CI |
+| `tests/api` integration | 245 | CI |
+| `tests/integration` | 404 (3 xfail) | CI |
+| LLM provider | 3 | CI |
+
+Cổng RAM đóng 16 phút khi verify `b120b5d` (03:28-03:44, 498-967 MB), nên các lane integration của commit đó do CI kiểm (DEC-019). Lane Celery và các lane cần model thật chỉ chạy trên CI.
 
 ## Việc đang dở
 
