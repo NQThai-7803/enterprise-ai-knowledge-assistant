@@ -8,6 +8,12 @@
 3. **Embedding fine-tune** (`docs/design/embedding-finetune.md` and DEC-015 on branch `feat/embedding-finetune-infra`): infrastructure only so far; the baseline measurement and training come after FIX 3.
 4. The final held-out v2 measurement, once, after the choices above are made (DEC-012).
 
+## FIX 4 (iii), (iv) -- 2026-11-14 (STOPPED for report)
+
+- **DONE: (iii)** excerpt fallback measured on 6 sets, **on by default**.
+- **DONE: (iv)** compound partial answers measured, **stays off**: CP1-R03 (must refuse) becomes a false answer because the validator accepted a wrong part.
+- **Open for the owner:** (iv) needs a stricter check on each kept part (e.g. responsiveness per claim) before it can win; Q071 shows the (ii) calibration gap; the compound set content is still pending owner review.
+
 ## Terminal blocks and phase 2 model -- 2026-11-14
 
 - **DONE:** retry-site inventory (content vs format) in `docs/design/pipeline-loss-fix-plan.md`; (a) `respt` and (b) `contt` measured, **both stay off** (UAT −1 / −4).

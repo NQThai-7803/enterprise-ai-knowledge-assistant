@@ -164,7 +164,7 @@ class Settings(BaseSettings):
     rag_content_blocks_terminal_enabled: bool = False
     # FIX 4 (iii): a source whose query-focused excerpt holds no content word of the question
     # (or no evidence block for one claim of a compound question) is given whole.
-    rag_excerpt_fallback_enabled: bool = False
+    rag_excerpt_fallback_enabled: bool = True  # on since the (iii) batch, 2026-11-14
     # FIX 4 (iv), DEC-021: a compound question answers its validated parts and says the others
     # could not be verified, instead of refusing everything.
     rag_compound_partial_answer_enabled: bool = False

@@ -1,5 +1,10 @@
 # Project Status
 
+## FIX 4 (iii), (iv) -- 2026-11-14
+
+- **(iii) excerpt fallback is on:** a chunk whose excerpt misses every content word of the question is given whole. One fewer false answer on the compound set, nothing else changes.
+- **(iv) partial answers stay off:** they recover 3 half-answerable questions but also answer a question that must be refused, because a wrong part passed the validator.
+
 ## Terminal blocks -- 2026-11-14
 
 - Making the responsiveness block final (a) stops the off-topic answer that a regeneration produced (RBD-03), but UAT still loses Q071 to the 0.81 threshold, so (a) does not win; making every content block final (b) loses 4 UAT questions. Both stay off. 3B stays the model (ADR 0003).
