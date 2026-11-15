@@ -19,6 +19,10 @@ on:
         description: "Type exactly: DEC-012 release run approved by the owner"
         type: string
         required: true
+      preflight_only:
+        description: "Only build the stack and run every check (gate, reranker, Ollama, logins); send no held-out question"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -141,6 +145,8 @@ jobs:
           fi
           ollama --version
           sudo systemctl stop ollama || true
+          # DEC-014: the runner reads the backend from this log (run #1 failed without it).
+          echo "EVAL_OLLAMA_LOG=$RUNNER_TEMP/ollama.log" >> "$GITHUB_ENV"
           OLLAMA_HOST=0.0.0.0:11434 OLLAMA_CONTEXT_LENGTH=8192 OLLAMA_NUM_PARALLEL=1 \
             nohup ollama serve > "$RUNNER_TEMP/ollama.log" 2>&1 &
           for _ in $(seq 1 30); do curl -sf http://127.0.0.1:11434/api/version && break; sleep 2; done
@@ -173,12 +179,21 @@ jobs:
           done
           docker inspect "$PROJECT-api-1" --format '{{.State.Health.Status}}' | grep -q healthy
 
+      - name: Preflight (sends no held-out question)
+        # The run's own checks, before the corpus load and the first question: gate, reranker
+        # mode, Ollama version and backend (DEC-014), one login per role.
+        run: |
+          set -euo pipefail
+          python scripts/eval/heldout_v2_release.py preflight 2>&1 | tee "$OUT/preflight.log"
+
       - name: Load corpus V2
+        if: ${{ !inputs.preflight_only }}
         run: >
           python scripts/eval/bootstrap_corpus_v2.py . http://127.0.0.1:18190
           "$OUT/runtime-manifest.json"
 
       - name: Run held-out v2 twice
+        if: ${{ !inputs.preflight_only }}
         run: |
           set -euo pipefail
           docker inspect "$PROJECT-api-1" --format '{{range .Config.Env}}{{println .}}{{end}}' \
@@ -192,13 +207,15 @@ jobs:
               --base-url http://127.0.0.1:11434 --model qwen2.5:3b --num-ctx 8192 \
               --keep-alive 10m --seed 20261031 >/dev/null
             python scripts/eval/heldout_v2_release.py run \
-              --output "$OUT/run$run/runtime_results.json" | tee "$OUT/run$run/runner.log"
+              --output "$OUT/run$run/runtime_results.json" 2>&1 | tee "$OUT/run$run/runner.log"
           done
 
       - name: Group by nearness to UAT (e5)
+        if: ${{ !inputs.preflight_only }}
         run: python scripts/eval/heldout_v2_release.py near-uat --output "$OUT/near-uat.json"
 
       - name: Write the owner's grading sheet (no labels)
+        if: ${{ !inputs.preflight_only }}
         run: |
           python scripts/eval/heldout_v2_release.py grading "$OUT/run1" "$OUT/run2" "$OUT/grading" \
             --stack-manifest "$OUT/runtime-manifest.json" --near-uat "$OUT/near-uat.json"

@@ -2,6 +2,7 @@
 
 usage (repo root, project venv):
   python scripts/eval/heldout_v2_release.py gate
+  python scripts/eval/heldout_v2_release.py preflight      # stack up; sends no held-out question
   python scripts/eval/heldout_v2_release.py lock-gold --approved-by "<owner>, <date>"
   python scripts/eval/heldout_v2_release.py run --output <dir>/runtime_results.json
   python scripts/eval/heldout_v2_release.py near-uat --output <dir>/near-uat.json
@@ -133,6 +134,48 @@ def lock_gold(
     text = json.dumps(payload, ensure_ascii=False, indent=1) + "\n"
     gold_lock.write_text(text, encoding="utf-8", newline="\n")  # LF on every OS
     return payload
+
+
+def passwords_from_env(environ: Mapping[str, str] = os.environ) -> dict[str, str]:
+    """The account passwords the run needs; raises GateRefusedError when one is missing."""
+    missing = [r for r in run_heldout.ACCOUNTS if not environ.get(f"EVAL_PASSWORD_{r.upper()}")]
+    if missing:
+        raise GateRefusedError(
+            "set " + ", ".join(f"EVAL_PASSWORD_{role.upper()}" for role in missing)
+        )
+    return {role: environ[f"EVAL_PASSWORD_{role.upper()}"] for role in run_heldout.ACCOUNTS}
+
+
+def preflight(args: argparse.Namespace, base_url: str, client_factory: Any = None) -> dict:
+    """Every check the run makes before its first question, and one login per role.
+
+    Run #1 (2026-11-15) stopped at the Ollama check after the stack and corpus were up; this
+    runs the same checks first, so a failure costs no corpus load and sends no question.
+    """
+    locks = gate()
+    passwords = passwords_from_env()
+    checks = reranker_check.guard(args, base_url)  # reranker mode, then Ollama (DEC-014)
+    factory = client_factory or (
+        lambda role: run_heldout.EvalClient(
+            base_url, email=run_heldout.ACCOUNTS[role], password=passwords[role]
+        )
+    )
+    for role in run_heldout.ACCOUNTS:
+        client = factory(role)
+        try:
+            client.login()
+        except run_heldout.EvalInfraError as exc:
+            raise GateRefusedError(f"login failed for {role}: {exc}") from exc
+        finally:
+            close = getattr(client, "close", None)
+            if close is not None:
+                close()
+    return {
+        "questions_sha256": locks["questions"]["sha256"],
+        "gold_sha256": locks["gold"]["sha256"],
+        "logins": list(run_heldout.ACCOUNTS),
+        **checks,
+    }
 
 
 def merged_items(
@@ -428,6 +471,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("gate")
+    pre = sub.add_parser("preflight")
+    reranker_check.add_arguments(pre)
     lock = sub.add_parser("lock-gold")
     lock.add_argument("--approved-by", required=True)
     runner = sub.add_parser("run")
@@ -449,17 +494,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "gate":
             print(json.dumps(gate(), ensure_ascii=False))
             return 0
+        if args.command == "preflight":
+            base_url = os.environ.get("RAG_ACCEPTANCE_BASE_URL", "http://127.0.0.1:18190")
+            print(json.dumps(preflight(args, base_url), ensure_ascii=False, default=str))
+            return 0
         if args.command == "lock-gold":
             print(json.dumps(lock_gold(args.approved_by), ensure_ascii=False))
             return 0
         if args.command == "run":
             locks = gate()
-            passwords = {}
-            for role in run_heldout.ACCOUNTS:
-                value = os.environ.get(f"EVAL_PASSWORD_{role.upper()}")
-                if not value:
-                    parser.error(f"set EVAL_PASSWORD_{role.upper()}")
-                passwords[role] = value
+            passwords = passwords_from_env()
             base_url = os.environ.get("RAG_ACCEPTANCE_BASE_URL", "http://127.0.0.1:18190")
             reranker = reranker_check.guard(args, base_url)
             code = run_heldout.run(

@@ -167,3 +167,68 @@ def test_report_notes_reach_the_report() -> None:
     counts = release.report([row])
     assert counts["report_notes"] == {"H2-001": "câu trùng câu hỏi gợi ý trong tài liệu"}
     assert "H2-001: câu trùng câu hỏi gợi ý" in release.render_report(counts)
+
+
+class _FakeClient:
+    def __init__(self, role: str, logins: list[str], fail: str | None) -> None:
+        self.role, self.logins, self.fail = role, logins, fail
+
+    def login(self) -> None:
+        if self.role == self.fail:
+            raise release.run_heldout.EvalInfraError("login failed: status=401")
+        self.logins.append(self.role)
+
+    def close(self) -> None:
+        return None
+
+
+def _preflight(monkeypatch: pytest.MonkeyPatch, *, fail: str | None = None) -> tuple:
+    monkeypatch.setattr(
+        release, "gate", lambda: {"questions": {"sha256": "q"}, "gold": {"sha256": "g"}}
+    )
+    monkeypatch.setattr(
+        release.reranker_check, "guard", lambda args, url: {"reranker_mode": "lexical_fallback"}
+    )
+    for role in ("STAFF", "MANAGER", "ADMIN"):
+        monkeypatch.setenv(f"EVAL_PASSWORD_{role}", "x")
+    logins: list[str] = []
+    result = release.preflight(
+        object(), "http://api", client_factory=lambda role: _FakeClient(role, logins, fail)
+    )
+    return result, logins
+
+
+def test_preflight_checks_the_stack_and_logs_in_as_every_role(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    result, logins = _preflight(monkeypatch)
+    assert logins == ["staff", "manager", "admin"]
+    assert result["reranker_mode"] == "lexical_fallback" and result["gold_sha256"] == "g"
+
+
+def test_preflight_refuses_a_failed_login_or_a_missing_password(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with pytest.raises(release.GateRefusedError, match="login failed for manager"):
+        _preflight(monkeypatch, fail="manager")
+    with pytest.raises(release.GateRefusedError, match="EVAL_PASSWORD_ADMIN"):
+        release.passwords_from_env({"EVAL_PASSWORD_STAFF": "x", "EVAL_PASSWORD_MANAGER": "x"})
+
+
+@pytest.mark.repo_layout(".github/workflows/heldout-v2.yml")
+def test_the_release_workflow_gives_the_runner_its_environment_and_checks_first() -> None:
+    import yaml
+
+    path = release.ROOT / ".github" / "workflows" / "heldout-v2.yml"
+    text = path.read_text(encoding="utf-8")
+    job = yaml.safe_load(text)["jobs"]["heldout-v2"]
+    # Run #1 stopped at the Ollama check: the runner reads the backend from EVAL_OLLAMA_LOG.
+    assert 'echo "EVAL_OLLAMA_LOG=' in text
+    for name in ("EVAL_OLLAMA_EXPECTED_VERSION", "EVAL_OLLAMA_EXPECTED_BACKEND",
+                 "EVAL_EXPECTED_RERANKER_MODE", "RAG_ACCEPTANCE_BASE_URL"):  # fmt: skip
+        assert name in job["env"], name
+    for role in ("STAFF", "MANAGER", "ADMIN"):
+        assert f"EVAL_PASSWORD_{role}=" in text
+    names = [step["name"] for step in job["steps"]]
+    preflight = names.index("Preflight (sends no held-out question)")
+    assert preflight < names.index("Load corpus V2") < names.index("Run held-out v2 twice")
