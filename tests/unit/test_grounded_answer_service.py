@@ -35,7 +35,7 @@ from app.models import (
     User,
     UserRole,
 )
-from app.observability.metrics import GLOBAL_METRICS
+from app.observability.metrics import ANSWER_BRANCHES, GLOBAL_METRICS
 from app.repositories.chat_message_repository import ConversationMemoryMessageRow
 from app.retrieval import question_analysis
 from app.retrieval.errors import RetrievalError, RetrievalFailureCode
@@ -3815,20 +3815,11 @@ def test_reselection_is_counted_with_the_strong_support_flag_off() -> None:
 
     asyncio.run(_draft_for_rejected_answer())
 
+    # Every other branch stays at 0.
     assert GLOBAL_METRICS.answer_branch_counts() == {
+        **dict.fromkeys(ANSWER_BRANCHES, 0),
         "reselect_after_rejection": 1,
         "reselect_guard_would_change": 1,
-        "refusal_phrase_extended": 0,
-        "question_head_missing": 0,
-        "question_evidence_dissimilar": 0,
-        "first_answer_kept": 0,
-        "retry_abandoned_first": 0,
-        "route_deterministic": 0,
-        "route_llm": 0,
-        "terminal_block": 0,
-        "compound_partial_answer": 0,
-        "excerpt_fallback": 0,
-        "claim_unresponsive": 0,
     }
     GLOBAL_METRICS.reset()
 
@@ -3856,20 +3847,11 @@ def test_reselection_guard_is_not_counted_when_the_source_holds_the_answer() -> 
 
     asyncio.run(scenario())
 
+    # Every other branch stays at 0.
     assert GLOBAL_METRICS.answer_branch_counts() == {
+        **dict.fromkeys(ANSWER_BRANCHES, 0),
         "reselect_after_rejection": 1,
         "reselect_guard_would_change": 0,
-        "refusal_phrase_extended": 0,
-        "question_head_missing": 0,
-        "question_evidence_dissimilar": 0,
-        "first_answer_kept": 0,
-        "retry_abandoned_first": 0,
-        "route_deterministic": 0,
-        "route_llm": 0,
-        "terminal_block": 0,
-        "compound_partial_answer": 0,
-        "excerpt_fallback": 0,
-        "claim_unresponsive": 0,
     }
     GLOBAL_METRICS.reset()
 

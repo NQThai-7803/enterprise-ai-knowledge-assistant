@@ -190,6 +190,7 @@ def run(
         )
 
     results: list[dict[str, Any]] = []
+    counters_start = route_reader()
     # One keep-alive client for the whole run (a new connection per question exhausted the
     # Windows socket buffers in PROMPT 3g: WinError 10055).
     with client_factory(credentials) as client:
@@ -233,6 +234,11 @@ def run(
         case.get("execution_status") == OK for case in results
     )
     final_status = "COMPLETE" if complete else "PARTIAL"
+    # Every branch counter over the run (e.g. simple_no_answer_<reason>), as the other runners do.
+    run_metadata = {
+        **(run_metadata or {}),
+        "branch_counters": branch_counters.delta(counters_start, route_reader()),
+    }
     checkpoint(results, final_status)
     return 0 if complete else 1
 

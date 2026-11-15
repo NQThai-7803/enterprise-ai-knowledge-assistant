@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import contextlib
+import contextvars
 import re
 import unicodedata
+from collections.abc import Iterator
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import StrEnum
@@ -2741,10 +2744,26 @@ def _canonical_numbers_are_contradicted(answer: str, evidence: str) -> bool:
     return bool(values and evidence_values and values.isdisjoint(evidence_values))
 
 
+# Simple answer mode compares numbers once written one way (F) for its own validations only.
+_NUMBER_NORMALIZATION: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "number_normalization", default=False
+)
+
+
+@contextlib.contextmanager
+def number_normalization() -> Iterator[None]:
+    """Compare numbers with canonical number/unit pairs inside this block, whatever F says."""
+    token = _NUMBER_NORMALIZATION.set(True)
+    try:
+        yield
+    finally:
+        _NUMBER_NORMALIZATION.reset(token)
+
+
 def _numbers_are_contradicted(answer: str, evidence: str) -> bool:
     if not re.search(r"\d", answer):
         return False  # nothing to compare; the rest needs the answer's numbers too
-    if get_settings().rag_number_normalization_enabled:
+    if get_settings().rag_number_normalization_enabled or _NUMBER_NORMALIZATION.get():
         return _canonical_numbers_are_contradicted(answer, evidence)
     answer_pairs = set(_number_unit_pairs(answer))
     evidence_pairs = set(_number_unit_pairs(evidence))

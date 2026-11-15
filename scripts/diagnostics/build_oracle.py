@@ -1,7 +1,7 @@
 """Write the gold map of a dev set for the PROMPT 6 oracle ablation. Run on the host.
 
 usage: python scripts/diagnostics/build_oracle.py \
-           --set uat|rbac|relevance|false_refusal|false_refusal_v2 --output <file>
+           --set uat|rbac|relevance|false_refusal|false_refusal_v2|compound --output <file>
 
 Maps each question, as the runner asks it, to its gold: [{"document", "pages"|"facts"}].
 UAT uses eval-data/uat/retrieval-gold.json (the document and page each reviewed answer cited);
@@ -30,6 +30,7 @@ SOURCES = {
     "relevance": "answer_relevance_dev_v1",
     "false_refusal": "false_refusal_dev_v1",
     "false_refusal_v2": "false_refusal_dev_v2",
+    "compound": "compound_partial_dev_v1",
 }
 
 
@@ -47,7 +48,8 @@ def uat_oracle(questions: Mapping[str, Any], gold: Mapping[str, Any]) -> dict[st
 def fact_oracle(data: Mapping[str, Any]) -> dict[str, list[dict]]:
     oracle = {}
     for item in data["items"]:
-        if item.get("expect", "answer") != "answer" or not item.get("fact"):
+        # A half-answerable (partial) item's gold is the document and fact of its stated part.
+        if item.get("expect", "answer") not in ("answer", "partial") or not item.get("fact"):
             continue
         facts = [item["fact"], *item.get("fact_alternatives", ())]
         for extra in item.get("also_facts", ()):
