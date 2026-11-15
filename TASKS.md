@@ -8,6 +8,10 @@
 3. **Embedding fine-tune** (`docs/design/embedding-finetune.md` and DEC-015 on branch `feat/embedding-finetune-infra`): infrastructure only so far; the baseline measurement and training come after FIX 3.
 4. The final held-out v2 measurement, once, after the choices above are made (DEC-012).
 
+## Phase 3 held-out v2 -- graded 2026-11-15
+
+- **DONE:** release run `43701804785` valid (0 INFRA_ERROR, none over 120 s); owner graded; report in `docs/eval/runs/heldout-v2-ff5016d/`. `report` now reads labels with the held-out v1 rule (blank run 2 inherits run 1 only when the runs are identical) and records the grader. No app change from the results.
+
 ## Phase 3 held-out v2 -- 2026-11-15 (prepared, NOT run)
 
 - **DONE (tooling):** `scripts/eval/heldout_v2_release.py` and `.github/workflows/heldout-v2.yml`: gate on frozen questions and an owner-approved gold lock, 2 runs at the current defaults, e5 grouping near UAT (>= 0.90) / rest, grading sheet with empty labels, report split by group, DEC-022 stated everywhere. Procedure: `docs/design/heldout-v2-release.md`.

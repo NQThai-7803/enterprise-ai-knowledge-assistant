@@ -143,8 +143,25 @@ def test_the_report_needs_every_label_and_counts_each_group_apart() -> None:
     assert counts["all"]["run2"]["PASS"] == 2
     assert "DEC-022" in release.render_report(counts)
     rows[1]["label_run2"] = ""
-    with pytest.raises(release.GateRefusedError, match="labels missing"):
+    with pytest.raises(release.GateRefusedError, match="missing or invalid labels"):
         release.report(rows)
+
+
+def test_a_blank_run_2_label_inherits_run_1_only_when_the_runs_are_identical() -> None:
+    def row(item_id: str, differ: str, run2: str) -> dict[str, str]:
+        return {"id": item_id, "near_uat_group": "other", "gold_status": "ANSWERED",
+                "run1_status": "ANSWERED", "run2_status": "ANSWERED", "RUNS_DIFFER": differ,
+                "label_run1": "PARTIAL", "label_run2": run2}  # fmt: skip
+
+    counts = release.report(
+        [row("H2-001", "0", ""), row("H2-002", "1", "FAIL")], grader="owner (x)", run="1 (abc)"
+    )
+    assert counts["run2_labels_inherited"] == ["H2-001"]
+    assert counts["all"]["run2"]["PARTIAL"] == 1 and counts["all"]["run2"]["FAIL"] == 1
+    text = release.render_report(counts)
+    assert "Người chấm: owner (x)" in text and "43697066034" in text and ": 1 câu." in text
+    with pytest.raises(release.GateRefusedError, match="H2-002: blank"):
+        release.report([row("H2-002", "1", "")])
 
 
 def test_a_gold_document_cited_only_off_its_gold_pages_gets_a_hint() -> None:

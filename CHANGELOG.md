@@ -6,6 +6,10 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### Held-out v2 report -- 2026-11-15
+
+- Owner-graded held-out v2 report (`docs/eval/runs/heldout-v2-ff5016d/report.md`): PASS 2, PARTIAL 5-6, FAIL 12-13, LEAK 0 of 20 per run, split near UAT / rest, with DEC-022 and run #1 stated. `heldout_v2_release.py report` uses the held-out v1 label rule and takes `--grader` / `--run`.
+
 ### No cross-encoder (DEC-025) -- 2026-11-15
 
 - `RERANKER_PROVIDER` defaults to `heuristic`: lexical alignment ranks the candidates, as in every measurement; the cross-encoder stays behind the flag for ADR 0004 option (a). `eval.yml` no longer downloads or mounts cross-encoder models. One batch on 6 dev sets: 0 changed answers.

@@ -1,0 +1,135 @@
+{
+ "grader": "owner (NQThai-7803)",
+ "run": "43701804785 (ff5016d)",
+ "run2_labels_inherited": [
+  "HO2-001",
+  "HO2-002",
+  "HO2-003",
+  "HO2-005",
+  "HO2-006",
+  "HO2-007",
+  "HO2-008",
+  "HO2-009",
+  "HO2-010",
+  "HO2-011",
+  "HO2-012",
+  "HO2-013",
+  "HO2-014",
+  "HO2-015",
+  "HO2-016",
+  "HO2-017",
+  "HO2-019",
+  "HO2-020"
+ ],
+ "near_uat": {
+  "run1": {
+   "PASS": 0,
+   "PARTIAL": 5,
+   "FAIL": 4,
+   "LEAK": 0,
+   "items": 9,
+   "false_answers": [],
+   "false_refusals": [
+    "HO2-003",
+    "HO2-008",
+    "HO2-018"
+   ],
+   "leaks": []
+  },
+  "run2": {
+   "PASS": 0,
+   "PARTIAL": 6,
+   "FAIL": 3,
+   "LEAK": 0,
+   "items": 9,
+   "false_answers": [],
+   "false_refusals": [
+    "HO2-003",
+    "HO2-008"
+   ],
+   "leaks": []
+  }
+ },
+ "other": {
+  "run1": {
+   "PASS": 2,
+   "PARTIAL": 0,
+   "FAIL": 9,
+   "LEAK": 0,
+   "items": 11,
+   "false_answers": [],
+   "false_refusals": [
+    "HO2-002",
+    "HO2-004",
+    "HO2-009",
+    "HO2-011",
+    "HO2-013",
+    "HO2-014",
+    "HO2-016"
+   ],
+   "leaks": []
+  },
+  "run2": {
+   "PASS": 2,
+   "PARTIAL": 0,
+   "FAIL": 9,
+   "LEAK": 0,
+   "items": 11,
+   "false_answers": [],
+   "false_refusals": [
+    "HO2-002",
+    "HO2-009",
+    "HO2-011",
+    "HO2-013",
+    "HO2-014",
+    "HO2-016"
+   ],
+   "leaks": []
+  }
+ },
+ "all": {
+  "run1": {
+   "PASS": 2,
+   "PARTIAL": 5,
+   "FAIL": 13,
+   "LEAK": 0,
+   "items": 20,
+   "false_answers": [],
+   "false_refusals": [
+    "HO2-002",
+    "HO2-003",
+    "HO2-004",
+    "HO2-008",
+    "HO2-009",
+    "HO2-011",
+    "HO2-013",
+    "HO2-014",
+    "HO2-016",
+    "HO2-018"
+   ],
+   "leaks": []
+  },
+  "run2": {
+   "PASS": 2,
+   "PARTIAL": 6,
+   "FAIL": 12,
+   "LEAK": 0,
+   "items": 20,
+   "false_answers": [],
+   "false_refusals": [
+    "HO2-002",
+    "HO2-003",
+    "HO2-008",
+    "HO2-009",
+    "HO2-011",
+    "HO2-013",
+    "HO2-014",
+    "HO2-016"
+   ],
+   "leaks": []
+  }
+ },
+ "report_notes": {
+  "HO2-020": "Câu hỏi trùng nguyên văn câu hỏi gợi ý in trong tài liệu (ND-HR-004 tr. 12); retrieval có thể khớp thẳng vào câu đó."
+ }
+}
