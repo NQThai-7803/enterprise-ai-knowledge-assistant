@@ -53,11 +53,13 @@ def test_oracle_maps_questions_to_their_gold_and_skips_items_to_refuse() -> None
              "fact_alternatives": ["05 phút"], "also_facts": [{"fact": "30 phút"}]},
             {"question": "B?", "expect": "refuse"},
             {"question": "C?", "document": "E", "fact": "17 phút"},
+            {"question": "P?", "expect": "partial", "document": "F", "fact": "6 lần"},
         ]
     }  # fmt: skip
     assert fact_oracle(data) == {
         "A?": [{"document": "D", "facts": ["5 phút", "05 phút", "30 phút"]}],
         "C?": [{"document": "E", "facts": ["17 phút"]}],
+        "P?": [{"document": "F", "facts": ["6 lần"]}],  # the stated part of a partial item
     }
 
 

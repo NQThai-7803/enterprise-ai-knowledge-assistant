@@ -26,6 +26,8 @@ from app.chat.prompt_builder import (
     build_failed_claim_repair_prompt,
     build_grounded_prompt,
     build_grounding_system_prompt,
+    build_simple_grounded_prompt,
+    build_simple_system_prompt,
     information_need_source_labels,
 )
 from app.citations.errors import (
@@ -41,6 +43,8 @@ from app.citations.grounded_output import (
     parse_structured_grounded_llm_output,
 )
 from app.citations.models import PromptSourceRegistry
+from app.citations.normalizer import normalize_llm_citation_markers
+from app.citations.parser import SOURCE_MARKER_PATTERN, parse_citation_markers
 from app.citations.registry import build_prompt_source_registry
 from app.core.config import Settings, get_settings
 from app.core.exceptions import (
@@ -84,6 +88,8 @@ from app.observability.metrics import (
     BRANCH_RETRY_ABANDONED_FIRST,
     BRANCH_ROUTE_DETERMINISTIC,
     BRANCH_ROUTE_LLM,
+    BRANCH_SIMPLE_DETERMINISTIC,
+    BRANCH_SIMPLE_RETRY,
     BRANCH_TERMINAL_BLOCK,
     GLOBAL_METRICS,
 )
@@ -137,6 +143,7 @@ from app.services.claim_evidence_validation_service import (
     infer_yes_no_polarity,
     question_content_terms,
     question_head_in_evidence,
+    simple_validation,
     supporting_sentence,
 )
 from app.web_search.errors import WebSearchError
@@ -747,6 +754,10 @@ class GroundedAnswerService:
         conversation_context: ConversationContext,
     ) -> _AnswerDraft:
         grounding_question = conversation_context.resolved_question.standalone_question
+        if self.settings.rag_answer_mode != "legacy":
+            return await self._simple_answer_draft(
+                current_user=current_user, grounding_question=grounding_question
+            )
         information_needs = information_need_queries(grounding_question)
         retrieval_hits = ()
         retrieval_ms = 0
@@ -1332,6 +1343,175 @@ class GroundedAnswerService:
             close_provider = getattr(provider, "aclose", None)
             if self.close_llm_provider_after_generate and close_provider is not None:
                 await close_provider()
+
+    async def _simple_answer_draft(
+        self, *, current_user: User, grounding_question: str
+    ) -> _AnswerDraft:
+        """Simple answer mode: hybrid retrieval (permission-filtered in SQL), the top 5 chunks
+        with at most 2 per document, one prompt, citation and claim validation, one retry with
+        the reason, else NO_ANSWER. No deterministic route (except simple_det), no low-alignment
+        filter, no completeness or responsiveness check, no repair after the LLM."""
+        hits: tuple[HybridRetrievalHit, ...] = ()
+        if _should_retrieve_internal_context(self.settings):
+            try:
+                result = await self.hybrid_retrieval_service.retrieve(
+                    query=grounding_question,
+                    current_user=current_user,
+                    top_k=_chat_retrieval_candidate_top_k(
+                        settings=self.settings, reranker=self.retrieval_reranker
+                    ),
+                )
+            except Exception as exc:
+                raise ChatRetrievalFailedError() from exc
+            hits = _simple_select_hits(result.hits)
+        sentinel = self.settings.llm_no_answer_sentinel
+        selected = select_context_for_prompt(
+            hits=hits,
+            history_messages=(),
+            question=grounding_question,
+            system_prompt=build_simple_system_prompt(no_answer_sentinel=sentinel),
+            token_counter=self.token_counter,
+            max_tokens=self.settings.chat_context_max_tokens,
+            whole_chunks=True,
+        )
+        source_registry = build_prompt_source_registry(
+            context_items=selected.items, max_sources=_SIMPLE_TOP_K
+        )
+        if not source_registry.sources:
+            return self._simple_no_answer("no_sources")
+        if self.settings.rag_answer_mode == "simple_det":
+            built = await self._structured_value_answer_draft(
+                question=grounding_question,
+                source_registry=source_registry,
+                current_user=current_user,
+            )
+            if built is not None:
+                GLOBAL_METRICS.record_answer_branch(BRANCH_SIMPLE_DETERMINISTIC)
+                return built
+        messages = build_simple_grounded_prompt(
+            question=grounding_question,
+            source_registry=source_registry,
+            no_answer_sentinel=sentinel,
+        )
+        provider = None
+        try:
+            provider = _PromptTruncationGuard(
+                self.llm_provider_factory(),
+                context_window=self.settings.llm_context_window,
+                reserved_output_tokens=self.settings.llm_max_output_tokens,
+                enforce=self.settings.llm_prompt_truncation_guard_enabled,
+                token_counter=self.token_counter,
+                token_estimate_ratio=self.settings.llm_token_estimate_ratio,
+            )
+            reason = "llm_refused"
+            for attempt in (1, 2):
+                generation = await provider.generate(
+                    messages=messages,
+                    temperature=self.settings.llm_temperature,
+                    max_output_tokens=self.settings.llm_max_output_tokens,
+                )
+                outcome = await self._simple_validate(
+                    generation,
+                    question=grounding_question,
+                    source_registry=source_registry,
+                    current_user=current_user,
+                )
+                if isinstance(outcome, _AnswerDraft):
+                    return outcome
+                reason, retry_text = outcome
+                if retry_text is None or attempt == 2:
+                    break
+                GLOBAL_METRICS.record_answer_branch(BRANCH_SIMPLE_RETRY)
+                messages = build_simple_grounded_prompt(
+                    question=grounding_question,
+                    source_registry=source_registry,
+                    no_answer_sentinel=sentinel,
+                    retry_reason=retry_text,
+                    previous_answer=generation.content,
+                )
+            return self._simple_no_answer(reason, selected_chunk_count=len(source_registry.sources))
+        except LLMError as exc:
+            logger.error(
+                "LLM operation failed during grounded answer generation.",
+                extra={
+                    "provider": self.settings.llm_provider,
+                    "error_code": exc.code.value,
+                    "error_type": exc.__class__.__name__,
+                },
+            )
+            raise _map_llm_error(exc) from exc
+        except _PromptGuardStopError:
+            return self._simple_no_answer("no_sources")
+        finally:
+            close_provider = getattr(provider, "aclose", None)
+            if self.close_llm_provider_after_generate and close_provider is not None:
+                await close_provider()
+
+    async def _simple_validate(
+        self,
+        generation: LLMGenerationResult,
+        *,
+        question: str,
+        source_registry: PromptSourceRegistry,
+        current_user: User,
+    ) -> _AnswerDraft | tuple[str, str | None]:
+        """The answer draft, or (NO_ANSWER reason, retry instruction or None when final)."""
+        raw = generation.content.strip()
+        if raw.strip("\"' ") == self.settings.llm_no_answer_sentinel:
+            return "llm_refused", None
+        text = normalize_llm_citation_markers(raw, source_registry=source_registry)
+        markers = parse_citation_markers(text).ordered_unique_markers
+        plain = _simple_claim_text(text)
+        if not plain:
+            return "refusal_text", None
+        if not markers:
+            return "citation_missing", (
+                "it has no source marker. End every sentence that uses a source with its "
+                "marker, for example [SOURCE_1]."
+            )
+        try:
+            validated = await self.citation_validation_service.validate_and_map(
+                answer=text, source_registry=source_registry, current_user=current_user
+            )
+        except CitationPermissionRevalidationError:
+            return "permission", None
+        except CitationValidationError:
+            return "citation_invalid", (
+                "it uses a marker that is not one of the sources. Use only the markers shown, "
+                "for example [SOURCE_1]."
+            )
+        except CitationMappingError as exc:
+            raise CitationMappingFailedApplicationError() from exc
+        with simple_validation():
+            claim = await self.claim_validation_service.validate(
+                question=question,
+                answer=plain,
+                source_registry=source_registry,
+                cited_source_labels=tuple(marker.strip("[]") for marker in markers),
+            )
+        if claim.status != ClaimEvidenceStatus.SUPPORTED:
+            return f"claim_{claim.status.value.lower()}", (
+                "the cited sources do not support it as written. State only what the cited "
+                "sources say, with the marker of the source that says it; say plainly what the "
+                "documents do not mention."
+            )
+        return _AnswerDraft(
+            content=_strip_internal_evidence_labels(validated.answer),
+            grounding_status=GroundingStatus.ANSWERED,
+            retrieved_chunk_count=len(source_registry.sources),
+            response_time_ms=generation.response_time_ms,
+            prompt_tokens=generation.prompt_tokens,
+            completion_tokens=generation.completion_tokens,
+            citations=validated.citations,
+        )
+
+    def _simple_no_answer(self, reason: str, *, selected_chunk_count: int = 0) -> _AnswerDraft:
+        GLOBAL_METRICS.record_answer_branch(f"simple_no_answer_{reason}")
+        if self.settings.rag_diagnostics_enabled:
+            _log_no_answer_diagnostics(reason=f"simple_{reason}")
+        return _no_answer_draft(
+            self.settings.chat_no_answer_message, selected_chunk_count=selected_chunk_count
+        )
 
     async def _compound_draft_with_claim_repair(
         self,
@@ -5223,6 +5403,46 @@ def _number_occurs_in_source(number: str, source_text: str) -> bool:
         return False
     normalized = str(int(number))
     return any(str(int(match.group(0))) == normalized for match in re.finditer(r"\d+", source_text))
+
+
+_SIMPLE_TOP_K = 5
+_SIMPLE_MAX_CHUNKS_PER_DOCUMENT = 2
+# "The documents do not mention ...": the simple prompt states a missing part this way.
+_SIMPLE_ABSENCE_PHRASES = (*_NO_ANSWER_LIKE_ANSWER_PHRASES, *REFUSAL_PHRASES)
+# A sentence ends at . ! ? or a line break; a marker written after the full stop stays with it.
+_SIMPLE_SENTENCE_BREAK = re.compile(r"(?<=[.!?])\s+(?!\[SOURCE_)|\n+(?!\s*\[SOURCE_)")
+
+
+def _simple_select_hits(
+    hits: Sequence[HybridRetrievalHit],
+) -> tuple[HybridRetrievalHit, ...]:
+    """Hybrid order, the first 5 chunks with at most 2 from one document."""
+    chosen: list[HybridRetrievalHit] = []
+    per_document: dict[UUID, int] = {}
+    for hit in hits:
+        if per_document.get(hit.document_id, 0) >= _SIMPLE_MAX_CHUNKS_PER_DOCUMENT:
+            continue
+        chosen.append(hit)
+        per_document[hit.document_id] = per_document.get(hit.document_id, 0) + 1
+        if len(chosen) == _SIMPLE_TOP_K:
+            break
+    return tuple(chosen)
+
+
+def _simple_claim_text(answer: str) -> str:
+    """The answer's claims, markers removed, for claim validation. A sentence with no marker
+    that says the documents do not mention something states an absence, not a claim, so a
+    partial answer is checked on its stated part only; "" when the answer only states absences.
+    A sentence with a marker is always a claim."""
+    claims = []
+    for sentence in _SIMPLE_SENTENCE_BREAK.split(answer.strip()):
+        folded = sentence.casefold()
+        absence = not SOURCE_MARKER_PATTERN.search(sentence) and any(
+            phrase in folded for phrase in _SIMPLE_ABSENCE_PHRASES
+        )
+        if sentence.strip() and not absence:
+            claims.append(SOURCE_MARKER_PATTERN.sub(" ", sentence))
+    return " ".join(" ".join(claims).split())
 
 
 def _merge_retrieval_hits(

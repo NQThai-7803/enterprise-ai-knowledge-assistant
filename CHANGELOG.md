@@ -6,6 +6,13 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### Simple answer mode (experimental, off) -- 2026-11-16
+
+- `RAG_ANSWER_MODE` (`legacy` by default, `simple`, `simple_det`): a short answer path with the same hybrid retrieval and SQL permission filter, top 5 whole chunks (at most 2 per document), one plain-text prompt with `[SOURCE_n]` markers, citation and claim validation with number/unit normalization, one retry with the reason, then NO_ANSWER. `simple_det` adds the strict deterministic route as a fast path. New counters `simple_retry`, `simple_deterministic`, `simple_no_answer_<reason>`.
+- In simple mode a REFERENCE chunk counts by its answer segments in claim validation, so one document-control line no longer hides the other facts of a whole chunk.
+- The UAT runner records branch counters; the compound set has an oracle map.
+- Measured, not adopted: on the dev sets fewer false refusals (28 to 11 / 9) but more false answers (17 to 19 / 20), so DEC-026 is not met; UAT 98-99 to 39-40 / 59. Results and the proposed next step: `docs/design/simple-answer-mode.md`.
+
 ### Held-out v2 report -- 2026-11-15
 
 - Owner-graded held-out v2 report (`docs/eval/runs/heldout-v2-ff5016d/report.md`): PASS 2, PARTIAL 5-6, FAIL 12-13, LEAK 0 of 20 per run, split near UAT / rest, with DEC-022 and run #1 stated. `heldout_v2_release.py report` uses the held-out v1 label rule and takes `--grader` / `--run`.

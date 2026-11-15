@@ -8,6 +8,13 @@
 3. **Embedding fine-tune** (`docs/design/embedding-finetune.md` and DEC-015 on branch `feat/embedding-finetune-infra`): infrastructure only so far; the baseline measurement and training come after FIX 3.
 4. The final held-out v2 measurement, once, after the choices above are made (DEC-012).
 
+## Simple answer mode -- 2026-11-16 (STOPPED for report)
+
+- **DONE:** DEC-026 (PR #35); `RAG_ANSWER_MODE=legacy|simple|simple_det` behind the flag, default `legacy`; unit tests with made-up documents; measured on 6 sets, 2 runs, with oracle × {legacy, simple} (`docs/design/simple-answer-mode.md`).
+- **Result:** neither mode meets DEC-026 (dev false answers + wrong 17 → 19 / 20); UAT monitoring 98-99 → 39-40 / 59. Default unchanged.
+- **WAITING FOR OWNER:** (1) the compound partial wording: "chưa xác minh được" (compound grader, earlier decision) or "tài liệu không đề cập" (phase prompt); (2) whether to go on with the proposed order: diagnostic run of rejected drafts (counts only) → per-sentence claim validation, QUESTION_LIST by segments, short-answer prompt, each measured; `simple_det` dropped.
+- natural_dev_v1 and held-out v3: waiting for the owner's collection (`docs/design/natural-dev-heldout-v3-intake.md`).
+
 ## Phase 3 held-out v2 -- graded 2026-11-15
 
 - **DONE:** release run `43701804785` valid (0 INFRA_ERROR, none over 120 s); owner graded; report in `docs/eval/runs/heldout-v2-ff5016d/`. `report` now reads labels with the held-out v1 rule (blank run 2 inherits run 1 only when the runs are identical) and records the grader. No app change from the results.

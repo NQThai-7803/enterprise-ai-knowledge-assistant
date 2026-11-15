@@ -147,6 +147,7 @@ def select_context_for_prompt(
     token_counter: TokenCounter,
     max_tokens: int,
     excerpt_fallback: bool = False,
+    whole_chunks: bool = False,
 ) -> SelectedContext:
     if max_tokens <= 0:
         raise ValueError("max_tokens must be greater than zero.")
@@ -159,13 +160,17 @@ def select_context_for_prompt(
     )
     used_tokens = token_counter.count(base_text) + token_counter.count(render_source_context(()))
     for hit in hits:
-        source_text = query_focused_excerpt(
-            hit.text,
-            question,
-            information_needs=information_needs,
+        source_text = (
+            _collapse_whitespace(hit.text)
+            if whole_chunks  # simple answer mode: the chunk as indexed, no line selection
+            else query_focused_excerpt(hit.text, question, information_needs=information_needs)
         )
-        if excerpt_fallback and excerpt_misses_question(
-            source_text, hit.text, question=question, information_needs=information_needs
+        if (
+            not whole_chunks
+            and excerpt_fallback
+            and excerpt_misses_question(
+                source_text, hit.text, question=question, information_needs=information_needs
+            )
         ):
             GLOBAL_METRICS.record_answer_branch(BRANCH_EXCERPT_FALLBACK)
             source_text = _collapse_whitespace(hit.text)

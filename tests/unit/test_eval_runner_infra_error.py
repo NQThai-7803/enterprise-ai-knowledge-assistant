@@ -217,3 +217,26 @@ def test_each_case_records_the_route_its_answer_took(tmp_path: Path) -> None:
     # No counter moved for q3, so its route is unknown rather than guessed.
     assert [case["answer_route"] for case in cases] == ["deterministic", "llm", None]
     assert runner.answer_route(None, counters) is None
+
+
+def test_the_run_records_every_branch_counter_over_the_run(tmp_path: Path) -> None:
+    counters = {"route_llm": 0, "simple_no_answer_claim_insufficient": 0}
+
+    class CountingClient(FakeClient):
+        def ask(self, session_id: str, question: str) -> eval_client.AskResult:
+            counters["route_llm"] += 1
+            counters["simple_no_answer_claim_insufficient"] += question == "q2"
+            return super().ask(session_id, question)
+
+    output = tmp_path / "runtime_results.json"
+    runner.run(
+        selected_ids=set(),
+        output=output,
+        resume=False,
+        delay_seconds=0.0,
+        client_factory=lambda _credentials: CountingClient({"q1": [OK], "q2": [OK], "q3": [OK]}),
+        benchmark_loader=lambda: (("e", "p"), BENCHMARK),
+        route_reader=lambda: dict(counters),
+    )
+    payload = json.loads(output.read_text(encoding="utf-8"))
+    assert payload["branch_counters"] == {"route_llm": 3, "simple_no_answer_claim_insufficient": 1}
