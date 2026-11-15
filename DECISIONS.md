@@ -212,3 +212,16 @@ Set by the owner on 2026-11-15.
 - `RERANKER_PROVIDER` defaults to `heuristic`: candidates are ranked by lexical alignment, which is what every measurement used (`reranker_mode=lexical_fallback`). The lexical ranking itself is not changed.
 - The `sentence_transformers` cross-encoder stays in the code behind `RERANKER_PROVIDER` for option (a) of ADR 0004, once a GPU is available. The eval workflow no longer downloads or mounts cross-encoder models.
 - Accepted only if one batch on the 6 dev sets (same job, 2 runs) changes no answer; a stable change stops the merge.
+
+## DEC-026 — New selection rule; UAT is monitored, not a gate
+
+Set by the owner on 2026-11-15, before the simple answer mode is coded.
+
+- **UAT Q001-Q100 is no longer a hard gate.** It overfits the deterministic route (75-76 of 100 answers are server-built, `docs/design/pipeline-loss-fix-plan.md` section 7). UAT is still run and reported for monitoring, split by route (`by_route`).
+- **Selection rule for a configuration, in this order:**
+  1. permission leaks = 0 on every set;
+  2. the **total** of false answers (answered when it must refuse, plus a wrong value) summed over the dev sets does not increase;
+  3. then prefer fewer false refusals on `natural_dev_v1` (once it exists), then on the other dev sets.
+- Supersedes the per-set "not worse anywhere" comparison of DEC-013 for decisions from now on. Same-job baselines, 2 runs and rules written before measuring (DEC-011) still apply.
+- **`natural_dev_v1` and held-out v3** are collected by the owner from the team. Intake follows the held-out v2 procedure (`docs/design/natural-dev-heldout-v3-intake.md`): freeze with a lock, fingerprints, overlap check, gold written from the PDFs only and approved by the owner. `natural_dev_v1` may be used for design; held-out v3 may not (as DEC-012).
+- Recorded reason: on new questions the false-refusal rate is about 53%, caused by the stack of hand-written checks; only this overall conclusion is used, never held-out v1/v2 items, for design.
