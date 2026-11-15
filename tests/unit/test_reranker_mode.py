@@ -72,6 +72,8 @@ def _reranker(cache: Path | str = "./missing-cache", **kwargs) -> object:
 
 def _settings(tmp_path: Path, **kwargs) -> Settings:
     reranker_factory._RERANKER_CACHE.clear()
+    # These tests exercise the cross-encoder path, which is no longer the default (DEC-025).
+    kwargs.setdefault("reranker_provider", "sentence_transformers")
     return Settings(
         reranker_model_cache_path=str(tmp_path),
         reranker_model="org/model",
@@ -148,6 +150,16 @@ def test_startup_warns_only_on_fallback(tmp_path: Path, caplog: pytest.LogCaptur
     _fake_cache(tmp_path, weights=True)
     with caplog.at_level(logging.WARNING):
         assert log_reranker_startup_status(_settings(tmp_path)) == "cross_encoder"
+    assert _codes(caplog) == []
+
+
+def test_the_default_heuristic_ranker_is_lexical_and_not_reported_as_a_fallback(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    reranker_factory._RERANKER_CACHE.clear()
+    default = Settings(_env_file=None, reranker_model_cache_path=str(tmp_path))
+    with caplog.at_level(logging.WARNING):
+        assert log_reranker_startup_status(default) == "lexical_fallback"
     assert _codes(caplog) == []
 
 

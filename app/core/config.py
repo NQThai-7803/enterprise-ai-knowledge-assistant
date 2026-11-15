@@ -183,7 +183,9 @@ class Settings(BaseSettings):
     # D2: a sub-claim answer that only restates an earlier one is not shown twice.
     rag_dedupe_claim_answers_enabled: bool = True
     reranker_enabled: bool = True
-    reranker_provider: Literal["sentence_transformers", "heuristic"] = "sentence_transformers"
+    # ADR 0004 (b), DEC-025: no cross-encoder by default; lexical alignment ranks, as in every
+    # measurement. sentence_transformers stays for option (a), when a GPU is available.
+    reranker_provider: Literal["sentence_transformers", "heuristic"] = "heuristic"
     reranker_model: str = Field(default="BAAI/bge-reranker-v2-m3", min_length=1)
     reranker_model_revision: str = ""
     reranker_device: str = Field(default="cpu", min_length=1)

@@ -57,6 +57,8 @@ def resolve_reranker_mode(settings: Settings) -> str:
 
 def log_reranker_startup_status(settings: Settings) -> str:
     mode = resolve_reranker_mode(settings)
-    if mode == RERANKER_MODE_LEXICAL_FALLBACK:
+    # Lexical alignment is the chosen ranker with the heuristic provider (DEC-025); it is a
+    # fallback only when a cross-encoder was configured and could not be loaded.
+    if mode == RERANKER_MODE_LEXICAL_FALLBACK and settings.reranker_provider != "heuristic":
         log_reranker_fallback_active(context="startup")
     return mode

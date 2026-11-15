@@ -204,3 +204,11 @@ Recorded on 2026-11-14 at the owner's instruction. Full record: `adr/0003-phase-
 - qwen2.5:7b was measured against 3B on 6 dev sets, with gold context and with real retrieval, on CPU. It removes some false answers (5 of 6 sets with real retrieval, one more on relevance) but adds almost no correct answers, at 1.9-2.8x the latency and 11-13 GB peak RAM on a 16 GB runner.
 - **Keep qwen2.5:3b. Revisit when a GPU with at least 8 GB VRAM is available,** with the same 6 sets in one batch.
 - Limit recorded: the responsiveness threshold t = 0.81 was calibrated on 18 LLM-route UAT answers with 3B; a model change needs a new calibration.
+
+## DEC-025 — No cross-encoder in the pipeline (ADR 0004 option b)
+
+Set by the owner on 2026-11-15.
+
+- `RERANKER_PROVIDER` defaults to `heuristic`: candidates are ranked by lexical alignment, which is what every measurement used (`reranker_mode=lexical_fallback`). The lexical ranking itself is not changed.
+- The `sentence_transformers` cross-encoder stays in the code behind `RERANKER_PROVIDER` for option (a) of ADR 0004, once a GPU is available. The eval workflow no longer downloads or mounts cross-encoder models.
+- Accepted only if one batch on the 6 dev sets (same job, 2 runs) changes no answer; a stable change stops the merge.
