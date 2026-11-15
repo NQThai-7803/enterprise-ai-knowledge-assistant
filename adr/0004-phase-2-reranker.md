@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (2026-11-14). Chưa code. Owner chọn một phương án trước khi làm.
+Accepted: phương án (b) (owner, 2026-11-15; DEC-025). Phương án (a) giữ lại sau flag `RERANKER_PROVIDER=sentence_transformers`, làm khi có GPU.
 
 ## Context
 

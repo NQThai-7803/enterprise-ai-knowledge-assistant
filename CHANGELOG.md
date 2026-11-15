@@ -6,6 +6,10 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### No cross-encoder (DEC-025) -- 2026-11-15
+
+- `RERANKER_PROVIDER` defaults to `heuristic`: lexical alignment ranks the candidates, as in every measurement; the cross-encoder stays behind the flag for ADR 0004 option (a). `eval.yml` no longer downloads or mounts cross-encoder models. One batch on 6 dev sets: 0 changed answers.
+
 ### Phase 1 closed -- 2026-11-15
 
 - The responsiveness check is on for LLM answers, with t = 0.80 recalibrated on every LLM draft of UAT (20 answers) and the terminal stop (`RAG_RESPONSIVENESS_CHECK_ENABLED`, `RAG_RESPONSIVENESS_MIN_SIMILARITY=0.80`, `RAG_RESPONSIVENESS_BLOCK_TERMINAL_ENABLED`): fewer false answers on RBAC, relevance and FR v2, no set worse.

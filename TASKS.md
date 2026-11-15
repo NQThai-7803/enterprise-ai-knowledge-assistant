@@ -8,6 +8,14 @@
 3. **Embedding fine-tune** (`docs/design/embedding-finetune.md` and DEC-015 on branch `feat/embedding-finetune-infra`): infrastructure only so far; the baseline measurement and training come after FIX 3.
 4. The final held-out v2 measurement, once, after the choices above are made (DEC-012).
 
+## Phase 5 backlog -- English questions (recorded 2026-11-15)
+
+- **FR2-E01, FR2-E03 (English questions over Vietnamese sources) became false refusals** when the responsiveness check (ii) was turned on: its threshold t = 0.80 was calibrated on Vietnamese UAT questions only, and an English question has a lower e5 cosine with Vietnamese evidence. Fix in phase 5 (with mechanism E, `docs/design/pipeline-loss-fix-plan.md`): calibrate per language or translate the question before the check; measure on group E of `false_refusal_dev_v2`.
+
+## Phase 2 reranker -- 2026-11-15
+
+- **DONE (code):** ADR 0004 option (b), DEC-025: `RERANKER_PROVIDER=heuristic` by default; no cross-encoder download or mount in `eval.yml`. **Measured: 0 changed answers on 6 sets** (`docs/eval/runs/reranker-off.md`).
+
 ## Phase 1 final round -- 2026-11-15 (STOPPED for report; phase 1 closed)
 
 - **DONE:** (ii) recalibrated on every LLM draft (t = 0.80, 20 answers) and on by default with the terminal stop; (iv) with per-claim responsiveness measured, stays off (CP1-R03).

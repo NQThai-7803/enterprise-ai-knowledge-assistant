@@ -1,5 +1,9 @@
 # Project Status
 
+## Reranker: no cross-encoder -- 2026-11-15
+
+- DEC-025 (ADR 0004 option b): the pipeline ranks by lexical alignment only; the cross-encoder is off by default and kept behind `RERANKER_PROVIDER`. Measured on 6 dev sets in one batch: 0 changed answers.
+
 ## Phase 1 closed -- 2026-11-15
 
 - **Responsiveness check on:** LLM answers whose evidence sentence is too far from the question (cosine < 0.80) end at NO_ANSWER. Fewer false answers on RBAC (1 to 0), relevance (5 to 4) and FR v2 (5 to 4); UAT 100/100 and the other sets unchanged. English questions (FR2-E01, E03) are now refused: the threshold comes from Vietnamese UAT.
