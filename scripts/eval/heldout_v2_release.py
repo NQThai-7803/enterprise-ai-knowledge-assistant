@@ -130,7 +130,8 @@ def lock_gold(
         "locked_at": datetime.now(UTC).isoformat(timespec="seconds"),
         "rule": "any edit needs a new approval and a new lock",
     }
-    gold_lock.write_text(json.dumps(payload, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    text = json.dumps(payload, ensure_ascii=False, indent=1) + "\n"
+    gold_lock.write_text(text, encoding="utf-8", newline="\n")  # LF on every OS
     return payload
 
 
