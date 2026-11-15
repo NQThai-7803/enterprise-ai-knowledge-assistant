@@ -34,3 +34,9 @@ Ngày 2026-11-11 owner đã chạy tay 20 câu held-out v2 trên hệ thống, n
 - **Artifact của run #1 không được dùng để chấm** và không được mở ngoài việc liệt kê tên file và đếm dòng.
 - **Sửa:** workflow đặt `EVAL_OLLAMA_LOG`; bước mới `preflight` (`heldout_v2_release.py preflight`) chạy mọi kiểm tra của runner (gate, reranker, Ollama, một lần đăng nhập mỗi vai trò) ngay sau khi dựng stack, trước khi nạp corpus và trước câu đầu tiên; `runner.log` ghi cả stderr; input `preflight_only` cho phép chạy riêng phần kiểm mà không gửi câu nào. Test chặn hồi quy: `tests/unit/test_heldout_v2_release.py`.
 - Lần chạy kế tiếp vẫn là lần đo held-out v2 đầu tiên theo DEC-012, vì run #1 chưa gửi câu nào. Báo cáo của lần đó phải nêu run #1 cùng với sự việc DEC-022.
+
+## Lượt đo held-out v2 (2026-11-15)
+
+- **Actions run `43701804785`, commit `ff5016d`**, mặc định hiện tại, CPU, Ollama 0.40.15 (backend CPU, kiểm ở đầu và cuối mỗi lượt), `reranker_mode=lexical_fallback`. Trước đó: `43701078424` huỷ sau 14 s, `43701098015` chỉ chạy preflight; cả hai không gửi câu nào.
+- **Hai lượt hợp lệ:** mỗi lượt 20/20 câu, 0 INFRA_ERROR, 0 lần thử lại, không câu nào quá 120 s (lớn nhất 84,5 s và 83,0 s). SHA256 câu hỏi và gold khớp lock.
+- Bảng chấm: `docs/eval/runs/heldout-v2-ff5016d/grading.md` và `grading.csv`, chép nguyên từng byte từ artifact; **chưa có nhãn**, owner chấm. Cờ REVIEW và gợi ý proxy trong đó là phần tự động của bảng chấm, không phải nhãn.

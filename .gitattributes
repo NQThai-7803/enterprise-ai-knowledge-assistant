@@ -20,3 +20,5 @@ tests/acceptance/compound_partial_dev_v1.lock text eol=lf
 eval-data/**/*.pdf binary
 eval-data/**/*.json text eol=lf
 eval-data/corpus-v2/SHA256SUMS text eol=lf
+# Held-out grading sheets are kept byte for byte as the run produced them.
+docs/eval/runs/heldout-v2-*/grading.csv -text
