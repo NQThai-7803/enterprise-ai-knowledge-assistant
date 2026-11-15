@@ -145,3 +145,25 @@ def test_the_report_needs_every_label_and_counts_each_group_apart() -> None:
     rows[1]["label_run2"] = ""
     with pytest.raises(release.GateRefusedError, match="labels missing"):
         release.report(rows)
+
+
+def test_a_gold_document_cited_only_off_its_gold_pages_gets_a_hint() -> None:
+    item = {"gold_citations": [{"document": "DOC-A", "pages": [10]}]}
+    on_page = {"status": "ANSWERED", "citations": [{"document_id": "d1", "page_number": 10}]}
+    off_page = {"status": "ANSWERED", "citations": [{"document_id": "d1", "page_number": 12}]}
+    codes = {"d1": "DOC-A"}
+    assert release.page_hints(item, on_page, codes) == []
+    assert release.page_hints(item, off_page, codes) == [
+        "DOC-A cited on p.[12] but not on gold p.[10]"
+    ]
+    assert release.page_hints(item, {"status": "NO_ANSWER", "citations": []}, codes) == []
+
+
+def test_report_notes_reach_the_report() -> None:
+    row = {"id": "H2-001", "near_uat_group": "other", "gold_status": "ANSWERED",
+           "run1_status": "ANSWERED", "run2_status": "ANSWERED", "label_run1": "PASS",
+           "label_run2": "PASS",
+           "report_note": "câu trùng câu hỏi gợi ý trong tài liệu"}  # fmt: skip
+    counts = release.report([row])
+    assert counts["report_notes"] == {"H2-001": "câu trùng câu hỏi gợi ý trong tài liệu"}
+    assert "H2-001: câu trùng câu hỏi gợi ý" in release.render_report(counts)

@@ -215,6 +215,8 @@ def build_grading(
         hints = sorted(
             set(heldout_grading.proxy_suggestions(item, c1, codes))
             | set(heldout_grading.proxy_suggestions(item, c2, codes))
+            | set(page_hints(item, c1, codes))
+            | set(page_hints(item, c2, codes))
         )
         near = groups.get(item["id"], {})
         group = near.get("group", OTHER)
@@ -231,6 +233,7 @@ def build_grading(
                 "run2_status": c2["status"],
                 **{flag: int(flag in flags) for flag in heldout_grading.FLAGS},
                 "proxy_suggestions": " | ".join(hints),
+                "report_note": item.get("report_note", ""),
                 "label_run1": "",
                 "label_run2": "",
                 "notes": "",
@@ -264,6 +267,10 @@ def build_grading(
                 md += ["", f"**{title}:**"] + (
                     [f"- {p}" for p in value] if isinstance(value, list) else [f"- {value}"]
                 )
+        if item.get("notes"):
+            md += ["", f"**Gold notes:** {item['notes']}"]
+        if item.get("report_note"):
+            md += ["", f"**Report note:** {item['report_note']}"]
         if item.get("gold_citations"):
             md += [
                 "",
@@ -330,6 +337,27 @@ def build_grading(
     return "\n".join(lines) + "\n", rows
 
 
+def page_hints(
+    item: Mapping[str, Any], case: Mapping[str, Any], codes: Mapping[str, str]
+) -> list[str]:
+    """A gold document cited only on pages outside its gold pages (the proxy is per document)."""
+    if case["status"] != "ANSWERED":
+        return []
+    cited: dict[str, set[Any]] = {}
+    for citation in case["citations"]:
+        code = codes.get(citation.get("document_id"), "?")
+        cited.setdefault(code, set()).add(citation.get("page_number"))
+    hints = []
+    for gold in item.get("gold_citations", []):
+        pages = cited.get(gold["document"])
+        if pages and not pages & set(gold["pages"]):
+            hints.append(
+                f"{gold['document']} cited on p.{sorted(pages, key=str)} but not on gold "
+                f"p.{gold['pages']}"
+            )
+    return hints
+
+
 def report(rows: Sequence[Mapping[str, str]]) -> dict[str, Any]:
     """Counts per group and run from the owner's labels; refuses a sheet with a blank label."""
     blank = [r["id"] for r in rows if not r["label_run1"].strip() or not r["label_run2"].strip()]
@@ -358,6 +386,7 @@ def report(rows: Sequence[Mapping[str, str]]) -> dict[str, Any]:
                 "leaks": [r["id"] for r in members if r[f"label_{run}"].strip().upper() == "LEAK"],
             }
         out[group] = per_run
+    out["report_notes"] = {r["id"]: r["report_note"] for r in rows if r.get("report_note")}
     return out
 
 
@@ -383,6 +412,10 @@ def render_report(counts: Mapping[str, Any]) -> str:
         "Nhóm gần UAT đo gần với bộ dev nên dễ được lợi từ việc tinh chỉnh trên UAT; nhóm còn lại "
         "là tín hiệu chính.",
     ]
+    notes = counts.get("report_notes") or {}
+    if notes:
+        lines += ["", "**Ghi chú từng câu (owner):**"]
+        lines += [f"- {item_id}: {note}" for item_id, note in sorted(notes.items())]
     return "\n".join(lines) + "\n"
 
 

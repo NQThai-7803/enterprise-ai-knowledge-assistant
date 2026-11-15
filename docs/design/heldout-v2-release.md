@@ -1,6 +1,6 @@
 # Giai đoạn 3: lần đo held-out v2 (DEC-012)
 
-Chuẩn bị 2026-11-15. **Chưa chạy.** Held-out v2 chỉ chạy một lần, ở mốc release, có owner duyệt.
+Chuẩn bị 2026-11-15. **Chưa chạy.** Gold đã được owner duyệt và khóa ngày 2026-11-15 (`heldout-v2-gold.lock`, `approved_by: owner (NQThai-7803)`); còn chờ environment `heldout-v2-release` và merge vào `main`. Held-out v2 chỉ chạy một lần, ở mốc release, có owner duyệt.
 
 ## Phải nêu trong mọi báo cáo (DEC-022)
 

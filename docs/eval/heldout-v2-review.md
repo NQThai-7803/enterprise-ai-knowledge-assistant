@@ -1,17 +1,19 @@
-# Held-out v2, đợt 1: gold chờ duyệt
+# Held-out v2, đợt 1: gold đã duyệt
 
-Trạng thái: **BẢN NHÁP, chờ chủ dự án duyệt.** Tạo bằng `scripts/eval/heldout_v2_check.py check` từ `docs/eval/heldout-v2-gold.yaml`; muốn sửa thì sửa YAML rồi chạy lại. Gold chỉ soạn từ PDF, không chạy hệ thống trên bộ này.
+Trạng thái: **ĐÃ DUYỆT** (gold `status: APPROVED`; quyết định của owner ghi trong `notes` của từng câu). Khóa bằng `docs/eval/heldout-v2-gold.lock`; sửa gì cũng cần duyệt và khóa lại. Tạo bằng `scripts/eval/heldout_v2_check.py check` từ `docs/eval/heldout-v2-gold.yaml`; muốn sửa thì sửa YAML rồi chạy lại.
 
-Câu hỏi đã đóng băng: SHA256 `dae7f8818a015d43a00d09fbeff9cc63f41c75d005e11f465e77617a0e86cd5a`. Gold chưa đóng băng; sẽ khóa sau khi duyệt.
+Gold chỉ soạn từ PDF, không chạy hệ thống trên bộ này.
 
-Cách duyệt: với mỗi câu, đánh dấu **DUYỆT**, hoặc **SỬA** và ghi nội dung cần đổi.
+Câu hỏi đã đóng băng: SHA256 `dae7f8818a015d43a00d09fbeff9cc63f41c75d005e11f465e77617a0e86cd5a`.
+
+Các câu dưới đây là gold đã khóa; không còn ô duyệt.
 
 ## Kiểm tra
 
 - Lỗi cấu trúc: không có
 - Đoạn trích khớp đúng trang PDF: 47/47
 - Câu trùng 4-gram trong `app/`: {'HO2-020': ['xu ly su co']}
-- Câu cần bạn quyết định: HO2-001, HO2-003, HO2-004, HO2-005, HO2-012, HO2-016, HO2-018, HO2-020
+- Câu cần bạn quyết định: không có
 
 ## HO2-001: ANSWERED
 
@@ -34,12 +36,7 @@ Cách duyệt: với mỗi câu, đánh dấu **DUYỆT**, hoặc **SỬA** và 
 - ND-HR-003 tr. 4 (khớp): "Nghỉ trưa tiêu chuẩn 60 phút, thông thường từ 12:00 - 13:00"
 - ND-HR-002 tr. 5 (khớp): "Khung giờ làm việc tham chiếu: 08:30-17:30; nghỉ trưa 12:00-13:00. Nhân viên linh hoạt có thể bắt đầu 08:00-09:30"
 
-**CẦN BẠN QUYẾT ĐỊNH:** Hai tài liệu khác nhau về giờ bắt đầu và kết thúc. Đề xuất: gold theo ND-HR-003 vì là chính sách chuyên đề và áp dụng muộn hơn (01/09/2026 so với 01/08/2026); câu trả lời nêu số của ND-HR-002 và trích ND-HR-002 vẫn đạt.
-
-**Ghi chú:** Câu ghép 3 ý, mỗi ý một mục bắt buộc.
-
-- [ ] DUYỆT
-- [ ] SỬA:
+**Ghi chú:** Câu ghép 3 ý, mỗi ý một mục bắt buộc. Owner duyệt theo đề xuất (2026-11-15): hai tài liệu khác nhau về giờ bắt đầu và kết thúc; gold theo ND-HR-003 vì là chính sách chuyên đề và áp dụng muộn hơn (01/09/2026 so với 01/08/2026); câu trả lời nêu số của ND-HR-002 và trích ND-HR-002 vẫn đạt.
 
 ## HO2-002: ANSWERED
 
@@ -63,9 +60,6 @@ Cách duyệt: với mỗi câu, đánh dấu **DUYỆT**, hoặc **SỬA** và 
 
 **Ghi chú:** Câu ghép 2 ý. ND-HR-003 trang 8 chỉ nói 'theo thẩm quyền'; tên vai trò nằm ở trang 10.
 
-- [ ] DUYỆT
-- [ ] SỬA:
-
 ## HO2-003: ANSWERED
 
 **Câu hỏi:** Tiền OT sẽ tính như nào nếu tôi làm sau giờ làm hành chính?
@@ -85,10 +79,7 @@ Cách duyệt: với mỗi câu, đánh dấu **DUYỆT**, hoặc **SỬA** và 
 - ND-HR-005 tr. 7 (khớp): "Làm thêm vào ban đêm Ngoài tiền OT và khoản 30% ban đêm, còn trả thêm ít nhất 20% theo cơ sở pháp luật áp dụng."
 - ND-HR-005 tr. 7 (khớp): "OT phải được yêu cầu/phê duyệt theo ND-HR-003"
 
-**CẦN BẠN QUYẾT ĐỊNH:** Đề xuất chỉ bắt buộc mức 150%, vì câu hỏi nói 'sau giờ hành chính' mà không nói ban đêm hay điều kiện duyệt. Nếu muốn, có thể nâng điều kiện phê duyệt thành ý bắt buộc.
-
-- [ ] DUYỆT
-- [ ] SỬA:
+**Ghi chú:** Owner duyệt theo đề xuất (2026-11-15): chỉ bắt buộc mức 150%, vì câu hỏi nói 'sau giờ hành chính' mà không nói ban đêm hay điều kiện duyệt; điều kiện phê duyệt là ý không bắt buộc.
 
 ## HO2-004: ANSWERED
 
@@ -113,23 +104,24 @@ Cách duyệt: với mỗi câu, đánh dấu **DUYỆT**, hoặc **SỬA** và 
 - ND-HR-004 tr. 6 (khớp): "Người lao động chỉ rời lịch làm việc sau khi yêu cầu ở trạng thái Approved, trừ tình huống khẩn cấp đã thông báo cho quản lý."
 - UAT-LEAVE-AUTHORITY-001 tr. 4 (khớp): "Người lao động nên đăng ký nghỉ phép năm trước ít nhất 03 ngày làm việc; nghỉ từ 05 ngày liên tục nên đăng ký trước ít nhất 10 ngày làm việc"
 
-**CẦN BẠN QUYẾT ĐỊNH:** UAT-LEAVE-AUTHORITY-001 trang 4 ghi thời hạn khác (ít nhất 03 ngày; từ 05 ngày liên tục ít nhất 10 ngày). Đây là tài liệu mẫu ghi 'CHƯA PHẢI VĂN BẢN BAN HÀNH' với [TÊN DOANH NGHIỆP]. Đề xuất: gold theo ND-HR-004; câu chỉ nêu thời hạn của tài liệu mẫu không đạt ý 4. 'Nghỉ có phép' được hiểu là phép năm.
+**Ví dụ không đạt:**
+- Đăng ký nghỉ phép năm trước ít nhất 03 ngày làm việc; nghỉ từ 05 ngày liên tục đăng ký trước ít nhất 10 ngày làm việc. (chỉ thời hạn của tài liệu mẫu: không đạt ý 4)
 
-- [ ] DUYỆT
-- [ ] SỬA:
+**Ghi chú:** Owner quyết định (2026-11-15): gold theo ND-HR-004, tài liệu công ty. UAT-LEAVE-AUTHORITY-001 là tài liệu mẫu ('CHƯA PHẢI VĂN BẢN BAN HÀNH', [TÊN DOANH NGHIỆP]), không phải chính sách công ty; trang 4 của nó ghi thời hạn khác (ít nhất 03 ngày; từ 05 ngày liên tục ít nhất 10 ngày). Câu trả lời chỉ nêu thời hạn của tài liệu mẫu thì không đạt ý 4. 'Nghỉ có phép' được hiểu là phép năm.
 
 ## HO2-005: ANSWERED_LIMITED
 
 **Câu hỏi:** Phụ nữ mang thai thì được nghỉ 3 tháng có phép phải không?
 
 **Ý bắt buộc:**
-1. Đính chính: không xác nhận được. Tài liệu không có quy định phụ nữ mang thai được nghỉ 3 tháng.
-2. Thai sản không phải nghỉ phép: đây là chế độ nghỉ theo BHXH; quyền lợi và thời gian nghỉ khi sinh con thực hiện theo pháp luật hiện hành.
+1. Tài liệu không quy định thời gian nghỉ cụ thể cho phụ nữ mang thai; không xác nhận "3 tháng".
+2. Nghỉ thai sản thực hiện theo Luật Bảo hiểm xã hội và Bộ luật Lao động.
 
 **Tài liệu không nêu:**
 - Số tháng nghỉ thai sản.
 
 **Ý không bắt buộc:**
+- Thai sản không phải nghỉ phép: đây là chế độ nghỉ theo BHXH.
 - HR hỗ trợ xác định hồ sơ, thời điểm nghỉ, quyền lợi BHXH và kế hoạch bàn giao.
 - Khám thai/chăm sóc thai kỳ: đăng ký loại nghỉ tương ứng.
 - Quản lý không được tự ý chuyển nghỉ thai sản thành nghỉ phép năm nếu người lao động đủ điều kiện hưởng chế độ khác.
@@ -142,7 +134,7 @@ Cách duyệt: với mỗi câu, đánh dấu **DUYỆT**, hoặc **SỬA** và 
 - ND-HR-004 tr. 8 (khớp): "Sinh con Lập kế hoạch bàn giao trước khi nghỉ nếu điều kiện cho phép; quyền lợi và thời gian nghỉ thực hiện theo pháp luật hiện hành."
 - ND-HR-004 tr. 8 (khớp): "Các chế độ thai sản thực hiện theo Luật Bảo hiểm xã hội 2024, Bộ luật Lao động và văn bản hướng dẫn có hiệu lực tại thời điểm phát sinh."
 
-**Điều kiện đạt:** Đạt khi câu trả lời (a) không xác nhận 3 tháng, (b) nói thai sản theo BHXH và pháp luật chứ không phải nghỉ phép, (c) không thêm số tháng nào từ ngoài tài liệu.
+**Điều kiện đạt:** Đạt khi câu trả lời (a) nói tài liệu không quy định thời gian cụ thể và không xác nhận 3 tháng, (b) nói nghỉ thai sản theo Luật Bảo hiểm xã hội và Bộ luật Lao động, (c) không nêu bất kỳ số tháng cụ thể nào. Nói thêm 'không phải nghỉ phép' là ý không bắt buộc. Câu mẫu đạt: "Không có thời gian cụ thể, phụ nữ mang thai được nghỉ theo quy định của Luật Bảo hiểm xã hội và Bộ luật Lao động."
 
 **Ví dụ không đạt:**
 - Đúng, được nghỉ 3 tháng có phép.
@@ -150,12 +142,7 @@ Cách duyệt: với mỗi câu, đánh dấu **DUYỆT**, hoặc **SỬA** và 
 
 **Từ khóa phải vắng, số lần gặp trong tài liệu:** '3 tháng': 1, '6 tháng': 1
 
-**CẦN BẠN QUYẾT ĐỊNH:** Tiền đề sai theo yêu cầu của bạn, nhưng PDF không nêu số tháng đúng. Con số 6 tháng là kiến thức ngoài PDF, nên đề xuất tính là KHÔNG ĐẠT nếu câu trả lời nêu số đó. Hai kết quả tìm thấy không liên quan: '3. Thăng chức' (ND-HR-005 trang 8) và 'không quá 06 tháng' về kỷ luật (ND-HR-002 trang 12).
-
-**Ghi chú:** Câu tiền đề sai.
-
-- [ ] DUYỆT
-- [ ] SỬA:
+**Ghi chú:** Câu tiền đề sai. Owner quyết định (2026-11-15): hai ý bắt buộc là (1) tài liệu không quy định thời gian cụ thể, không xác nhận 3 tháng; (2) nghỉ thai sản theo Luật BHXH và Bộ luật Lao động. 'Không phải nghỉ phép' chuyển thành ý không bắt buộc. Nêu bất kỳ số tháng cụ thể nào là không đạt; con số 6 tháng là kiến thức ngoài PDF. Hai kết quả tìm thấy không liên quan: '3. Thăng chức' (ND-HR-005 trang 8) và 'không quá 06 tháng' về kỷ luật (ND-HR-002 trang 12).
 
 ## HO2-006: ANSWERED
 
@@ -173,9 +160,6 @@ Cách duyệt: với mỗi câu, đánh dấu **DUYỆT**, hoặc **SỬA** và 
 **Đoạn trích:**
 - ND-HR-005 tr. 4 (khớp): "Grade Ví dụ chức danh Dải Base Salary tham khảo (gross/tháng)"
 - ND-HR-005 tr. 4 (khớp): "N3 Middle Developer / BA / Data Analyst 18 - 32 triệu đồng"
-
-- [ ] DUYỆT
-- [ ] SỬA:
 
 ## HO2-007: ANSWERED
 
@@ -200,9 +184,6 @@ Cách duyệt: với mỗi câu, đánh dấu **DUYỆT**, hoặc **SỬA** và 
 
 **Ghi chú:** Mỗi xếp hạng phải đúng hệ số.
 
-- [ ] DUYỆT
-- [ ] SỬA:
-
 ## HO2-008: ANSWERED
 
 **Câu hỏi:** Ngày nào là ngày trả lương cho nhân viên?
@@ -217,9 +198,6 @@ Cách duyệt: với mỗi câu, đánh dấu **DUYỆT**, hoặc **SỬA** và 
 
 **Đoạn trích:**
 - ND-HR-005 tr. 5 (khớp): "Ngày trả lương Ngày 10 của tháng kế tiếp; nếu trùng ngày nghỉ/lễ, Finance thực hiện vào ngày làm việc liền trước hoặc theo phương án hợp pháp thuận lợi cho người lao động."
-
-- [ ] DUYỆT
-- [ ] SỬA:
 
 ## HO2-009: ANSWERED
 
@@ -239,9 +217,6 @@ Cách duyệt: với mỗi câu, đánh dấu **DUYỆT**, hoặc **SỬA** và 
 **Đoạn trích:**
 - ND-HR-005 tr. 10 (khớp): "Nova Digital không sử dụng phạt tiền hoặc cắt lương thay cho xử lý kỷ luật lao động. Các hành vi vi phạm được xử lý theo ND-HR-002 và ND-HR-010, còn thiệt hại vật chất (nếu có) phải xác định riêng theo đúng căn cứ pháp luật."
 - ND-HR-002 tr. 12 (khớp): "Phạt tiền hoặc cắt lương thay cho xử lý kỷ luật lao động."
-
-- [ ] DUYỆT
-- [ ] SỬA:
 
 ## HO2-010: NO_ANSWER
 
@@ -274,9 +249,6 @@ Cách duyệt: với mỗi câu, đánh dấu **DUYỆT**, hoặc **SỬA** và 
 
 **Ghi chú:** Câu ghép 2 ý, cả 2 đều không có trong tài liệu.
 
-- [ ] DUYỆT
-- [ ] SỬA:
-
 ## HO2-011: ANSWERED
 
 **Câu hỏi:** Có lịch khám sức khỏe định kỳ hay không?
@@ -298,9 +270,6 @@ Cách duyệt: với mỗi câu, đánh dấu **DUYỆT**, hoặc **SỬA** và 
 
 **Ghi chú:** Tài liệu không nêu ngày khám cụ thể.
 
-- [ ] DUYỆT
-- [ ] SỬA:
-
 ## HO2-012: ANSWERED_LIMITED
 
 **Câu hỏi:** Làm việc remote được tối đa mấy ngày trong tháng?
@@ -320,18 +289,13 @@ Cách duyệt: với mỗi câu, đánh dấu **DUYỆT**, hoặc **SỬA** và 
 **Đoạn trích:**
 - ND-HR-003 tr. 7 (khớp): "Số ngày remote thông thường Tối đa 02 ngày/tuần, tùy vị trí và phê duyệt của quản lý"
 
-**Điều kiện đạt:** Đạt khi nêu 02 ngày/tuần và cho biết tài liệu quy định theo tuần, không theo tháng.
+**Điều kiện đạt:** Đạt khi nêu 02 ngày/tuần và cho biết tài liệu quy định theo tuần, không theo tháng. Nêu 02 ngày/tuần rồi ước tính khoảng 8 ngày/tháng và ghi rõ là ước tính thì vẫn đạt; chỉ nêu số ngày/tháng như một quy định là không đạt.
 
 **Ví dụ không đạt:**
 - Tối đa 8 ngày mỗi tháng.
 - Tài liệu không có thông tin về remote.
 
-**CẦN BẠN QUYẾT ĐỊNH:** Câu hỏi hỏi theo tháng, tài liệu quy định theo tuần. Đề xuất: câu chỉ nêu số ngày/tháng như một quy định là không đạt. Câu nêu 02 ngày/tuần rồi ước tính khoảng 8 ngày/tháng và ghi rõ là ước tính thì đạt.
-
-**Ghi chú:** Lệch đơn vị giữa câu hỏi và tài liệu.
-
-- [ ] DUYỆT
-- [ ] SỬA:
+**Ghi chú:** Lệch đơn vị giữa câu hỏi và tài liệu. Owner duyệt theo đề xuất (2026-11-15).
 
 ## HO2-013: ANSWERED
 
@@ -348,9 +312,6 @@ Cách duyệt: với mỗi câu, đánh dấu **DUYỆT**, hoặc **SỬA** và 
 **Đoạn trích:**
 - ND-CORP-001 tr. 6 (khớp): "Giám đốc Nhân sự (CHRO) Trương Thanh An - phụ trách con người, văn hóa, tổ chức và hành chính"
 
-- [ ] DUYỆT
-- [ ] SỬA:
-
 ## HO2-014: ANSWERED
 
 **Câu hỏi:** Nếu tôi cần hỗ trợ CNTT thì liên hệ email nào?
@@ -364,9 +325,6 @@ Cách duyệt: với mỗi câu, đánh dấu **DUYỆT**, hoặc **SỬA** và 
 **Đoạn trích:**
 - ND-CORP-001 tr. 9 (khớp): "Hỗ trợ CNTT và tài khoản servicedesk@novadigital.example"
 - ND-HR-002 tr. 15 (khớp): "Service Desk servicedesk@novadigital.example"
-
-- [ ] DUYỆT
-- [ ] SỬA:
 
 ## HO2-015: ANSWERED
 
@@ -382,9 +340,6 @@ Cách duyệt: với mỗi câu, đánh dấu **DUYỆT**, hoặc **SỬA** và 
 - ND-CORP-001 tr. 5 (khớp): "NovaSecure Bộ công cụ an toàn thông tin Quản lý cấu hình, giám sát sự kiện, đánh giá rủi ro và hỗ trợ ứng phó sự cố."
 
 **Ghi chú:** Câu chỉ có 3 từ; bộ lọc 4-gram được mở rộng để vẫn nhận ra câu ngắn.
-
-- [ ] DUYỆT
-- [ ] SỬA:
 
 ## HO2-016: ANSWERED_LIMITED
 
@@ -407,7 +362,7 @@ Cách duyệt: với mỗi câu, đánh dấu **DUYỆT**, hoặc **SỬA** và 
 - ND-CORP-001 tr. 8 (khớp): "Hoạch định nguồn lực, tuyển dụng, tiếp nhận, đánh giá hiệu suất, đào tạo và phát triển tổ chức."
 - ND-CORP-001 tr. 9 (khớp): "Nhân sự và chính sách lao động people@novadigital.example"
 
-**Điều kiện đạt:** Đạt khi nêu đúng địa chỉ, cho biết tài liệu không nêu người liên hệ khi phỏng vấn, và không tạo tên hoặc số điện thoại.
+**Điều kiện đạt:** Đạt khi nêu đúng địa chỉ, cho biết tài liệu không nêu người liên hệ khi phỏng vấn, và không tạo tên hoặc số điện thoại. Gợi ý Phòng Nhân sự hoặc people@novadigital.example vẫn đạt nếu nói rõ tài liệu không quy định riêng.
 
 **Ví dụ không đạt:**
 - Liên hệ chị Trương Thanh An khi tới phỏng vấn.
@@ -415,12 +370,7 @@ Cách duyệt: với mỗi câu, đánh dấu **DUYỆT**, hoặc **SỬA** và 
 
 **Từ khóa phải vắng, số lần gặp trong tài liệu:** 'phỏng vấn': 1
 
-**CẦN BẠN QUYẾT ĐỊNH:** Đề xuất: gợi ý Phòng Nhân sự hoặc people@ vẫn đạt nếu nói rõ tài liệu không quy định riêng. Từ 'phỏng vấn' chỉ xuất hiện ở ND-HR-006 trang 6, về tư vấn CV khi tái cấu trúc, không liên quan.
-
-**Ghi chú:** Câu ghép 2 ý: ý đầu có đáp án, ý sau không.
-
-- [ ] DUYỆT
-- [ ] SỬA:
+**Ghi chú:** Câu ghép 2 ý: ý đầu có đáp án, ý sau không. Owner duyệt theo đề xuất (2026-11-15). Từ 'phỏng vấn' chỉ xuất hiện ở ND-HR-006 trang 6, về tư vấn CV khi tái cấu trúc, không liên quan.
 
 ## HO2-017: ANSWERED
 
@@ -442,9 +392,6 @@ Cách duyệt: với mỗi câu, đánh dấu **DUYỆT**, hoặc **SỬA** và 
 
 **Ghi chú:** Chỉ tài liệu mẫu UAT-LEAVE-AUTHORITY-001 ghi tổng 11; ND-HR-004 chỉ có bảng, phải cộng lại. Trích một trong hai đều đạt.
 
-- [ ] DUYỆT
-- [ ] SỬA:
-
 ## HO2-018: ANSWERED
 
 **Câu hỏi:** Bao lâu thì review lương / lần?
@@ -462,10 +409,7 @@ Cách duyệt: với mỗi câu, đánh dấu **DUYỆT**, hoặc **SỬA** và 
 - ND-HR-005 tr. 8 (khớp): "Đánh giá hiệu suất năm Tháng 01 - 02 Hiệu chỉnh/Calibration Tháng 03 Phê duyệt ngân sách tăng lương Tháng 03 - 04 Thông báo điều chỉnh Trong tháng 04 Ngày hiệu lực thông thường 01/05"
 - ND-HR-005 tr. 8 (khớp): "Việc tham gia salary review không tạo quyền đương nhiên được tăng lương."
 
-**CẦN BẠN QUYẾT ĐỊNH:** Tài liệu không viết nguyên văn '1 lần/năm'. 'Mỗi năm một lần' suy ra từ 'đánh giá hiệu suất năm' và các mốc theo tháng. Đề xuất chấp nhận suy luận này; nếu không, câu này chuyển thành ANSWERED_LIMITED.
-
-- [ ] DUYỆT
-- [ ] SỬA:
+**Ghi chú:** Owner duyệt theo đề xuất (2026-11-15): tài liệu không viết nguyên văn '1 lần/năm'; 'mỗi năm một lần' suy ra từ 'đánh giá hiệu suất năm' và các mốc theo tháng, và được chấp nhận; câu giữ ANSWERED.
 
 ## HO2-019: ANSWERED
 
@@ -487,9 +431,6 @@ Cách duyệt: với mỗi câu, đánh dấu **DUYỆT**, hoặc **SỬA** và 
 
 **Ghi chú:** Câu ghép 2 ý.
 
-- [ ] DUYỆT
-- [ ] SỬA:
-
 ## HO2-020: ANSWERED
 
 **Câu hỏi:** Nhân viên đang nghỉ phép có bắt buộc phải xử lý sự cố production không?
@@ -510,10 +451,9 @@ Cách duyệt: với mỗi câu, đánh dấu **DUYỆT**, hoặc **SỬA** và 
 - ND-HR-004 tr. 10 (khớp): "Khẩn cấp an ninh / an toàn Có thể yêu cầu phối hợp theo quy trình ứng phó sự cố"
 - ND-HR-004 tr. 12 (khớp): "Nhân viên đang nghỉ phép có bắt buộc phải xử lý sự cố production không?"
 
-**CẦN BẠN QUYẾT ĐỊNH:** Câu này trùng nguyên văn câu hỏi gợi ý in trong chính tài liệu (ND-HR-004 trang 12). Bạn cân nhắc giữ hay bỏ, vì retrieval có thể khớp thẳng vào câu đó.
+**Ghi chú:** Owner quyết định (2026-11-15): giữ câu. Citation bắt buộc ND-HR-004 tr. 10; tr. 12 chỉ là câu hỏi gợi ý, không chứa đáp án, nên câu trả lời chỉ trích tr. 12 thì citation không đạt.
 
-- [ ] DUYỆT
-- [ ] SỬA:
+**Ghi trong báo cáo:** Câu hỏi trùng nguyên văn câu hỏi gợi ý in trong tài liệu (ND-HR-004 tr. 12); retrieval có thể khớp thẳng vào câu đó.
 
 ## Kiểm trùng, chỉ báo số liệu
 

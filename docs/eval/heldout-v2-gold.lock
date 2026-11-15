@@ -1,0 +1,9 @@
+{
+ "version": "heldout_v2_gold",
+ "file": "heldout-v2-gold.yaml",
+ "sha256": "c35f141331ea181c257cd36c456cadaba98f46e1b63cc95c2360b2c72bcad67a",
+ "items": 20,
+ "approved_by": "owner (NQThai-7803)",
+ "locked_at": "2026-11-15T08:08:18+00:00",
+ "rule": "any edit needs a new approval and a new lock"
+}
