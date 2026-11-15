@@ -45,14 +45,14 @@ services:
       RAG_COMPLETENESS_NUMBER_NORMALIZATION_ENABLED: ${EVAL_COMPLETENESS_NUMBERS:-true}
       RAG_KEEP_VALIDATED_FIRST_ANSWER_ENABLED: ${EVAL_KEEP_FIRST_ANSWER:-false}
       RAG_RETRY_MUST_KEEP_VALIDATED_VALUES_ENABLED: ${EVAL_RETRY_KEEPS_VALUES:-true}
-      # PROMPT 6 ablations and rerankers (scripts/diagnostics/ablation_patches.py); inert by default.
+      # PROMPT 6 ablations (scripts/diagnostics/ablation_patches.py); inert by default.
       PYTHONPATH: /app/scripts/diagnostics/ablation_site:/app
       EVAL_ABLATION: ${EVAL_ABLATION:-}
       LLM_OLLAMA_MODEL: ${EVAL_LLM_MODEL:-qwen2.5:3b}
       EVAL_ORACLE_FILE: ${EVAL_ORACLE_FILE:-}
-      RERANKER_MODEL: ${EVAL_RERANKER_MODEL:-BAAI/bge-reranker-v2-m3}
-      RERANKER_MODEL_CACHE_PATH: ${EVAL_RERANKER_CACHE:-/app/data/models}
-      RERANKER_TIMEOUT_SECONDS: ${EVAL_RERANKER_TIMEOUT:-10}
+      # DEC-025: the app default (heuristic) unless a configuration sets it; no cross-encoder
+      # model is downloaded or mounted on Actions.
+      RERANKER_PROVIDER: ${EVAL_RERANKER_PROVIDER:-heuristic}
       LLM_SEED: ${EVAL_LLM_SEED:-20261031}
       RAG_RESTORE_SOURCE_DIACRITICS_ENABLED: ${EVAL_SOURCE_DIACRITICS:-true}
       RAG_DEDUPE_CLAIM_ANSWERS_ENABLED: ${EVAL_DEDUPE_CLAIMS:-true}

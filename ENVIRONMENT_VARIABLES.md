@@ -196,7 +196,7 @@ RETRIEVAL_MAX_TOP_K=50
 MIN_RELEVANCE_SCORE=0.50
 RETRIEVAL_MAX_QUERY_CHARACTERS=4000
 RERANKER_ENABLED=true
-RERANKER_PROVIDER=sentence_transformers
+RERANKER_PROVIDER=heuristic
 RERANKER_MODEL=BAAI/bge-reranker-v2-m3
 RERANKER_MODEL_REVISION=
 RERANKER_DEVICE=cpu
@@ -291,8 +291,8 @@ Retrieval variable rules:
 - Hybrid RRF scores are ranking scores, not probabilities.
 - These retrieval values are not secrets.
 - `RERANKER_ENABLED` enables the document/chunk reranking layer after hybrid retrieval and before final context packing.
-- `RERANKER_PROVIDER` accepts `sentence_transformers` or `heuristic`; `sentence_transformers` is the default local cross-encoder provider and falls back safely to heuristic alignment if the local model is unavailable.
-- `RERANKER_MODEL` defaults to `BAAI/bge-reranker-v2-m3` when `RERANKER_PROVIDER=sentence_transformers`; keep `RERANKER_LOCAL_FILES_ONLY=true` unless the model has been intentionally provisioned.
+- `RERANKER_PROVIDER` accepts `heuristic` (default since DEC-025: lexical alignment, `reranker_mode=lexical_fallback`, no model loaded) or `sentence_transformers` (the local cross-encoder of ADR 0004 option (a); falls back safely to heuristic alignment if the model is unavailable, and only then logs `RERANKER_FALLBACK_ACTIVE`).
+- `RERANKER_MODEL` (used only with `RERANKER_PROVIDER=sentence_transformers`) defaults to `BAAI/bge-reranker-v2-m3`; keep `RERANKER_LOCAL_FILES_ONLY=true` unless the model has been intentionally provisioned.
 - `RERANKER_CANDIDATE_K` controls how many hybrid candidates are reranked; `RERANKER_TOP_K` controls the final high-confidence source count. `RERANKER_TIMEOUT_SECONDS` bounds reranker latency before fallback.
 - `RERANKER_TIMEOUT_SECONDS`: a rerank over this limit falls back for that request only (`RERANKER_TIMEOUT`). Only a failed model load keeps the fallback on.
 - `EVAL_EXPECTED_RERANKER_MODE` (eval scripts only): the `reranker_mode` a run expects. `scripts/eval/reranker_check.py` defaults to `cross_encoder`; `run_uat.sh` and `run_heldout.sh` default to `lexical_fallback`.

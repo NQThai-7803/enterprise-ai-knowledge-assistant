@@ -3093,7 +3093,7 @@ def test_rag_accuracy_settings_defaults_and_constraints() -> None:
     settings = Settings(_env_file=None)
 
     assert settings.reranker_enabled is True
-    assert settings.reranker_provider == "sentence_transformers"
+    assert settings.reranker_provider == "heuristic"  # DEC-025: no cross-encoder by default
     assert settings.reranker_model == "BAAI/bge-reranker-v2-m3"
     assert settings.reranker_local_files_only is True
     assert settings.reranker_candidate_k == 50

@@ -92,7 +92,7 @@ app/
 - Chunking.
 - Embedding.
 - Retrieval.
-- Reranking.
+- Reranking: xếp hạng theo trùng từ (lexical alignment, `HeuristicRetrievalReranker`). **Pipeline hiện không có cross-encoder** (DEC-025, ADR 0004); lớp `sentence_transformers` vẫn còn sau `RERANKER_PROVIDER` cho thí nghiệm khi có GPU.
 - Prompt building.
 - Citation validation.
 

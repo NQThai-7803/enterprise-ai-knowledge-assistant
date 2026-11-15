@@ -13,6 +13,14 @@
 - **DONE (tooling):** `scripts/eval/heldout_v2_release.py` and `.github/workflows/heldout-v2.yml`: gate on frozen questions and an owner-approved gold lock, 2 runs at the current defaults, e5 grouping near UAT (>= 0.90) / rest, grading sheet with empty labels, report split by group, DEC-022 stated everywhere. Procedure: `docs/design/heldout-v2-release.md`.
 - **WAITING FOR OWNER:** review the 8 pending gold items, then `lock-gold`; create the `heldout-v2-release` environment with the owner as required reviewer. Only then run (DEC-012).
 
+## Phase 5 backlog -- English questions (recorded 2026-11-15)
+
+- **FR2-E01, FR2-E03 (English questions over Vietnamese sources) became false refusals** when the responsiveness check (ii) was turned on: its threshold t = 0.80 was calibrated on Vietnamese UAT questions only, and an English question has a lower e5 cosine with Vietnamese evidence. Fix in phase 5 (with mechanism E, `docs/design/pipeline-loss-fix-plan.md`): calibrate per language or translate the question before the check; measure on group E of `false_refusal_dev_v2`.
+
+## Phase 2 reranker -- 2026-11-15
+
+- **DONE (code):** ADR 0004 option (b), DEC-025: `RERANKER_PROVIDER=heuristic` by default; no cross-encoder download or mount in `eval.yml`. **Measured: 0 changed answers on 6 sets** (`docs/eval/runs/reranker-off.md`).
+
 ## Phase 1 final round -- 2026-11-15 (STOPPED for report; phase 1 closed)
 
 - **DONE:** (ii) recalibrated on every LLM draft (t = 0.80, 20 answers) and on by default with the terminal stop; (iv) with per-claim responsiveness measured, stays off (CP1-R03).
