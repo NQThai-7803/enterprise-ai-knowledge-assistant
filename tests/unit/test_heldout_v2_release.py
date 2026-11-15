@@ -215,6 +215,7 @@ def test_preflight_refuses_a_failed_login_or_a_missing_password(
         release.passwords_from_env({"EVAL_PASSWORD_STAFF": "x", "EVAL_PASSWORD_MANAGER": "x"})
 
 
+@pytest.mark.repo_layout(".github/workflows/heldout-v2.yml")
 def test_the_release_workflow_gives_the_runner_its_environment_and_checks_first() -> None:
     import yaml
 
