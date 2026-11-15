@@ -38,7 +38,13 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.eval import heldout_grading, heldout_v2_check, reranker_check, run_heldout  # noqa: E402
+from scripts.eval import (  # noqa: E402
+    heldout_grading,
+    heldout_v2_check,
+    metrics,
+    reranker_check,
+    run_heldout,
+)
 
 GOLD_LOCK = heldout_v2_check.DOCS / "heldout-v2-gold.lock"
 UAT_QUESTIONS = ROOT / "eval-data" / "uat" / "questions.json"
@@ -51,6 +57,13 @@ DEC_022_NOTICE = (
     "hệ thống, ngoài quy trình DEC-012. Bản ghi lần chạy đó không có trong repo và không được "
     "dùng để thiết kế bản sửa nào; chỉ ba lỗi hiển thị chung (D2) được lấy từ đó. Vì vậy đây "
     "không phải lần đầu hệ thống gặp bộ câu này."
+)
+
+
+RUN1_NOTICE = (
+    "**Lần chạy trước (run #1, Actions `43697066034`):** dừng ở bước kiểm Ollama trước câu đầu "
+    "tiên; 0 câu held-out được gửi tới hệ thống; artifact không được dùng để chấm "
+    "(`docs/design/heldout-v2-release.md`)."
 )
 
 
@@ -402,24 +415,24 @@ def page_hints(
     return hints
 
 
-def report(rows: Sequence[Mapping[str, str]]) -> dict[str, Any]:
-    """Counts per group and run from the owner's labels; refuses a sheet with a blank label."""
-    blank = [r["id"] for r in rows if not r["label_run1"].strip() or not r["label_run2"].strip()]
-    if blank:
-        raise GateRefusedError("labels missing for: " + ", ".join(blank))
-    bad = [
-        r["id"]
-        for r in rows
-        if {r["label_run1"].strip().upper(), r["label_run2"].strip().upper()} - set(LABELS)
-    ]
-    if bad:
-        raise GateRefusedError("labels outside PASS/PARTIAL/FAIL/LEAK for: " + ", ".join(bad))
-    out: dict[str, Any] = {}
+def report(rows: Sequence[Mapping[str, str]], *, grader: str = "", run: str = "") -> dict[str, Any]:
+    """Counts per group and run from the owner's labels, read with the held-out v1 rule
+    (metrics.resolve_labels): a blank run 2 label inherits run 1 only when the two runs are
+    identical (RUNS_DIFFER = 0); any other blank or unknown label refuses the report."""
+    try:
+        resolved = {
+            "run1": metrics.resolve_labels(rows, 1),
+            "run2": metrics.resolve_labels(rows, 2),
+        }
+    except metrics.LabelError as exc:
+        raise GateRefusedError(str(exc)) from exc
+    inherited = [r["id"] for r in rows if not r["label_run2"].strip() and resolved["run2"][r["id"]]]
+    out: dict[str, Any] = {"grader": grader, "run": run, "run2_labels_inherited": inherited}
     for group in (NEAR, OTHER, "all"):
         members = [r for r in rows if group == "all" or r["near_uat_group"] == group]
         per_run = {}
         for run in ("run1", "run2"):
-            labels = [r[f"label_{run}"].strip().upper() for r in members]
+            labels = [resolved[run][r["id"]] or "" for r in members]
             gold_no = [r for r in members if r["gold_status"] == "NO_ANSWER"]
             gold_yes = [r for r in members if r["gold_status"] != "NO_ANSWER"]
             per_run[run] = {
@@ -427,7 +440,7 @@ def report(rows: Sequence[Mapping[str, str]]) -> dict[str, Any]:
                 "items": len(members),
                 "false_answers": [r["id"] for r in gold_no if r[f"{run}_status"] == "ANSWERED"],
                 "false_refusals": [r["id"] for r in gold_yes if r[f"{run}_status"] == "NO_ANSWER"],
-                "leaks": [r["id"] for r in members if r[f"label_{run}"].strip().upper() == "LEAK"],
+                "leaks": [r["id"] for r in members if resolved[run][r["id"]] == "LEAK"],
             }
         out[group] = per_run
     out["report_notes"] = {r["id"]: r["report_note"] for r in rows if r.get("report_note")}
@@ -438,7 +451,14 @@ def render_report(counts: Mapping[str, Any]) -> str:
     lines = [
         "# Held-out v2: kết quả (owner chấm)",
         "",
+        f"Người chấm: {counts.get('grader') or '(chưa ghi)'}. Lượt đo: {counts.get('run') or '-'}.",
+        "",
         DEC_022_NOTICE,
+        "",
+        RUN1_NOTICE,
+        "",
+        "Nhãn lượt 2 để trống được lấy từ lượt 1 chỉ khi hai lượt giống hệt nhau (quy tắc của "
+        f"held-out v1): {len(counts.get('run2_labels_inherited', []))} câu.",
         "",
         "| Nhóm | Lượt | Số câu | PASS | PARTIAL | FAIL | LEAK | Trả lời sai | Từ chối sai |",
         "|---|---|---:|---:|---:|---:|---:|---|---|",
@@ -489,6 +509,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     grading.add_argument("--near-uat", type=Path)
     rep = sub.add_parser("report")
     rep.add_argument("out", type=Path)
+    rep.add_argument("--grader", required=True, help='who labelled the sheet, e.g. "owner (x)"')
+    rep.add_argument("--run", default="", help='the release run, e.g. "43701804785 (ff5016d)"')
     args = parser.parse_args(argv)
     try:
         if args.command == "gate":
@@ -576,11 +598,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "report":
             with (args.out / "grading.csv").open(encoding="utf-8") as handle:
                 rows = list(csv.DictReader(handle))
-            counts = report(rows)
+            counts = report(rows, grader=args.grader, run=args.run)
             (args.out / "report.json").write_text(
-                json.dumps(counts, indent=1) + "\n", encoding="utf-8"
+                json.dumps(counts, ensure_ascii=False, indent=1) + "\n",
+                encoding="utf-8",
+                newline="\n",
             )
-            (args.out / "report.md").write_text(render_report(counts), encoding="utf-8")
+            (args.out / "report.md").write_text(
+                render_report(counts), encoding="utf-8", newline="\n"
+            )
             return 0
     except (
         GateRefusedError,

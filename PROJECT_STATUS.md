@@ -1,5 +1,9 @@
 # Project Status
 
+## Held-out v2 graded -- 2026-11-15
+
+- Release run `43701804785` (commit `ff5016d`, current defaults, 2 valid runs) graded by the owner (NQThai-7803): `docs/eval/runs/heldout-v2-ff5016d/report.md`. Run 1 / run 2: PASS 2 / 2, PARTIAL 5 / 6, FAIL 13 / 12, LEAK 0 / 0 of 20; near UAT (e5 ≥ 0.90, 9 items) PASS 0, PARTIAL 5-6, FAIL 3-4; the rest (11 items) PASS 2, FAIL 9. The report states DEC-022 and run #1.
+
 ## Reranker: no cross-encoder -- 2026-11-15
 
 - DEC-025 (ADR 0004 option b): the pipeline ranks by lexical alignment only; the cross-encoder is off by default and kept behind `RERANKER_PROVIDER`. Measured on 6 dev sets in one batch: 0 changed answers.
