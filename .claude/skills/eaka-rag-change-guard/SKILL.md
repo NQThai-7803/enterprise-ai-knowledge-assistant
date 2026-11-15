@@ -47,6 +47,8 @@ Lõi RAG là nơi rủi ro cao nhất của EAKA: sai một chỗ là lộ tài 
 
 ## Cổng đổi mặc định (default-flip gate)
 
+**Từ 2026-11-15, luật chọn là DEC-026** (`DECISIONS.md`): leak = 0 trên mọi bộ; tổng trả lời sai (gồm nhầm giá trị) trên các bộ dev không tăng; rồi ưu tiên giảm từ chối sai trên `natural_dev_v1`, sau đó các bộ dev khác. UAT chỉ theo dõi, báo tách route. Bảng dưới là luật cũ (DEC-013), giữ để tham khảo.
+
 Chỉ được đề xuất đổi mặc định của flag khi **đồng thời**:
 
 | Chỉ số | Điều kiện |
