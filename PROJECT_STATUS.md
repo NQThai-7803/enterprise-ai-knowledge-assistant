@@ -1,5 +1,12 @@
 # Project Status
 
+## Simple answer mode measured -- 2026-11-16
+
+- `RAG_ANSWER_MODE=simple|simple_det` (default `legacy`, unchanged): top 5 whole chunks, one plain-text prompt, only citation and claim validation, one retry. Measured on 6 sets in Actions jobs (`docs/design/simple-answer-mode.md`). Leaks 0 everywhere.
+- **Dev sets (117 items):** false refusals fall from 28 to 11 (`simple`) and 9 (`simple_det`), but false answers + wrong values rise from 17 to 19 and 20, so neither meets DEC-026. 2 of simple's extra compound false answers use the "tài liệu không đề cập" wording that the phase prompt asked for and the compound grader does not accept; which wording counts is the owner's call.
+- **UAT (monitoring):** legacy 98-99, simple 39-40, simple_det 59. Even with the gold chunks simple refuses 44-45: claim validation of whole answers against whole chunks is the main cause, and the whole gold pages of 6 questions classify as question lists.
+- Fixed while measuring: a whole chunk with a document-control line hid its other facts from claim validation (simple only, `e9ad7ee`).
+
 ## Held-out v2 graded -- 2026-11-15
 
 - Release run `43701804785` (commit `ff5016d`, current defaults, 2 valid runs) graded by the owner (NQThai-7803): `docs/eval/runs/heldout-v2-ff5016d/report.md`. Run 1 / run 2: PASS 2 / 2, PARTIAL 5 / 6, FAIL 13 / 12, LEAK 0 / 0 of 20; near UAT (e5 ≥ 0.90, 9 items) PASS 0, PARTIAL 5-6, FAIL 3-4; the rest (11 items) PASS 2, FAIL 9. The report states DEC-022 and run #1.
