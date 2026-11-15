@@ -14,7 +14,7 @@
 
 ## Phase 2 reranker -- 2026-11-15
 
-- **DONE (code):** ADR 0004 option (b), DEC-025: `RERANKER_PROVIDER=heuristic` by default; no cross-encoder download or mount in `eval.yml`. Measurement: one batch on 6 sets, 0 changed answers expected (`docs/eval/runs/reranker-off.md`).
+- **DONE (code):** ADR 0004 option (b), DEC-025: `RERANKER_PROVIDER=heuristic` by default; no cross-encoder download or mount in `eval.yml`. **Measured: 0 changed answers on 6 sets** (`docs/eval/runs/reranker-off.md`).
 
 ## Phase 1 final round -- 2026-11-15 (STOPPED for report; phase 1 closed)
 
