@@ -141,9 +141,9 @@ from app.services.claim_evidence_validation_service import (
     answer_missing_requested_unit,
     canonical_number_unit_pairs,
     infer_yes_no_polarity,
-    number_normalization,
     question_content_terms,
     question_head_in_evidence,
+    simple_validation,
     supporting_sentence,
 )
 from app.web_search.errors import WebSearchError
@@ -1482,7 +1482,7 @@ class GroundedAnswerService:
             )
         except CitationMappingError as exc:
             raise CitationMappingFailedApplicationError() from exc
-        with number_normalization():
+        with simple_validation():
             claim = await self.claim_validation_service.validate(
                 question=question,
                 answer=plain,

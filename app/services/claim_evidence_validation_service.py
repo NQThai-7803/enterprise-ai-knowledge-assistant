@@ -11,7 +11,11 @@ from enum import StrEnum
 
 from app.citations.models import PromptSourceRegistry
 from app.core.config import get_settings
-from app.retrieval.evidence_quality import is_non_answer_context
+from app.retrieval.evidence_quality import (
+    EvidenceContextKind,
+    classify_evidence_context,
+    is_non_answer_context,
+)
 from app.retrieval.leave_relations import (
     annual_leave_relation_intent,
     annual_leave_seniority_increment,
@@ -1966,8 +1970,22 @@ def _evidence_for_labels(
     for label in cited_source_labels:
         marker = f"[{label}]" if not label.startswith("[") else label
         source = source_registry.by_marker(marker)
-        if source is not None and not is_non_answer_context(source.text):
+        if source is None:
+            continue
+        if not is_non_answer_context(source.text):
             parts.append(source.text)
+        elif _REFERENCE_SEGMENTS.get() and (
+            classify_evidence_context(source.text) == EvidenceContextKind.REFERENCE
+        ):
+            # A whole chunk with one "document control" line still holds its other facts; a
+            # query-focused excerpt drops such lines the same way. Question lists stay out.
+            kept = [
+                segment
+                for segment in _EVIDENCE_SEGMENT_BREAK.split(source.text)
+                if segment.strip() and not is_non_answer_context(segment)
+            ]
+            if kept:
+                parts.append(" ".join(kept))
     return "\n\n".join(parts)
 
 
@@ -2758,6 +2776,25 @@ def number_normalization() -> Iterator[None]:
         yield
     finally:
         _NUMBER_NORMALIZATION.reset(token)
+
+
+# Simple answer mode cites whole chunks: a reference-looking one is evidence by its segments.
+_REFERENCE_SEGMENTS: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "reference_segments", default=False
+)
+_EVIDENCE_SEGMENT_BREAK = re.compile(r"(?<=[.!?])\s+|\n+")
+
+
+@contextlib.contextmanager
+def simple_validation() -> Iterator[None]:
+    """Simple answer mode: normalized numbers, and a whole chunk that classifies as reference
+    (document control, related documents, ...) counts as evidence by its answer segments."""
+    token = _REFERENCE_SEGMENTS.set(True)
+    try:
+        with number_normalization():
+            yield
+    finally:
+        _REFERENCE_SEGMENTS.reset(token)
 
 
 def _numbers_are_contradicted(answer: str, evidence: str) -> bool:

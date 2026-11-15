@@ -232,3 +232,42 @@ def test_number_normalization_applies_only_inside_its_block() -> None:
     with validation.number_normalization():
         assert not validation._numbers_are_contradicted(answer, evidence)
     assert validation._numbers_are_contradicted(answer, evidence)
+
+
+def _validate_whole_chunk(text: str, answer: str, question: str) -> Any:
+    from app.citations.registry import build_prompt_source_registry
+
+    items = select_context_for_prompt(
+        hits=(hit(text),), history_messages=(), question=question, system_prompt="s",
+        token_counter=FakeCounter(), max_tokens=1000, whole_chunks=True,
+    ).items  # fmt: skip
+    registry = build_prompt_source_registry(context_items=items, max_sources=5)
+    return asyncio.run(
+        validation.ClaimEvidenceValidationService().validate(
+            question=question, answer=answer, source_registry=registry,
+            cited_source_labels=("SOURCE_1",),
+        )
+    ).status  # fmt: skip
+
+
+CONTROLLED = (
+    "So tay kho lanh. Ma kiem soat tai lieu: KL-0042. Ke tang 2 chiu toi da 640 kg. "
+    "Cua kho mo luc 6 gio."
+)
+
+
+def test_a_document_control_line_does_not_hide_the_other_facts_of_a_whole_chunk() -> None:
+    args = (CONTROLLED, "Ke tang 2 chiu toi da 640 kg.", "Ke tang 2 chiu toi da bao nhieu?")
+    supported = validation.ClaimEvidenceStatus.SUPPORTED
+    assert _validate_whole_chunk(*args) != supported  # legacy rule: the whole chunk is reference
+    with validation.simple_validation():
+        assert _validate_whole_chunk(*args) == supported
+        # the control line itself is still no evidence
+        assert _validate_whole_chunk(CONTROLLED, "Ma tai lieu la KL-0042.", "Ma tai lieu?") != (
+            supported
+        )
+        # a question list stays out whole
+        questions = "Cau hoi mau: Ke tang 2 chiu toi da 640 kg? Cua kho mo luc may gio?"
+        assert _validate_whole_chunk(questions, "Ke tang 2 chiu toi da 640 kg.", args[2]) != (
+            supported
+        )
