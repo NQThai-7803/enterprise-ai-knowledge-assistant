@@ -8,6 +8,12 @@
 3. **Embedding fine-tune** (`docs/design/embedding-finetune.md` and DEC-015 on branch `feat/embedding-finetune-infra`): infrastructure only so far; the baseline measurement and training come after FIX 3.
 4. The final held-out v2 measurement, once, after the choices above are made (DEC-012).
 
+## Phase 3 held-out v2 -- 2026-11-15 (prepared, NOT run)
+
+- **DONE (tooling):** `scripts/eval/heldout_v2_release.py` and `.github/workflows/heldout-v2.yml`: gate on frozen questions and an owner-approved gold lock, 2 runs at the current defaults, e5 grouping near UAT (>= 0.90) / rest, grading sheet with empty labels, report split by group, DEC-022 stated everywhere. Procedure: `docs/design/heldout-v2-release.md`.
+- **DONE (2026-11-15):** the owner approved the gold (HO2-004, 005, 020 changed; HO2-001, 003, 012, 016, 018 as proposed; the other 12 as they were); `heldout_v2_check.py check` clean; gold locked (`heldout-v2-gold.lock`, approved by owner (NQThai-7803)).
+- **WAITING FOR OWNER:** merge PR #30 and create the `heldout-v2-release` environment. The workflow is not dispatched until the owner says so (DEC-012).
+
 ## Phase 5 backlog -- English questions (recorded 2026-11-15)
 
 - **FR2-E01, FR2-E03 (English questions over Vietnamese sources) became false refusals** when the responsiveness check (ii) was turned on: its threshold t = 0.80 was calibrated on Vietnamese UAT questions only, and an English question has a lower e5 cosine with Vietnamese evidence. Fix in phase 5 (with mechanism E, `docs/design/pipeline-loss-fix-plan.md`): calibrate per language or translate the question before the check; measure on group E of `false_refusal_dev_v2`.

@@ -63,9 +63,11 @@ def load_items() -> list[dict[str, Any]]:
     return yaml_items(HELDOUT)
 
 
-def _ask(client: EvalClient, item: dict[str, Any], attempts: int) -> dict[str, Any]:
+def _ask(
+    client: EvalClient, item: dict[str, Any], attempts: int, label: str = "heldout-v1"
+) -> dict[str, Any]:
     try:
-        session_id = client.create_session(f"heldout-v1 {item['id']}")
+        session_id = client.create_session(f"{label} {item['id']}")
     except EvalInfraError:
         result: dict[str, Any] = {
             "status": INFRA_ERROR,
@@ -83,7 +85,7 @@ def _ask(client: EvalClient, item: dict[str, Any], attempts: int) -> dict[str, A
     result.update(
         {
             "id": item["id"],
-            "group": item["group"],
+            "group": item.get("group"),
             "role": item["role"],
             "question": item["question"],
             "session_id": session_id,
@@ -104,9 +106,15 @@ def run(
     client_factory=None,  # noqa: ANN001 - tests inject a fake
     monitor=None,  # noqa: ANN001 - callable returning a host resource sample
     run_metadata: dict[str, Any] | None = None,
+    frozen: dict[str, Any] | None = None,
+    all_items: list[dict[str, Any]] | None = None,
+    label: str = "heldout-v1",
 ) -> int:
-    lock = verify_frozen()
-    items = [i for i in load_items() if not selected or i["id"] in selected]
+    """Run the frozen set. Held-out v1 by default; the v2 release run passes its own verified
+    lock (frozen) and items (heldout_v2_release.py)."""
+    lock = frozen if frozen is not None else verify_frozen()
+    source = all_items if all_items is not None else load_items()
+    items = [i for i in source if not selected or i["id"] in selected]
     started_at = datetime.now(UTC).isoformat()
     done: dict[str, dict[str, Any]] = {}
     if resume and output.exists():
@@ -130,7 +138,7 @@ def run(
         payload = {
             "status": status,
             "heldout_sha256": lock["sha256"],
-            "heldout_version": lock["version"],
+            "heldout_version": lock.get("version"),
             **(run_metadata or {}),
             "started_at": started_at,
             "updated_at": datetime.now(UTC).isoformat(),
@@ -152,7 +160,7 @@ def run(
             if results and delay_seconds > 0:
                 time.sleep(delay_seconds)
             client = clients.setdefault(item["role"], make_client(item["role"]))
-            result = _ask(client, item, attempts=1)
+            result = _ask(client, item, attempts=1, label=label)
             if monitor is not None:
                 result["monitor"] = monitor()
             results.append(result)
@@ -168,7 +176,7 @@ def run(
                 continue
             item = by_id[result["id"]]
             client = clients.setdefault(item["role"], make_client(item["role"]))
-            retry = _ask(client, item, attempts=2)
+            retry = _ask(client, item, attempts=2, label=label)
             retry["first_attempt_failure_class"] = result.get("failure_class")
             if monitor is not None:
                 retry["monitor"] = monitor()

@@ -184,20 +184,36 @@ def render_review(
     app_hits: Mapping[str, Sequence[str]],
     problems: Sequence[str],
     lock_sha: str,
+    approved: bool = False,
 ) -> str:
     total = sum(len(rows) for rows in excerpts.values())
     verified = sum(row["verified"] for rows in excerpts.values() for row in rows)
     decisions = [item["id"] for item in items if item.get("owner_decision")]
+    if approved:
+        heading = "# Held-out v2, đợt 1: gold đã duyệt"
+        state = (
+            "Trạng thái: **ĐÃ DUYỆT** (gold `status: APPROVED`; quyết định của owner ghi trong "
+            "`notes` của từng câu). Khóa bằng `docs/eval/heldout-v2-gold.lock`; sửa gì cũng cần "
+            "duyệt và khóa lại."
+        )
+        how = "Các câu dưới đây là gold đã khóa; không còn ô duyệt."
+    else:
+        heading = "# Held-out v2, đợt 1: gold chờ duyệt"
+        state = "Trạng thái: **BẢN NHÁP, chờ chủ dự án duyệt.**"
+        how = "Cách duyệt: với mỗi câu, đánh dấu **DUYỆT**, hoặc **SỬA** và ghi nội dung cần đổi."
     lines = [
-        "# Held-out v2, đợt 1: gold chờ duyệt",
+        heading,
         "",
-        "Trạng thái: **BẢN NHÁP, chờ chủ dự án duyệt.** Tạo bằng "
-        "`scripts/eval/heldout_v2_check.py check` từ `docs/eval/heldout-v2-gold.yaml`; muốn sửa "
-        "thì sửa YAML rồi chạy lại. Gold chỉ soạn từ PDF, không chạy hệ thống trên bộ này.",
+        state
+        + " Tạo bằng `scripts/eval/heldout_v2_check.py check` từ `docs/eval/heldout-v2-gold.yaml`; "
+        "muốn sửa thì sửa YAML rồi chạy lại.",
         "",
-        f"Câu hỏi đã đóng băng: SHA256 `{lock_sha}`. Gold chưa đóng băng; sẽ khóa sau khi duyệt.",
+        "Gold chỉ soạn từ PDF, không chạy hệ thống trên bộ này.",
         "",
-        "Cách duyệt: với mỗi câu, đánh dấu **DUYỆT**, hoặc **SỬA** và ghi nội dung cần đổi.",
+        f"Câu hỏi đã đóng băng: SHA256 `{lock_sha}`."
+        + ("" if approved else " Gold chưa đóng băng; sẽ khóa sau khi duyệt."),
+        "",
+        how,
         "",
         "## Kiểm tra",
         "",
@@ -247,7 +263,9 @@ def render_review(
             lines += ["", f"**CẦN BẠN QUYẾT ĐỊNH:** {item['owner_decision']}"]
         if item.get("notes"):
             lines += ["", f"**Ghi chú:** {item['notes']}"]
-        lines += ["", "- [ ] DUYỆT", "- [ ] SỬA:", ""]
+        if item.get("report_note"):
+            lines += ["", f"**Ghi trong báo cáo:** {item['report_note']}"]
+        lines += [""] if approved else ["", "- [ ] DUYỆT", "- [ ] SỬA:", ""]
     lines += [
         "## Kiểm trùng, chỉ báo số liệu",
         "",
@@ -282,7 +300,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 json.dumps(payload, ensure_ascii=False), encoding="utf-8"
             )
         return 0
-    items = _yaml(GOLD)["items"]
+    gold_doc = _yaml(GOLD)
+    items = gold_doc["items"]
     problems = gold_problems(items, frozen)
     pages, pdf_problems = heldout_check.load_pages()
     problems += pdf_problems
@@ -295,7 +314,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     e5 = json.loads(args.e5_scores.read_text(encoding="utf-8")) if args.e5_scores else {}
     app_hits = heldout_check.app_fourgram_hits(items)
     REVIEW.write_text(
-        render_review(items, excerpts, absent, numbers, e5, app_hits, problems, lock["sha256"]),
+        render_review(
+            items,
+            excerpts,
+            absent,
+            numbers,
+            e5,
+            app_hits,
+            problems,
+            lock["sha256"],
+            approved=gold_doc.get("status") == "APPROVED",
+        ),
         encoding="utf-8",
         newline="\n",
     )
