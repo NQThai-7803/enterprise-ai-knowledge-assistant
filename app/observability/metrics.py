@@ -33,8 +33,9 @@ BRANCH_COMPOUND_PARTIAL_ANSWER = "compound_partial_answer"
 BRANCH_EXCERPT_FALLBACK = "excerpt_fallback"
 # A compound claim dropped by the responsiveness check on the claim itself.
 BRANCH_CLAIM_UNRESPONSIVE = "claim_unresponsive"
-# Simple answer mode: the one retry, the deterministic fast path, and why it refused.
+# Simple answer mode: the one retry, a claim dropped as unrelated (s2), and why it refused.
 BRANCH_SIMPLE_RETRY = "simple_retry"
+BRANCH_SIMPLE_CLAIM_IRRELEVANT = "simple_claim_irrelevant"
 SIMPLE_NO_ANSWER_REASONS = (
     "no_sources",
     "llm_refused",
@@ -43,6 +44,7 @@ SIMPLE_NO_ANSWER_REASONS = (
     "citation_invalid",
     "claim_contradicted",
     "claim_insufficient",
+    "claim_irrelevant",
     "permission",
 )
 ANSWER_BRANCHES = (
@@ -60,6 +62,7 @@ ANSWER_BRANCHES = (
     BRANCH_EXCERPT_FALLBACK,
     BRANCH_CLAIM_UNRESPONSIVE,
     BRANCH_SIMPLE_RETRY,
+    BRANCH_SIMPLE_CLAIM_IRRELEVANT,
     *(f"simple_no_answer_{reason}" for reason in SIMPLE_NO_ANSWER_REASONS),
 )
 _UUID_SEGMENT_PATTERN = re.compile(

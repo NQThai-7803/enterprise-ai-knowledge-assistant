@@ -1,6 +1,14 @@
 # Project Status
 
-## Simple mode: rejected drafts diagnosed -- 2026-11-16 (STOPPED for the owner's review)
+## Simple mode s1-s3 measured -- 2026-11-16 (STOPPED for the owner's review)
+
+- Owner-approved fixes behind flags, all off, only read in `RAG_ANSWER_MODE=simple`: s1 (absence sentences never claims + short-answer prompt), s2 (s1 + relaxed claim rules + per-claim relevance check, t = 0.78 calibrated on dev before measuring), s3 (s2 + question-list sources by segments). Default stays `legacy`.
+- Measured on Actions, same job as `legacy`, 2 runs, 6 sets (`docs/design/simple-answer-mode.md`, "Results of s1-s3"). Both runs identical on every dev set. Leaks 0 everywhere.
+- **Dev (117):** correct–false refusal–false answer–wrong: legacy 72–27–17–1, s1 90–13–13–1, s2 96–7–13–1, s3 96–7–13–1. **s1, s2 and s3 each meet DEC-026; s2 = s3 rank first.** Default not changed.
+- Not solved: 12 of the 13 dev false answers are refuse items answered with a supported but off-topic sentence; the relevance check at 0.78 drops none of them.
+- **UAT (monitoring):** correct s1 39/39, s2 44/47, s3 56/50; wrong answers s1 6, s2 10/7, s3 10/12 (right number, wrong subject 4 → 5-8); the relevance check refuses 2 answerable UAT questions per run. Runs in different jobs differ by 10-14 UAT questions (legacy by 2); runs in one job are identical.
+
+## Simple mode: rejected drafts diagnosed -- 2026-11-16 (direction approved, see s1-s3 above)
 
 - Owner decisions applied: a missing part is named "Chưa xác minh được từ tài liệu bạn được phép truy cập: …" (matches the compound grader), `simple_det` removed, model unchanged. Default stays `legacy`.
 - Eval-only ablation `simple_trace` records every simple-mode draft with per-sentence validator status. 1 run on UAT and the 5 dev sets, real retrieval and oracle; 187 rejected sentences classified by hand (`docs/design/simple-answer-mode.md`, "Diagnosis").

@@ -340,3 +340,144 @@ Two patterns cover most of it. First, the rules were written for legacy's server
 3. **Per-sentence validation** helps only together with a looser subject rule: of the 54 correct sentences rejected, 23 fail `_explicit_value_answer_is_subject_aligned`. The question is whether `simple` should skip that rule (and the legacy domain rules for attendance, leave and bereavement, 15 more) and keep the number, polarity and evidence checks. That is a choice between false refusals and the risk of a wrong-subject value, so it needs the owner's call and a measurement under DEC-026.
 4. **Question-list sources by segments:** worth 7 sentences on UAT, none on the dev sets.
 5. **Not covered by any of these:** class (b) on UAT (44%), and refuse items answered with a supported but unrelated sentence (15 of the 20 dev false answers of this run). The first is the model's limit on long chunks; the second needs a relevance check between the question and the cited sentence, which `simple` removed on purpose.
+
+## s1-s3 (owner approval 2026-11-16)
+
+The owner approved three cumulative configurations. Each change has its own flag, all off by default, and only read when `RAG_ANSWER_MODE=simple`. The flags are listed in `ENVIRONMENT_VARIABLES.md`.
+
+| Config | Flags | What changes |
+|---|---|---|
+| s1 | `RAG_SIMPLE_ABSENCE_SENTENCES_ENABLED`, `RAG_SIMPLE_SHORT_PROMPT_ENABLED` | A sentence naming an unverified part ("chưa/không xác minh được", "could not be verified") is never a claim, marked or not; its marker is removed; an answer of such sentences only is NO_ANSWER. A marker after a full stop stays with its sentence, so the next sentence is judged alone. The prompt asks for one short sentence per point asked, marker inside it, from the first draft. |
+| s2 | s1 + `RAG_SIMPLE_RELAXED_RULES_ENABLED`, `RAG_SIMPLE_CLAIM_RELEVANCE_ENABLED` | Claim validation skips `_explicit_value_answer_is_subject_aligned` and the attendance, annual-leave and bereavement rules (the number/unit, polarity and evidence checks stay). Each marked claim is compared (e5 cosine) through the source sentence it cites with the question and each of its parts; below the threshold it is dropped; none left is NO_ANSWER with no retry. |
+| s3 | s2 + `RAG_SIMPLE_QUESTION_LIST_SEGMENTS_ENABLED` | A whole question-list chunk counts by its segments that are neither questions nor non-answer context. |
+
+Two choices made while implementing, not in the owner's text:
+
+- An unverified-part sentence that holds a number the question does not hold stays a claim and is validated. Without this a fact written after "chưa xác minh được" would reach the user unchecked.
+- A claim whose relevance cannot be measured (no marker, no evidence, no embedding provider) is kept, as the legacy responsiveness check does.
+
+### Relevance threshold (calibrated before measuring)
+
+Rule, fixed before computing: on the dev sets of the diagnostic run (`3698da9`, both configurations, UAT excluded), each draft scores the highest similarity among its claims, computed by the service's own code with the s1 split and the s2 validation flags. Positive: an accepted draft of an item to answer that states the item's fact. Negative: any draft of an item to refuse (RBAC: a draft none of whose sources holds the fact). t = the lowest positive score, floored to 0.01, so that no correct dev answer loses all its claims.
+
+Result: **t = 0.78**, from 109 positive drafts (58 items) and 39 negative drafts (18 items). Positive best scores start at 0.780, 0.789, 0.824; negative best scores reach 0.908.
+
+**At t = 0.78 the check is expected to do almost nothing:** 2 of 39 negative drafts and 0 of the 32 accepted ones fall below it. The question and the off-topic source sentence usually share the subject, so e5 rates them close. The trade-off on the same data (items to answer that lose every claim / of the 16 refuse items answered, those caught):
+
+| t | correct items lost (of 58) | false answers caught (of 16) |
+|---|---|---|
+| 0.78 | 0 | 0 |
+| 0.80 | 2 | 1 |
+| 0.84 | 3 | 3 |
+| 0.86 | 5 | 4 |
+| 0.87 | 5 | 8 |
+| 0.88 | 9 | 10 |
+| 0.90 | 19 | 13 |
+
+The measurement uses 0.78 as the rule gives. A higher value is a choice between false refusals and false answers, for the owner.
+
+### What the relaxed rules let through (checked before measuring)
+
+Replaying the 187 classified rejected sentences of the diagnostic run against their full cited sources with the s2 rules gives the following. Classes (d) and (e) are excluded; they do not depend on these rules.
+
+| | (a) correct, rejected | (b) model wrong, rejected | (c) question list |
+|---|---|---|---|
+| dev, now SUPPORTED | 17 of 29 | 6 of 11 | – |
+| UAT, now SUPPORTED | 13 of 25 | 17 of 52 | 0 of 15 |
+
+So s2's rules accept about as many wrong sentences as correct ones on UAT. Where a retry followed, these sentences are counted once per draft. This is the risk that the "right number, wrong subject" count below is meant to measure.
+
+### Measurement plan (written before measuring, DEC-011)
+
+- **Where:** Actions `eval.yml`, 2 runs, qwen2.5:3b on CPU. Every configuration is compared only with the `legacy` of its own job (DEC-016).
+- **Configurations:** `legacy`; `s1` = `EVAL_ANSWER_MODE=simple`, `EVAL_ABLATION=simple_trace`, `EVAL_SIMPLE_S1=true`; `s2` = s1 + `EVAL_SIMPLE_S2=true`; `s3` = s2 + `EVAL_SIMPLE_S3=true`. `scripts/eval/compose.uat-eval.yaml` maps each switch to the flags of its configuration. Every draft of s1-s3 is saved as in the diagnosis.
+- **Process note:** the first dispatch (7 jobs, `2fb1b26`) spelled out each flag. Six of them failed before starting, because the `configs` input is part of the job's concurrency group, which is limited to about 400 characters. The one short job (UAT `legacy, s1`, run 43818691901) ran as dispatched, on `2fb1b26` with the per-flag names; the app code is the same in both commits.
+- **Jobs:** one job per dev set with `legacy, s1, s2, s3`: RBAC, relevance, false refusal v1, v2, compound. UAT in two jobs, because four configurations × 2 runs exceed the 340-minute job limit (the earlier three-configuration UAT job took 4 h 49): `legacy, s2, s3` (s2 and s3 differ only on question-list sources, which only UAT has) and `legacy, s1`.
+- **Per set and configuration:** correct – false refusal – false answer – wrong value or document, leaks, latency; dev totals.
+- **Extra counts, defined now:**
+  - *Supported but off topic:* false answers on items to refuse (RBAC: negatives) whose answer is not only an unverified sentence and whose every number appears in the text of its cited sources. The other false answers are counted as invented.
+  - *Right number, wrong subject (s2's risk):* answered items to answer graded wrong (wrong value or document) whose every number appears in their cited sources; on the dev sets and, for monitoring, on UAT.
+  - *s1:* share of first drafts with at least one valid marker, and mean LLM calls per question, from the saved drafts.
+  - Drops by the relevance check: `simple_claim_irrelevant` and `simple_no_answer_claim_irrelevant`.
+- **Rule (DEC-026), per configuration against the legacy of its job:** leaks = 0 everywhere; dev total of false answers plus wrong answers not above legacy; then fewer false refusals. A change counts only when both runs agree; the others are reported as unstable. UAT is monitoring only, reported by the route legacy took.
+- A configuration that meets the rule is reported. **The default is not changed in this step.**
+
+### Results of s1-s3 (2026-11-16)
+
+Jobs, all on `5d9622c` except UAT `legacy, s1` on `2fb1b26` (same app code): RBAC 43819021449, relevance 43819050099, false refusal v1 43819075562, v2 43819098974, compound 43819124988; UAT 43818691901 (`legacy, s1`), 43819150999 (`legacy, s2, s3`), 43867560167 (`legacy, s2`), 43867565634 (`legacy, s3`). Every s1-s3 draft is saved in its job's artifact as `simple_trace.jsonl` (kept 14 days).
+
+**Process note:** the UAT `legacy, s2, s3` job stopped at its 340-minute limit after legacy ×2, s2 ×1 and s3 ×1; one s2 run took 8,370 s against 2,262 s for legacy. The planned estimate was wrong. The second s2 and s3 runs come from two more jobs, each with its own `legacy`, 1 run each; there the s2 run took 3,416 s.
+
+#### Dev sets
+
+Correct – false refusal – false answer – wrong value or document. **Both runs give the same result on every set and configuration; no item is unstable.**
+
+| Set | legacy | s1 | s2 | s3 |
+|---|---|---|---|---|
+| RBAC (36) | 23–13–0–0 | 34–2–0–0 | 36–0–0–0 | 36–0–0–0 |
+| relevance (25) | 18–3–4–0 | 18–2–4–1 | 20–0–4–1 | 20–0–4–1 |
+| false refusal v1 (20) | 13–1–6–0 | 14–2–4–0 | 14–2–4–0 | 14–2–4–0 |
+| false refusal v2 (24) | 14–6–4–0 | 18–3–3–0 | 20–1–3–0 | 20–1–3–0 |
+| compound (12) | 4–4–3–1 | 6–4–2–0 | 6–4–2–0 | 6–4–2–0 |
+| **Dev total (117)** | **72–27–17–1** | **90–13–13–1** | **96–7–13–1** | **96–7–13–1** |
+| Leaks | 0 | 0 | 0 | 0 |
+| Median latency per set, s | 11.6–55.2 | 1.7–16.0 | 1.7–10.4 | 1.7–10.5 |
+
+Items that change (both runs):
+
+- legacy → s1: 27 items become correct, 9 correct items are lost (5 to a false answer, 3 to a false refusal, 1 to a wrong value). False answers: 10 removed, 6 new (one of them a compound item that legacy refused).
+- s1 → s2: 6 false refusals become correct (RBAC 2, relevance 2, false refusal v2 2); nothing gets worse.
+- s2 → s3: no item changes.
+
+#### DEC-026
+
+1. Leaks: 0 on every set and configuration (RBAC retrieval-level check: 18 pairs, all conclusive, no chunk seen by a negative). UAT: 0.
+2. Dev false answers + wrong: legacy 18; s1, s2, s3 14 each. None increases.
+3. Dev false refusals (`natural_dev_v1` does not exist yet): legacy 27; s1 13; s2 7; s3 7.
+
+**s1, s2 and s3 each meet DEC-026 against the legacy of their job. s2 and s3 rank first and are the same item by item on the dev sets;** s3 makes a difference only on UAT. The default is not changed.
+
+#### Extra counts
+
+| | legacy | s1 | s2 | s3 |
+|---|---|---|---|---|
+| Dev false answers that are supported but off topic | 15 | 12 | 12 | 12 |
+| Dev false answers that are invented / only an unverified sentence | 0 / 0 | 0 / 0 | 0 / 0 | 0 / 0 |
+| Compound half-answerable items answered in full | 2 | 1 | 1 | 1 |
+| Right number, wrong subject: dev | 1 | 0 | 0 | 0 |
+| Right number, wrong subject: UAT (monitoring), per run | – | 4, 4 | 8, 5 | 8, 7 |
+| First drafts with a valid marker: UAT, per run (of 100) | – | 90, 89 | 86, 85 | 84, 83 |
+| First drafts with a valid marker: dev, per run (of 117; RBAC's 18 negatives answer with the no-answer sentinel) | – | 94, 93 | 93, 93 | 93, 93 |
+| Mean LLM drafts per question: UAT, per run | – | 1.36, 1.35 | 1.28, 1.24 | 1.16, 1.18 |
+| Mean LLM drafts per question: dev sets | – | 1.05–1.12 | 1.00–1.08 | 1.00–1.08 |
+| Relevance check, claims dropped / questions ended: dev | – | – | 0 / 0 | 0 / 0 |
+| Relevance check, claims dropped / questions ended: UAT, per run | – | – | 2 / 2, 2 / 2 | 2 / 2, 2 / 2 |
+
+- **Off topic:** every dev false answer of s1-s3 except one compound partial is a refuse item answered with a sentence its cited source supports. The relevance check at t = 0.78 caught none of them; the lowest claim similarity on the dev sets was 0.780, as the calibration predicted.
+- **The UAT questions ended by the relevance check** (Q031 and Q032; in the s3 second run Q032 and Q084) are all items the reference answers, so the check caused 2 false refusals per run there.
+- **s1's prompt:** in the diagnosis 21-25 of 100 UAT first drafts had a marker; with s1, 89-90 have one.
+
+#### UAT (monitoring only), by the route legacy took for the same question
+
+Correct – false refusal – false answer – wrong. Legacy is 100–0–0–0 in the first two jobs and 98–1–0–1 in the two second-run jobs (Q002 wrong, Q071 refused, both on its LLM route); its route split is 76/24 (deterministic/LLM) in job 43819150999 and 75/25 in the others.
+
+| Config | Run (job) | All | Legacy deterministic route | Legacy LLM route |
+|---|---|---|---|---|
+| s1 | 1 and 2 (43818691901), same | 39–54–1–6 | 28–43–0–4 | 11–11–1–2 |
+| s2 | 1 (43819150999) | 44–45–1–10 | 33–36–0–7 | 11–9–1–3 |
+| s2 | 2 (43867560167) | 47–45–1–7 | 36–35–0–4 | 11–10–1–3 |
+| s3 | 1 (43819150999) | 56–33–1–10 | 45–24–0–7 | 11–9–1–3 |
+| s3 | 2 (43867565634) | 50–37–1–12 | 40–26–0–9 | 10–11–1–3 |
+
+- **s3 against s2, run 1, same job:** 14 false refusals become correct and 2 correct answers become false refusals, all on questions legacy answers on its deterministic route.
+- **Runs in different jobs differ.** Within one job the two runs are identical everywhere (dev sets and UAT `legacy, s1`), but between jobs (another runner) s2 changes on 10 UAT questions and s3 on 14, and legacy on 2. So the second run in a job does not measure this variation, and the dev results above each come from one runner.
+- **s2's risk shows on UAT only.** UAT wrong answers: s1 6 and 6, s2 10 and 7, s3 10 and 12; right number, wrong subject: s1 4 and 4, s2 8 and 5, s3 8 and 7. The 4 extra wrong answers of s2 run 1 against s1, read one by one (Q044, Q048, Q068, Q096; s1 is in another job): a leave duration for another family relation, a notice period from a conflicting document, a holiday-overtime answer saying there is no minimum, and an answer to the other half of a two-part question. The dev sets have no wrong answer of this kind under s2.
+- Median latency: legacy 0.6-1.1 s (most answers are server-built); s1 28.7 s; s2 73.0 and 24.8 s; s3 64.2 and 42.5 s. Job wall time per run: legacy 1,423-2,262 s, s1 3,093-4,074 s, s2 8,370 and 3,416 s, s3 5,655 and 5,218 s. The slow s2 run 1 was that runner, not s2.
+
+#### Summary (for the owner; nothing is switched on)
+
+- s1 fixes the absence-sentence defect and the missing first-draft marker: 89-90 of 100 UAT first drafts now carry one (was 21-25), and dev false refusals fall from 27 to 13 with fewer false answers (18 → 14).
+- s2 turns 6 more dev false refusals into correct answers with no dev regression. Its relevance check at 0.78 drops nothing on the dev sets and 2 correct UAT answers per run; with its relaxed rules the UAT right-number-wrong-subject count goes from 4 (s1) to 5-8.
+- s3 equals s2 on the dev sets. On UAT it has 12 more correct answers than s2 in the same job (run 1); the second runs, in separate jobs, give 50 against 47.
+- Not solved by any of the three: refuse items answered with a supported but off-topic sentence (12 of the 13 dev false answers).
+- **Meets DEC-026: s1, s2 and s3; s2 and s3 rank first.** Choosing one, and whether the UAT wrong-subject risk of s2 is acceptable or the threshold should be raised (trade-off table above), is the owner's call.

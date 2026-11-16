@@ -88,6 +88,7 @@ from app.observability.metrics import (
     BRANCH_RETRY_ABANDONED_FIRST,
     BRANCH_ROUTE_DETERMINISTIC,
     BRANCH_ROUTE_LLM,
+    BRANCH_SIMPLE_CLAIM_IRRELEVANT,
     BRANCH_SIMPLE_RETRY,
     BRANCH_TERMINAL_BLOCK,
     GLOBAL_METRICS,
@@ -116,6 +117,7 @@ from app.retrieval.question_analysis import (
     QuestionAnalysis,
     analyze_question,
     asks_for_organization_activity,
+    fold_text,
     retrieval_query_variants,
 )
 from app.retrieval.reranker import RetrievalReranker
@@ -1364,11 +1366,12 @@ class GroundedAnswerService:
                 raise ChatRetrievalFailedError() from exc
             hits = _simple_select_hits(result.hits)
         sentinel = self.settings.llm_no_answer_sentinel
+        short = self.settings.rag_simple_short_prompt_enabled
         selected = select_context_for_prompt(
             hits=hits,
             history_messages=(),
             question=grounding_question,
-            system_prompt=build_simple_system_prompt(no_answer_sentinel=sentinel),
+            system_prompt=build_simple_system_prompt(no_answer_sentinel=sentinel, short=short),
             token_counter=self.token_counter,
             max_tokens=self.settings.chat_context_max_tokens,
             whole_chunks=True,
@@ -1382,6 +1385,7 @@ class GroundedAnswerService:
             question=grounding_question,
             source_registry=source_registry,
             no_answer_sentinel=sentinel,
+            short=short,
         )
         provider = None
         try:
@@ -1418,6 +1422,7 @@ class GroundedAnswerService:
                     no_answer_sentinel=sentinel,
                     retry_reason=retry_text,
                     previous_answer=generation.content,
+                    short=short,
                 )
             return self._simple_no_answer(reason, selected_chunk_count=len(source_registry.sources))
         except LLMError as exc:
@@ -1450,8 +1455,14 @@ class GroundedAnswerService:
         if raw.strip("\"' ") == self.settings.llm_no_answer_sentinel:
             return "llm_refused", None
         text = normalize_llm_citation_markers(raw, source_registry=source_registry)
+        settings = self.settings
+        if settings.rag_simple_absence_sentences_enabled:
+            text, claims = _simple_split_absences(text, question=question)
+            plain = " ".join(filter(None, map(_simple_claim_text, claims)))
+        else:
+            claims = tuple(s for s in _SIMPLE_SENTENCE_BREAK.split(text) if _simple_claim_text(s))
+            plain = _simple_claim_text(text)
         markers = parse_citation_markers(text).ordered_unique_markers
-        plain = _simple_claim_text(text)
         if not plain:
             return "refusal_text", None
         if not markers:
@@ -1459,6 +1470,31 @@ class GroundedAnswerService:
                 "it has no source marker. End every sentence that uses a source with its "
                 "marker, for example [SOURCE_1]."
             )
+        validation_flags = {
+            "relaxed_rules": settings.rag_simple_relaxed_rules_enabled,
+            "question_list_segments": settings.rag_simple_question_list_segments_enabled,
+        }
+        if settings.rag_simple_claim_relevance_enabled:
+            kept = []
+            for claim in claims:
+                with simple_validation(**validation_flags):
+                    similarity = await self._simple_claim_similarity(
+                        question=question, claim=claim, source_registry=source_registry
+                    )
+                if similarity is None or (
+                    similarity >= settings.rag_simple_claim_relevance_min_similarity
+                ):
+                    kept.append(claim)
+                else:
+                    GLOBAL_METRICS.record_answer_branch(BRANCH_SIMPLE_CLAIM_IRRELEVANT)
+                    text = text.replace(claim, "", 1)
+            if not kept:
+                return "claim_irrelevant", None  # an end point: a retry would cite the same
+            text = re.sub(r"[ \t]{2,}", " ", text).strip()
+            plain = " ".join(filter(None, map(_simple_claim_text, kept)))
+            markers = parse_citation_markers(text).ordered_unique_markers
+            if not plain or not markers:
+                return "claim_irrelevant", None
         try:
             validated = await self.citation_validation_service.validate_and_map(
                 answer=text, source_registry=source_registry, current_user=current_user
@@ -1472,7 +1508,7 @@ class GroundedAnswerService:
             )
         except CitationMappingError as exc:
             raise CitationMappingFailedApplicationError() from exc
-        with simple_validation():
+        with simple_validation(**validation_flags):
             claim = await self.claim_validation_service.validate(
                 question=question,
                 answer=plain,
@@ -1494,6 +1530,29 @@ class GroundedAnswerService:
             completion_tokens=generation.completion_tokens,
             citations=validated.citations,
         )
+
+    async def _simple_claim_similarity(
+        self, *, question: str, claim: str, source_registry: PromptSourceRegistry
+    ) -> float | None:
+        """s2: the e5 cosine between the source sentence a claim cites (the one sharing most
+        words with it) and the closest of the question and its parts; None when it cannot be
+        measured (no marker, no evidence, no embedding provider)."""
+        labels = tuple(m.strip("[]") for m in parse_citation_markers(claim).ordered_unique_markers)
+        evidence = _evidence_for_labels(source_registry=source_registry, cited_source_labels=labels)
+        sentence = supporting_sentence(answer=_simple_claim_text(claim), evidence=evidence)
+        provider = getattr(
+            getattr(self.hybrid_retrieval_service, "semantic_retrieval_service", None),
+            "embedding_provider",
+            None,
+        )
+        if not labels or not evidence or sentence is None or provider is None:
+            return None
+        passage = await anyio.to_thread.run_sync(provider.embed_passages, [sentence])
+        best = -1.0
+        for need in dict.fromkeys((question, *information_need_queries(question))):
+            query = await anyio.to_thread.run_sync(provider.embed_query, need)
+            best = max(best, _cosine(query.values, passage.vectors[0].values))
+        return best
 
     def _simple_no_answer(self, reason: str, *, selected_chunk_count: int = 0) -> _AnswerDraft:
         GLOBAL_METRICS.record_answer_branch(f"simple_no_answer_{reason}")
@@ -5408,6 +5467,41 @@ _SIMPLE_ABSENCE_PHRASES = (
 )
 # A sentence ends at . ! ? or a line break; a marker written after the full stop stays with it.
 _SIMPLE_SENTENCE_BREAK = re.compile(r"(?<=[.!?])\s+(?!\[SOURCE_)|\n+(?!\s*\[SOURCE_)")
+# s1: markers written after a full stop move in front of it, so the text after them starts a
+# new sentence; sentences are then split with their separators kept.
+_SIMPLE_MARKERS_AFTER_STOP = re.compile(r"([.!?])((?:[ \t]*\[SOURCE_\d+\])+)")
+_SIMPLE_SPLIT_KEEPING_BREAKS = re.compile(r"((?<=[.!?])[ \t]+|\n+)")
+_SIMPLE_MARKER = re.compile(r"[ \t]*\[SOURCE_\d+\]")
+_SIMPLE_UNVERIFIED_PHRASES = ("chua xac minh duoc", "khong xac minh duoc", "could not be verified")
+
+
+def _simple_sentence_parts(text: str) -> list[str]:
+    """s1: sentences at even indexes, the breaks between them at odd ones."""
+    return _SIMPLE_SPLIT_KEEPING_BREAKS.split(_SIMPLE_MARKERS_AFTER_STOP.sub(r"\2\1", text.strip()))
+
+
+def _simple_split_absences(text: str, *, question: str) -> tuple[str, tuple[str, ...]]:
+    """s1: the answer with every sentence that names an unverified part ("chưa/không xác minh
+    được", "could not be verified") stripped of its markers, and the claim sentences with
+    their markers. Such a sentence is never a claim, marked or not, unless it holds a number
+    the question does not: then it may carry a fact and stays a claim."""
+    parts = _simple_sentence_parts(text)
+    question_numbers = set(re.findall(r"\d+", question))
+    shown: list[str] = []
+    claims: list[str] = []
+    for index, part in enumerate(parts):
+        if index % 2 or not part.strip():  # odd parts are the separators
+            shown.append(part)
+            continue
+        bare = _SIMPLE_MARKER.sub("", part)
+        if any(phrase in fold_text(bare) for phrase in _SIMPLE_UNVERIFIED_PHRASES) and set(
+            re.findall(r"\d+", bare)
+        ).issubset(question_numbers):
+            shown.append(bare)
+        else:
+            shown.append(part)
+            claims.append(part)
+    return "".join(shown), tuple(claims)
 
 
 def _simple_select_hits(

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import replace
+from types import SimpleNamespace
 from typing import Any
 from uuid import UUID
 
@@ -11,13 +12,17 @@ import pytest
 
 from app.chat.context_builder import select_context_for_prompt
 from app.chat.models import GroundingStatus
-from app.chat.prompt_builder import build_simple_grounded_prompt
+from app.chat.prompt_builder import build_simple_grounded_prompt, build_simple_system_prompt
 from app.citations.errors import CitationFailureCode, CitationValidationError
 from app.citations.models import PromptSourceRegistry
 from app.llm.models import LLMGenerationResult
 from app.observability.metrics import GLOBAL_METRICS
 from app.services import claim_evidence_validation_service as validation
-from app.services.grounded_answer_service import _simple_claim_text, _simple_select_hits
+from app.services.grounded_answer_service import (
+    _simple_claim_text,
+    _simple_select_hits,
+    _simple_split_absences,
+)
 from tests.unit.test_grounded_answer_service import (
     FakeCitationValidationService,
     FakeCounter,
@@ -59,9 +64,13 @@ class StrictCitationValidation(FakeCitationValidationService):
         )
 
 
-def _ask(*contents: str, mode: str = "simple", hits: tuple = (), **flags: Any) -> tuple:
+def _ask(
+    *contents: str, mode: str = "simple", hits: tuple = (), embeddings: Any = None, **flags: Any
+) -> tuple:
     llm = SequentialFakeLLMProvider(*(_generation(c) for c in contents))
     retrieval = FakeRetrievalService(retrieval_result(*(hits or (hit(SOURCE),))))
+    if embeddings is not None:
+        retrieval.semantic_retrieval_service = SimpleNamespace(embedding_provider=embeddings)
     service, _, _, _, resolved_llm, _, _ = make_service(
         retrieval=retrieval,
         llm=llm,
@@ -253,3 +262,145 @@ def test_a_document_control_line_does_not_hide_the_other_facts_of_a_whole_chunk(
         assert _validate_whole_chunk(questions, "Ke tang 2 chiu toi da 640 kg.", args[2]) != (
             supported
         )
+
+
+# --- s1-s3 (owner decision 2026-11-16), each behind its flag ------------------------------
+
+S1 = {"rag_simple_absence_sentences_enabled": True}
+UNVERIFIED = "Chưa xác minh được từ tài liệu bạn được phép truy cập"
+
+
+def test_s1_an_unverified_part_is_never_a_claim_marked_or_not() -> None:
+    q = "Muc in thay may lan va ai ky phieu?"
+    shown, claims = _simple_split_absences(
+        f"Muc in duoc thay 2 lan moi thang. [SOURCE_1] {UNVERIFIED}: nguoi ky phieu [SOURCE_1].",
+        question=q,
+    )
+    # the marker after the full stop stays with its sentence; the next one starts a sentence
+    assert claims == ("Muc in duoc thay 2 lan moi thang [SOURCE_1].",)
+    assert shown.endswith(f"{UNVERIFIED}: nguoi ky phieu.")
+    assert _simple_split_absences(f"{UNVERIFIED}: [SOURCE_1]", question=q) == (f"{UNVERIFIED}:", ())
+    assert _simple_split_absences("Không xác minh được: người ký.", question=q)[1] == ()
+    # a number the question does not hold may carry a fact: it stays a claim
+    fact = "Không xác minh được: mức phạt là 300 nghìn [SOURCE_1]."
+    assert _simple_split_absences(fact, question=q)[1] == (fact,)
+
+
+def test_s1_an_answer_of_unverified_parts_only_is_no_answer_without_a_retry() -> None:
+    marked = f"{UNVERIFIED}: tai trong cua xe [SOURCE_1]."
+    result, llm = _ask(marked, **S1)
+    assert result.grounding_status == GroundingStatus.NO_ANSWER and llm.calls == 1
+    assert GLOBAL_METRICS.answer_branch_counts()["simple_no_answer_refusal_text"] == 1
+    _, old = _ask(marked, marked)  # flag off: the marked sentence is a claim and is retried
+    assert old.calls == 2
+
+
+def test_s1_a_partial_answer_shows_the_unverified_part_without_a_citation() -> None:
+    citations = StrictCitationValidation()
+    llm = SequentialFakeLLMProvider(
+        _generation(f"{GOOD[:-1]}. {UNVERIFIED}: nguoi kiem dinh xe [SOURCE_1].")
+    )
+    service, _, _, _, resolved, _, _ = make_service(
+        retrieval=FakeRetrievalService(retrieval_result(hit(SOURCE))), llm=llm,
+        citation_validation=citations, settings_obj=settings(rag_answer_mode="simple", **S1),
+    )  # fmt: skip
+    result = asyncio.run(
+        service.answer_question(
+            current_user=user(), session_id=chat_session().id, question=QUESTION
+        )
+    )
+    assert result.grounding_status == GroundingStatus.ANSWERED and resolved.calls == 1
+    assert citations.answers[0].count("[SOURCE_1]") == 1  # only the claim cites
+    assert result.assistant_message.content.endswith(f"{UNVERIFIED}: nguoi kiem dinh xe.")
+
+
+def test_s1_short_prompt_asks_for_the_marker_inside_each_sentence() -> None:
+    short = build_simple_system_prompt(no_answer_sentinel="__NO__", short=True)
+    assert "one short sentence for each point" in short and "without a marker" in short
+    assert "2.500" not in short  # holds no source text
+    assert build_simple_system_prompt(no_answer_sentinel="__NO__") != short
+    _, llm = _ask(GOOD, rag_simple_short_prompt_enabled=True)
+    assert "one short sentence for each point" in llm.message_history[0][0].content
+
+
+PRINTER = (
+    "So tay xuong in. Phieu bao hanh may in phai gui trong 05 ngay lam viec sau khi nhan may. "
+    "Muc in duoc thay 2 lan moi thang."
+)
+PRINTER_Q = "Phieu bao hanh may in phai gui trong bao lau?"
+
+
+def test_s2_relaxed_rules_accept_a_bare_value_but_still_catch_a_wrong_number() -> None:
+    supported = validation.ClaimEvidenceStatus.SUPPORTED
+    with validation.simple_validation():
+        assert _validate_whole_chunk(PRINTER, "5 ngay lam viec.", PRINTER_Q) != supported
+    with validation.simple_validation(relaxed_rules=True):
+        assert _validate_whole_chunk(PRINTER, "5 ngay lam viec.", PRINTER_Q) == supported
+        assert _validate_whole_chunk(PRINTER, "9 ngay lam viec.", PRINTER_Q) == (
+            validation.ClaimEvidenceStatus.CONTRADICTED
+        )
+
+
+class _ByWordEmbeddings:
+    """The query is (1, 0); a passage holding `near` is (1, 0), any other (0, 1)."""
+
+    def __init__(self, near: str) -> None:
+        self.near = near
+
+    def embed_query(self, text: str) -> Any:
+        return SimpleNamespace(values=(1.0, 0.0))
+
+    def embed_passages(self, texts: Any) -> Any:
+        return SimpleNamespace(
+            vectors=[SimpleNamespace(values=(1.0, 0.0) if self.near in t else (0.0, 1.0))
+                     for t in texts]
+        )  # fmt: skip
+
+
+S2 = {**S1, "rag_simple_relaxed_rules_enabled": True, "rag_simple_claim_relevance_enabled": True}
+OFF_TOPIC = "Day cap duoc kiem tra 2 lan moi quy [SOURCE_1]."
+
+
+def test_s2_a_claim_whose_source_sentence_is_off_topic_is_dropped() -> None:
+    result, llm = _ask(f"{GOOD} {OFF_TOPIC}", embeddings=_ByWordEmbeddings("2.500"), **S2)
+    assert result.grounding_status == GroundingStatus.ANSWERED and llm.calls == 1
+    assert "Day cap" not in result.assistant_message.content
+    assert "2.500 kg" in result.assistant_message.content
+    assert GLOBAL_METRICS.answer_branch_counts()["simple_claim_irrelevant"] == 1
+
+
+def test_s2_no_relevant_claim_left_ends_at_no_answer_without_a_retry() -> None:
+    result, llm = _ask(OFF_TOPIC, GOOD, embeddings=_ByWordEmbeddings("2.500"), **S2)
+    assert result.grounding_status == GroundingStatus.NO_ANSWER and llm.calls == 1
+    assert GLOBAL_METRICS.answer_branch_counts()["simple_no_answer_claim_irrelevant"] == 1
+
+
+def test_s2_relevance_is_skipped_when_it_cannot_be_measured() -> None:
+    result, llm = _ask(GOOD, **S2)  # no embedding provider
+    assert result.grounding_status == GroundingStatus.ANSWERED and llm.calls == 1
+
+
+def test_s3_a_question_list_counts_by_its_non_question_segments() -> None:
+    from app.retrieval.evidence_quality import EvidenceContextKind, classify_evidence_context
+
+    faq = (
+        "Phu luc cau hoi kiem thu. Muc in duoc thay may lan moi thang? "
+        "Muc in duoc thay 2 lan moi thang. Ai ky phieu bao hanh?"
+    )
+    assert classify_evidence_context(faq) == EvidenceContextKind.QUESTION_LIST
+    q, supported = "Muc in duoc thay may lan moi thang?", validation.ClaimEvidenceStatus.SUPPORTED
+    with validation.simple_validation():
+        assert _validate_whole_chunk(faq, "Muc in duoc thay 2 lan moi thang.", q) != supported
+    with validation.simple_validation(question_list_segments=True):
+        assert _validate_whole_chunk(faq, "Muc in duoc thay 2 lan moi thang.", q) == supported
+        # its questions are still no evidence
+        assert _validate_whole_chunk(faq, "Ai ky phieu bao hanh.", "Ai ky phieu?") != supported
+
+
+def test_the_new_flags_are_off_by_default() -> None:
+    s = settings()
+    assert not (
+        s.rag_simple_absence_sentences_enabled or s.rag_simple_short_prompt_enabled
+        or s.rag_simple_relaxed_rules_enabled or s.rag_simple_claim_relevance_enabled
+        or s.rag_simple_question_list_segments_enabled
+    )  # fmt: skip

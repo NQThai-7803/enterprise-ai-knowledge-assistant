@@ -173,6 +173,21 @@ class Settings(BaseSettings):
     # (at most 2 per document), one prompt, citation + claim validation, one retry. legacy
     # keeps the full pipeline.
     rag_answer_mode: Literal["legacy", "simple"] = "legacy"
+    # Simple-mode fixes s1-s3 (same doc, owner decision 2026-11-16), read only in simple mode.
+    # s1: a sentence naming an unverified part ("chưa/không xác minh được") is never a claim,
+    # with or without a marker; a short-answer prompt asks for the marker in the first draft.
+    rag_simple_absence_sentences_enabled: bool = False
+    rag_simple_short_prompt_enabled: bool = False
+    # s2: claim validation skips the subject-alignment rule and the attendance, annual-leave and
+    # bereavement rules; a claim whose cited source sentence is too far (e5 cosine) from the
+    # question and from each of its parts is dropped, and none left ends at NO_ANSWER.
+    rag_simple_relaxed_rules_enabled: bool = False
+    rag_simple_claim_relevance_enabled: bool = False
+    # Calibrated 2026-11-16 on the dev-set drafts of the diagnostic run (UAT excluded): the
+    # lowest best-claim cosine of a correct answer, floored (109 drafts of 58 items).
+    rag_simple_claim_relevance_min_similarity: float = Field(default=0.78, ge=0.0, le=1.0)
+    # s3: a whole question-list chunk counts by its answer segments, as a reference one does.
+    rag_simple_question_list_segments_enabled: bool = False
     # FIX 3c F: numbers are compared once written one way (01 = 1, 1,2 trieu = 1.200.000).
     rag_number_normalization_enabled: bool = False
     # FIX 4 (i), completeness checks: a grouped number is one number in the unit check; a

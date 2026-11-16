@@ -8,7 +8,13 @@
 3. **Embedding fine-tune** (`docs/design/embedding-finetune.md` and DEC-015 on branch `feat/embedding-finetune-infra`): infrastructure only so far; the baseline measurement and training come after FIX 3.
 4. The final held-out v2 measurement, once, after the choices above are made (DEC-012).
 
-## Simple mode diagnosis -- 2026-11-16 (STOPPED for the owner's review)
+## Simple mode s1-s3 -- 2026-11-16 (STOPPED for the owner's review)
+
+- **DONE:** s1, s2, s3 behind flags (off); relevance threshold calibrated on dev before measuring (t = 0.78); measured legacy/s1/s2/s3 in the same Actions jobs, 2 runs, 6 sets; results in `docs/design/simple-answer-mode.md`.
+- **Result:** s1, s2, s3 each meet DEC-026 on the dev sets; s2 = s3 rank first (dev 96–7–13–1 against legacy 72–27–17–1). Default unchanged.
+- **WAITING FOR OWNER:** which configuration (if any) becomes the default; whether s2's UAT wrong-subject risk (4 → 5-8) is acceptable or t should be raised; what to do about supported-but-off-topic false answers (12 of 13 dev false answers).
+
+## Simple mode diagnosis -- 2026-11-16 (direction approved; superseded by s1-s3 above)
 
 - **DONE:** owner decisions applied ("chưa xác minh được" wording, `simple_det` removed); eval ablation `simple_trace`; 1 diagnostic run on UAT and 5 dev sets (real retrieval and oracle); 187 rejected sentences classified (`docs/design/simple-answer-mode.md`, "Diagnosis").
 - **WAITING FOR OWNER:** the fix direction. Proposed, each behind a flag and measured with 2 runs under DEC-026: (1) absence sentences recognised with or without a marker, fixing the defect where one is returned as an answer; (2) short-answer prompt with the marker in the first draft; (3) per-sentence validation, with the owner's call on whether simple skips the subject-alignment rule and the legacy domain rules; (4) question-list sources by segments. Open: refuse items answered with a supported but unrelated sentence.

@@ -176,8 +176,9 @@ def test_simple_trace_records_every_draft_and_changes_nothing(
     plain_result, _ = _ask(wrong, GOOD)
     trace = tmp_path / "trace.jsonl"
     monkeypatch.setenv("EVAL_SIMPLE_TRACE_FILE", str(trace))
-    monkeypatch.setattr(gas.GroundedAnswerService, "_simple_validate",
-                        gas.GroundedAnswerService._simple_validate)  # fmt: skip
+    for method in ("_simple_validate", "_simple_answer_draft", "_simple_claim_similarity"):
+        monkeypatch.setattr(gas.GroundedAnswerService, method,
+                            getattr(gas.GroundedAnswerService, method))  # fmt: skip
     for name, value in list(vars(validation).items()):  # restored after the test
         if name.startswith("_") and callable(value):
             monkeypatch.setattr(validation, name, value)
@@ -192,4 +193,37 @@ def test_simple_trace_records_every_draft_and_changes_nothing(
     assert first["sentences"][0]["status"] == "CONTRADICTED"
     assert first["sentences"][0]["rule"] == "_numbers_are_contradicted=True"
     assert (second["outcome"], second["whole"]["status"]) == ("answered", "SUPPORTED")
+    assert (first["attempt"], second["attempt"]) == (1, 2) and first["similarities"] == []
     assert first["sources"][0]["kind"] == "answer" and "2.500 kg" in first["sources"][0]["text"]
+
+
+def test_simple_trace_follows_the_s1_s2_flags(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import app.services.claim_evidence_validation_service as validation
+    import app.services.grounded_answer_service as gas
+    from scripts.diagnostics import ablation_patches
+    from tests.unit.test_simple_answer_mode import (
+        GOOD,
+        OFF_TOPIC,
+        S2,
+        UNVERIFIED,
+        _ask,
+        _ByWordEmbeddings,
+    )
+
+    trace = tmp_path / "trace.jsonl"
+    monkeypatch.setenv("EVAL_SIMPLE_TRACE_FILE", str(trace))
+    for method in ("_simple_validate", "_simple_answer_draft", "_simple_claim_similarity"):
+        monkeypatch.setattr(gas.GroundedAnswerService, method,
+                            getattr(gas.GroundedAnswerService, method))  # fmt: skip
+    for name, value in list(vars(validation).items()):
+        if name.startswith("_") and callable(value):
+            monkeypatch.setattr(validation, name, value)
+    ablation_patches._patch_simple_trace(gas)
+    draft = f"{GOOD} {OFF_TOPIC} {UNVERIFIED}: nguoi kiem dinh [SOURCE_1]."
+    _ask(draft, embeddings=_ByWordEmbeddings("2.500"), **S2)
+    (record,) = (json.loads(line) for line in trace.read_text("utf-8").splitlines())
+    assert record["outcome"] == "answered" and record["attempt"] == 1
+    assert [s["absence"] for s in record["sentences"]] == [False, False, True]
+    assert [round(s["similarity"], 2) for s in record["similarities"]] == [1.0, 0.0]
