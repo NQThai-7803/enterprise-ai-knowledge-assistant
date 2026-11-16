@@ -6,6 +6,13 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### Simple answer mode: s1-s3 behind flags -- 2026-11-16
+
+- New flags, all off, read only in `RAG_ANSWER_MODE=simple` (`ENVIRONMENT_VARIABLES.md`): `RAG_SIMPLE_ABSENCE_SENTENCES_ENABLED`, `RAG_SIMPLE_SHORT_PROMPT_ENABLED` (s1); `RAG_SIMPLE_RELAXED_RULES_ENABLED`, `RAG_SIMPLE_CLAIM_RELEVANCE_ENABLED`, `RAG_SIMPLE_CLAIM_RELEVANCE_MIN_SIMILARITY` (s2, 0.78); `RAG_SIMPLE_QUESTION_LIST_SEGMENTS_ENABLED` (s3).
+- Fixes the simple-mode defect where an unverified-part sentence with a marker was returned as an answer (under s1).
+- Eval stack: one switch per configuration (`EVAL_SIMPLE_S1/S2/S3`); `simple_trace` records the draft number and the relevance similarities.
+- Measured: on the dev sets s1, s2 and s3 all meet DEC-026 (false answers + wrong 18 → 14, false refusals 27 → 13 / 7 / 7). Not adopted yet; the owner decides (`docs/design/simple-answer-mode.md`).
+
 ### Simple answer mode: wording and diagnosis -- 2026-11-16
 
 - Simple mode names a missing part "Chưa xác minh được từ tài liệu bạn được phép truy cập: …" (was "Tài liệu không đề cập …"), to match the compound grader. `simple_det` and its counter are removed; `RAG_ANSWER_MODE` is `legacy` (default) or `simple`.
