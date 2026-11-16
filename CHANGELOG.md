@@ -6,6 +6,12 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### Simple answer mode: wording and diagnosis -- 2026-11-16
+
+- Simple mode names a missing part "Chưa xác minh được từ tài liệu bạn được phép truy cập: …" (was "Tài liệu không đề cập …"), to match the compound grader. `simple_det` and its counter are removed; `RAG_ANSWER_MODE` is `legacy` (default) or `simple`.
+- Eval-only ablation `simple_trace`: every simple-mode LLM draft, with each sentence, its cited sources and the validator status, goes to the eval artifact `simple_trace.jsonl`. No change to answers.
+- Diagnosis of 187 rejected sentences on UAT and 5 dev sets, and a known defect of simple mode (an absence sentence with a marker can be returned as an answer): `docs/design/simple-answer-mode.md`.
+
 ### Simple answer mode (experimental, off) -- 2026-11-16
 
 - `RAG_ANSWER_MODE` (`legacy` by default, `simple`, `simple_det`): a short answer path with the same hybrid retrieval and SQL permission filter, top 5 whole chunks (at most 2 per document), one plain-text prompt with `[SOURCE_n]` markers, citation and claim validation with number/unit normalization, one retry with the reason, then NO_ANSWER. `simple_det` adds the strict deterministic route as a fast path. New counters `simple_retry`, `simple_deterministic`, `simple_no_answer_<reason>`.

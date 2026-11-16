@@ -8,7 +8,13 @@
 3. **Embedding fine-tune** (`docs/design/embedding-finetune.md` and DEC-015 on branch `feat/embedding-finetune-infra`): infrastructure only so far; the baseline measurement and training come after FIX 3.
 4. The final held-out v2 measurement, once, after the choices above are made (DEC-012).
 
-## Simple answer mode -- 2026-11-16 (STOPPED for report)
+## Simple mode diagnosis -- 2026-11-16 (STOPPED for the owner's review)
+
+- **DONE:** owner decisions applied ("chưa xác minh được" wording, `simple_det` removed); eval ablation `simple_trace`; 1 diagnostic run on UAT and 5 dev sets (real retrieval and oracle); 187 rejected sentences classified (`docs/design/simple-answer-mode.md`, "Diagnosis").
+- **WAITING FOR OWNER:** the fix direction. Proposed, each behind a flag and measured with 2 runs under DEC-026: (1) absence sentences recognised with or without a marker, fixing the defect where one is returned as an answer; (2) short-answer prompt with the marker in the first draft; (3) per-sentence validation, with the owner's call on whether simple skips the subject-alignment rule and the legacy domain rules; (4) question-list sources by segments. Open: refuse items answered with a supported but unrelated sentence.
+- **NOT STARTED:** step 3 of the owner's prompt (the fixes).
+
+## Simple answer mode -- 2026-11-16 (measured; superseded by the diagnosis above)
 
 - **DONE:** DEC-026 (PR #35); `RAG_ANSWER_MODE=legacy|simple|simple_det` behind the flag, default `legacy`; unit tests with made-up documents; measured on 6 sets, 2 runs, with oracle × {legacy, simple} (`docs/design/simple-answer-mode.md`).
 - **Result:** neither mode meets DEC-026 (dev false answers + wrong 17 → 19 / 20); UAT monitoring 98-99 → 39-40 / 59. Default unchanged.
