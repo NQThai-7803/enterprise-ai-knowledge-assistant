@@ -1,0 +1,481 @@
+# Gold of natural_dev_v1, written from the corpus V2 PDFs only (no system run on this set).
+# DRAFT until the owner approves it; then status: APPROVED and natural_dev_v1_gold.lock.
+# Fields as held-out v2; `not_stated` lists what the documents do not say (situational items).
+version: natural_dev_v1
+status: DRAFT
+questions_sha256: c899d75a86baab36981ed8a424081885cdb7c102441311b97be10c509b19bc94
+items:
+  - id: ND-001
+    question: "Tổng thời gian nghỉ lễ là bao nhiêu ngày trong một năm?"
+    role: staff
+    gold_status: ANSWERED
+    gold_answer:
+      - "11 ngày nghỉ lễ, Tết trong năm, hưởng nguyên lương."
+    gold_optional:
+      - "Gồm Tết Dương lịch 01, Tết Âm lịch 05, Chiến thắng 30/4 01, Quốc tế Lao động 01/5 01, Quốc khánh 02, Giỗ Tổ Hùng Vương 01 ngày."
+      - "Người lao động nước ngoài được nghỉ thêm 01 ngày Tết cổ truyền và 01 ngày Quốc khánh của nước họ."
+      - "Lịch nghỉ cụ thể do HR/doanh nghiệp thông báo hằng năm."
+    gold_citations:
+      - {document: UAT-LEAVE-AUTHORITY-001, pages: [3]}
+    acceptable_extra_citations:
+      - {document: ND-HR-004, pages: [5]}
+    source_excerpt:
+      - {document: UAT-LEAVE-AUTHORITY-001, page: 3, text: "Tổng số ngày nghỉ lễ, Tết theo lịch quốc gia là 11 ngày trong năm."}
+      - {document: ND-HR-004, page: 5, text: "Tết Dương lịch 01 ngày Tết Âm lịch 05 ngày Ngày Chiến thắng 30/4 01 ngày Ngày Quốc tế Lao động 01/5 01 ngày Quốc khánh 02 ngày Giỗ Tổ Hùng Vương 01 ngày"}
+    fail_examples:
+      - "Một tổng khác 11 ngày."
+      - "Cộng nghỉ hằng năm (12 ngày) vào nghỉ lễ."
+    forbidden:
+      - {document: UAT-GROUNDING-001, value: "travel approval"}
+    notes: "ND-HR-004 liệt kê từng dịp (cộng lại 11) nhưng không ghi tổng; UAT-LEAVE-AUTHORITY-001 ghi tổng 11 nhưng là tài liệu mẫu cần rà soát. Trích tài liệu nào cũng được."
+
+  - id: ND-002
+    question: "Tôi là ứng viên được tuyển và hoàn thành mốc thử việc thì được thưởng thêm gì không?"
+    role: staff
+    gold_status: ANSWERED_LIMITED
+    gold_answer:
+      - "Chính sách thưởng có Employee Referral Bonus 3 - 15 triệu đồng, điều kiện: ứng viên được tuyển và hoàn thành mốc thử việc/điều kiện chương trình."
+      - "Đó là thưởng giới thiệu ứng viên; tài liệu không nói chính người được tuyển nhận khoản thưởng này."
+    missing_points:
+      - "Khoản thưởng nào dành cho chính ứng viên/người mới khi qua thử việc."
+      - "Ai nhận Employee Referral Bonus (ngoài tên chương trình)."
+    limited_pass: "Nêu Employee Referral Bonus 3 - 15 triệu đồng với điều kiện ứng viên được tuyển và qua thử việc, và nói rõ tài liệu không xác nhận chính ứng viên nhận khoản này."
+    fail_examples:
+      - "Khẳng định người được tuyển nhận 3 - 15 triệu đồng khi qua thử việc."
+      - "Nói không có khoản thưởng nào liên quan mà không nhắc Employee Referral Bonus."
+    gold_citations:
+      - {document: ND-HR-005, pages: [9]}
+    source_excerpt:
+      - {document: ND-HR-005, page: 9, text: "Employee Referral Bonus 3 - 15 triệu đồng Ứng viên được tuyển và hoàn thành mốc thử việc/điều kiện chương trình."}
+    forbidden:
+      - {document: UAT-GROUNDING-001, value: "travel approval"}
+    owner_decision: "Người hỏi tự nhận là ứng viên; tài liệu chỉ có thưởng giới thiệu (Employee Referral Bonus) với điều kiện ứng viên qua thử việc. Giữ ANSWERED_LIMITED như bản nháp, hay ANSWERED nếu coi câu hỏi là hỏi về thưởng giới thiệu?"
+
+  - id: ND-003
+    question: "Năm giá trị cốt lõi của công ty Nova Digital là gì? Hãy liệt kê."
+    role: staff
+    gold_status: ANSWERED
+    gold_answer:
+      - "Tin cậy."
+      - "Lấy khách hàng làm trung tâm."
+      - "Chất lượng kỹ thuật."
+      - "Hợp tác có trách nhiệm."
+      - "Học hỏi liên tục."
+    gold_optional:
+      - "Mô tả ngắn của từng giá trị như trong tài liệu."
+    gold_citations:
+      - {document: ND-CORP-001, pages: [4]}
+    source_excerpt:
+      - {document: ND-CORP-001, page: 4, text: "Năm giá trị cốt lõi 01 TIN CẬY"}
+      - {document: ND-CORP-001, page: 4, text: "02 LẤY KHÁCH HÀNG LÀM TRUNG TÂM"}
+      - {document: ND-CORP-001, page: 4, text: "03 CHẤT LƯỢNG KỸ THUẬT"}
+      - {document: ND-CORP-001, page: 4, text: "04 HỢP TÁC CÓ TRÁCH NHIỆM"}
+      - {document: ND-CORP-001, page: 4, text: "05 HỌC HỎI LIÊN TỤC"}
+    fail_examples:
+      - "Thiếu hoặc thay một giá trị bằng nội dung tầm nhìn, sứ mệnh hay nguyên tắc văn hóa."
+    forbidden:
+      - {document: UAT-GROUNDING-001, value: "travel approval"}
+
+  - id: ND-004
+    question: "Tôi kết hôn thì được nghỉ việc riêng mà vẫn hưởng lương mấy ngày?"
+    role: staff
+    gold_status: ANSWERED
+    gold_answer:
+      - "03 ngày."
+    gold_optional:
+      - "Nghỉ việc riêng hưởng lương do kết hôn không trừ vào phép năm (tình huống mẫu)."
+      - "Phúc lợi kết hôn 2.000.000 đ là khoản tiền, không phải ngày nghỉ."
+    gold_citations:
+      - {document: ND-HR-004, pages: [6]}
+    acceptable_extra_citations:
+      - {document: UAT-LEAVE-AUTHORITY-001, pages: [4]}
+    source_excerpt:
+      - {document: ND-HR-004, page: 6, text: "Kết hôn 03 ngày Con đẻ hoặc con nuôi kết hôn 01 ngày"}
+      - {document: UAT-LEAVE-AUTHORITY-001, page: 4, text: "Kết hôn 03 ngày Con kết hôn 01 ngày"}
+    fail_examples:
+      - "01 ngày (mức khi con kết hôn)."
+    forbidden:
+      - {document: UAT-GROUNDING-001, value: "travel approval"}
+
+  - id: ND-005
+    question: "Tôi lần đầu lỡ quên chấm công thì có bị phạt gì không?"
+    role: staff
+    gold_status: ANSWERED
+    gold_answer:
+      - "Quên chấm công / vi phạm quy trình lần đầu, không gây hậu quả thuộc nhóm nhẹ: nhắc nhở, hướng dẫn, bổ sung hồ sơ; chỉ xem xét kỷ luật nếu có căn cứ và tái diễn."
+      - "Công ty không phạt tiền hoặc cắt lương thay cho xử lý kỷ luật."
+    gold_optional:
+      - "Tạo yêu cầu điều chỉnh chấm công trên HRM kèm bằng chứng, nên trong 03 ngày làm việc."
+      - "Dữ liệu chấm công bất thường phải được xác minh trước khi kết luận vi phạm."
+    not_stated:
+      - "Không có mức phạt cụ thể nào cho lần quên đầu tiên."
+    gold_citations:
+      - {document: ND-HR-002, pages: [15]}
+    acceptable_extra_citations:
+      - {document: ND-HR-003, pages: [6, 9]}
+      - {document: ND-HR-002, pages: [12]}
+      - {document: ND-HR-005, pages: [10]}
+    source_excerpt:
+      - {document: ND-HR-002, page: 15, text: "Nhẹ Quên chấm công; vi phạm quy trình lần đầu, không gây hậu quả Nhắc nhở, hướng dẫn, bổ sung hồ sơ; xem xét kỷ luật nếu có căn cứ và tái diễn"}
+      - {document: ND-HR-003, page: 9, text: "Không áp dụng phạt tiền hoặc cắt lương thay cho xử lý kỷ luật lao động trái quy định pháp luật."}
+    fail_examples:
+      - "Bị phạt tiền hoặc trừ lương."
+      - "Tự động bị khiển trách."
+    forbidden:
+      - {document: UAT-GROUNDING-001, value: "travel approval"}
+
+  - id: ND-006
+    question: "Nhân viên được phép nói về lương của chính mình cho người khác không?"
+    role: staff
+    gold_status: ANSWERED
+    gold_answer:
+      - "Được: chính sách không cấm người lao động sử dụng, trao đổi hoặc cung cấp thông tin lương của chính mình khi thực hiện quyền hợp pháp."
+    gold_optional:
+      - "Không được truy cập, sao chép hoặc phát tán dữ liệu lương của người khác khi không có nhiệm vụ/phê duyệt."
+      - "Quyền của người lao động với thông tin lương của chính mình không bị hạn chế."
+    gold_citations:
+      - {document: ND-HR-005, pages: [11]}
+    acceptable_extra_citations:
+      - {document: ND-HR-005, pages: [3]}
+    source_excerpt:
+      - {document: ND-HR-005, page: 11, text: "Chính sách không cấm người lao động sử dụng, trao đổi hoặc cung cấp thông tin lương của chính mình khi thực hiện quyền hợp pháp."}
+      - {document: ND-HR-005, page: 3, text: "quyền của người lao động đối với thông tin lương của chính mình không bị hạn chế."}
+    fail_examples:
+      - "Không được, lương là thông tin bảo mật."
+    forbidden:
+      - {document: UAT-GROUNDING-001, value: "travel approval"}
+
+  - id: ND-007
+    question: "Tôi chia sẻ tài khoản của tôi cho đồng nghiệp để làm hộ phần cần thiết thì có bị kỷ luật không?"
+    role: staff
+    gold_status: ANSWERED
+    gold_answer:
+      - "Nội quy cấm chia sẻ: mỗi người dùng tài khoản cá nhân; cấm chia sẻ mật khẩu, mã OTP, khóa API, khóa SSH hoặc token."
+      - "Chia sẻ tài khoản thuộc nhóm nặng: khoanh vùng rủi ro, thu hồi quyền; xem xét hình thức kỷ luật phù hợp sau quy trình."
+    gold_optional:
+      - "Không hành vi nào tự động dẫn đến một hình thức kỷ luật khi chưa xác minh và đủ thủ tục."
+      - "Các hình thức kỷ luật: khiển trách; kéo dài thời hạn nâng lương không quá 06 tháng; cách chức; sa thải theo điều kiện pháp luật."
+    not_stated:
+      - "Lý do làm hộ phần việc cần thiết không phải ngoại lệ được nêu."
+      - "Hình thức kỷ luật cụ thể sẽ áp dụng."
+    gold_citations:
+      - {document: ND-HR-002, pages: [7, 15]}
+    acceptable_extra_citations:
+      - {document: ND-HR-002, pages: [12]}
+    source_excerpt:
+      - {document: ND-HR-002, page: 7, text: "Mỗi người sử dụng tài khoản cá nhân; cấm chia sẻ mật khẩu, mã OTP, khóa API, khóa SSH hoặc token truy cập."}
+      - {document: ND-HR-002, page: 15, text: "Nặng Chia sẻ tài khoản; gửi dữ liệu công việc sang email cá nhân; bỏ qua kiểm soát thay đổi Khoanh vùng rủi ro, thu hồi quyền; xem xét hình thức kỷ luật phù hợp sau quy trình"}
+    fail_examples:
+      - "Được phép nếu chỉ để làm hộ."
+      - "Chắc chắn bị sa thải."
+    forbidden:
+      - {document: UAT-GROUNDING-001, value: "travel approval"}
+
+  - id: ND-008
+    question: "Công ty Nova Digital có bao nhiêu khối và giám đốc của từng khối là ai?"
+    role: staff
+    gold_status: ANSWERED_LIMITED
+    gold_answer:
+      - "Ba khối trong sơ đồ cơ cấu: Khối Sản phẩm & Công nghệ, Khối Kinh doanh & Khách hàng, Khối Vận hành Doanh nghiệp."
+      - "Tài liệu không ghi giám đốc của từng khối; chỉ liệt kê Ban điều hành và phạm vi phụ trách: CEO Nguyễn Anh Khoa, CTO Lê Thu Hà, COO Võ Ngọc Linh, CFO Phạm Gia Minh, CHRO Trương Thanh An."
+    missing_points:
+      - "Người đứng đầu từng khối."
+    limited_pass: "Nêu đúng 3 khối và nói rõ tài liệu không ghi giám đốc từng khối; có thể kèm Ban điều hành và phạm vi phụ trách."
+    fail_examples:
+      - "Gán chắc chắn một giám đốc cho từng khối, ví dụ giám đốc Khối Kinh doanh & Khách hàng là COO."
+      - "Một số khối khác 3 mà không giải thích."
+    gold_citations:
+      - {document: ND-CORP-001, pages: [6]}
+    acceptable_extra_citations:
+      - {document: ND-CORP-001, pages: [7, 8]}
+    source_excerpt:
+      - {document: ND-CORP-001, page: 6, text: "KHỐI SẢN PHẨM & CÔNG NGHỆ KHỐI KINH DOANH & KHÁCH HÀNG KHỐI VẬN HÀNH DOANH NGHIỆP"}
+      - {document: ND-CORP-001, page: 6, text: "Tổng Giám đốc (CEO) Nguyễn Anh Khoa - chịu trách nhiệm kết quả kinh doanh và điều hành chung"}
+      - {document: ND-CORP-001, page: 6, text: "Giám đốc Vận hành (COO) Võ Ngọc Linh - phụ trách triển khai, dịch vụ khách hàng và vận hành nội bộ"}
+    forbidden:
+      - {document: UAT-GROUNDING-001, value: "travel approval"}
+    owner_decision: "Trang 7-8 cũng gọi một số đơn vị là 'Khối' (Khối Sản phẩm, Khối Kỹ thuật Phần mềm, Khối Kinh doanh & Marketing, Khối Customer Success & Managed Services). Bản nháp lấy 3 khối của sơ đồ trang 6. Duyệt, hay đổi số khối?"
+
+  - id: ND-009
+    question: "Tôi dùng công cụ AI để làm việc thì có bị kỷ luật không?"
+    role: staff
+    gold_status: ANSWERED
+    gold_answer:
+      - "Được dùng công cụ AI được Công ty phê duyệt cho mục đích công việc."
+      - "Không nhập dữ liệu mật, dữ liệu cá nhân, mã nguồn độc quyền, khóa truy cập, hợp đồng hoặc thông tin khách hàng vào dịch vụ AI công cộng chưa được đánh giá; nội dung AI tạo phải được người kiểm tra trước khi dùng."
+      - "Dùng phần mềm chưa duyệt thuộc nhóm trung bình: xác minh, coaching/đào tạo; có thể xem xét khiển trách tùy lỗi và tình tiết."
+    not_stated:
+      - "Dùng công cụ AI đã được phê duyệt đúng quy tắc thì bị kỷ luật."
+      - "Một điều khoản kỷ luật riêng cho việc dùng AI."
+    gold_citations:
+      - {document: ND-HR-002, pages: [7]}
+    acceptable_extra_citations:
+      - {document: ND-HR-002, pages: [15]}
+    source_excerpt:
+      - {document: ND-HR-002, page: 7, text: "Chỉ sử dụng công cụ AI được Công ty phê duyệt cho mục đích công việc."}
+      - {document: ND-HR-002, page: 7, text: "Không nhập dữ liệu mật, dữ liệu cá nhân, mã nguồn độc quyền, khóa truy cập, hợp đồng hoặc thông tin khách hàng vào dịch vụ AI công cộng chưa được đánh giá."}
+      - {document: ND-HR-002, page: 15, text: "Trung bình Đi muộn lặp lại; dùng phần mềm chưa duyệt; không hoàn tất bàn giao Xác minh, coaching/đào tạo; có thể xem xét khiển trách tùy lỗi và tình tiết"}
+    fail_examples:
+      - "Dùng AI là bị kỷ luật."
+      - "Được dùng mọi công cụ AI tùy ý."
+    forbidden:
+      - {document: UAT-GROUNDING-001, value: "travel approval"}
+
+  - id: ND-010
+    question: "Tôi là nhân viên thì có thể xin tạm ứng lương trước được không?"
+    role: staff
+    gold_status: ANSWERED
+    gold_answer:
+      - "Có thể đề nghị tạm ứng trong trường hợp khó khăn hoặc tình huống được pháp luật/chính sách cho phép."
+      - "Mức và lịch hoàn ứng do HR/Finance xác nhận bằng văn bản hoặc trên HRM."
+    gold_optional:
+      - "Không thu lãi nội bộ với khoản tạm ứng lương thông thường."
+    not_stated:
+      - "Mức tạm ứng tối đa và thời hạn xét duyệt."
+    gold_citations:
+      - {document: ND-HR-005, pages: [10]}
+    source_excerpt:
+      - {document: ND-HR-005, page: 10, text: "Người lao động có thể đề nghị tạm ứng trong trường hợp khó khăn hoặc tình huống được pháp luật/chính sách cho phép."}
+      - {document: ND-HR-005, page: 10, text: "Mức và lịch hoàn ứng được HR/Finance xác nhận bằng văn bản hoặc trên HRM."}
+    fail_examples:
+      - "Không được tạm ứng."
+      - "Một mức tạm ứng tối đa không có trong tài liệu."
+    forbidden:
+      - {document: UAT-GROUNDING-001, value: "travel approval"}
+
+  - id: ND-011
+    question: "Ví dụ tôi muốn tố giác nội bộ công ty thì liên lạc qua mail nào?"
+    role: staff
+    gold_status: ANSWERED
+    gold_answer:
+      - "compliance@novadigital.example (đầu mối Tuân thủ và tố giác nội bộ)."
+    gold_optional:
+      - "Kênh phản ánh theo nội quy: quản lý, HR Business Partner, Ethics Officer hoặc ethics@novadigital.example."
+    gold_citations:
+      - {document: ND-CORP-001, pages: [9]}
+    acceptable_extra_citations:
+      - {document: ND-HR-002, pages: [9, 15]}
+    source_excerpt:
+      - {document: ND-CORP-001, page: 9, text: "Tuân thủ và tố giác nội bộ compliance@novadigital.example"}
+      - {document: ND-HR-002, page: 9, text: "Người lao động có thể phản ánh với quản lý, HR Business Partner, Ethics Officer hoặc kênh ethics@novadigital.example."}
+    fail_examples:
+      - "Một địa chỉ email khác (hr@, people@, ...) cho việc tố giác."
+    forbidden:
+      - {document: UAT-GROUNDING-001, value: "travel approval"}
+    owner_decision: "Câu trả lời chỉ nêu ethics@novadigital.example (kênh phản ánh của nội quy), không có compliance@: bản nháp xếp KHÔNG ĐẠT. Duyệt, hay chấp nhận như đạt một phần?"
+
+  - id: ND-012
+    question: "Nếu trường hợp khẩn cấp thì tôi xin nghỉ không lương có được không?"
+    role: staff
+    gold_status: ANSWERED
+    gold_answer:
+      - "Ngoài trường hợp luật định, người lao động có thể đề nghị nghỉ không hưởng lương nhưng phải được công ty chấp thuận."
+      - "Khi khẩn cấp: không bắt buộc báo trước theo thời hạn (đề nghị từ 05 ngày liên tục thường gửi trước 10 ngày làm việc), có thể rời lịch làm việc trước khi yêu cầu được duyệt nếu đã thông báo cho quản lý; hoàn thiện HRM và hồ sơ sau."
+    gold_optional:
+      - "Theo chính sách nghỉ mẫu: báo qua điện thoại/kênh khẩn cấp trong 02 giờ kể từ giờ bắt đầu ca; nghỉ không lương có thể ảnh hưởng lương, phụ cấp, chuyên cần, bảo hiểm."
+    not_stated:
+      - "Nghỉ không lương khẩn cấp được tự động chấp thuận."
+      - "Thế nào là khẩn cấp."
+    gold_citations:
+      - {document: ND-HR-004, pages: [6]}
+    acceptable_extra_citations:
+      - {document: ND-HR-004, pages: [9]}
+      - {document: UAT-LEAVE-AUTHORITY-001, pages: [4, 5]}
+    source_excerpt:
+      - {document: ND-HR-004, page: 6, text: "Ngoài các trường hợp luật định, người lao động có thể đề nghị nghỉ không hưởng lương và phải được công ty chấp thuận trước."}
+      - {document: ND-HR-004, page: 6, text: "Đề nghị từ 05 ngày làm việc liên tục trở lên nên gửi trước ít nhất 10 ngày làm việc, trừ trường hợp khẩn cấp."}
+      - {document: ND-HR-004, page: 6, text: "Người lao động chỉ rời lịch làm việc sau khi yêu cầu ở trạng thái Approved, trừ tình huống khẩn cấp đã thông báo cho quản lý."}
+    fail_examples:
+      - "Được nghỉ ngay, không cần ai chấp thuận."
+      - "Không được nghỉ không lương."
+    forbidden:
+      - {document: UAT-GROUNDING-001, value: "travel approval"}
+
+  - id: ND-013
+    question: "Ví dụ trong trường hợp tôi sinh con thì có hỗ trợ phần tiền nào không?"
+    role: staff
+    gold_status: ANSWERED
+    gold_answer:
+      - "Có: phúc lợi 2.000.000 đ/lần khi sinh con hoặc nhận con nuôi hợp pháp."
+    gold_optional:
+      - "Đề nghị qua HRM > Welfare Request, mục tiêu 03 ngày làm việc."
+      - "Chế độ thai sản do BHXH chi theo pháp luật, không phải khoản công ty chi."
+    gold_citations:
+      - {document: ND-HR-006, pages: [9]}
+    acceptable_extra_citations:
+      - {document: ND-HR-006, pages: [11]}
+      - {document: ND-HR-004, pages: [8]}
+    source_excerpt:
+      - {document: ND-HR-006, page: 9, text: "Sinh con / nhận con nuôi hợp pháp 2.000.000 đ/lần"}
+    fail_examples:
+      - "3.000.000 đ (mức tang chế)."
+      - "Không có hỗ trợ nào."
+    forbidden:
+      - {document: UAT-GROUNDING-001, value: "travel approval"}
+
+  - id: ND-014
+    question: "Công ty tổ chức team building mấy lần trong năm?"
+    role: staff
+    gold_status: ANSWERED_LIMITED
+    gold_answer:
+      - "Tài liệu không ghi số lần tổ chức team building trong năm."
+      - "Tài liệu ghi company trip/retreat dự kiến 01 lần/năm (tùy kết quả kinh doanh, an toàn, ngân sách) và ngân sách team building 1.200.000 đ/người/năm."
+    missing_points:
+      - "Số lần team building trong năm."
+    limited_pass: "Nói tài liệu không ghi số lần team building; có thể kèm company trip/retreat dự kiến 01 lần/năm và ngân sách 1.200.000 đ/người/năm."
+    fail_examples:
+      - "Khẳng định team building 01 lần/năm (đánh đồng với company trip)."
+      - "Một số lần không có trong tài liệu."
+    gold_citations:
+      - {document: ND-HR-006, pages: [9]}
+    source_excerpt:
+      - {document: ND-HR-006, page: 9, text: "Company trip/retreat dự kiến 01 lần/năm tùy kết quả kinh doanh, an toàn và ngân sách."}
+      - {document: ND-HR-006, page: 9, text: "Team building budget mô phỏng: 1.200.000 đ/người/năm, quản lý theo đầu người đủ điều kiện và hóa đơn hợp lệ."}
+    forbidden:
+      - {document: UAT-GROUNDING-001, value: "travel approval"}
+    owner_decision: "Company trip/retreat dự kiến 01 lần/năm có được coi là câu trả lời cho 'team building mấy lần' không? Bản nháp: không, nên ANSWERED_LIMITED."
+
+  - id: ND-015
+    question: "Quy trình khiếu nại của Payroll Query là như nào? Giải thích chi tiết."
+    role: staff
+    gold_status: ANSWERED
+    gold_answer:
+      - "Gửi yêu cầu: nhân viên tạo ticket HRM, nêu kỳ lương, khoản sai lệch và tài liệu hỗ trợ."
+      - "Xác minh: HR/Finance đối chiếu HRM, chấm công, HĐLĐ, quyết định lương, OT và dữ liệu ngân hàng."
+      - "Phản hồi: mục tiêu phản hồi sơ bộ trong 03 ngày làm việc, trừ vụ việc phức tạp."
+      - "Điều chỉnh: khoản thiếu thanh toán bổ sung sớm nhất hợp lý; khoản trả thừa xử lý minh bạch, ưu tiên thỏa thuận lộ trình hoàn trả."
+      - "Escalation: nếu chưa thống nhất, yêu cầu HR Head/Finance Head rà soát và dùng quy trình khiếu nại ND-HR-010."
+    gold_optional:
+      - "Sai lệch được gửi qua HRM Payroll Query trong vòng 05 ngày làm việc."
+      - "Không quản lý nào được trả đũa người hỏi về payslip một cách thiện chí."
+    gold_citations:
+      - {document: ND-HR-005, pages: [12]}
+    acceptable_extra_citations:
+      - {document: ND-HR-005, pages: [5, 13]}
+    source_excerpt:
+      - {document: ND-HR-005, page: 12, text: "1. Gửi yêu cầu Nhân viên tạo ticket HRM, nêu kỳ lương, khoản sai lệch và tài liệu hỗ trợ."}
+      - {document: ND-HR-005, page: 12, text: "2. Xác minh HR/Finance đối chiếu HRM, chấm công, HĐLĐ, quyết định lương, OT và dữ liệu ngân hàng."}
+      - {document: ND-HR-005, page: 12, text: "3. Phản hồi Mục tiêu phản hồi sơ bộ trong 03 ngày làm việc, trừ vụ việc phức tạp."}
+      - {document: ND-HR-005, page: 12, text: "5. Escalation Nếu chưa thống nhất, nhân viên có thể yêu cầu HR Head/Finance Head rà soát và sử dụng quy trình khiếu nại ND- HR-010."}
+      - {document: ND-HR-005, page: 5, text: "Sai lệch được gửi qua HRM Payroll Query trong vòng 05 ngày làm việc"}
+    fail_examples:
+      - "Thời hạn phản hồi khác 03 ngày làm việc."
+      - "Bỏ bước xác minh hoặc escalation."
+    forbidden:
+      - {document: UAT-GROUNDING-001, value: "travel approval"}
+
+  - id: ND-016
+    question: "Thưởng hiệu suất exceptional là bao nhiêu?"
+    role: staff
+    gold_status: ANSWERED
+    gold_answer:
+      - "1,5 - 2,0 tháng Base Salary."
+    gold_optional:
+      - "Phụ thuộc kết quả công ty và phê duyệt ngân sách."
+    gold_citations:
+      - {document: ND-HR-005, pages: [9]}
+    source_excerpt:
+      - {document: ND-HR-005, page: 9, text: "Exceptional 1,5 - 2,0 tháng Base Salary Phụ thuộc kết quả công ty và phê duyệt ngân sách."}
+    fail_examples:
+      - "1,0 - 1,5 tháng (mức Exceeds Expectations)."
+    forbidden:
+      - {document: UAT-GROUNDING-001, value: "travel approval"}
+
+  - id: ND-017
+    question: "Vai trò của HR Benefits thì gồm những trách nhiệm gì?"
+    role: staff
+    gold_status: ANSWERED
+    gold_answer:
+      - "Đăng ký/điều chỉnh (bảo hiểm, phúc lợi)."
+      - "Hướng dẫn hồ sơ."
+      - "Quản lý nhà bảo hiểm."
+      - "Tiếp nhận ticket."
+      - "Bảo mật dữ liệu."
+    gold_optional:
+      - "Tiếp nhận báo sai lệch thông tin BHXH/BHYT."
+      - "Rà soát lần 1 khiếu nại quyết định quyền lợi bổ sung trong 10 ngày làm việc."
+      - "Hỗ trợ NovaCare claim (HR hỗ trợ trong 02 ngày)."
+    gold_citations:
+      - {document: ND-HR-006, pages: [13]}
+    acceptable_extra_citations:
+      - {document: ND-HR-006, pages: [4, 5, 11, 12]}
+    source_excerpt:
+      - {document: ND-HR-006, page: 13, text: "HR Benefits Đăng ký/điều chỉnh, hướng dẫn hồ sơ, quản lý nhà bảo hiểm, tiếp nhận ticket, bảo mật dữ liệu."}
+    fail_examples:
+      - "Trách nhiệm của Payroll/Finance (khấu trừ, đóng bảo hiểm, thanh toán) gán cho HR Benefits."
+    forbidden:
+      - {document: UAT-GROUNDING-001, value: "travel approval"}
+
+  - id: ND-018
+    question: "Đánh giá hiệu suất làm việc vào tháng mấy trong năm?"
+    role: staff
+    gold_status: ANSWERED
+    gold_answer:
+      - "Tháng 01 - 02 (đánh giá hiệu suất năm trong chu kỳ salary review mô phỏng)."
+    gold_optional:
+      - "Calibration tháng 03; phê duyệt ngân sách tăng lương tháng 03 - 04; thông báo trong tháng 04; hiệu lực thường 01/05."
+    gold_citations:
+      - {document: ND-HR-005, pages: [8]}
+    source_excerpt:
+      - {document: ND-HR-005, page: 8, text: "Đánh giá hiệu suất năm Tháng 01 - 02"}
+    fail_examples:
+      - "Tháng 03 hoặc 04 (calibration, thông báo)."
+    forbidden:
+      - {document: UAT-GROUNDING-001, value: "travel approval"}
+
+  - id: ND-019
+    question: "Trong trường hợp tôi là người lao động bị ốm nặng thì cần làm gì?"
+    role: staff
+    gold_status: ANSWERED
+    gold_answer:
+      - "Thông báo cho quản lý càng sớm càng tốt, ưu tiên trước giờ làm; khi cấp cứu có thể nhờ người thân thông báo."
+      - "Đăng ký Sick Leave / BHXH trên HRM (khi khẩn cấp có thể hoàn thiện sau) và nộp chứng từ khi pháp luật hoặc cơ quan BHXH yêu cầu."
+    gold_optional:
+      - "Nghỉ ốm theo chế độ BHXH không đồng nghĩa nghỉ hưởng nguyên lương do công ty; mức hưởng theo pháp luật BHXH."
+      - "Không bị yêu cầu họp hay xử lý công việc thường xuyên khi đang nghỉ ốm."
+      - "Chẩn đoán chi tiết chỉ cung cấp cho HR/BHXH khi cần."
+      - "Ốm dài ngày: quyền lợi bắt buộc theo pháp luật; các allowance phụ thuộc ngày làm việc có thể tạm dừng, HR thông báo rõ."
+      - "Theo chính sách nghỉ mẫu: thông báo cả quản lý trực tiếp và Phòng Nhân sự; cấp cứu hoặc điều trị nội trú thì thân nhân có thể báo thay."
+    not_stated:
+      - "Định nghĩa ốm nặng, hay quy trình riêng cho ốm nặng ngoài nghỉ ốm và ốm dài ngày."
+    gold_citations:
+      - {document: ND-HR-004, pages: [7]}
+    acceptable_extra_citations:
+      - {document: ND-HR-004, pages: [9]}
+      - {document: UAT-LEAVE-AUTHORITY-001, pages: [4]}
+      - {document: ND-HR-006, pages: [10]}
+      - {document: ND-HR-003, pages: [9]}
+    source_excerpt:
+      - {document: ND-HR-004, page: 7, text: "Thông báo cho quản lý càng sớm càng tốt, ưu tiên trước giờ bắt đầu làm việc; trong trường hợp cấp cứu có thể nhờ người thân thông báo."}
+      - {document: ND-HR-004, page: 7, text: "Đăng ký loại nghỉ Sick Leave / BHXH trên HRM và cung cấp chứng từ khi pháp luật hoặc cơ quan BHXH yêu cầu."}
+      - {document: UAT-LEAVE-AUTHORITY-001, page: 4, text: "Trường hợp cấp cứu hoặc điều trị nội trú, thân nhân có thể thay người lao động thông báo ban đầu."}
+    fail_examples:
+      - "Phải đi làm hoặc họp khi đang ốm."
+      - "Nghỉ ốm luôn được công ty trả nguyên lương."
+    forbidden:
+      - {document: UAT-GROUNDING-001, value: "travel approval"}
+
+  - id: ND-020
+    question: "Tôi quên check-in nhưng có bằng chứng hợp lệ thực tế về việc đi làm thì tôi phải báo cáo ai?"
+    role: staff
+    gold_status: ANSWERED
+    gold_answer:
+      - "Tạo yêu cầu điều chỉnh chấm công trên HRM, nêu ngày, thời gian cần sửa, lý do và bằng chứng; nên gửi trong 03 ngày làm việc."
+      - "Quản lý trực tiếp kiểm tra và phê duyệt/từ chối."
+      - "HR kiểm tra tính nhất quán, xử lý ngoại lệ và khóa dữ liệu khi kết thúc kỳ công."
+    gold_optional:
+      - "Bằng chứng có thể là log hệ thống, lịch họp, ticket, biên bản công tác hoặc xác nhận của quản lý."
+      - "Sau khi khóa kỳ công (ngày 04-05 tháng sau), điều chỉnh muộn cần yêu cầu đặc biệt có phê duyệt của HR và quản lý có thẩm quyền."
+    gold_citations:
+      - {document: ND-HR-003, pages: [6]}
+    acceptable_extra_citations:
+      - {document: ND-HR-003, pages: [10, 11]}
+    source_excerpt:
+      - {document: ND-HR-003, page: 6, text: "Quên check-in hoặc check-out nhưng có bằng chứng hợp lý về việc làm việc thực tế."}
+      - {document: ND-HR-003, page: 6, text: "1. Nhân viên tạo yêu cầu điều chỉnh trên HRM, nêu ngày, thời gian cần sửa, lý do và bằng chứng liên quan."}
+      - {document: ND-HR-003, page: 6, text: "3. Quản lý trực tiếp kiểm tra lịch làm việc, lịch họp, ticket, log dự án hoặc thông tin liên quan và phê duyệt/từ chối."}
+    fail_examples:
+      - "Chỉ cần báo đồng nghiệp hoặc không cần làm gì."
+      - "Gửi email cho Service Desk thay cho yêu cầu trên HRM."
+    forbidden:
+      - {document: UAT-GROUNDING-001, value: "travel approval"}
