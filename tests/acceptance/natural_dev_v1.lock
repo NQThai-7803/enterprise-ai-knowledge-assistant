@@ -1,0 +1,9 @@
+{
+ "version": "natural_dev_v1",
+ "file": "tests/acceptance/natural_dev_v1.yaml",
+ "sha256": "c899d75a86baab36981ed8a424081885cdb7c102441311b97be10c509b19bc94",
+ "frozen_at": "2026-11-16",
+ "items": 20,
+ "approved_by": "questions written by the owner 2026-11-16 (DEC-026), kept word for word; gold to be approved by the owner before any run",
+ "rule": "any edit needs v1.1 with a new lock"
+}

@@ -48,6 +48,37 @@ def create_retrieval_reranker(settings: Settings) -> RetrievalReranker:
     return reranker
 
 
+def create_claim_relevance_cross_encoder(
+    settings: Settings,
+) -> SentenceTransformerCrossEncoderReranker:
+    """s5 (simple mode): the cross-encoder that scores a claim's cited sentence against the
+    question. Built once per configuration; the model loads on the first score."""
+    cache_key = (
+        "claim_relevance",
+        settings.rag_simple_claim_cross_encoder_model,
+        settings.reranker_device,
+        settings.reranker_batch_size,
+        settings.reranker_max_length,
+        settings.reranker_timeout_seconds,
+        settings.reranker_local_files_only,
+        settings.reranker_model_cache_path,
+    )
+    cached = _RERANKER_CACHE.get(cache_key)
+    if not isinstance(cached, SentenceTransformerCrossEncoderReranker):
+        cached = SentenceTransformerCrossEncoderReranker(
+            model_name=settings.rag_simple_claim_cross_encoder_model,
+            model_revision="",
+            device=settings.reranker_device,
+            batch_size=settings.reranker_batch_size,
+            max_length=settings.reranker_max_length,
+            timeout_seconds=settings.reranker_timeout_seconds,
+            local_files_only=settings.reranker_local_files_only,
+            cache_folder=settings.reranker_model_cache_path,
+        )
+        _RERANKER_CACHE[cache_key] = cached
+    return cached
+
+
 def resolve_reranker_mode(settings: Settings) -> str:
     """Report what ranks candidates now: cross_encoder, lexical_fallback or disabled."""
     if not settings.reranker_enabled:

@@ -89,6 +89,7 @@ from app.observability.metrics import (
     BRANCH_ROUTE_DETERMINISTIC,
     BRANCH_ROUTE_LLM,
     BRANCH_SIMPLE_CLAIM_IRRELEVANT,
+    BRANCH_SIMPLE_CLAIM_UNBOUND,
     BRANCH_SIMPLE_RETRY,
     BRANCH_TERMINAL_BLOCK,
     GLOBAL_METRICS,
@@ -121,6 +122,7 @@ from app.retrieval.question_analysis import (
     retrieval_query_variants,
 )
 from app.retrieval.reranker import RetrievalReranker
+from app.retrieval.reranker_factory import create_claim_relevance_cross_encoder
 from app.retrieval.structured import (
     has_explicit_not_specified,
     monetary_example_rows,
@@ -146,6 +148,7 @@ from app.services.claim_evidence_validation_service import (
     question_head_in_evidence,
     simple_validation,
     supporting_sentence,
+    value_bound_to_subject,
 )
 from app.web_search.errors import WebSearchError
 from app.web_search.intent import WebSearchIntentClassifier
@@ -1474,24 +1477,44 @@ class GroundedAnswerService:
             "relaxed_rules": settings.rag_simple_relaxed_rules_enabled,
             "question_list_segments": settings.rag_simple_question_list_segments_enabled,
         }
-        if settings.rag_simple_claim_relevance_enabled:
-            kept = []
+        # s4 and s2/s5 drop claims; none left is an end point: a retry would cite the same.
+        if settings.rag_simple_subject_binding_enabled:
+            needs = tuple(dict.fromkeys((question, *information_need_queries(question))))
+            with simple_validation(**validation_flags):
+                bound = [
+                    value_bound_to_subject(
+                        needs=needs,
+                        claim=_simple_claim_text(claim),
+                        evidence=_evidence_for_labels(
+                            source_registry=source_registry,
+                            cited_source_labels=_simple_claim_labels(claim),
+                        ),
+                    )
+                    for claim in claims
+                ]
+            text, claims = _simple_drop_claims(text, claims, bound, BRANCH_SIMPLE_CLAIM_UNBOUND)
+            plain = " ".join(filter(None, map(_simple_claim_text, claims)))
+            markers = parse_citation_markers(text).ordered_unique_markers
+            if not plain or not markers:
+                return "claim_unbound", None
+        cross_encoder = settings.rag_simple_claim_cross_encoder_enabled
+        if settings.rag_simple_claim_relevance_enabled or cross_encoder:
+            threshold = (
+                settings.rag_simple_claim_cross_encoder_min_score
+                if cross_encoder
+                else settings.rag_simple_claim_relevance_min_similarity
+            )
+            relevant = []
             for claim in claims:
                 with simple_validation(**validation_flags):
                     similarity = await self._simple_claim_similarity(
                         question=question, claim=claim, source_registry=source_registry
                     )
-                if similarity is None or (
-                    similarity >= settings.rag_simple_claim_relevance_min_similarity
-                ):
-                    kept.append(claim)
-                else:
-                    GLOBAL_METRICS.record_answer_branch(BRANCH_SIMPLE_CLAIM_IRRELEVANT)
-                    text = text.replace(claim, "", 1)
-            if not kept:
-                return "claim_irrelevant", None  # an end point: a retry would cite the same
-            text = re.sub(r"[ \t]{2,}", " ", text).strip()
-            plain = " ".join(filter(None, map(_simple_claim_text, kept)))
+                relevant.append(similarity is None or similarity >= threshold)
+            text, claims = _simple_drop_claims(
+                text, claims, relevant, BRANCH_SIMPLE_CLAIM_IRRELEVANT
+            )
+            plain = " ".join(filter(None, map(_simple_claim_text, claims)))
             markers = parse_citation_markers(text).ordered_unique_markers
             if not plain or not markers:
                 return "claim_irrelevant", None
@@ -1535,11 +1558,20 @@ class GroundedAnswerService:
         self, *, question: str, claim: str, source_registry: PromptSourceRegistry
     ) -> float | None:
         """s2: the e5 cosine between the source sentence a claim cites (the one sharing most
-        words with it) and the closest of the question and its parts; None when it cannot be
-        measured (no marker, no evidence, no embedding provider)."""
-        labels = tuple(m.strip("[]") for m in parse_citation_markers(claim).ordered_unique_markers)
+        words with it) and the closest of the question and its parts; with s5, the highest
+        cross-encoder score of those pairs instead. None when it cannot be measured (no marker,
+        no evidence, no embedding provider or model)."""
+        labels = _simple_claim_labels(claim)
         evidence = _evidence_for_labels(source_registry=source_registry, cited_source_labels=labels)
         sentence = supporting_sentence(answer=_simple_claim_text(claim), evidence=evidence)
+        needs = tuple(dict.fromkeys((question, *information_need_queries(question))))
+        if self.settings.rag_simple_claim_cross_encoder_enabled:
+            if not labels or not evidence or sentence is None:
+                return None
+            scores = await create_claim_relevance_cross_encoder(self.settings).score_pairs(
+                [(need, sentence) for need in needs]
+            )
+            return max(scores) if scores else None
         provider = getattr(
             getattr(self.hybrid_retrieval_service, "semantic_retrieval_service", None),
             "embedding_provider",
@@ -1549,7 +1581,7 @@ class GroundedAnswerService:
             return None
         passage = await anyio.to_thread.run_sync(provider.embed_passages, [sentence])
         best = -1.0
-        for need in dict.fromkeys((question, *information_need_queries(question))):
+        for need in needs:
             query = await anyio.to_thread.run_sync(provider.embed_query, need)
             best = max(best, _cosine(query.values, passage.vectors[0].values))
         return best
@@ -5518,6 +5550,22 @@ def _simple_select_hits(
         if len(chosen) == _SIMPLE_TOP_K:
             break
     return tuple(chosen)
+
+
+def _simple_claim_labels(claim: str) -> tuple[str, ...]:
+    return tuple(m.strip("[]") for m in parse_citation_markers(claim).ordered_unique_markers)
+
+
+def _simple_drop_claims(
+    text: str, claims: tuple[str, ...], keep: Sequence[bool], branch: str
+) -> tuple[str, tuple[str, ...]]:
+    """The answer and its claims without those not kept, each counted under `branch`."""
+    for claim, kept in zip(claims, keep, strict=True):
+        if not kept:
+            GLOBAL_METRICS.record_answer_branch(branch)
+            text = text.replace(claim, "", 1)
+    kept_claims = tuple(claim for claim, kept in zip(claims, keep, strict=True) if kept)
+    return re.sub(r"[ \t]{2,}", " ", text).strip(), kept_claims
 
 
 def _simple_claim_text(answer: str) -> str:

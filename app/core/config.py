@@ -188,6 +188,18 @@ class Settings(BaseSettings):
     rag_simple_claim_relevance_min_similarity: float = Field(default=0.78, ge=0.0, le=1.0)
     # s3: a whole question-list chunk counts by its answer segments, as a reference one does.
     rag_simple_question_list_segments_enabled: bool = False
+    # s4: a value in a claim must sit in a cited sentence or table row that names the subject
+    # the question asks about, when another sentence or row with a value of that kind does.
+    rag_simple_subject_binding_enabled: bool = False
+    # s5: the per-claim relevance check scores (question or part, cited sentence) with this
+    # cross-encoder instead of e5 (DEC-027); loaded on first use from reranker_model_cache_path.
+    rag_simple_claim_cross_encoder_enabled: bool = False
+    rag_simple_claim_cross_encoder_model: str = Field(
+        default="cross-encoder/mmarco-mMiniLMv2-L12-H384-v1", min_length=1
+    )
+    # A raw model score (logit). Calibrated 2026-11-16 on the dev-set drafts of s3 (UAT excluded):
+    # the lowest best-claim score of a correct answer, floored (60 drafts of 60 items).
+    rag_simple_claim_cross_encoder_min_score: float = -4.2
     # FIX 3c F: numbers are compared once written one way (01 = 1, 1,2 trieu = 1.200.000).
     rag_number_normalization_enabled: bool = False
     # FIX 4 (i), completeness checks: a grouped number is one number in the unit check; a

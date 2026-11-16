@@ -1,5 +1,15 @@
 # Project Status
 
+## Simple mode s4-s5 measured; natural_dev_v1 gold drafted -- 2026-11-17 (STOPPED for the owner's review)
+
+- Owner decision 2026-11-16: `legacy` stays the default; s3 is the candidate, switched on only once it wins on `natural_dev_v1` and the wrong-subject risk is handled. DEC-027 recorded before measuring: decisions rest on at least 2 separate Actions jobs, each with its own `legacy`; a difference smaller than the between-job variation is a tie.
+- New, off by default: s4 = s3 + `RAG_SIMPLE_SUBJECT_BINDING_ENABLED` (each value must sit in a cited sentence or table row naming the asked subject); s5 = s4 + `RAG_SIMPLE_CLAIM_CROSS_ENCODER_ENABLED` (per-claim relevance with `cross-encoder/mmarco-mMiniLMv2-L12-H384-v1`, t = −4.2 calibrated on dev drafts before measuring).
+- Measured legacy/s3/s4/s5 on 6 sets in 2 jobs each, 1 run per configuration (`docs/design/simple-answer-mode.md`, "Results of s4-s5"). Leaks 0 everywhere.
+- **Dev (117), job a / job b:** legacy 72–28–16–1 both; s3 = s4 97–7–13–0 / 98–7–12–0; s5 96–8–13–0 / 97–8–12–0. **s3, s4, s5 meet DEC-026 in both jobs; DEC-027: s3 better than legacy, s4 = s3 (no item changes), s5 worse than s4 (FR2-F04 refused in both jobs).**
+- **UAT (monitoring):** correct s3 50/55, s4 51/51, s5 34/34. s4 catches none of the right-number-wrong-subject answers (8 and 6, all passed its check) and ends 4 questions per job, 7 of 8 answered correctly by s3. s5's dev threshold refuses 25-27 UAT questions per job. Between jobs each simple configuration changes on 9-11 UAT questions (legacy 0-2).
+- `natural_dev_v1`: 20 owner-written questions frozen (lock + fingerprints) before any run; gold drafted from the PDFs only, with 4 decisions and 11 overlap flags for the owner (`tests/acceptance/natural_dev_v1_review.md`). Not run yet; not in the matrix until the gold is approved.
+- Eval fix: `ci_batch.sh` no longer reports "ablation not applied" falsely under `pipefail` (it skipped 2 of 16 configurations; re-run).
+
 ## Simple mode s1-s3 measured -- 2026-11-16 (STOPPED for the owner's review)
 
 - Owner-approved fixes behind flags, all off, only read in `RAG_ANSWER_MODE=simple`: s1 (absence sentences never claims + short-answer prompt), s2 (s1 + relaxed claim rules + per-claim relevance check, t = 0.78 calibrated on dev before measuring), s3 (s2 + question-list sources by segments). Default stays `legacy`.

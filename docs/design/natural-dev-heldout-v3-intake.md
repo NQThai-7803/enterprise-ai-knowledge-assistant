@@ -24,3 +24,10 @@ Câu thu được chia ngẫu nhiên giữa hai bộ **trước khi** ai xem câ
 
 - Tham số hóa `heldout_v2_check.py` và `heldout_v2_release.py` theo tên bộ (hiện chỉ có v2).
 - Runner cho `natural_dev_v1` trong `eval.yml` (`set=natural`), chấm proxy như `run_answer_relevance_dev.py`.
+
+## Trạng thái `natural_dev_v1` (2026-11-17)
+
+- **Câu hỏi:** 20 câu do owner viết ngày 2026-11-16 (ND-001..020, role staff), giữ nguyên văn, đóng băng trong `tests/acceptance/natural_dev_v1.yaml` với `natural_dev_v1.lock` (SHA256 `c899d75a…`), `eol=lf`, đã thêm vào fingerprints (`question_leak.py`, nguồn `natural_dev`). Đóng băng trước mọi lượt chạy; chưa chạy hệ thống trên bộ này.
+- **Công cụ:** `scripts/eval/natural_dev_check.py` (dùng lại hàm của `heldout_v2_check.py`): kiểm lock, cấu trúc gold, đoạn trích đúng trang PDF, kiểm trùng (3-gram ký tự, difflib, 4-gram từ, e5 với `--e5-model-cache`) với Q001-Q100, held-out v1, held-out v2 và 5 bộ dev. Chỉ ghi số và id gần nhất, không chép câu của bộ khác. Kết quả: `natural_dev_v1_review.md`, `natural_dev_v1_check.json`.
+- **Gold:** bản nháp `natural_dev_v1_gold.yaml` (soạn chỉ từ PDF; câu ghép mỗi ý một mục; câu tình huống có `not_stated`), **chờ owner duyệt**; sau khi duyệt mới khóa (`natural_dev_v1_gold.lock`) và thêm runner `set=natural` vào `eval.yml`.
+- Held-out v3: chưa có câu.

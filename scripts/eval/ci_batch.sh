@@ -35,6 +35,12 @@ for entry in "${ENTRIES[@]}"; do
     # Git Bash rewrites /path arguments to C:/Program Files/Git/path when dispatching from Windows.
     [[ "${pair#*=}" =~ ^[A-Za-z]:/ ]] && { echo "host-rewritten path in $pair (MSYS_NO_PATHCONV=1)"; exit 2; }
   done
+  # EVAL_SIMPLE_LEVEL=n: simple mode with s1..sn (docs/design/simple-answer-mode.md), so that a
+  # configuration stays short; the configs input is part of a 400-character concurrency group.
+  if [[ ",$vars," =~ ,EVAL_SIMPLE_LEVEL=([1-9]), ]]; then
+    vars+=",EVAL_ANSWER_MODE=simple"
+    for n in $(seq 1 "${BASH_REMATCH[1]}"); do vars+=",EVAL_SIMPLE_S$n=true"; done
+  fi
   NAMES+=("$name"); ENVS+=("$vars")
 done
 [ "${#NAMES[@]}" -ge 1 ] || { echo "no configuration"; exit 2; }
@@ -65,8 +71,9 @@ run_one() {  # $1 = config index, $2 = run number
   local name="${NAMES[$1]}" vars="${ENVS[$1]}" dir
   dir="$OUT/$name/run$2"; mkdir -p "$dir"
   start_api "$vars" || return 1
+  # grep reads to the end: with pipefail, grep -q exiting early SIGPIPEs docker logs (false miss)
   if [[ ",$vars," == *",EVAL_ABLATION="* ]] \
-    && ! docker logs "$PROJECT-api-1" 2>&1 | grep -q "ABLATION applied"; then
+    && ! docker logs "$PROJECT-api-1" 2>&1 | grep "ABLATION applied" >/dev/null; then
     echo "ablation not applied in the API" | tee "$dir/runner.log"; return 1
   fi
   ( # the runner sees the configuration too (e.g. EVAL_EXPECTED_RERANKER_MODE)

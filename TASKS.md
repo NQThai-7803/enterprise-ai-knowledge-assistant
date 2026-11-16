@@ -8,7 +8,14 @@
 3. **Embedding fine-tune** (`docs/design/embedding-finetune.md` and DEC-015 on branch `feat/embedding-finetune-infra`): infrastructure only so far; the baseline measurement and training come after FIX 3.
 4. The final held-out v2 measurement, once, after the choices above are made (DEC-012).
 
-## Simple mode s1-s3 -- 2026-11-16 (STOPPED for the owner's review)
+## Simple mode s4-s5 and natural_dev_v1 -- 2026-11-17 (STOPPED for the owner's review)
+
+- **DONE:** DEC-027; s4 (subject binding) and s5 (cross-encoder claim relevance, t = −4.2 from dev drafts) behind flags, off; measured legacy/s3/s4/s5 on 6 sets in 2 jobs each (`docs/design/simple-answer-mode.md`, "Results of s4-s5"); `natural_dev_v1` questions frozen and fingerprinted; gold drafted from the PDFs with its check and review file.
+- **Result:** s3 = s4 rank first on the dev sets (97–7–13–0 / 98–7–12–0 against legacy 72–28–16–1); s5 one false refusal worse (DEC-027: real). s4 does not reduce the UAT wrong-subject answers; s5's threshold refuses 25-27 UAT questions. Default unchanged.
+- **WAITING FOR OWNER:** approve the `natural_dev_v1` gold (4 decisions: ND-002, ND-008, ND-011, ND-014) and decide on the 11 overlap flags (keep or replace) in `tests/acceptance/natural_dev_v1_review.md`.
+- **NEXT, after approval:** lock the gold (`natural_dev_v1_gold.lock`), add the `set=natural` runner to `eval.yml`, and measure legacy/s3/s4/s5 on it in 2 jobs (first dev set in DEC-026).
+
+## Simple mode s1-s3 -- 2026-11-16 (STOPPED for the owner's review; s4-s5 above)
 
 - **DONE:** s1, s2, s3 behind flags (off); relevance threshold calibrated on dev before measuring (t = 0.78); measured legacy/s1/s2/s3 in the same Actions jobs, 2 runs, 6 sets; results in `docs/design/simple-answer-mode.md`.
 - **Result:** s1, s2, s3 each meet DEC-026 on the dev sets; s2 = s3 rank first (dev 96–7–13–1 against legacy 72–27–17–1). Default unchanged.

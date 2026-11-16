@@ -481,3 +481,132 @@ Correct – false refusal – false answer – wrong. Legacy is 100–0–0–0 
 - s3 equals s2 on the dev sets. On UAT it has 12 more correct answers than s2 in the same job (run 1); the second runs, in separate jobs, give 50 against 47.
 - Not solved by any of the three: refuse items answered with a supported but off-topic sentence (12 of the 13 dev false answers).
 - **Meets DEC-026: s1, s2 and s3; s2 and s3 rank first.** Choosing one, and whether the UAT wrong-subject risk of s2 is acceptable or the threshold should be raised (trade-off table above), is the owner's call.
+
+## s4-s5 (owner decision 2026-11-16, second round)
+
+The owner kept `legacy` as the default and named s3 the candidate, to be switched on only once it wins on `natural_dev_v1` and the wrong-subject risk is handled. Two more configurations, each with its own flag, off by default (`ENVIRONMENT_VARIABLES.md`):
+
+| Config | Flags | What changes |
+|---|---|---|
+| s4 | s3 + `RAG_SIMPLE_SUBJECT_BINDING_ENABLED` | Each value in a claim (a number, read with the word after it) must sit in a cited sentence or table row that names the subject the question asks about. The answer need not repeat the subject. A failing claim is dropped; none left is NO_ANSWER with no retry. |
+| s5 | s4 + `RAG_SIMPLE_CLAIM_CROSS_ENCODER_ENABLED` | The per-claim relevance check scores (question or one of its parts, cited source sentence) with `cross-encoder/mmarco-mMiniLMv2-L12-H384-v1` instead of e5 0.78. Threshold `RAG_SIMPLE_CLAIM_CROSS_ENCODER_MIN_SCORE`, calibrated below. |
+
+### How s4 reads "the subject" (implementer's choices, before measuring)
+
+- **Units:** each cited source is split into sentences and table rows. A PDF table comes out one row per line; a line that starts in lower case or holds only a value is the rest of the line before it (a wrapped cell). A row also carries the numbered section heading above it ("3.3 …"), because a table's subject often sits there and not in the rows.
+- **Same kind:** the units holding a value with the same word after the number as the claim's value (ngày with ngày, đồng with đồng, % with %).
+- **Subject:** the words the question asks about (question words and particles removed, syllables of 2 letters and more) that appear in some of those units but not all. A part of a two-part question is judged on its own.
+- **Verdict per part:** no unit of that kind names any of its words → the part says nothing; every unit names the same ones → bound; else bound if a unit holding the value names a subject word. The claim fails only when some part says "not bound" and none says "bound". A value the question itself states is not checked.
+- **Checked before measuring, dev only:** replayed on the 120 s3 run-1 drafts of the 5 dev jobs (93 claims), s4 drops none. One rule was changed after this replay: a part whose words all units name now counts as bound; before, a correct value of a two-part question was dropped because the other part's subject was in another row. The dev sets have no wrong-subject answer under s3, so s4 can only cost false refusals there; its effect is expected on UAT (monitoring) and `natural_dev_v1`.
+- **Known limit:** words are matched as written, so a synonym ("cưới" for "kết hôn") does not name the subject.
+
+### Cross-encoder threshold (rule fixed before computing)
+
+On the dev sets only (UAT excluded): the s3 run-1 drafts of the 5 dev jobs of s1-s3. Each claim that s4 keeps scores the highest cross-encoder score (raw logit) of (question or one of its parts, the cited source sentence), computed by the service's own code; a draft scores its highest claim. Positive: an accepted draft of an item to answer that states the item's fact. Negative: any draft of an item to refuse (RBAC: a draft none of whose sources holds the fact). **t = the lowest positive score, floored to 0.1**, so that no correct dev answer loses all its claims. The trade-off table is reported as for e5.
+
+Result: **t = −4.2**, from 60 positive drafts (60 items) and 12 negative drafts (12 items, all accepted, on relevance and both false-refusal sets and compound; RBAC has none under s3). Positive best scores start at −4.19, −0.22, 0.65; negative best scores reach 7.63. As with e5, the rule gives a threshold that catches none of them. The cross-encoder separates the two groups better than e5 did, which the owner may want to use (items to answer that lose every claim / of the 12 refuse items answered, those caught):
+
+| t | correct items lost (of 60) | false answers caught (of 12) |
+|---|---|---|
+| −4.2 | 0 | 0 |
+| −2.0 | 1 | 4 |
+| 0.0 | 2 | 4 |
+| 0.5 | 2 | 5 |
+| 1.0 | 4 | 6 |
+| 2.0 | 7 | 8 |
+| 3.0 | 9 | 10 |
+
+Model files: snapshot `1427fd65` of the Hugging Face repository (safetensors only on Actions). Measured locally on the owner's laptop CPU: loading takes about 6 s and adds about 790 MB of working set; one claim with 2 (question part, sentence) pairs takes about 38 ms. A claim it cannot score (model missing, timeout) is kept.
+
+### Measurement plan (written before measuring, DEC-011, DEC-026, DEC-027)
+
+- **Configurations:** `legacy`; `s3`, `s4`, `s5` = `EVAL_ABLATION=simple_trace,EVAL_SIMPLE_LEVEL=n` (`scripts/eval/ci_batch.sh` turns level n into simple mode with s1…sn on). Every draft is saved in `simple_trace.jsonl`, with s4's verdict per claim (`bindings`) and the relevance score per claim (`similarities`, the cross-encoder's under s5).
+- **Two separate jobs per set (rounds a and b), each with its own `legacy`, 1 run per configuration (DEC-027).** Dev sets: one job per set and round with `legacy, s3, s4, s5`. UAT: three jobs per round, `legacy, s3`, `legacy, s4`, `legacy, s5`, to stay under the 340-minute limit. The two rounds run at the same time on different runners; `legacy` carries `EVAL_ROUND=a|b` only so that their concurrency groups differ.
+- **Per set and configuration:** correct – false refusal – false answer – wrong, leaks, latency; dev totals; UAT by legacy route. UAT also: right number, wrong subject, and supported but off topic (definitions as for s1-s3). Drops by s4 and by the relevance check, from the traces.
+- **Cost of s5:** extra median latency per question against s4 of the same job, and the runner's peak memory while s5 ran against s4 (`memory.log`).
+- **Rule:** DEC-026 inside each job (leaks = 0; dev false answers + wrong not above legacy; then fewer false refusals), and DEC-027 across the two jobs: a difference counts only with the same sign in both jobs and larger than the largest change of either configuration between the jobs on that count; otherwise it is a tie.
+- `natural_dev_v1` joins this matrix (legacy, s3, s4, s5, 2 jobs) once the owner approves its gold; it is then the first dev set in DEC-026. **The default is not changed in this step.**
+
+### Results of s4-s5 (2026-11-17)
+
+Jobs on `012ee8b` (round a: RBAC 43914469601, relevance 43914482325, false refusal v1 43914497353, v2 43914511636; UAT 43914538373 `legacy, s3`, 43914553130 `legacy, s4`, 43914568334 `legacy, s5`. Round b: RBAC 43914581686, relevance 43914596883, v2 43914625810, compound 43914639957; UAT 43914654247, 43914668424, 43914681662). Compound round a is 43949754203 and false refusal v1 round b is 43949786222, both on `5450a29` (same app code, see the process note). 1 run per configuration; every draft is in the job's `simple_trace.jsonl`.
+
+**Process note:** in two jobs one configuration did not run (compound 43914524934 without s4, false refusal v1 43914610692 without s3): `ci_batch.sh` reported "ablation not applied in the API" for an API that had applied it. Under `set -o pipefail`, `grep -q` stops reading at the first match and the SIGPIPE it leaves `docker logs` failed the pipeline. Fixed in `5450a29` (grep reads to the end); the two sets were run again as complete jobs with all four configurations. The incomplete jobs agree with the complete ones (compound: legacy 4–5–2–1, s3 and s5 7–3–2–0; false refusal v1: legacy 13–1–6–0, s4 and s5 14–2–4–0).
+
+#### Dev sets
+
+Correct – false refusal – false answer – wrong value or document; job of round a / job of round b.
+
+| Set | legacy | s3 | s4 | s5 |
+|---|---|---|---|---|
+| RBAC (36) | 23–13–0–0 / same | 35–1–0–0 / 36–0–0–0 | = s3 | = s3 |
+| relevance (25) | 18–3–4–0 / same | 20–0–5–0 / 21–0–4–0 | = s3 | = s3 |
+| false refusal v1 (20) | 13–1–6–0 / same | 14–2–4–0 / 15–2–3–0 | = s3 | = s3 |
+| false refusal v2 (24) | 14–6–4–0 / same | 21–1–2–0 / 20–1–3–0 | = s3 | 20–2–2–0 / 19–2–3–0 |
+| compound (12) | 4–5–2–1 / same | 7–3–2–0 / 6–4–2–0 | = s3 | = s3 |
+| **Dev total (117)** | **72–28–16–1 / same** | **97–7–13–0 / 98–7–12–0** | **= s3** | **96–8–13–0 / 97–8–12–0** |
+| Leaks | 0 | 0 | 0 | 0 |
+| Median latency per set, s | 15.0–53.2 | 2.1–28.2 | 2.1–15.7 | 2.2–15.7 |
+
+- **Between the two jobs** (another runner) each simple configuration changes on 1 item per set; legacy on 0 (relevance: 2 items, same totals).
+- **s4 against s3: no dev item changes** in either job. s4 checked the drafts and found every value bound (0 claims dropped), as the replay before measuring predicted.
+- **s5 against s4: one item, FR2-F04, correct → false refusal in both jobs.** Its first draft scores −8.11 with the cross-encoder. With e5 (0.81) that draft passes the relevance check, fails the contradiction check, and the retry answers correctly. With the cross-encoder the relevance check ends the turn first, and that check does not retry. The calibration scored only accepted drafts (that draft was rejected under s3), so it did not see this case. No other dev claim scores below −4.2.
+- legacy → s3 per item (round a / round b): RBAC 12 / 13 false refusals become correct; relevance 8 / 9 changes (3 false refusals and 2-3 false answers become correct, 2-3 correct items become false answers); false refusal v1 5 / 4; v2 9 / 10; compound 4 / 4 (the wrong item becomes correct in both).
+
+#### DEC-026 and DEC-027
+
+1. Leaks: 0 on every set, configuration and job (RBAC retrieval-level check: 18 pairs per configuration, all conclusive, no chunk seen by a negative). UAT: 0.
+2. Dev false answers + wrong, per job: legacy 17 / 17; s3 13 / 12; s4 13 / 12; s5 13 / 12. None increases.
+3. Dev false refusals (`natural_dev_v1` is not in the matrix yet): legacy 28 / 28; s3 7 / 7; s4 7 / 7; s5 8 / 8.
+
+DEC-027 across the two jobs (difference per job; it counts only with the same sign in both and larger than either configuration's change between the jobs on that count):
+
+| Comparison | False refusals | False answers + wrong | Verdict |
+|---|---|---|---|
+| s3 vs legacy | −21, −21 (variation 0) | −4, −5 (variation 1) | **s3 better** on both |
+| s4 vs s3 | 0, 0 | 0, 0 | **tie** (identical) |
+| s5 vs s4 | +1, +1 (variation 0) | 0, 0 | **s5 worse** (one more false refusal, FR2-F04) |
+| s4 vs legacy | −21, −21 | −4, −5 | s4 better |
+| s5 vs legacy | −20, −20 | −4, −5 | s5 better |
+
+**s3, s4 and s5 each meet DEC-026 in both jobs; s3 = s4 rank first; s5 ranks below s4.** The default is not changed.
+
+#### UAT (monitoring only), by the route legacy took for the same question
+
+Correct – false refusal – false answer – wrong. Legacy is 98–1–0–1 or 100–0–0–0 in each of the six jobs (route split 75/25 or 76/24) and changes on 0-2 questions between jobs.
+
+| Config | Job | All | Legacy deterministic route | Legacy LLM route |
+|---|---|---|---|---|
+| s3 | a (43914538373) | 50–37–1–12 | 39–27–0–9 | 11–10–1–3 |
+| s3 | b (43914654247) | 55–35–1–9 | 43–26–0–7 | 12–9–1–2 |
+| s4 | a (43914553130) | 51–39–1–9 | 40–30–0–6 | 11–9–1–3 |
+| s4 | b (43914668424) | 51–39–0–10 | 38–30–0–8 | 13–9–0–2 |
+| s5 | a (43914568334) | 34–59–0–7 | 23–47–0–5 | 11–12–0–2 |
+| s5 | b (43914681662) | 34–62–0–4 | 23–49–0–3 | 11–13–0–1 |
+
+| Per job a, b | s3 | s4 | s5 |
+|---|---|---|---|
+| Right number, wrong subject | 7, 6 | 8, 6 | 5, 3 |
+| Other wrong answers | 5, 3 | 1, 4 | 2, 1 |
+| Supported but off topic (refuse items answered) | 1, 1 | 1, 0 | 0, 0 |
+| Questions ended by s4 (claim not bound) | – | 4, 4 | 5, 6 |
+| Questions ended by the relevance check | 2, 3 | 2, 3 | 25, 27 |
+| First drafts with a valid marker (of 100) | 84, 85 | 84, 83 | 83, 85 |
+| Mean LLM drafts per question | 1.19, 1.15 | 1.18, 1.19 | 1.13, 1.12 |
+| Questions that change between the two jobs | 11 | 10 | 9 |
+
+- **s4 does not catch the wrong-subject answers.** Every UAT wrong answer whose numbers are all in the cited excerpts (8 and 6) passed s4's check: the check found each value in a unit naming a subject word. The 4 questions s4 ended per job were answered correctly by s3 in the same round in 7 of 8 cases, and 6 of the 8 dropped drafts are word for word drafts s3 also produced; one (round b) was a refuse item that s3 had answered, which s4 refused correctly.
+- **s5's threshold does not carry over to UAT.** The cross-encoder dropped 25 and 28 UAT claims (scores −9.53 to −4.29, median about −5.6; kept claims have a median of about −1.3), and every one of those questions ended as a false refusal. 12 and 17 of them were answered correctly by s3 in the same round, 5 and 3 wrongly. On the dev sets the only claim below −4.2 is FR2-F04's (−8.11, both jobs); the UAT questions (longer, often first person) score lower.
+- s5's lower wrong counts (7 and 4) come with 20-23 fewer correct answers than s4.
+- **Runs in different jobs differ** by 9-11 UAT questions for each simple configuration (legacy 0-2), as in s1-s3.
+
+#### Cost of s5
+
+- Median latency per question, s5 against s4 of the same job, dev sets: −1.4 s to +0.12 s (median −0.1 s). The cross-encoder (about 38 ms per claim measured locally) is below the LLM's variation. On UAT s5 is faster (25.1 and 42.2 s against 74.1 and 74.8 s) because a quarter of the questions end before a retry.
+- Runner peak memory while s5 ran, against s4 of the same job: +318 to +394 MB in 8 of 10 dev jobs (median +344 MB), +936 and −26 MB in the two RBAC jobs; UAT +343 and +576 MB (different jobs). The model loaded in every s5 job (only deprecation warnings in the logs, no timeout).
+
+#### Summary (for the owner; nothing is switched on)
+
+- **s4 = s3 on the dev sets** (no item changes) and does not reduce the UAT wrong-subject answers (8 and 6 against 7 and 6); on UAT it ends 4 questions per job, mostly correct ones. The wrong-subject risk is not handled by s4.
+- **s5 is worse than s4 on the dev sets under DEC-027** (one more false refusal in both jobs), and its dev-calibrated threshold refuses 25-27 UAT questions per job. The calibration rule missed drafts that the relevance check ends before another check would have retried them.
+- **s3 (= s4) meets DEC-026 in both jobs and wins against legacy under DEC-027**, as in s1-s3. Per the owner's rule it stays a candidate: `natural_dev_v1` is not measured yet (gold waiting for approval) and the wrong-subject risk is still open.

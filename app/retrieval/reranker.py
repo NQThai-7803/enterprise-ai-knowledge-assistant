@@ -423,6 +423,35 @@ class SentenceTransformerCrossEncoderReranker:
             raise ValueError(msg)
         return scores
 
+    async def score_pairs(self, pairs: Sequence[tuple[str, str]]) -> tuple[float, ...] | None:
+        """Raw model scores of (query, passage) pairs; None when the model cannot score them."""
+        if not pairs or self._model_load_failed:
+            return None
+        try:
+            with anyio.fail_after(self._timeout_seconds):
+                return await anyio.to_thread.run_sync(
+                    self._predict_pairs, tuple(pairs), abandon_on_cancel=True
+                )
+        except Exception as exc:
+            logger.warning(
+                "%s: pair scoring failed.",
+                RERANKER_PREDICT_FAILED,
+                extra={
+                    "error_code": RERANKER_PREDICT_FAILED,
+                    "model": self._model_name,
+                    "error_type": exc.__class__.__name__,
+                },
+            )
+            return None
+
+    def _predict_pairs(self, pairs: tuple[tuple[str, str], ...]) -> tuple[float, ...]:
+        raw_scores = self._get_model().predict(  # noqa: B028 - external API accepts this shape.
+            [list(pair) for pair in pairs], batch_size=self._batch_size, show_progress_bar=False
+        )
+        if hasattr(raw_scores, "tolist"):
+            raw_scores = raw_scores.tolist()
+        return tuple(_coerce_score(score) for score in raw_scores)
+
     def _get_model(self) -> Any:
         """Load once, even when a request that timed out is still loading in its thread."""
         with self._model_load_lock:

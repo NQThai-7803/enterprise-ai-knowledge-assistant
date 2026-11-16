@@ -176,20 +176,37 @@ jobs:
       - name: Prepare the oracle folder
         run: |
           set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/oracle"
+          mkdir -p "$RUNNER_TEMP/oracle" "$HOME/crossenc"
           echo "ORACLE_DIR=$RUNNER_TEMP/oracle" >> "$GITHUB_ENV"
+          echo "CROSSENC_DIR=$HOME/crossenc" >> "$GITHUB_ENV"
+
+      - name: Download the s5 cross-encoder (DEC-027)
+        # Only for a configuration with s5; DEC-025 keeps the reranker without a cross-encoder.
+        if: contains(inputs.configs, 'EVAL_SIMPLE_LEVEL=5') || contains(inputs.configs, 'EVAL_SIMPLE_S5=true')
+        run: |
+          set -euo pipefail
+          python - "$CROSSENC_DIR" <<'PY'
+          import sys
+          from huggingface_hub import snapshot_download
+          skip = ["onnx/*", "openvino/*", "*.h5", "*.msgpack", "*.ot", "tf_model*", "flax_model*", "*.bin"]
+          print(snapshot_download("cross-encoder/mmarco-mMiniLMv2-L12-H384-v1", cache_dir=sys.argv[1], ignore_patterns=skip))
+          PY
+          chmod -R a+rwX "$CROSSENC_DIR"
+          du -sh "$CROSSENC_DIR" | tee -a "$GITHUB_STEP_SUMMARY"
+          echo "EVAL_CROSS_ENCODER_CACHE=/crossenc" >> "$GITHUB_ENV"
 
       - name: Start the eval stack
         run: |
           set -euo pipefail
           # The API reaches Ollama on the host, as on Docker Desktop. The oracle map is mounted
-          # for the PROMPT 6 oracle configurations; unused otherwise. No cross-encoder (DEC-025).
+          # for the PROMPT 6 oracle configurations, the s5 cross-encoder for s5; empty otherwise.
           cat > ci-host.yaml <<'EOF'
           services:
             api:
               extra_hosts: ["host.docker.internal:host-gateway"]
               volumes:
                 - ${ORACLE_DIR}:/oracle:ro
+                - ${CROSSENC_DIR}:/crossenc
             worker:
               extra_hosts: ["host.docker.internal:host-gateway"]
           EOF

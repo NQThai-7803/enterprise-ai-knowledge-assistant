@@ -17,6 +17,7 @@ from app.citations.errors import CitationFailureCode, CitationValidationError
 from app.citations.models import PromptSourceRegistry
 from app.llm.models import LLMGenerationResult
 from app.observability.metrics import GLOBAL_METRICS
+from app.retrieval.subclaims import information_need_queries
 from app.services import claim_evidence_validation_service as validation
 from app.services.grounded_answer_service import (
     _simple_claim_text,
@@ -65,7 +66,12 @@ class StrictCitationValidation(FakeCitationValidationService):
 
 
 def _ask(
-    *contents: str, mode: str = "simple", hits: tuple = (), embeddings: Any = None, **flags: Any
+    *contents: str,
+    mode: str = "simple",
+    hits: tuple = (),
+    embeddings: Any = None,
+    question: str = QUESTION,
+    **flags: Any,
 ) -> tuple:
     llm = SequentialFakeLLMProvider(*(_generation(c) for c in contents))
     retrieval = FakeRetrievalService(retrieval_result(*(hits or (hit(SOURCE),))))
@@ -79,7 +85,7 @@ def _ask(
     )
     result = asyncio.run(
         service.answer_question(
-            current_user=user(), session_id=chat_session().id, question=QUESTION
+            current_user=user(), session_id=chat_session().id, question=question
         )
     )
     return result, resolved_llm
@@ -402,5 +408,145 @@ def test_the_new_flags_are_off_by_default() -> None:
     assert not (
         s.rag_simple_absence_sentences_enabled or s.rag_simple_short_prompt_enabled
         or s.rag_simple_relaxed_rules_enabled or s.rag_simple_claim_relevance_enabled
-        or s.rag_simple_question_list_segments_enabled
+        or s.rag_simple_question_list_segments_enabled or s.rag_simple_subject_binding_enabled
+        or s.rag_simple_claim_cross_encoder_enabled
     )  # fmt: skip
+
+
+# --- s4, s5 (owner decision 2026-11-16, second round), each behind its flag -------------------
+
+SHIFTS = (
+    "Bảng phụ cấp ca.\nCa ngày 50.000 đồng\nCa đêm 80.000 đồng\nCa lễ, Tết và\n120.000 đồng\n"
+    "ngày nghỉ bù"
+)
+NIGHT = "Phụ cấp ca đêm là bao nhiêu?"
+
+
+def _bound(question: str, claim: str, evidence: str) -> bool:
+    needs = tuple(dict.fromkeys((question, *information_need_queries(question))))
+    return validation.value_bound_to_subject(needs=needs, claim=claim, evidence=evidence)
+
+
+def test_s4_a_value_counts_only_in_the_row_that_names_the_subject() -> None:
+    assert _bound(NIGHT, "Mức phụ cấp là 80.000 đồng.", SHIFTS)  # no need to restate "ca đêm"
+    assert not _bound(NIGHT, "Mức phụ cấp là 50.000 đồng.", SHIFTS)
+    # a row wrapped over three lines is one row
+    assert _bound("Phụ cấp ca lễ là bao nhiêu?", "120.000 đồng.", SHIFTS)
+    assert not _bound("Phụ cấp ca lễ là bao nhiêu?", "80.000 đồng.", SHIFTS)
+    # a value the question states, and a claim with no value, are not checked
+    assert _bound("Ca ngày có được 50.000 đồng không?", "Có, 50.000 đồng.", SHIFTS)
+    assert _bound(NIGHT, "Có phụ cấp ca.", SHIFTS)
+
+
+def test_s4_a_row_takes_the_subject_of_its_numbered_heading() -> None:
+    headed = (
+        "3.1 Phụ cấp ca đêm\nMỗi ca được 80.000 đồng.\n"
+        "3.2 Phụ cấp ca ngày\nMỗi ca được 50.000 đồng."
+    )
+    assert _bound(NIGHT, "80.000 đồng.", headed)
+    assert not _bound(NIGHT, "50.000 đồng.", headed)
+
+
+def test_s4_each_part_of_a_two_part_question_binds_its_own_value() -> None:
+    question = "Phụ cấp ca đêm là bao nhiêu và máy chủ được sao lưu mấy lần mỗi tuần?"
+    evidence = f"{SHIFTS}\n\nMáy chủ được sao lưu 3 lần mỗi tuần. Ổ đĩa được thay 2 lần mỗi năm."
+    assert _bound(question, "80.000 đồng.", evidence)
+    assert _bound(question, "Sao lưu 3 lần mỗi tuần.", evidence)
+    assert not _bound(question, "Thay 2 lần mỗi năm.", evidence)
+    assert not _bound(question, "50.000 đồng.", evidence)
+    # rows that all name a part's subject are bound to it, whatever the other part asks
+    books = "Thời hạn mượn sách là 21 ngày. Trả sách trễ bị dừng quyền mượn trong 14 ngày."
+    asked = "Sách mượn được mấy ngày và trả trễ thì dừng quyền mượn bao lâu?"
+    assert _bound(asked, "21 ngày.", books)
+
+
+def test_s4_conflicting_documents_are_judged_row_by_row() -> None:
+    first = "Thẻ ra vào được cấp lại trong 2 ngày làm việc."
+    second = (
+        "Thẻ ra vào được cấp lại trong 4 ngày làm việc. "
+        "Đồng phục được cấp lại trong 7 ngày làm việc."
+    )
+    question = "Thẻ ra vào được cấp lại trong bao lâu?"
+    assert _bound(question, "4 ngày làm việc.", second)
+    assert _bound(question, "2 ngày làm việc.", first)  # which document wins is not this check
+    assert not _bound(question, "7 ngày làm việc.", second)
+    assert not _bound(question, "7 ngày làm việc.", f"{first}\n\n{second}")
+
+
+S4 = {**S2, "rag_simple_question_list_segments_enabled": True,
+      "rag_simple_subject_binding_enabled": True}  # fmt: skip
+
+
+def test_s4_drops_a_value_of_another_row_and_none_left_is_no_answer() -> None:
+    right, wrong = "Ca đêm được 80.000 đồng [SOURCE_1].", "Ca lễ được 50.000 đồng [SOURCE_1]."
+    result, llm = _ask(f"{right} {wrong}", hits=(hit(SHIFTS),), question=NIGHT, **S4)
+    assert result.grounding_status == GroundingStatus.ANSWERED and llm.calls == 1
+    assert "80.000" in result.assistant_message.content
+    assert "50.000" not in result.assistant_message.content
+    assert GLOBAL_METRICS.answer_branch_counts()["simple_claim_unbound"] == 1
+    result, llm = _ask(wrong, right, hits=(hit(SHIFTS),), question=NIGHT, **S4)
+    assert result.grounding_status == GroundingStatus.NO_ANSWER and llm.calls == 1
+    assert GLOBAL_METRICS.answer_branch_counts()["simple_no_answer_claim_unbound"] == 1
+
+
+class _FakeCrossEncoder:
+    """Scores 3.0 a passage holding `near`, -3.0 any other; None when `broken`."""
+
+    def __init__(self, near: str, broken: bool = False) -> None:
+        self.near, self.broken, self.pairs = near, broken, []
+
+    async def score_pairs(self, pairs: Any) -> Any:
+        self.pairs += list(pairs)
+        return None if self.broken else tuple(3.0 if self.near in p else -3.0 for _, p in pairs)
+
+
+S5 = {**S4, "rag_simple_claim_cross_encoder_enabled": True,
+      "rag_simple_claim_cross_encoder_min_score": 0.0}  # fmt: skip
+
+
+def test_s5_the_cross_encoder_replaces_e5_for_relevance(monkeypatch: pytest.MonkeyPatch) -> None:
+    import app.services.grounded_answer_service as gas
+
+    scorer = _FakeCrossEncoder("2.500")
+    monkeypatch.setattr(gas, "create_claim_relevance_cross_encoder", lambda settings: scorer)
+    # e5 here would drop GOOD (nothing near "xyz"); the cross-encoder keeps it
+    result, llm = _ask(f"{GOOD} {OFF_TOPIC}", embeddings=_ByWordEmbeddings("xyz"), **S5)
+    assert result.grounding_status == GroundingStatus.ANSWERED and llm.calls == 1
+    assert "2.500 kg" in result.assistant_message.content
+    assert "Day cap" not in result.assistant_message.content
+    assert scorer.pairs[0][0] == QUESTION and "2.500" in scorer.pairs[0][1]
+    assert GLOBAL_METRICS.answer_branch_counts()["simple_claim_irrelevant"] == 1
+
+
+def test_s5_a_claim_the_model_cannot_score_is_kept(monkeypatch: pytest.MonkeyPatch) -> None:
+    import app.services.grounded_answer_service as gas
+
+    monkeypatch.setattr(
+        gas, "create_claim_relevance_cross_encoder", lambda s: _FakeCrossEncoder("", broken=True)
+    )
+    result, _ = _ask(GOOD, **S5)
+    assert result.grounding_status == GroundingStatus.ANSWERED
+
+
+def test_cross_encoder_scores_pairs_and_reports_failure_as_none() -> None:
+    from app.retrieval.reranker import SentenceTransformerCrossEncoderReranker
+
+    class Model:
+        def __init__(self, fail: bool) -> None:
+            self.fail = fail
+
+        def predict(self, pairs: Any, **kwargs: Any) -> list[float]:
+            if self.fail:
+                raise RuntimeError("boom")
+            return [float(len(passage)) for _, passage in pairs]
+
+    def scorer(fail: bool) -> SentenceTransformerCrossEncoderReranker:
+        return SentenceTransformerCrossEncoderReranker(
+            model_name="m", model_revision="", device="cpu", batch_size=2, max_length=64,
+            timeout_seconds=5, local_files_only=True, cache_folder="x",
+            model_loader=lambda name, **kwargs: Model(fail),
+        )  # fmt: skip
+
+    assert asyncio.run(scorer(False).score_pairs([("q", "ab"), ("q", "abc")])) == (2.0, 3.0)
+    assert asyncio.run(scorer(True).score_pairs([("q", "ab")])) is None
+    assert asyncio.run(scorer(False).score_pairs([])) is None
