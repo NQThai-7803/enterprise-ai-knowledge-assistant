@@ -88,7 +88,6 @@ from app.observability.metrics import (
     BRANCH_RETRY_ABANDONED_FIRST,
     BRANCH_ROUTE_DETERMINISTIC,
     BRANCH_ROUTE_LLM,
-    BRANCH_SIMPLE_DETERMINISTIC,
     BRANCH_SIMPLE_RETRY,
     BRANCH_TERMINAL_BLOCK,
     GLOBAL_METRICS,
@@ -1349,7 +1348,7 @@ class GroundedAnswerService:
     ) -> _AnswerDraft:
         """Simple answer mode: hybrid retrieval (permission-filtered in SQL), the top 5 chunks
         with at most 2 per document, one prompt, citation and claim validation, one retry with
-        the reason, else NO_ANSWER. No deterministic route (except simple_det), no low-alignment
+        the reason, else NO_ANSWER. No deterministic route, no low-alignment
         filter, no completeness or responsiveness check, no repair after the LLM."""
         hits: tuple[HybridRetrievalHit, ...] = ()
         if _should_retrieve_internal_context(self.settings):
@@ -1379,15 +1378,6 @@ class GroundedAnswerService:
         )
         if not source_registry.sources:
             return self._simple_no_answer("no_sources")
-        if self.settings.rag_answer_mode == "simple_det":
-            built = await self._structured_value_answer_draft(
-                question=grounding_question,
-                source_registry=source_registry,
-                current_user=current_user,
-            )
-            if built is not None:
-                GLOBAL_METRICS.record_answer_branch(BRANCH_SIMPLE_DETERMINISTIC)
-                return built
         messages = build_simple_grounded_prompt(
             question=grounding_question,
             source_registry=source_registry,
@@ -1492,8 +1482,8 @@ class GroundedAnswerService:
         if claim.status != ClaimEvidenceStatus.SUPPORTED:
             return f"claim_{claim.status.value.lower()}", (
                 "the cited sources do not support it as written. State only what the cited "
-                "sources say, with the marker of the source that says it; say plainly what the "
-                "documents do not mention."
+                "sources say, with the marker of the source that says it; name what could not "
+                "be verified."
             )
         return _AnswerDraft(
             content=_strip_internal_evidence_labels(validated.answer),
@@ -5407,8 +5397,15 @@ def _number_occurs_in_source(number: str, source_text: str) -> bool:
 
 _SIMPLE_TOP_K = 5
 _SIMPLE_MAX_CHUNKS_PER_DOCUMENT = 2
-# "The documents do not mention ...": the simple prompt states a missing part this way.
-_SIMPLE_ABSENCE_PHRASES = (*_NO_ANSWER_LIKE_ANSWER_PHRASES, *REFUSAL_PHRASES)
+# DEC-021: the simple prompt names a missing part "Chưa xác minh được ...". The other
+# wordings stay: the model still writes them.
+_SIMPLE_ABSENCE_PHRASES = (
+    "chưa xác minh được",
+    "chua xac minh duoc",
+    "could not be verified",
+    *_NO_ANSWER_LIKE_ANSWER_PHRASES,
+    *REFUSAL_PHRASES,
+)
 # A sentence ends at . ! ? or a line break; a marker written after the full stop stays with it.
 _SIMPLE_SENTENCE_BREAK = re.compile(r"(?<=[.!?])\s+(?!\[SOURCE_)|\n+(?!\s*\[SOURCE_)")
 
@@ -5431,9 +5428,9 @@ def _simple_select_hits(
 
 def _simple_claim_text(answer: str) -> str:
     """The answer's claims, markers removed, for claim validation. A sentence with no marker
-    that says the documents do not mention something states an absence, not a claim, so a
-    partial answer is checked on its stated part only; "" when the answer only states absences.
-    A sentence with a marker is always a claim."""
+    that says a part could not be verified or is not in the documents states an absence, not
+    a claim, so a partial answer is checked on its stated part only; "" when the answer only
+    states absences. A sentence with a marker is always a claim."""
     claims = []
     for sentence in _SIMPLE_SENTENCE_BREAK.split(answer.strip()):
         folded = sentence.casefold()

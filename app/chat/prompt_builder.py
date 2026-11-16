@@ -181,8 +181,9 @@ def build_simple_system_prompt(*, no_answer_sentinel: str) -> str:
         "2. End every sentence that uses a source with its marker, for example [SOURCE_1]. "
         "Use only markers shown in the sources.\n"
         "3. Answer what the sources say first. If a part of the question is not in the "
-        'sources, say so plainly in one sentence: "Tài liệu không đề cập ..." (or "The '
-        'documents do not mention ..." for an English question). Do not invent that part.\n'
+        'sources, name it in one sentence: "Chưa xác minh được từ tài liệu bạn được phép '
+        'truy cập: ..." (or "Could not be verified from the documents you can access: ..." '
+        "for an English question). Do not invent that part.\n"
         f"4. If no part of the question is answered by the sources, reply exactly "
         f"{no_answer_sentinel} and nothing else.\n"
         "5. Answer in the language of the question.\n"
