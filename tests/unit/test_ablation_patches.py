@@ -162,3 +162,34 @@ def test_every_ablation_applies_to_the_current_service(tmp_path: Path) -> None:
     assert all(
         name.startswith("_patch") or name.startswith("apply") for name in result.stdout.split()
     )
+
+
+def test_simple_trace_records_every_draft_and_changes_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import app.services.claim_evidence_validation_service as validation
+    import app.services.grounded_answer_service as gas
+    from scripts.diagnostics import ablation_patches
+    from tests.unit.test_simple_answer_mode import GOOD, _ask
+
+    wrong = "Tai trong toi da cua xe toi la 9.900 kg [SOURCE_1]."
+    plain_result, _ = _ask(wrong, GOOD)
+    trace = tmp_path / "trace.jsonl"
+    monkeypatch.setenv("EVAL_SIMPLE_TRACE_FILE", str(trace))
+    monkeypatch.setattr(gas.GroundedAnswerService, "_simple_validate",
+                        gas.GroundedAnswerService._simple_validate)  # fmt: skip
+    for name, value in list(vars(validation).items()):  # restored after the test
+        if name.startswith("_") and callable(value):
+            monkeypatch.setattr(validation, name, value)
+    ablation_patches._patch_simple_trace(gas)
+    result, llm = _ask(wrong, GOOD)
+    assert llm.calls == 2
+    assert result.assistant_message.content == plain_result.assistant_message.content
+    first, second = (json.loads(line) for line in trace.read_text("utf-8").splitlines())
+    assert (first["outcome"], first["final"]) == ("claim_contradicted", False)
+    assert first["draft"] == wrong
+    assert first["sentences"][0]["sources"] == ["SOURCE_1"]
+    assert first["sentences"][0]["status"] == "CONTRADICTED"
+    assert first["sentences"][0]["rule"] == "_numbers_are_contradicted=True"
+    assert (second["outcome"], second["whole"]["status"]) == ("answered", "SUPPORTED")
+    assert first["sources"][0]["kind"] == "answer" and "2.500 kg" in first["sources"][0]["text"]
