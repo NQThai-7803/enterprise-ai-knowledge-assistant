@@ -6,6 +6,14 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### Simple answer mode: s4-s5 behind flags, natural_dev_v1 frozen -- 2026-11-17
+
+- DEC-027: Actions measurements rest on at least 2 separate jobs, each with its own `legacy`; a smaller difference than the between-job variation is a tie.
+- New flags, all off, read only in `RAG_ANSWER_MODE=simple` (`ENVIRONMENT_VARIABLES.md`): `RAG_SIMPLE_SUBJECT_BINDING_ENABLED` (s4); `RAG_SIMPLE_CLAIM_CROSS_ENCODER_ENABLED`, `RAG_SIMPLE_CLAIM_CROSS_ENCODER_MODEL`, `RAG_SIMPLE_CLAIM_CROSS_ENCODER_MIN_SCORE` (s5, −4.2). New counters `simple_claim_unbound`, `simple_no_answer_claim_unbound`.
+- Eval: `EVAL_SIMPLE_LEVEL=n` turns on simple mode with s1…sn; `eval.yml` downloads and mounts the cross-encoder only for s5; `simple_trace` records s4's verdict per claim. `ci_batch.sh` no longer misses the ablation marker under `pipefail`.
+- `natural_dev_v1` (20 questions) frozen with a lock and added to the question fingerprints; gold draft from the PDFs and `scripts/eval/natural_dev_check.py` (lock, gold structure, excerpts on their PDF page, overlap with the other sets), waiting for the owner.
+- Measured: s4 = s3 on the dev sets, s5 one false refusal worse; s3/s4/s5 meet DEC-026. Not adopted (`docs/design/simple-answer-mode.md`).
+
 ### Simple answer mode: s1-s3 behind flags -- 2026-11-16
 
 - New flags, all off, read only in `RAG_ANSWER_MODE=simple` (`ENVIRONMENT_VARIABLES.md`): `RAG_SIMPLE_ABSENCE_SENTENCES_ENABLED`, `RAG_SIMPLE_SHORT_PROMPT_ENABLED` (s1); `RAG_SIMPLE_RELAXED_RULES_ENABLED`, `RAG_SIMPLE_CLAIM_RELEVANCE_ENABLED`, `RAG_SIMPLE_CLAIM_RELEVANCE_MIN_SIMILARITY` (s2, 0.78); `RAG_SIMPLE_QUESTION_LIST_SEGMENTS_ENABLED` (s3).
