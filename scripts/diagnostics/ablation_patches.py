@@ -253,6 +253,10 @@ async def partial_draft(
 _rules: contextvars.ContextVar[list[tuple[str, str]] | None] = contextvars.ContextVar(
     "rules", default=None
 )
+_attempt: contextvars.ContextVar[list[int] | None] = contextvars.ContextVar("attempt", default=None)
+_similarities: contextvars.ContextVar[list[dict[str, Any]] | None] = contextvars.ContextVar(
+    "similarities", default=None
+)
 
 
 def _patch_simple_trace(gas: Any) -> None:
@@ -268,10 +272,16 @@ def _patch_simple_trace(gas: Any) -> None:
         if name.startswith("_") and callable(rule) and not isinstance(rule, type):
             setattr(validation, name, _noting(name, rule))
 
+    def flags(self: Any) -> dict[str, bool]:
+        return {
+            "relaxed_rules": self.settings.rag_simple_relaxed_rules_enabled,
+            "question_list_segments": self.settings.rag_simple_question_list_segments_enabled,
+        }
+
     async def judged(self: Any, *, question: str, answer: str, registry: Any, labels: Any) -> dict:
         token = _rules.set([])
         try:
-            with validation.simple_validation():
+            with validation.simple_validation(**flags(self)):
                 result = await self.claim_validation_service.validate(
                     question=question,
                     answer=answer,
@@ -283,29 +293,66 @@ def _patch_simple_trace(gas: Any) -> None:
             _rules.reset(token)
 
     original = gas.GroundedAnswerService._simple_validate
+    original_draft = gas.GroundedAnswerService._simple_answer_draft
+    original_similarity = gas.GroundedAnswerService._simple_claim_similarity
+
+    async def simple_answer_draft(self: Any, **kwargs: Any) -> Any:
+        token = _attempt.set([0])  # LLM drafts of this question
+        try:
+            return await original_draft(self, **kwargs)
+        finally:
+            _attempt.reset(token)
+
+    async def claim_similarity(self: Any, **kwargs: Any) -> Any:
+        similarity = await original_similarity(self, **kwargs)
+        noted = _similarities.get()
+        if noted is not None:
+            noted.append({"claim": kwargs["claim"], "similarity": similarity})
+        return similarity
+
+    def sentences_of(self: Any, text: str, question: str) -> list[tuple[str, bool]]:
+        """(sentence, absence) as the service splits the draft."""
+        if self.settings.rag_simple_absence_sentences_enabled:
+            _, claims = gas._simple_split_absences(text, question=question)
+            pieces = gas._simple_sentence_parts(text)[::2]
+            return [(s, s not in claims) for s in pieces if s.strip()]
+        return [
+            (s, not gas._simple_claim_text(s)) for s in gas._SIMPLE_SENTENCE_BREAK.split(text)
+            if s.strip()
+        ]  # fmt: skip
 
     async def simple_validate(self: Any, generation: Any, **kwargs: Any) -> Any:
-        outcome = await original(self, generation, **kwargs)
+        counter = _attempt.get()
+        if counter is not None:
+            counter[0] += 1
+        token = _similarities.set([])
+        try:
+            outcome = await original(self, generation, **kwargs)
+            similarities = _similarities.get() or []
+        finally:
+            _similarities.reset(token)
         registry, question = kwargs["source_registry"], kwargs["question"]
         text = gas.normalize_llm_citation_markers(
             generation.content.strip(), source_registry=registry
         )
         sentences = []
-        for sentence in gas._SIMPLE_SENTENCE_BREAK.split(text):
-            if not sentence.strip():
-                continue
+        for sentence, absence in sentences_of(self, text, question):
             labels = tuple(
                 m.strip("[]") for m in parse_citation_markers(sentence).ordered_unique_markers
             )
-            plain = gas._simple_claim_text(sentence)
+            plain = "" if absence else gas._simple_claim_text(sentence)
             row: dict[str, Any] = {"text": sentence, "sources": labels, "absence": not plain}
             if plain and labels:
                 row |= await judged(
                     self, question=question, answer=plain, registry=registry, labels=labels
                 )
             sentences.append(row)
-        labels = tuple(m.strip("[]") for m in parse_citation_markers(text).ordered_unique_markers)
-        plain = gas._simple_claim_text(text)
+        claim_sentences = [s for s, absence in sentences_of(self, text, question) if not absence]
+        labels = tuple(
+            m.strip("[]")
+            for m in parse_citation_markers(" ".join(claim_sentences)).ordered_unique_markers
+        )
+        plain = " ".join(filter(None, map(gas._simple_claim_text, claim_sentences)))
         whole = (
             await judged(self, question=question, answer=plain, registry=registry, labels=labels)
             if plain and labels
@@ -315,11 +362,13 @@ def _patch_simple_trace(gas: Any) -> None:
             "asked": _question.get(),
             "question": question,
             "oracle_hit": _oracle_hit.get(),
+            "attempt": counter[0] if counter is not None else None,
             "draft": generation.content,
             "outcome": "answered" if not isinstance(outcome, tuple) else outcome[0],
             "final": not isinstance(outcome, tuple) or outcome[1] is None,
             "whole": whole,
             "sentences": sentences,
+            "similarities": similarities,
             "sources": [
                 {
                     "label": source.marker.strip("[]"),
@@ -336,6 +385,8 @@ def _patch_simple_trace(gas: Any) -> None:
         return outcome
 
     gas.GroundedAnswerService._simple_validate = simple_validate
+    gas.GroundedAnswerService._simple_answer_draft = simple_answer_draft
+    gas.GroundedAnswerService._simple_claim_similarity = claim_similarity
 
 
 def _noting(name: str, rule: Any) -> Any:

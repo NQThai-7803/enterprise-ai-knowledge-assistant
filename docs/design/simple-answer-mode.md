@@ -340,3 +340,63 @@ Two patterns cover most of it. First, the rules were written for legacy's server
 3. **Per-sentence validation** helps only together with a looser subject rule: of the 54 correct sentences rejected, 23 fail `_explicit_value_answer_is_subject_aligned`. The question is whether `simple` should skip that rule (and the legacy domain rules for attendance, leave and bereavement, 15 more) and keep the number, polarity and evidence checks. That is a choice between false refusals and the risk of a wrong-subject value, so it needs the owner's call and a measurement under DEC-026.
 4. **Question-list sources by segments:** worth 7 sentences on UAT, none on the dev sets.
 5. **Not covered by any of these:** class (b) on UAT (44%), and refuse items answered with a supported but unrelated sentence (15 of the 20 dev false answers of this run). The first is the model's limit on long chunks; the second needs a relevance check between the question and the cited sentence, which `simple` removed on purpose.
+
+## s1-s3 (owner approval 2026-11-16)
+
+The owner approved three cumulative configurations. Each change has its own flag, all off by default, and only read when `RAG_ANSWER_MODE=simple`. The flags are listed in `ENVIRONMENT_VARIABLES.md`.
+
+| Config | Flags | What changes |
+|---|---|---|
+| s1 | `RAG_SIMPLE_ABSENCE_SENTENCES_ENABLED`, `RAG_SIMPLE_SHORT_PROMPT_ENABLED` | A sentence naming an unverified part ("chưa/không xác minh được", "could not be verified") is never a claim, marked or not; its marker is removed; an answer of such sentences only is NO_ANSWER. A marker after a full stop stays with its sentence, so the next sentence is judged alone. The prompt asks for one short sentence per point asked, marker inside it, from the first draft. |
+| s2 | s1 + `RAG_SIMPLE_RELAXED_RULES_ENABLED`, `RAG_SIMPLE_CLAIM_RELEVANCE_ENABLED` | Claim validation skips `_explicit_value_answer_is_subject_aligned` and the attendance, annual-leave and bereavement rules (the number/unit, polarity and evidence checks stay). Each marked claim is compared (e5 cosine) through the source sentence it cites with the question and each of its parts; below the threshold it is dropped; none left is NO_ANSWER with no retry. |
+| s3 | s2 + `RAG_SIMPLE_QUESTION_LIST_SEGMENTS_ENABLED` | A whole question-list chunk counts by its segments that are neither questions nor non-answer context. |
+
+Two choices made while implementing, not in the owner's text:
+
+- An unverified-part sentence that holds a number the question does not hold stays a claim and is validated. Without this a fact written after "chưa xác minh được" would reach the user unchecked.
+- A claim whose relevance cannot be measured (no marker, no evidence, no embedding provider) is kept, as the legacy responsiveness check does.
+
+### Relevance threshold (calibrated before measuring)
+
+Rule, fixed before computing: on the dev sets of the diagnostic run (`3698da9`, both configurations, UAT excluded), each draft scores the highest similarity among its claims, computed by the service's own code with the s1 split and the s2 validation flags. Positive: an accepted draft of an item to answer that states the item's fact. Negative: any draft of an item to refuse (RBAC: a draft none of whose sources holds the fact). t = the lowest positive score, floored to 0.01, so that no correct dev answer loses all its claims.
+
+Result: **t = 0.78**, from 109 positive drafts (58 items) and 39 negative drafts (18 items). Positive best scores start at 0.780, 0.789, 0.824; negative best scores reach 0.908.
+
+**At t = 0.78 the check is expected to do almost nothing:** 2 of 39 negative drafts and 0 of the 32 accepted ones fall below it. The question and the off-topic source sentence usually share the subject, so e5 rates them close. The trade-off on the same data (items to answer that lose every claim / of the 16 refuse items answered, those caught):
+
+| t | correct items lost (of 58) | false answers caught (of 16) |
+|---|---|---|
+| 0.78 | 0 | 0 |
+| 0.80 | 2 | 1 |
+| 0.84 | 3 | 3 |
+| 0.86 | 5 | 4 |
+| 0.87 | 5 | 8 |
+| 0.88 | 9 | 10 |
+| 0.90 | 19 | 13 |
+
+The measurement uses 0.78 as the rule gives. A higher value is a choice between false refusals and false answers, for the owner.
+
+### What the relaxed rules let through (checked before measuring)
+
+Replaying the 187 classified rejected sentences of the diagnostic run against their full cited sources with the s2 rules gives the following. Classes (d) and (e) are excluded; they do not depend on these rules.
+
+| | (a) correct, rejected | (b) model wrong, rejected | (c) question list |
+|---|---|---|---|
+| dev, now SUPPORTED | 17 of 29 | 6 of 11 | – |
+| UAT, now SUPPORTED | 13 of 25 | 17 of 52 | 0 of 15 |
+
+So s2's rules accept about as many wrong sentences as correct ones on UAT. Where a retry followed, these sentences are counted once per draft. This is the risk that the "right number, wrong subject" count below is meant to measure.
+
+### Measurement plan (written before measuring, DEC-011)
+
+- **Where:** Actions `eval.yml`, 2 runs, qwen2.5:3b on CPU. Every configuration is compared only with the `legacy` of its own job (DEC-016).
+- **Configurations:** `legacy`; `s1` = `EVAL_ANSWER_MODE=simple`, `EVAL_SIMPLE_ABSENCE=true`, `EVAL_SIMPLE_SHORT_PROMPT=true`, `EVAL_ABLATION=simple_trace`; `s2` = s1 + `EVAL_SIMPLE_RELAXED_RULES=true`, `EVAL_SIMPLE_RELEVANCE=true`; `s3` = s2 + `EVAL_SIMPLE_QUESTION_LIST=true`. Every draft of s1-s3 is saved as in the diagnosis.
+- **Jobs:** one job per dev set with `legacy, s1, s2, s3`: RBAC, relevance, false refusal v1, v2, compound. UAT in two jobs, because four configurations × 2 runs exceed the 340-minute job limit (the earlier three-configuration UAT job took 4 h 49): `legacy, s2, s3` (s2 and s3 differ only on question-list sources, which only UAT has) and `legacy, s1`.
+- **Per set and configuration:** correct – false refusal – false answer – wrong value or document, leaks, latency; dev totals.
+- **Extra counts, defined now:**
+  - *Supported but off topic:* false answers on items to refuse (RBAC: negatives) whose answer is not only an unverified sentence and whose every number appears in the text of its cited sources. The other false answers are counted as invented.
+  - *Right number, wrong subject (s2's risk):* answered items to answer graded wrong (wrong value or document) whose every number appears in their cited sources; on the dev sets and, for monitoring, on UAT.
+  - *s1:* share of first drafts with at least one valid marker, and mean LLM calls per question, from the saved drafts.
+  - Drops by the relevance check: `simple_claim_irrelevant` and `simple_no_answer_claim_irrelevant`.
+- **Rule (DEC-026), per configuration against the legacy of its job:** leaks = 0 everywhere; dev total of false answers plus wrong answers not above legacy; then fewer false refusals. A change counts only when both runs agree; the others are reported as unstable. UAT is monitoring only, reported by the route legacy took.
+- A configuration that meets the rule is reported. **The default is not changed in this step.**

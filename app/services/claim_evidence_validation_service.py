@@ -1348,7 +1348,8 @@ def _validate_answer_against_evidence(
     analysis = analyze_question(question) if question is not None else None
     is_yes_no = analysis is not None and analysis.is_yes_no
 
-    if question is not None and annual_leave_relation_intent(question):
+    relaxed = _RELAXED_RULES.get()
+    if not relaxed and question is not None and annual_leave_relation_intent(question):
         leave_status = _annual_leave_relation_alignment_status(
             question=question,
             answer=answer,
@@ -1357,15 +1358,20 @@ def _validate_answer_against_evidence(
         if leave_status is not None:
             return leave_status
 
-    if question is not None and _prorated_leave_condition_is_missing(
-        question=question,
-        answer=folded_answer,
-        evidence=folded_evidence,
+    if (
+        not relaxed
+        and question is not None
+        and _prorated_leave_condition_is_missing(
+            question=question,
+            answer=folded_answer,
+            evidence=folded_evidence,
+        )
     ):
         return ClaimEvidenceStatus.INSUFFICIENT
 
     if (
-        question is not None
+        not relaxed
+        and question is not None
         and (
             bereavement_status := _paid_parent_bereavement_duration_status(
                 question=question,
@@ -1470,10 +1476,14 @@ def _validate_answer_against_evidence(
         )
         if named_benefit_status is not None:
             return named_benefit_status
-        attendance_status = _attendance_policy_yes_no_status(
-            question=question,
-            answer=answer,
-            evidence=evidence,
+        attendance_status = (
+            None
+            if relaxed
+            else _attendance_policy_yes_no_status(
+                question=question,
+                answer=answer,
+                evidence=evidence,
+            )
         )
         if attendance_status is not None:
             return attendance_status
@@ -1509,7 +1519,8 @@ def _validate_answer_against_evidence(
         )
 
     if (
-        question is not None
+        not relaxed
+        and question is not None
         and analysis is not None
         and analysis.asks_for_explicit_value
         and not _explicit_value_answer_is_subject_aligned(
@@ -1975,14 +1986,18 @@ def _evidence_for_labels(
         if not is_non_answer_context(source.text):
             parts.append(source.text)
         elif _REFERENCE_SEGMENTS.get() and (
-            classify_evidence_context(source.text) == EvidenceContextKind.REFERENCE
+            (kind := classify_evidence_context(source.text)) == EvidenceContextKind.REFERENCE
+            or (_QUESTION_LIST_SEGMENTS.get() and kind == EvidenceContextKind.QUESTION_LIST)
         ):
             # A whole chunk with one "document control" line still holds its other facts; a
-            # query-focused excerpt drops such lines the same way. Question lists stay out.
+            # query-focused excerpt drops such lines the same way. Question lists stay out,
+            # unless s3: then only their questions do.
             kept = [
                 segment
                 for segment in _EVIDENCE_SEGMENT_BREAK.split(source.text)
-                if segment.strip() and not is_non_answer_context(segment)
+                if segment.strip()
+                and not is_non_answer_context(segment)
+                and not (kind == EvidenceContextKind.QUESTION_LIST and "?" in segment)
             ]
             if kept:
                 parts.append(" ".join(kept))
@@ -2785,16 +2800,37 @@ _REFERENCE_SEGMENTS: contextvars.ContextVar[bool] = contextvars.ContextVar(
 _EVIDENCE_SEGMENT_BREAK = re.compile(r"(?<=[.!?])\s+|\n+")
 
 
+# s2: the subject-alignment rule and the attendance, annual-leave and bereavement rules are off.
+_RELAXED_RULES: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "relaxed_rules", default=False
+)
+# s3: a whole question-list chunk counts by its answer segments too.
+_QUESTION_LIST_SEGMENTS: contextvars.ContextVar[bool] = contextvars.ContextVar(
+    "question_list_segments", default=False
+)
+
+
 @contextlib.contextmanager
-def simple_validation() -> Iterator[None]:
+def simple_validation(
+    *, relaxed_rules: bool = False, question_list_segments: bool = False
+) -> Iterator[None]:
     """Simple answer mode: normalized numbers, and a whole chunk that classifies as reference
-    (document control, related documents, ...) counts as evidence by its answer segments."""
-    token = _REFERENCE_SEGMENTS.set(True)
+    (document control, related documents, ...) counts as evidence by its answer segments.
+    `relaxed_rules` (s2) skips the subject-alignment rule and the attendance, annual-leave and
+    bereavement rules; the number, polarity and evidence checks stay. `question_list_segments`
+    (s3) lets a question-list chunk count by its segments that are not questions."""
+    tokens = (
+        _REFERENCE_SEGMENTS.set(True),
+        _RELAXED_RULES.set(relaxed_rules),
+        _QUESTION_LIST_SEGMENTS.set(question_list_segments),
+    )
     try:
         with number_normalization():
             yield
     finally:
-        _REFERENCE_SEGMENTS.reset(token)
+        _QUESTION_LIST_SEGMENTS.reset(tokens[2])
+        _RELAXED_RULES.reset(tokens[1])
+        _REFERENCE_SEGMENTS.reset(tokens[0])
 
 
 def _numbers_are_contradicted(answer: str, evidence: str) -> bool:
