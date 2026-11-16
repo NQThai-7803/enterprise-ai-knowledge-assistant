@@ -1,5 +1,13 @@
 # Project Status
 
+## Simple mode: rejected drafts diagnosed -- 2026-11-16 (STOPPED for the owner's review)
+
+- Owner decisions applied: a missing part is named "Chưa xác minh được từ tài liệu bạn được phép truy cập: …" (matches the compound grader), `simple_det` removed, model unchanged. Default stays `legacy`.
+- Eval-only ablation `simple_trace` records every simple-mode draft with per-sentence validator status. 1 run on UAT and the 5 dev sets, real retrieval and oracle; 187 rejected sentences classified by hand (`docs/design/simple-answer-mode.md`, "Diagnosis").
+- **Dev sets:** validator too strict 41-44%, model wrong 10-21%, absence sentence with a marker 31-34%. **UAT:** model wrong 44% (with the gold chunks too), validator too strict 21%, question-list source 9-16%. 75-79 of 100 UAT first drafts have no marker, so most questions take two LLM calls.
+- **Defect found, not fixed (no behaviour change in this step):** with the new wording, an absence sentence that carries a marker sometimes passes validation and is returned as an answer (2 of 25 relevance items). Simple mode only.
+- Not addressed by the three planned fixes: refuse items answered with a supported but unrelated sentence (15 of simple's 20 dev false answers in this run).
+
 ## Simple answer mode measured -- 2026-11-16
 
 - `RAG_ANSWER_MODE=simple|simple_det` (default `legacy`, unchanged): top 5 whole chunks, one plain-text prompt, only citation and claim validation, one retry. Measured on 6 sets in Actions jobs (`docs/design/simple-answer-mode.md`). Leaks 0 everywhere.

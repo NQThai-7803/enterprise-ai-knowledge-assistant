@@ -35,7 +35,6 @@ BRANCH_EXCERPT_FALLBACK = "excerpt_fallback"
 BRANCH_CLAIM_UNRESPONSIVE = "claim_unresponsive"
 # Simple answer mode: the one retry, the deterministic fast path, and why it refused.
 BRANCH_SIMPLE_RETRY = "simple_retry"
-BRANCH_SIMPLE_DETERMINISTIC = "simple_deterministic"
 SIMPLE_NO_ANSWER_REASONS = (
     "no_sources",
     "llm_refused",
@@ -61,7 +60,6 @@ ANSWER_BRANCHES = (
     BRANCH_EXCERPT_FALLBACK,
     BRANCH_CLAIM_UNRESPONSIVE,
     BRANCH_SIMPLE_RETRY,
-    BRANCH_SIMPLE_DETERMINISTIC,
     *(f"simple_no_answer_{reason}" for reason in SIMPLE_NO_ANSWER_REASONS),
 )
 _UUID_SEGMENT_PATTERN = re.compile(

@@ -170,9 +170,9 @@ class Settings(BaseSettings):
     # could not be verified, instead of refusing everything.
     rag_compound_partial_answer_enabled: bool = False
     # Simple answer mode (docs/design/simple-answer-mode.md): hybrid retrieval, top 5 chunks
-    # (at most 2 per document), one prompt, citation + claim validation, one retry. simple_det
-    # adds the strict deterministic route as a fast path. legacy keeps the full pipeline.
-    rag_answer_mode: Literal["legacy", "simple", "simple_det"] = "legacy"
+    # (at most 2 per document), one prompt, citation + claim validation, one retry. legacy
+    # keeps the full pipeline.
+    rag_answer_mode: Literal["legacy", "simple"] = "legacy"
     # FIX 3c F: numbers are compared once written one way (01 = 1, 1,2 trieu = 1.200.000).
     rag_number_normalization_enabled: bool = False
     # FIX 4 (i), completeness checks: a grouped number is one number in the unit check; a

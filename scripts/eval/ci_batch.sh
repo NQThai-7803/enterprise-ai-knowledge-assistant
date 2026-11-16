@@ -104,6 +104,10 @@ run_one() {  # $1 = config index, $2 = run number
         || echo "runner exit $?" >> "$dir/runner.log" ;;
   esac
   echo "seconds=$(( $(date +%s) - started ))" > "$dir/timing.txt"
+  if [[ ",$vars," == *",EVAL_ABLATION="*simple_trace* ]]; then  # every simple-mode draft
+    docker cp "$PROJECT-api-1:/tmp/simple_trace.jsonl" "$dir/simple_trace.jsonl" >/dev/null 2>&1 \
+      || echo "no simple trace" >> "$dir/runner.log"
+  fi
   )
   echo "$(date -u +%FT%TZ) $name run$2 $(cat "$dir/timing.txt") $(tail -1 "$dir/runner.log")" \
     | tee -a "$OUT/batch.log"

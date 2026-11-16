@@ -12,7 +12,7 @@ On new questions about 53% of the answers are false refusals, caused by the stac
 2. **One prompt** (`build_simple_grounded_prompt`). The system message holds only the rules, never retrieved text. The rules:
    - answer only from the sources and invent nothing;
    - end each sentence that uses a source with its `[SOURCE_n]` marker;
-   - say "Tài liệu không đề cập …" (or "The documents do not mention …") for a part the sources do not hold;
+   - name a part the sources do not hold in one sentence: "Chưa xác minh được từ tài liệu bạn được phép truy cập: …" (or "Could not be verified from the documents you can access: …"). Until `716531f` the wording was "Tài liệu không đề cập …"; the owner replaced it on 2026-11-16 to match the compound grader (DEC PROMPT 6);
    - reply with the no-answer sentinel when no part is answered;
    - answer in the question's language.
 
@@ -23,14 +23,14 @@ On new questions about 53% of the answers are false refusals, caused by the stac
 4. **One retry:** a missing marker, an unknown marker or an unsupported claim is retried once, with the specific reason and the rejected answer marked as not evidence. A second failure gives the fixed NO_ANSWER. The sentinel, an answer that only states absences, and a permission failure give NO_ANSWER at once, with no retry.
 5. **Skipped in `simple`:** the deterministic route, the low-alignment filter, the completeness checks (c1/c3, D2), the responsiveness check, terminal blocks, compound partial and every repair after the LLM. Legacy code is unchanged.
 
-`simple_det` is `simple` plus the strict deterministic route (`_structured_value_answer_draft`) as a fast path, tried before the LLM on the same 5 sources.
+`simple_det` is `simple` plus the strict deterministic route (`_structured_value_answer_draft`) as a fast path, tried before the LLM on the same 5 sources. **Removed in `716531f`** (owner decision, 2026-11-16); it appears below only as a measured configuration.
 
 ### Counters (`/metrics`, `enterprise_ai_rag_answer_branch_total`)
 
 | Counter | Meaning |
 |---|---|
 | `simple_retry` | the one retry was used |
-| `simple_deterministic` | `simple_det` answered on the deterministic fast path |
+| `simple_deterministic` | removed with `simple_det` in `716531f` |
 | `simple_no_answer_no_sources` | no permitted chunk, or the prompt guard stopped the call |
 | `simple_no_answer_llm_refused` | the model replied with the sentinel |
 | `simple_no_answer_refusal_text` | the answer only stated that the documents do not hold it |
@@ -216,3 +216,127 @@ Proposed order:
 2. The diagnostic run above.
 3. Per-sentence validation, QUESTION_LIST by segments and a short-answer prompt, each behind the mode and measured as here.
 4. `simple_det` is not worth pursuing: its fast path on 5 sources adds wrong values on dev and on UAT.
+
+## Diagnosis of the rejected drafts (2026-11-16)
+
+Owner decisions before this step: a missing part is named "chưa xác minh được …" (the earlier "tài liệu không đề cập" prompt was wrong), `simple_det` is dropped, the LLM model stays. Both are in `716531f`. This step changes no behaviour: it records and classifies.
+
+### How it was recorded
+
+- Eval-only ablation `simple_trace` (`scripts/diagnostics/ablation_patches.py`, `3698da9`). It wraps `_simple_validate` and writes one line per LLM draft, rejected ones included, to the artifact `simple_trace.jsonl`: the draft, its outcome, each sentence with the `[SOURCE_n]` it cites and the validator status when judged alone, and the sources. The application code and the answers are unchanged.
+- Jobs: `eval.yml`, 1 run, code `3698da9`, qwen2.5:3b on CPU, configurations `simple` (real retrieval) and `oracle_simple`. Runs: UAT 43786322434, RBAC 43786338347, relevance 43786354241, false refusal v1 43786368647, false refusal v2 43786382737, compound 43786397006. Leaks 0, INFRA_ERROR 0.
+- The validator has two failing statuses, INSUFFICIENT and CONTRADICTED. INSUFFICIENT is what the owner's prompt calls UNSUPPORTED.
+- The reason of each rejection comes from replaying the validator offline on every sentence of every rejected draft and noting which rule returned. The class of each sentence is a manual reading of the sentence against the text of the sources it cites. It was done once, by one reader, with no second opinion; about 6 of the 187 are borderline.
+- Unit: one sentence of one draft that claim validation rejected. A retry that repeats the same sentence counts again, which is common: the seed is fixed, so the retry often returns the same text.
+
+### What happens to a turn
+
+Outcome of the first draft and of the retry, per question:
+
+| Set | config | questions | answered at once | first draft has no marker at all | ends answered | ends rejected by claim validation | ends with no marker | absence only |
+|---|---|---|---|---|---|---|---|---|
+| UAT | simple | 100 | 3 | 79 | 43 | 42 | 8 | 7 |
+| UAT | oracle_simple | 100 | 10 | 75 | 50 | 38 | 8 | 4 |
+| RBAC | simple | 36 | 11 | 6 | 15 | 5 | 0 | 16 |
+| RBAC | oracle_simple | 36 | 5 | 12 | 16 | 3 | 0 | 17 |
+| relevance | simple | 25 | 13 | 6 | 18 | 6 | 0 | 1 |
+| relevance | oracle_simple | 25 | 10 | 9 | 17 | 6 | 0 | 2 |
+| false refusal v1 | simple | 20 | 12 | 2 | 14 | 4 | 0 | 2 |
+| false refusal v1 | oracle_simple | 20 | 12 | 4 | 15 | 3 | 0 | 2 |
+| false refusal v2 | simple | 24 | 5 | 15 | 18 | 4 | 0 | 2 |
+| false refusal v2 | oracle_simple | 24 | 6 | 15 | 18 | 3 | 0 | 3 |
+| compound | simple | 12 | 2 | 5 | 7 | 2 | 0 | 3 |
+| compound | oracle_simple | 12 | 2 | 6 | 8 | 1 | 0 | 3 |
+
+**The first draft usually has no marker.** On UAT 75-79 of 100 first drafts carry no `[SOURCE_n]` at all; on false refusal v2 15 of 24. The retry then returns the same sentence with a marker added. So most questions cost two LLM calls, and what is validated is in fact the second draft. This was not in the three classes the owner listed; it is a prompt matter.
+
+### Classes of the rejected sentences
+
+- **(a) validator too strict:** the sentence states what its cited source states, and answers the question.
+- **(b) model wrong or off topic:** wrong value, a fact of another subject, a claim the cited source does not hold (right value but wrong source included), another language, or prompt text echoed back.
+- **(c) question-list source:** every cited source is classified QUESTION_LIST, so the sentence has no evidence at all, right or wrong.
+- **(d) absence sentence with a marker** (not in the owner's list): the model writes "Chưa xác minh được từ tài liệu bạn được phép truy cập: [SOURCE_1]". The marker makes it a claim, and it is validated as one.
+- **(e) sentence with no marker** inside a draft that has markers elsewhere (not in the owner's list): long answers where only the last sentence is marked.
+
+| Set | config | rejected sentences | (a) | (b) | (c) | (d) | (e) |
+|---|---|---|---|---|---|---|---|
+| UAT | simple | 62 | 13 | 27 | 10 | 4 | 8 |
+| UAT | oracle_simple | 57 | 12 | 25 | 5 | 4 | 11 |
+| RBAC | simple | 8 | 2 | 2 | 0 | 4 | 0 |
+| RBAC | oracle_simple | 5 | 2 | 1 | 0 | 2 | 0 |
+| relevance | simple | 13 | 2 | 3 | 0 | 6 | 2 |
+| relevance | oracle_simple | 14 | 2 | 2 | 0 | 6 | 4 |
+| false refusal v1 | simple | 8 | 6 | 0 | 0 | 2 | 0 |
+| false refusal v1 | oracle_simple | 5 | 3 | 0 | 0 | 2 | 0 |
+| false refusal v2 | simple | 6 | 3 | 3 | 0 | 0 | 0 |
+| false refusal v2 | oracle_simple | 3 | 3 | 0 | 0 | 0 | 0 |
+| compound | simple | 4 | 4 | 0 | 0 | 0 | 0 |
+| compound | oracle_simple | 2 | 2 | 0 | 0 | 0 | 0 |
+| **Dev sets** | simple | 39 | 17 (44%) | 8 (21%) | 0 | 12 (31%) | 2 (5%) |
+| **Dev sets** | oracle_simple | 29 | 12 (41%) | 3 (10%) | 0 | 10 (34%) | 4 (14%) |
+| **UAT** | simple | 62 | 13 (21%) | 27 (44%) | 10 (16%) | 4 (6%) | 8 (13%) |
+| **UAT** | oracle_simple | 57 | 12 (21%) | 25 (44%) | 5 (9%) | 4 (7%) | 11 (19%) |
+| **All** | both | 187 | 54 (29%) | 63 (34%) | 15 (8%) | 30 (16%) | 25 (13%) |
+
+Reading it:
+
+- **Dev sets: the validator is the main cause.** 41-44% of the rejected sentences are correct, and another 31-34% are absence sentences with a marker. The model is wrong in 10-21%.
+- **UAT: the model is the main cause.** 44% of the rejected sentences are wrong, with the gold chunks too. The validator rejects a correct sentence in 21%, and question-list sources account for 9-16%.
+- So "claim validation is the main cause on UAT", written in the Results above, was too strong: about half of what it rejects there deserves it.
+- No draft was rejected only as a whole: in every rejected draft at least one sentence fails alone or has no marker. Per-sentence validation by itself therefore passes nothing more; its use is to let a correct sentence stand when another one is dropped.
+
+### (a) Which rules reject correct sentences
+
+54 sentences, by the rule of `_validate_answer_against_evidence` that returned:
+
+| Rule | Count | What it rejects (made-up wording) |
+|---|---|---|
+| `_explicit_value_answer_is_subject_aligned` | 23 | a short value answer without the subject ("7 ngày làm việc" to "nộp chứng từ trong bao lâu?"), and a sentence copied word for word from the source |
+| attendance policy yes/no status | 9 | "Không" or a copied policy sentence on a yes/no question about attendance or overtime |
+| `_person_lookup_answer_name_missing` | 5 | a "who" question answered with a role ("trưởng phòng") and no personal name; the answered half of a compound question when the other half asks "who" |
+| `_polarity_is_contradicted` | 5 | a correct value followed in the same sentence unit by an absence clause ("… 30% mỗi tuần. [SOURCE_1] Nhiệt độ không được nêu …"): the "không" of the absence clause is read against the claim (4); a plain correct count, once |
+| `_numbers_are_contradicted` | 4 | "8 tiếng" against "08 giờ/ngày" in a table row with other numbers; "khoảng 2 người" against "tối thiểu 02 người" |
+| annual-leave relation status | 4 | a copied seniority rule |
+| bereavement duration status | 2 | "3 ngày" against a table cell "03 ngày" whose label is on another line |
+| conditional allowance status, role relation | 2 | a correct amount; a title in Vietnamese where the question uses the English abbreviation |
+
+Two patterns cover most of it. First, the rules were written for legacy's server-built answers and expect a full sentence that restates the subject, while the model answers with the bare value, which is what a short-answer prompt would ask for even more. Second, domain rules written for the legacy route (attendance, leave, bereavement) fire on sentences copied from the source. The compound rows show a third: the sentence splitter keeps a marker that follows a full stop with the next sentence, so a claim and an absence clause are judged as one.
+
+### (b) What the model gets wrong
+
+63 sentences: a value of another row or subject (the role of one person given to another, the limit of one benefit for another), a fact the cited source does not hold (some of them right but cited to the wrong source), an answer in Chinese or English to a Vietnamese question (6 sentences), the retry instruction echoed as the answer, and a question about one thing answered with a nearby fact about another. The validator is right to reject these. On UAT they are 44% of the rejections with the gold chunks in the prompt, so this is the 3B model's reading of long, table-heavy chunks, not retrieval.
+
+### (c) Question-list sources
+
+15 sentences, all on UAT, 10 with real retrieval and 5 with the gold chunks. In 7 the value is the right one, read from a table that sits in a chunk classified QUESTION_LIST as a whole; in the other 8 the model copied a sample question or a page header, wrote an absence sentence, or gave a wrong or vague value. Counting such a source by its answer segments would give the 7 their evidence; the other 8 should still fail.
+
+### (d) Absence sentences with a marker, and a defect of this branch
+
+30 rejected sentences are "Chưa xác minh được …: [SOURCE_1]" (6 of them written "Không xác minh được …", which the absence phrases do not hold). Most are on items that must be refused, so the turn ends at NO_ANSWER, which is the right outcome for the wrong reason.
+
+**The same sentence sometimes passes validation and is returned as an answer with a citation.** In this run that happened on 2 of 25 relevance items with real retrieval, 1 with the gold chunks, and 1 UAT question with the gold chunks. The graders count it as a false answer. It comes from the new wording of `716531f`: the model adds a marker to the absence sentence more often than it did with "tài liệu không đề cập". Only `RAG_ANSWER_MODE=simple` is affected and the default is `legacy`. It is not fixed here because this step changes no behaviour; it is the first item of the proposal below.
+
+### Graded results of this run (not a DEC-026 comparison)
+
+1 run, no `legacy` in the same job, so these numbers cannot be compared with the table in Results under DEC-011. They are here only to show the direction after the wording change. Correct – false refusal – false answer – wrong:
+
+| Set | simple | oracle_simple |
+|---|---|---|
+| RBAC (36) | 32–3–0–1 | 33–2–0–1 |
+| relevance (25) | 16–2–7–0 | 17–2–6–0 |
+| false refusal v1 (20) | 12–3–5–0 | 13–2–5–0 |
+| false refusal v2 (24) | 16–3–5–0 | 16–3–5–0 |
+| compound (12) | 6–3–3–0 | 5–2–5–0 |
+| **Dev total (117)** | **82–14–20–1** | **84–11–21–1** |
+| UAT (100) | 36–55–0–9 | 51–48–0–1 |
+
+- Compound false answers with real retrieval went from 5 to 3. Of the 3, one is a refuse item answered and two are partial answers whose missing part is still written the old way ("không có thông tin trong tài liệu", or in Chinese), so the prompt rule is not followed every time.
+- Relevance false answers went from 4 to 7: 2 are the absence-with-marker defect above. The other 5, like all 5 of false refusal v1 and of v2, are items that must be refused and are answered with a sentence about something else, true or inferred from it. Claim validation passes them because the cited source supports the sentence; `simple` skips the responsiveness check that catches these in legacy. None of the three fixes proposed earlier addresses this.
+
+### What this says about the fixes (for the owner to decide; nothing below is implemented)
+
+1. **Absence sentences.** Recognise an absence sentence whether or not it carries a marker, also in the form "Không xác minh được", and drop its marker. An answer made only of absence sentences is NO_ANSWER. This removes class (d) (30 sentences), the defect above, and the polarity rejections on compound.
+2. **Short-answer prompt with the marker in the first draft.** 75-79 of 100 UAT first drafts have no marker. A prompt that shows the expected shape (one short sentence, marker at its end) should cut the second LLM call and class (e). It will not reduce class (b) by itself.
+3. **Per-sentence validation** helps only together with a looser subject rule: of the 54 correct sentences rejected, 23 fail `_explicit_value_answer_is_subject_aligned`. The question is whether `simple` should skip that rule (and the legacy domain rules for attendance, leave and bereavement, 15 more) and keep the number, polarity and evidence checks. That is a choice between false refusals and the risk of a wrong-subject value, so it needs the owner's call and a measurement under DEC-026.
+4. **Question-list sources by segments:** worth 7 sentences on UAT, none on the dev sets.
+5. **Not covered by any of these:** class (b) on UAT (44%), and refuse items answered with a supported but unrelated sentence (15 of the 20 dev false answers of this run). The first is the model's limit on long chunks; the second needs a relevance check between the question and the cited sentence, which `simple` removed on purpose.

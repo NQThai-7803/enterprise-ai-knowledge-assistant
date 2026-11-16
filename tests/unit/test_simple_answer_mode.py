@@ -1,4 +1,4 @@
-"""Simple answer mode (RAG_ANSWER_MODE=simple|simple_det). Invented questions and sources only."""
+"""Simple answer mode (RAG_ANSWER_MODE=simple). Invented questions and sources only."""
 
 from __future__ import annotations
 
@@ -17,7 +17,6 @@ from app.citations.models import PromptSourceRegistry
 from app.llm.models import LLMGenerationResult
 from app.observability.metrics import GLOBAL_METRICS
 from app.services import claim_evidence_validation_service as validation
-from app.services import grounded_answer_service as grounded_answer_module
 from app.services.grounded_answer_service import _simple_claim_text, _simple_select_hits
 from tests.unit.test_grounded_answer_service import (
     FakeCitationValidationService,
@@ -125,7 +124,7 @@ def test_the_prompt_keeps_sources_out_of_the_system_message() -> None:
         question=QUESTION, source_registry=registry, no_answer_sentinel="__NO_ANSWER__"
     )
     assert system.role == "system" and "2.500 kg" not in system.content
-    assert "[SOURCE_1]" in system.content and "Tài liệu không đề cập" in system.content
+    assert "[SOURCE_1]" in system.content and "Chưa xác minh được" in system.content
     assert "SOURCE_1" in user_message.content and "2.500 kg" in user_message.content
     _, retry = build_simple_grounded_prompt(
         question=QUESTION, source_registry=registry, no_answer_sentinel="__NO_ANSWER__",
@@ -183,25 +182,6 @@ def test_no_retrieved_chunk_refuses_without_calling_the_llm() -> None:
     assert GLOBAL_METRICS.answer_branch_counts()["simple_no_answer_no_sources"] == 1
 
 
-@pytest.mark.parametrize(("mode", "llm_calls", "deterministic"), [
-    ("simple", 1, 0), ("simple_det", 0, 1),
-])  # fmt: skip
-def test_the_deterministic_route_runs_only_in_simple_det(
-    mode: str, llm_calls: int, deterministic: int, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    def built(**_: Any) -> LLMGenerationResult:
-        return replace(
-            _generation('{"answer":"Tai trong toi da cua xe toi la 2.500 kg.",'
-                        '"citations":["SOURCE_1"]}'),
-            model="local-structured-value-repair", provider="local",
-        )  # fmt: skip
-
-    monkeypatch.setattr(grounded_answer_module, "_structured_value_repair_generation", built)
-    result, llm = _ask(GOOD, mode=mode)
-    assert result.grounding_status == GroundingStatus.ANSWERED and llm.calls == llm_calls
-    assert GLOBAL_METRICS.answer_branch_counts()["simple_deterministic"] == deterministic
-
-
 def test_legacy_stays_the_default() -> None:
     assert settings().rag_answer_mode == "legacy"
 
@@ -209,6 +189,8 @@ def test_legacy_stays_the_default() -> None:
 def test_unmarked_absence_sentences_are_not_claims() -> None:
     assert _simple_claim_text("Tài liệu không đề cập mức phụ cấp.") == ""
     assert _simple_claim_text("The documents do not mention the allowance.") == ""
+    assert _simple_claim_text("Chưa xác minh được từ tài liệu: mức phụ cấp.") == ""
+    assert _simple_claim_text("Could not be verified from the documents: the allowance.") == ""
     partial = "Phụ cấp là 500.000 đồng [SOURCE_1]. Tài liệu không đề cập thời điểm chi trả."
     assert _simple_claim_text(partial) == "Phụ cấp là 500.000 đồng ."
     assert _simple_claim_text("Tài liệu không đề cập A.\nB là 5 ngày. [SOURCE_2]") == (

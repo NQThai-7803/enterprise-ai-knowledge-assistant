@@ -17,6 +17,11 @@ more names joined by "." select what is patched:
                       in the permission-filtered retrieval (widened to the service's maximum
                       top_k), past ranking and filters; questions
                       without gold, or whose gold the user cannot retrieve, run unchanged.
+  simple_trace        behavior unchanged: every LLM draft of the simple answer mode, accepted or
+                      rejected, is appended to EVAL_SIMPLE_TRACE_FILE (default
+                      /tmp/simple_trace.jsonl) with its sources, its outcome, and each sentence
+                      with the markers it cites and the claim validator's status and deciding
+                      rule for that sentence against its own cited sources.
 
 Diagnostic only: per-request state lives in context variables, and every patch logs one
 "ABLATION ..." line per decision so a run can be audited from the stack log.
@@ -64,6 +69,7 @@ def apply(names: frozenset[str]) -> None:
     import app.services.grounded_answer_service as gas
 
     known = {"low_alignment_off", "excerpt_off", "group5", "partial_compound", "oracle"}
+    known.add("simple_trace")
     unknown = names - known - {"deterministic_off"}
     if unknown:
         raise RuntimeError(f"unknown ablation(s): {sorted(unknown)}")
@@ -96,6 +102,8 @@ def apply(names: frozenset[str]) -> None:
         _patch_prepared_hits(gas, oracle="oracle" in names)
     if "partial_compound" in names:
         _patch_partial_compound(gas)
+    if "simple_trace" in names:
+        _patch_simple_trace(gas)
     logger.warning("ABLATION applied %s", ",".join(sorted(names)))
 
 
@@ -240,3 +248,109 @@ async def partial_draft(
         grounding_question=kwargs["grounding_question"],
         claims_already_validated=True,
     )
+
+
+_rules: contextvars.ContextVar[list[tuple[str, str]] | None] = contextvars.ContextVar(
+    "rules", default=None
+)
+
+
+def _patch_simple_trace(gas: Any) -> None:
+    """Record every simple-mode draft. The rules of _validate_answer_against_evidence are
+    wrapped only to note which one decided; every wrapper returns the original value."""
+    import app.services.claim_evidence_validation_service as validation
+    from app.citations.parser import parse_citation_markers
+    from app.retrieval.evidence_quality import classify_evidence_context
+
+    path = Path(os.environ.get("EVAL_SIMPLE_TRACE_FILE") or "/tmp/simple_trace.jsonl")
+    for name in validation._validate_answer_against_evidence.__code__.co_names:
+        rule = getattr(validation, name, None)
+        if name.startswith("_") and callable(rule) and not isinstance(rule, type):
+            setattr(validation, name, _noting(name, rule))
+
+    async def judged(self: Any, *, question: str, answer: str, registry: Any, labels: Any) -> dict:
+        token = _rules.set([])
+        try:
+            with validation.simple_validation():
+                result = await self.claim_validation_service.validate(
+                    question=question,
+                    answer=answer,
+                    source_registry=registry,
+                    cited_source_labels=labels,
+                )
+            return {"status": result.status.value, "rule": deciding_rule(_rules.get() or [])}
+        finally:
+            _rules.reset(token)
+
+    original = gas.GroundedAnswerService._simple_validate
+
+    async def simple_validate(self: Any, generation: Any, **kwargs: Any) -> Any:
+        outcome = await original(self, generation, **kwargs)
+        registry, question = kwargs["source_registry"], kwargs["question"]
+        text = gas.normalize_llm_citation_markers(
+            generation.content.strip(), source_registry=registry
+        )
+        sentences = []
+        for sentence in gas._SIMPLE_SENTENCE_BREAK.split(text):
+            if not sentence.strip():
+                continue
+            labels = tuple(
+                m.strip("[]") for m in parse_citation_markers(sentence).ordered_unique_markers
+            )
+            plain = gas._simple_claim_text(sentence)
+            row: dict[str, Any] = {"text": sentence, "sources": labels, "absence": not plain}
+            if plain and labels:
+                row |= await judged(
+                    self, question=question, answer=plain, registry=registry, labels=labels
+                )
+            sentences.append(row)
+        labels = tuple(m.strip("[]") for m in parse_citation_markers(text).ordered_unique_markers)
+        plain = gas._simple_claim_text(text)
+        whole = (
+            await judged(self, question=question, answer=plain, registry=registry, labels=labels)
+            if plain and labels
+            else None
+        )
+        record = {
+            "asked": _question.get(),
+            "question": question,
+            "oracle_hit": _oracle_hit.get(),
+            "draft": generation.content,
+            "outcome": "answered" if not isinstance(outcome, tuple) else outcome[0],
+            "final": not isinstance(outcome, tuple) or outcome[1] is None,
+            "whole": whole,
+            "sentences": sentences,
+            "sources": [
+                {
+                    "label": source.marker.strip("[]"),
+                    "title": source.document_title,
+                    "pages": list(source.page_numbers),
+                    "kind": classify_evidence_context(source.text).value,
+                    "text": source.text,
+                }
+                for source in registry.sources
+            ],
+        }
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+        return outcome
+
+    gas.GroundedAnswerService._simple_validate = simple_validate
+
+
+def _noting(name: str, rule: Any) -> Any:
+    def noted(*args: Any, **kwargs: Any) -> Any:
+        result = rule(*args, **kwargs)
+        calls = _rules.get()
+        status = getattr(result, "value", None)  # a ClaimEvidenceStatus; True for a predicate
+        if calls is not None and (result is True or isinstance(status, str)):
+            calls.append((name, status or "True"))
+        return result
+
+    return noted
+
+
+def deciding_rule(calls: list[tuple[str, str]]) -> str:
+    """The last rule that returned True or a status: the validator returns right after it.
+    "fallthrough" when none did."""
+    return "=".join(calls[-1]) if calls else "fallthrough"
