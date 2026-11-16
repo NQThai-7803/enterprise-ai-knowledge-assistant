@@ -179,6 +179,7 @@ def test_simple_trace_records_every_draft_and_changes_nothing(
     for method in ("_simple_validate", "_simple_answer_draft", "_simple_claim_similarity"):
         monkeypatch.setattr(gas.GroundedAnswerService, method,
                             getattr(gas.GroundedAnswerService, method))  # fmt: skip
+    monkeypatch.setattr(gas, "value_bound_to_subject", gas.value_bound_to_subject)
     for name, value in list(vars(validation).items()):  # restored after the test
         if name.startswith("_") and callable(value):
             monkeypatch.setattr(validation, name, value)
@@ -217,6 +218,7 @@ def test_simple_trace_follows_the_s1_s2_flags(
     for method in ("_simple_validate", "_simple_answer_draft", "_simple_claim_similarity"):
         monkeypatch.setattr(gas.GroundedAnswerService, method,
                             getattr(gas.GroundedAnswerService, method))  # fmt: skip
+    monkeypatch.setattr(gas, "value_bound_to_subject", gas.value_bound_to_subject)
     for name, value in list(vars(validation).items()):
         if name.startswith("_") and callable(value):
             monkeypatch.setattr(validation, name, value)
@@ -227,3 +229,4 @@ def test_simple_trace_follows_the_s1_s2_flags(
     assert record["outcome"] == "answered" and record["attempt"] == 1
     assert [s["absence"] for s in record["sentences"]] == [False, False, True]
     assert [round(s["similarity"], 2) for s in record["similarities"]] == [1.0, 0.0]
+    assert record["bindings"] == []  # s4 off

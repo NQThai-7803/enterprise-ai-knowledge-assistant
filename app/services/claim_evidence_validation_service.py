@@ -4,7 +4,7 @@ import contextlib
 import contextvars
 import re
 import unicodedata
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from decimal import Decimal
 from enum import StrEnum
@@ -3290,7 +3290,7 @@ def question_content_terms(text: str) -> set[str]:
     }
 
 
-def asked_terms(question: str) -> set[str]:
+def asked_terms(question: str, *, min_length: int = 3) -> set[str]:
     """Content words of a question once its question words and particles are removed.
 
     Empty when the text has no question word in any form: then nothing in particular is asked.
@@ -3305,7 +3305,7 @@ def asked_terms(question: str) -> set[str]:
         text = form.tail.sub(" ", text.strip())
     text = form.question_words.sub(" ", text)
     text = form.function_words.sub(" ", text)
-    return {term for term in re.findall(r"\w+", fold_text(text)) if len(term) >= 3}
+    return {term for term in re.findall(r"\w+", fold_text(text)) if len(term) >= min_length}
 
 
 def _answer_value_words(answer: str, question: str) -> list[str]:
@@ -3439,6 +3439,112 @@ def supporting_sentence(*, answer: str, evidence: str) -> str | None:
         if overlap > best_overlap:
             best, best_overlap = sentence.strip(), overlap
     return best
+
+
+# s4 (simple mode): a value is a number, read with the word after it ("03 ngay", "300%").
+# A date such as "30/4" is not a value.
+_SUBJECT_VALUE = re.compile(
+    r"(?<![\w.,/])(\d+(?:[.,]\d+)*)(?![\w/]|[.,]\d)(\s*%)?(?:\s+([^\W\d_]+))?"
+)
+_SECTION_HEADING = re.compile(r"^\d+(?:\.\d+)*\.?\s+(?=[^\W\d_])")  # then a capital, no digit
+_LONE_VALUE_LINE = re.compile(r"^\d+(?:[.,]\d+)*\s*%?(?:\s+[^\W\d_]+){0,2}\.?$")
+_UNIT_SENTENCE_BREAK = re.compile(r"(?<=[.;!?])\s+")
+
+
+def _number_key(digits: str) -> float | None:
+    plain = re.sub(r"[.,](?=\d{3}(?!\d))", "", digits).replace(",", ".")
+    try:
+        return float(plain)
+    except ValueError:
+        return None
+
+
+def _subject_values(text: str) -> set[tuple[float, str | None]]:
+    """(number, folded word after it, or "%") for each value in the text."""
+    values = set()
+    for match in _SUBJECT_VALUE.finditer(fold_text(text)):
+        number = _number_key(match.group(1))
+        if number is not None:
+            values.add((number, "%" if match.group(2) else match.group(3)))
+    return values
+
+
+def _sentence_and_row_units(evidence: str) -> list[tuple[str, str]]:
+    """(sentence or table row, the numbered section heading above it) of each cited source.
+
+    PDF tables come out one row per line; a line that starts in lower case, or holds only a
+    value, is the rest of the line before it (a wrapped cell or sentence).
+    """
+    units: list[tuple[str, str]] = []
+    for source in evidence.split("\n\n"):
+        lines: list[str] = []
+        for raw in source.splitlines():
+            line = " ".join(
+                "".join(" " if unicodedata.category(ch) == "Co" else ch for ch in raw).split()
+            )
+            if not line:
+                continue
+            if lines and (line[0].islower() or _LONE_VALUE_LINE.match(line)):
+                lines[-1] += " " + line
+            else:
+                lines.append(line)
+        heading = ""
+        for line in lines:
+            numbered = _SECTION_HEADING.match(line)
+            if (
+                numbered
+                and line[numbered.end()].isupper()
+                and not re.search(r"\d", line[numbered.end() :])
+            ):
+                heading = line[numbered.end() :]
+                continue
+            units += [(part, heading) for part in _UNIT_SENTENCE_BREAK.split(line) if part]
+    return units
+
+
+def value_bound_to_subject(*, needs: Sequence[str], claim: str, evidence: str) -> bool:
+    """s4: False when a value of the claim sits only in cited sentences or table rows that do
+    not name the subject asked about, while another sentence or row holding a value of the same
+    kind does. The subject is the asked words that tell those sentences and rows apart; a value
+    the question itself states is not checked. True when it cannot be told.
+    """
+    units = [
+        (set(re.findall(r"\w+", fold_text(f"{text} {heading}"))), _subject_values(text))
+        for text, heading in _sentence_and_row_units(evidence)
+    ]
+    stated = {number for need in needs for number, _ in _subject_values(need)}
+    for number, unit in _subject_values(claim):
+        if number in stated:
+            continue
+        kind = [
+            (words, values) for words, values in units if any(unit in (None, u) for _, u in values)
+        ]
+        holding = [
+            words
+            for words, values in kind
+            if any(n == number and unit in (None, u) for n, u in values)
+        ]
+        same_kind = [words for words, _ in kind]
+        # A part of the question whose subject these rows do not tell apart says nothing.
+        verdicts = {_need_bound(need, unit, holding, same_kind) for need in needs} - {None}
+        if holding and verdicts == {False}:
+            return False
+    return True
+
+
+def _need_bound(
+    need: str, unit: str | None, holding: list[set[str]], same_kind: list[set[str]]
+) -> bool | None:
+    """None when no row of this kind names any asked word (the part is about something else);
+    True when each names the same ones; else whether a row holding the value names one of the
+    words that tell the rows apart."""
+    # Two letters: a subject can be one short syllable ("ca le", "con").
+    terms = (asked_terms(need, min_length=2) or question_content_terms(need)) - {unit}
+    counts = {term: sum(term in words for words in same_kind) for term in terms}
+    if not any(counts.values()):
+        return None
+    subject = {term for term, count in counts.items() if 0 < count < len(same_kind)}
+    return not subject or any(subject & words for words in holding)
 
 
 def _answer_is_low_substance(answer: str) -> bool:

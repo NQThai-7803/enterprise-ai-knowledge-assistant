@@ -257,6 +257,9 @@ _attempt: contextvars.ContextVar[list[int] | None] = contextvars.ContextVar("att
 _similarities: contextvars.ContextVar[list[dict[str, Any]] | None] = contextvars.ContextVar(
     "similarities", default=None
 )
+_bindings: contextvars.ContextVar[list[dict[str, Any]] | None] = contextvars.ContextVar(
+    "bindings", default=None
+)
 
 
 def _patch_simple_trace(gas: Any) -> None:
@@ -303,6 +306,15 @@ def _patch_simple_trace(gas: Any) -> None:
         finally:
             _attempt.reset(token)
 
+    original_binding = gas.value_bound_to_subject
+
+    def value_bound(**kwargs: Any) -> bool:
+        bound = original_binding(**kwargs)
+        noted = _bindings.get()
+        if noted is not None:
+            noted.append({"claim": kwargs["claim"], "bound": bound})
+        return bound
+
     async def claim_similarity(self: Any, **kwargs: Any) -> Any:
         similarity = await original_similarity(self, **kwargs)
         noted = _similarities.get()
@@ -326,11 +338,14 @@ def _patch_simple_trace(gas: Any) -> None:
         if counter is not None:
             counter[0] += 1
         token = _similarities.set([])
+        bindings_token = _bindings.set([])
         try:
             outcome = await original(self, generation, **kwargs)
             similarities = _similarities.get() or []
+            bindings = _bindings.get() or []
         finally:
             _similarities.reset(token)
+            _bindings.reset(bindings_token)
         registry, question = kwargs["source_registry"], kwargs["question"]
         text = gas.normalize_llm_citation_markers(
             generation.content.strip(), source_registry=registry
@@ -369,6 +384,7 @@ def _patch_simple_trace(gas: Any) -> None:
             "whole": whole,
             "sentences": sentences,
             "similarities": similarities,
+            "bindings": bindings,
             "sources": [
                 {
                     "label": source.marker.strip("[]"),
@@ -387,6 +403,7 @@ def _patch_simple_trace(gas: Any) -> None:
     gas.GroundedAnswerService._simple_validate = simple_validate
     gas.GroundedAnswerService._simple_answer_draft = simple_answer_draft
     gas.GroundedAnswerService._simple_claim_similarity = claim_similarity
+    gas.value_bound_to_subject = value_bound
 
 
 def _noting(name: str, rule: Any) -> Any:

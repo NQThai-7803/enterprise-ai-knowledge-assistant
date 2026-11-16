@@ -35,6 +35,12 @@ for entry in "${ENTRIES[@]}"; do
     # Git Bash rewrites /path arguments to C:/Program Files/Git/path when dispatching from Windows.
     [[ "${pair#*=}" =~ ^[A-Za-z]:/ ]] && { echo "host-rewritten path in $pair (MSYS_NO_PATHCONV=1)"; exit 2; }
   done
+  # EVAL_SIMPLE_LEVEL=n: simple mode with s1..sn (docs/design/simple-answer-mode.md), so that a
+  # configuration stays short; the configs input is part of a 400-character concurrency group.
+  if [[ ",$vars," =~ ,EVAL_SIMPLE_LEVEL=([1-9]), ]]; then
+    vars+=",EVAL_ANSWER_MODE=simple"
+    for n in $(seq 1 "${BASH_REMATCH[1]}"); do vars+=",EVAL_SIMPLE_S$n=true"; done
+  fi
   NAMES+=("$name"); ENVS+=("$vars")
 done
 [ "${#NAMES[@]}" -ge 1 ] || { echo "no configuration"; exit 2; }

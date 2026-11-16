@@ -246,6 +246,10 @@ RAG_SIMPLE_RELAXED_RULES_ENABLED=false
 RAG_SIMPLE_CLAIM_RELEVANCE_ENABLED=false
 RAG_SIMPLE_CLAIM_RELEVANCE_MIN_SIMILARITY=0.78
 RAG_SIMPLE_QUESTION_LIST_SEGMENTS_ENABLED=false
+RAG_SIMPLE_SUBJECT_BINDING_ENABLED=false
+RAG_SIMPLE_CLAIM_CROSS_ENCODER_ENABLED=false
+RAG_SIMPLE_CLAIM_CROSS_ENCODER_MODEL=cross-encoder/mmarco-mMiniLMv2-L12-H384-v1
+RAG_SIMPLE_CLAIM_CROSS_ENCODER_MIN_SCORE=-4.2
 RAG_NUMBER_NORMALIZATION_ENABLED=false
 RAG_COMPLETENESS_NUMBER_NORMALIZATION_ENABLED=true
 RAG_KEEP_VALIDATED_FIRST_ANSWER_ENABLED=false
@@ -295,6 +299,8 @@ Retrieval variable rules:
   - `RAG_SIMPLE_RELAXED_RULES_ENABLED` (boolean, s2): claim validation skips `_explicit_value_answer_is_subject_aligned` and the attendance, annual-leave and bereavement rules; the number/unit, polarity and evidence checks stay.
   - `RAG_SIMPLE_CLAIM_RELEVANCE_ENABLED` (boolean, s2) and `RAG_SIMPLE_CLAIM_RELEVANCE_MIN_SIMILARITY` (float, default `0.78`, calibrated on the dev sets 2026-11-16): each marked claim is compared (e5 cosine) through the source sentence it cites (the one sharing most words with it) with the question and each of its parts; a claim below the threshold is dropped, and none left ends at NO_ANSWER without a retry. Counters `simple_claim_irrelevant`, `simple_no_answer_claim_irrelevant`.
   - `RAG_SIMPLE_QUESTION_LIST_SEGMENTS_ENABLED` (boolean, s3): a whole question-list chunk counts in claim validation by its segments that are neither questions nor non-answer context, as a reference chunk already does.
+  - `RAG_SIMPLE_SUBJECT_BINDING_ENABLED` (boolean, s4, 2026-11-16): each value in a claim (a number with the word after it) must sit in a cited sentence or table row that names the subject the question asks about, when another sentence or row with a value of the same kind does; a table row also carries the numbered heading above it, and each part of a two-part question is judged on its own. The answer need not repeat the subject. A failing claim is dropped; none left ends at NO_ANSWER without a retry. Counters `simple_claim_unbound`, `simple_no_answer_claim_unbound`.
+  - `RAG_SIMPLE_CLAIM_CROSS_ENCODER_ENABLED` (boolean, s5, 2026-11-16, DEC-027), `RAG_SIMPLE_CLAIM_CROSS_ENCODER_MODEL` (string) and `RAG_SIMPLE_CLAIM_CROSS_ENCODER_MIN_SCORE` (float, raw logit, default `-4.2`, calibrated on the dev sets 2026-11-16): the per-claim relevance check scores (question or part, cited sentence) with this cross-encoder instead of e5, and takes its threshold. The model is loaded on first use from `RERANKER_MODEL_CACHE_PATH` with the `RERANKER_DEVICE`, `RERANKER_BATCH_SIZE`, `RERANKER_MAX_LENGTH`, `RERANKER_TIMEOUT_SECONDS` and `RERANKER_LOCAL_FILES_ONLY` settings; a claim it cannot score is kept. The reranker itself stays without a cross-encoder (DEC-025).
 - `RAG_NUMBER_NORMALIZATION_ENABLED` (boolean, default `false`, stays off: 0 cases changed in its DEC-013 batch; FIX 3c F): the validator compares numbers once each is written one way: leading zeros dropped (`01` = `1`), thousands separators removed (`1.200.000` = `1200000`), a decimal comma read as a point, scale words applied (`1,2 triệu` = `1.200.000`, `300 nghìn`, `tỷ`, `million`), and `đ`/`đồng`/`VND`/`₫` treated as one unit. A period after the unit (`/năm`, `mỗi năm`) is not compared.
 - FIX 4 (i), the retry forced by the completeness checks (all boolean; measured in one batch per set, `docs/eval/runs/fix4-completeness.md`):
   - `RAG_COMPLETENESS_NUMBER_NORMALIZATION_ENABLED` (default `true` since the c1+c3 batch of 2026-11-14: with the retry flag on, it fixes FR2-E01 and changes nothing else): in the numeric-unit check a thousands-grouped number (`2.500 kg`) is one number when the sources hold that value, not `2` and `500`.

@@ -225,3 +225,13 @@ Set by the owner on 2026-11-15, before the simple answer mode is coded.
 - Supersedes the per-set "not worse anywhere" comparison of DEC-013 for decisions from now on. Same-job baselines, 2 runs and rules written before measuring (DEC-011) still apply.
 - **`natural_dev_v1` and held-out v3** are collected by the owner from the team. Intake follows the held-out v2 procedure (`docs/design/natural-dev-heldout-v3-intake.md`): freeze with a lock, fingerprints, overlap check, gold written from the PDFs only and approved by the owner. `natural_dev_v1` may be used for design; held-out v3 may not (as DEC-012).
 - Recorded reason: on new questions the false-refusal rate is about 53%, caused by the stack of hand-written checks; only this overall conclusion is used, never held-out v1/v2 items, for design.
+
+## DEC-027 — Variation between runners: decisions need two separate jobs
+
+Set by the owner on 2026-11-16, before s4 and s5 are measured.
+
+- Two runs inside one Actions job are identical (same runner, same Ollama), so they do not measure the variation between runners. On s1-s3 the same configuration differed on 10-14 UAT questions between two jobs, and legacy on 2 (`docs/design/simple-answer-mode.md`, "Results of s1-s3").
+- **A default-flip decision rests on at least 2 separate jobs, each with its own `legacy`** (1 run per configuration per job is enough).
+- **A difference smaller than the variation between the jobs counts as a tie.** Applied per count (false refusals, false answers + wrong, ...): the difference between two configurations is taken in each job; it counts only when it has the same sign in both jobs and its smaller size is larger than the largest change of either configuration between the two jobs on that count.
+- DEC-011/016 (baseline in the same job) and DEC-026 (selection order) still apply inside each job.
+- Recorded with it, at the owner's instruction: s5 uses a cross-encoder (`cross-encoder/mmarco-mMiniLMv2-L12-H384-v1`) as a per-claim relevance check behind its flag, for measurement. DEC-025 (no cross-encoder reranker) is unchanged; the eval workflow downloads that model only for a configuration that turns the check on.

@@ -1,0 +1,66 @@
+# natural_dev_v1: questions written by the owner on 2026-11-16 (DEC-026), kept word for word.
+# A dev set: may be read and used to choose a configuration. Frozen by natural_dev_v1.lock;
+# any edit needs v1.1 with a new lock. Gold: natural_dev_v1_gold.yaml (from the PDFs only).
+version: natural_dev_v1
+frozen_at: "2026-11-16"
+items:
+  - id: ND-001
+    role: staff
+    question: "Tổng thời gian nghỉ lễ là bao nhiêu ngày trong một năm?"
+  - id: ND-002
+    role: staff
+    question: "Tôi là ứng viên được tuyển và hoàn thành mốc thử việc thì được thưởng thêm gì không?"
+  - id: ND-003
+    role: staff
+    question: "Năm giá trị cốt lõi của công ty Nova Digital là gì? Hãy liệt kê."
+  - id: ND-004
+    role: staff
+    question: "Tôi kết hôn thì được nghỉ việc riêng mà vẫn hưởng lương mấy ngày?"
+  - id: ND-005
+    role: staff
+    question: "Tôi lần đầu lỡ quên chấm công thì có bị phạt gì không?"
+  - id: ND-006
+    role: staff
+    question: "Nhân viên được phép nói về lương của chính mình cho người khác không?"
+  - id: ND-007
+    role: staff
+    question: "Tôi chia sẻ tài khoản của tôi cho đồng nghiệp để làm hộ phần cần thiết thì có bị kỷ luật không?"
+  - id: ND-008
+    role: staff
+    question: "Công ty Nova Digital có bao nhiêu khối và giám đốc của từng khối là ai?"
+  - id: ND-009
+    role: staff
+    question: "Tôi dùng công cụ AI để làm việc thì có bị kỷ luật không?"
+  - id: ND-010
+    role: staff
+    question: "Tôi là nhân viên thì có thể xin tạm ứng lương trước được không?"
+  - id: ND-011
+    role: staff
+    question: "Ví dụ tôi muốn tố giác nội bộ công ty thì liên lạc qua mail nào?"
+  - id: ND-012
+    role: staff
+    question: "Nếu trường hợp khẩn cấp thì tôi xin nghỉ không lương có được không?"
+  - id: ND-013
+    role: staff
+    question: "Ví dụ trong trường hợp tôi sinh con thì có hỗ trợ phần tiền nào không?"
+  - id: ND-014
+    role: staff
+    question: "Công ty tổ chức team building mấy lần trong năm?"
+  - id: ND-015
+    role: staff
+    question: "Quy trình khiếu nại của Payroll Query là như nào? Giải thích chi tiết."
+  - id: ND-016
+    role: staff
+    question: "Thưởng hiệu suất exceptional là bao nhiêu?"
+  - id: ND-017
+    role: staff
+    question: "Vai trò của HR Benefits thì gồm những trách nhiệm gì?"
+  - id: ND-018
+    role: staff
+    question: "Đánh giá hiệu suất làm việc vào tháng mấy trong năm?"
+  - id: ND-019
+    role: staff
+    question: "Trong trường hợp tôi là người lao động bị ốm nặng thì cần làm gì?"
+  - id: ND-020
+    role: staff
+    question: "Tôi quên check-in nhưng có bằng chứng hợp lệ thực tế về việc đi làm thì tôi phải báo cáo ai?"

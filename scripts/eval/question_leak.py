@@ -41,6 +41,8 @@ FALSE_REFUSAL_V2_SOURCE = ROOT / "tests" / "acceptance" / "false_refusal_dev_v2.
 FALSE_REFUSAL_V2_LOCK = ROOT / "tests" / "acceptance" / "false_refusal_dev_v2.lock"
 COMPOUND_SOURCE = ROOT / "tests" / "acceptance" / "compound_partial_dev_v1.yaml"
 COMPOUND_LOCK = ROOT / "tests" / "acceptance" / "compound_partial_dev_v1.lock"
+NATURAL_SOURCE = ROOT / "tests" / "acceptance" / "natural_dev_v1.yaml"
+NATURAL_LOCK = ROOT / "tests" / "acceptance" / "natural_dev_v1.lock"
 SALT = b"eaka-question-fingerprint-v1"
 GRAM_SIZE = 4
 EXPECTED_COUNTS = {
@@ -52,6 +54,7 @@ EXPECTED_COUNTS = {
     "false_refusal": 20,
     "false_refusal_v2": 24,
     "compound_partial": 12,
+    "natural_dev": 20,
 }
 OVERLAP_LIMIT = 0.60
 ESCAPE = re.compile(r"\\u([0-9a-fA-F]{4})")
@@ -94,6 +97,7 @@ def build_payload(
     false_refusal: Iterable[tuple[str, str]] = (),
     false_refusal_v2: Iterable[tuple[str, str]] = (),
     compound_partial: Iterable[tuple[str, str]] = (),
+    natural_dev: Iterable[tuple[str, str]] = (),
 ) -> dict[str, Any]:
     dev_items = {case_id: fingerprint(question) for case_id, question in dev}
     heldout_items = {case_id: fingerprint(question) for case_id, question in heldout}
@@ -103,6 +107,7 @@ def build_payload(
     false_refusal_items = {case_id: fingerprint(question) for case_id, question in false_refusal}
     fr_v2_items = {case_id: fingerprint(question) for case_id, question in false_refusal_v2}
     compound_items = {case_id: fingerprint(question) for case_id, question in compound_partial}
+    natural_items = {case_id: fingerprint(question) for case_id, question in natural_dev}
     return {
         "version": 1,
         "gram_size": GRAM_SIZE,
@@ -118,6 +123,7 @@ def build_payload(
             "false_refusal": {"count": len(false_refusal_items), "items": false_refusal_items},
             "false_refusal_v2": {"count": len(fr_v2_items), "items": fr_v2_items},
             "compound_partial": {"count": len(compound_items), "items": compound_items},
+            "natural_dev": {"count": len(natural_items), "items": natural_items},
             "heldout_v2": {
                 "count": len(v2_items),
                 "lock_sha256": lock_v2_sha256,
@@ -218,6 +224,7 @@ def max_overlap(payload: Mapping[str, Any]) -> tuple[float, str | None, str | No
         **sources.get("false_refusal", {}).get("items", {}),
         **sources.get("false_refusal_v2", {}).get("items", {}),
         **sources.get("compound_partial", {}).get("items", {}),
+        **sources.get("natural_dev", {}).get("items", {}),
     }
     for dev_id, dev_hashes in development.items():
         left = set(dev_hashes)
@@ -301,6 +308,11 @@ def _build(output: Path) -> int:
         raise QuestionSourceError("compound-partial dev set does not match its lock")
     compound_items = yaml.safe_load(COMPOUND_SOURCE.read_text(encoding="utf-8"))["items"]
     compound = [(item["id"], item["question"]) for item in compound_items]
+    natural_lock_sha = json.loads(NATURAL_LOCK.read_text(encoding="utf-8"))["sha256"]
+    if hashlib.sha256(NATURAL_SOURCE.read_bytes()).hexdigest() != natural_lock_sha:
+        raise QuestionSourceError("natural dev set does not match its lock")
+    natural_items = yaml.safe_load(NATURAL_SOURCE.read_text(encoding="utf-8"))["items"]
+    natural = [(item["id"], item["question"]) for item in natural_items]
     payload = build_payload(
         dev,
         heldout,
@@ -312,12 +324,14 @@ def _build(output: Path) -> int:
         false_refusal,
         false_refusal_v2,
         compound,
+        natural,
     )
     output.write_text(json.dumps(payload, indent=0, sort_keys=True) + "\n", encoding="utf-8")
     print(
         f"dev: {len(dev)}; held-out: {len(heldout)}; rbac dev: {len(rbac)}; "
         f"relevance dev: {len(relevance)}; held-out v2: {len(v2)}; "
-        f"false-refusal dev: {len(false_refusal)}; false-refusal dev v2: {len(false_refusal_v2)}"
+        f"false-refusal dev: {len(false_refusal)}; false-refusal dev v2: {len(false_refusal_v2)}; "
+        f"compound dev: {len(compound)}; natural dev: {len(natural)}"
     )
     return 0
 
