@@ -71,8 +71,9 @@ run_one() {  # $1 = config index, $2 = run number
   local name="${NAMES[$1]}" vars="${ENVS[$1]}" dir
   dir="$OUT/$name/run$2"; mkdir -p "$dir"
   start_api "$vars" || return 1
+  # grep reads to the end: with pipefail, grep -q exiting early SIGPIPEs docker logs (false miss)
   if [[ ",$vars," == *",EVAL_ABLATION="* ]] \
-    && ! docker logs "$PROJECT-api-1" 2>&1 | grep -q "ABLATION applied"; then
+    && ! docker logs "$PROJECT-api-1" 2>&1 | grep "ABLATION applied" >/dev/null; then
     echo "ablation not applied in the API" | tee "$dir/runner.log"; return 1
   fi
   ( # the runner sees the configuration too (e.g. EVAL_EXPECTED_RERANKER_MODE)
