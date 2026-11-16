@@ -390,7 +390,8 @@ So s2's rules accept about as many wrong sentences as correct ones on UAT. Where
 ### Measurement plan (written before measuring, DEC-011)
 
 - **Where:** Actions `eval.yml`, 2 runs, qwen2.5:3b on CPU. Every configuration is compared only with the `legacy` of its own job (DEC-016).
-- **Configurations:** `legacy`; `s1` = `EVAL_ANSWER_MODE=simple`, `EVAL_SIMPLE_ABSENCE=true`, `EVAL_SIMPLE_SHORT_PROMPT=true`, `EVAL_ABLATION=simple_trace`; `s2` = s1 + `EVAL_SIMPLE_RELAXED_RULES=true`, `EVAL_SIMPLE_RELEVANCE=true`; `s3` = s2 + `EVAL_SIMPLE_QUESTION_LIST=true`. Every draft of s1-s3 is saved as in the diagnosis.
+- **Configurations:** `legacy`; `s1` = `EVAL_ANSWER_MODE=simple`, `EVAL_ABLATION=simple_trace`, `EVAL_SIMPLE_S1=true`; `s2` = s1 + `EVAL_SIMPLE_S2=true`; `s3` = s2 + `EVAL_SIMPLE_S3=true`. `scripts/eval/compose.uat-eval.yaml` maps each switch to the flags of its configuration. Every draft of s1-s3 is saved as in the diagnosis.
+- **Process note:** the first dispatch (7 jobs, `2fb1b26`) spelled out each flag. Six of them failed before starting, because the `configs` input is part of the job's concurrency group, which is limited to about 400 characters. The one short job (UAT `legacy, s1`, run 43818691901) ran as dispatched, on `2fb1b26` with the per-flag names; the app code is the same in both commits.
 - **Jobs:** one job per dev set with `legacy, s1, s2, s3`: RBAC, relevance, false refusal v1, v2, compound. UAT in two jobs, because four configurations × 2 runs exceed the 340-minute job limit (the earlier three-configuration UAT job took 4 h 49): `legacy, s2, s3` (s2 and s3 differ only on question-list sources, which only UAT has) and `legacy, s1`.
 - **Per set and configuration:** correct – false refusal – false answer – wrong value or document, leaks, latency; dev totals.
 - **Extra counts, defined now:**
