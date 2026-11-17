@@ -173,7 +173,21 @@ jobs:
           ollama list | grep -q '^qwen2.5:3b'
           # Other models named by a configuration (EVAL_LLM_MODEL=...), for model comparisons.
           for model in $(grep -oE 'EVAL_LLM_MODEL=[^,;]+' <<< "$CONFIGS" | cut -d= -f2 | sort -u); do
-            for attempt in 1 2 3; do ollama pull "$model" && break; sleep 15; done
+            if [[ "$model" == *-text:* ]]; then
+              # DEC-029: <name>-text:<tag> is <name>:<tag> without its vision projector layer
+              # (same weights, template, renderer, parser and parameters); the library has none.
+              base="${model/-text:/:}"
+              for attempt in 1 2 3; do ollama pull "$base" && break; sleep 15; done
+              manifest="$HOME/.ollama/models/manifests/registry.ollama.ai/library/${base%%:*}/${base#*:}"
+              proj=$(python -c "import json, sys; print(''.join(l['digest'].replace(':', '-') for l in json.load(open(sys.argv[1]))['layers'] if l['mediaType'].endswith('.projector')))" "$manifest")
+              [ -n "$proj" ] || { echo "$base has no projector layer"; exit 1; }
+              ollama show --modelfile "$base" | grep -v "$proj" > "$RUNNER_TEMP/text.Modelfile"
+              [ "$(grep -c '^FROM ' "$RUNNER_TEMP/text.Modelfile")" = 1 ]
+              ollama create "$model" -f "$RUNNER_TEMP/text.Modelfile"
+              ollama show "$model" | grep -qE '^[[:space:]]+vision[[:space:]]*$' && { echo "$model still has vision"; exit 1; }
+            else
+              for attempt in 1 2 3; do ollama pull "$model" && break; sleep 15; done
+            fi
             ollama list | grep -q "^$model"
           done
           mkdir -p "$OUT"

@@ -272,3 +272,48 @@ Checked locally before measuring: with the app's payload `qwen3.5:4b` answers di
   - Default unchanged.
   - Oracle (5 dev sets, 1 run): `s3` + `qwen3.5:4b` gets 104 of 117 correct with gold context, against 106 / 107 with real retrieval.
   - Details: `docs/design/model-comparison.md`; hardware per model: ADR 0003.
+
+## DEC-029 — Candidate `s3` + `qwen3.5:4b`: conditions before the default changes
+
+Set by the owner on 2026-11-17, after DEC-028.
+
+**Candidate:** `s3` + `qwen3.5:4b`.
+
+- It is lighter than 7B, can run on a 4 GB GPU, and is Apache 2.0.
+- `qwen2.5:3b` does not allow commercial use.
+- The default (`legacy` + `qwen2.5:3b`) stays until (a), (b) and (c) all hold.
+
+**Conditions to change the default:**
+
+- **(a) Variation.** Add a third job per set (round c) on `natural_dev_v1` and the 5 dev sets, each with its own `legacy` + 3B.
+  - Over the three jobs (aA, bA, cA), `s3` + `qwen3.5:4b` must still win against `legacy` + 3B under DEC-026.
+  - DEC-027 extended to three jobs: a difference counts only if it has the same sign in all three. The smallest of the three must also exceed the largest between-job change of either side. Otherwise it is a tie.
+- **(b) UAT read by hand.** Run UAT Q001-Q100 in two rounds on separate jobs, each with `legacy` + 3B. UAT stays monitoring only (DEC-026).
+  - List every item that `s3` + `qwen3.5:4b` answers wrongly (false answer or wrong value) in either round, with the question, answer, citations and reference answer.
+  - The owner reads the list and accepts it.
+- **(c) Target hardware:** a host with 16 GB RAM, either CPU-only (4 vCPU) or with an NVIDIA GPU of at least 4 GB VRAM.
+  - CPU-only, measured on the Actions runner (4 vCPU, 15.6 GiB): no `INFRA_ERROR`, at least 1.5 GB RAM free at the stack's peak, and every answer within the deployment's LLM timeout.
+  - GPU, measured on the owner's GTX 1650 (4 GB): the model fully on the GPU (`ollama ps` 100% GPU).
+  - The owner names which of the two is the deployment target.
+
+**When the default changes, the same change must update:**
+
+- **Settings:** `RAG_ANSWER_MODE=simple` with s1-s3 on, and `LLM_OLLAMA_MODEL`.
+- **Timeout:** `LLM_TIMEOUT_SECONDS`, set from the latency measured on the target. It is 30 s today in `compose.yaml` and `.env.example`.
+- **Configuration files:** `compose.yaml`, `compose.prod.yaml`, `compose.uat-corpus-v2.yaml`, `.env.example`.
+- **Documentation:** `ENVIRONMENT_VARIABLES.md`, `DEPLOYMENT.md`, `README.md`, `SETUP.md`.
+- **Eval baselines:** `eval.yml`, `heldout-v2.yml`, `scripts/eval/compose.uat-eval.yaml`.
+- **ADR:** a new ADR replaces ADR 0003.
+
+**Measurement, fixed before running:**
+
+- **Round c:** one job per set, configurations `legacy` + 3B, `s3` + `qwen3.5:4b` and `s3` + `qwen3.5-text:4b`. LLM timeout 600 s, 1 run.
+- **`qwen3.5-text:4b`:**
+  - The Ollama library has no text-only tag: every `qwen3.5:4b` tag lists text and image input.
+  - The vision encoder is a separate projector layer. So `eval.yml` builds a text-only copy from the same model layer, template, renderer, parser and parameters, without the projector.
+  - It is measured for memory. It is a deployment option for the same candidate only if its answers differ from `qwen3.5:4b`'s by no more than the between-job change.
+- **UAT:** two rounds, each split into two jobs (Q001-Q050 and Q051-Q100) so no job reaches the 340-minute limit. Each job has its own `legacy` + 3B.
+- **Local GPU** (the owner's GTX 1650 4 GB, 7.8 GiB RAM, Windows, Ollama 0.40.15):
+  - Placement from `ollama ps` for both builds, once with Ollama's own placement and once with all layers forced to the GPU (`num_gpu` 99).
+  - Latency: the s3 LLM calls of ND-001 to ND-010 (the first 10 `natural_dev_v1` items), replayed from the `simple_trace` of CI run 44018356568 (round a, job A). Same prompts, temperature 0, seed, `num_ctx` 8192. The figure is LLM time per question; retrieval and validation are not included.
+  - No eval runs locally: the local Docker VM has 4 GB and runs the protected stacks.
