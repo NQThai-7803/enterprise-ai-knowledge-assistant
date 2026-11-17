@@ -18,6 +18,7 @@ export default {
         muted: "rgb(var(--color-muted) / <alpha-value>)",
         accent: "rgb(var(--color-accent) / <alpha-value>)",
         "accent-contrast": "rgb(var(--color-accent-contrast) / <alpha-value>)",
+        "accent-strong": "rgb(var(--color-accent-strong) / <alpha-value>)",
         success: "rgb(var(--color-success) / <alpha-value>)",
         warning: "rgb(var(--color-warning) / <alpha-value>)",
         danger: "rgb(var(--color-danger) / <alpha-value>)",

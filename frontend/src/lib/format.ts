@@ -46,3 +46,14 @@ export function truncateMiddle(value: string, maxLength = 36): string {
   const half = Math.floor((maxLength - 3) / 2);
   return `${value.slice(0, half)}...${value.slice(-half)}`;
 }
+
+export function initials(name: string | null | undefined): string {
+  const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) {
+    return "?";
+  }
+  // Array.from keeps a surrogate pair together; first word + last word, like "Staff Nhân sự" -> "SS".
+  const first = Array.from(parts[0])[0];
+  const last = parts.length > 1 ? Array.from(parts[parts.length - 1])[0] : "";
+  return `${first}${last}`.toUpperCase();
+}

@@ -100,9 +100,9 @@ test("admin navigation exposes administrative routes", async ({ page }) => {
   await mockChat(page);
   await page.goto("/chat");
 
-  await expect(page.getByRole("link", { name: "Users" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Departments" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Audit logs" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Người dùng" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Phòng ban" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Nhật ký hệ thống" })).toBeVisible();
 });
 
 test("staff navigation hides administrative routes", async ({ page }) => {
@@ -110,9 +110,9 @@ test("staff navigation hides administrative routes", async ({ page }) => {
   await mockChat(page);
   await page.goto("/chat");
 
-  await expect(page.getByRole("link", { name: "Chat" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Users" })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Audit logs" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Trò chuyện" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Người dùng" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Nhật ký hệ thống" })).toHaveCount(0);
 });
 
 
@@ -122,10 +122,10 @@ test("mobile navigation closes with Escape and does not block composer", async (
   await mockChat(page);
   await page.goto("/chat");
 
-  await page.getByRole("button", { name: "Open navigation" }).click();
-  await expect(page.getByRole("navigation", { name: "Primary navigation" })).toBeVisible();
+  await page.getByRole("button", { name: "Mở điều hướng" }).click();
+  await expect(page.getByRole("navigation", { name: "Điều hướng chính" })).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("navigation", { name: "Primary navigation" })).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: "Điều hướng chính" })).toHaveCount(0);
 
   await page.getByLabel("Message").fill("What is the policy?");
   await page.getByRole("button", { name: "Send" }).click();
@@ -343,7 +343,7 @@ test("admin department management supports conflict, edit, and delete", async ({
   await page.getByLabel("Description").fill("Duplicate department.");
   await page.getByRole("button", { name: "Create department" }).click();
   await expect(page.getByText("Create department failed")).toBeVisible();
-  await page.getByRole("button", { name: "Logout" }).click();
+  await page.getByRole("button", { name: "Đăng xuất" }).click();
   await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
 
   await authenticatedPage(page, "ADMIN");

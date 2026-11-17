@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatBytes, formatDateTime } from "./format";
+import { formatBytes, formatDateTime, initials } from "./format";
 
 describe("format helpers", () => {
   it("formats dates as dd/MM/yyyy HH:mm in local time", () => {
@@ -10,5 +10,13 @@ describe("format helpers", () => {
     expect(formatDateTime(null)).toBe("Không có");
     expect(formatDateTime("not-a-date")).toBe("Không có");
     expect(formatBytes(-1)).toBe("Không có");
+  });
+
+  it("builds avatar initials from the first and last word", () => {
+    expect(initials("Staff Nhân sự")).toBe("SS");
+    expect(initials("  đỗ   minh ")).toBe("ĐM");
+    expect(initials("Admin")).toBe("A");
+    expect(initials("")).toBe("?");
+    expect(initials(undefined)).toBe("?");
   });
 });

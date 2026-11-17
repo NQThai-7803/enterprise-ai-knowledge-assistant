@@ -10,6 +10,7 @@
   --color-ink: 20 26 33;
   --color-muted: 92 104 118;
   --color-accent: 15 118 110;
+  --color-accent-strong: 11 90 84;
   --color-accent-contrast: 255 255 255;
   --color-success: 16 122 85;
   --color-warning: 174 99 15;
@@ -18,7 +19,7 @@
   --radius-md: 8px;
   --radius-lg: 12px;
   --shadow-panel: 0 18px 60px rgb(15 23 42 / 0.10);
-  --sidebar-width: 17rem;
+  --sidebar-width: 15rem;
   --motion-fast: 150ms;
   --motion-base: 220ms;
   --motion-slow: 320ms;
@@ -33,6 +34,7 @@
   --color-ink: 233 238 244;
   --color-muted: 164 174 187;
   --color-accent: 45 212 191;
+  --color-accent-strong: 153 246 228;
   --color-accent-contrast: 6 43 39;
   --shadow-panel: 0 18px 60px rgb(0 0 0 / 0.28);
 }
