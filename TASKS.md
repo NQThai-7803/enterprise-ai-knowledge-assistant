@@ -8,7 +8,27 @@
 3. **Embedding fine-tune** (`docs/design/embedding-finetune.md` and DEC-015 on branch `feat/embedding-finetune-infra`): infrastructure only so far; the baseline measurement and training come after FIX 3.
 4. The final held-out v2 measurement, once, after the choices above are made (DEC-012).
 
-## s3 on natural_dev_v1 -- 2026-11-17 (STOPPED for the owner's review)
+## Model comparison (DEC-028) -- 2026-11-17 (STOPPED for the owner's review)
+
+- **DONE:**
+  - DEC-028 written before measuring.
+  - Measured {`legacy`, `s3`} × {3B, 7B, `qwen3.5:4b`, `sailor2:8b`} on `natural_dev_v1` and the 5 dev sets, in 2 rounds of separate jobs (24 jobs); no UAT.
+  - DEC-026/027 applied per combination.
+  - ND-002/003/011/014/019 read for every model.
+  - ADR 0003 updated with the new figures and hardware per model (`docs/design/model-comparison.md`).
+  - Oracle context with `qwen3.5:4b` on the 5 dev sets, 1 run (step 4).
+- **Result:**
+  - `s3` + `qwen3.5:4b`, `s3` + 7B and `legacy` + `qwen3.5:4b` win against `legacy` + 3B; the two `s3` winners tie with each other.
+  - `legacy` + 7B and both `sailor2:8b` combinations do not win.
+  - ND-002, ND-003 and ND-014 stay wrong with every model.
+  - Oracle: `s3` + `qwen3.5:4b` 104 correct of 117 with gold context against 106 / 107 with real retrieval. On the dev sets, what is left is false answers on items to refuse.
+  - Default unchanged.
+- **WAITING FOR OWNER:** whether to adopt a model and mode (the candidates are `s3` + `qwen3.5:4b` and `s3` + 7B), given:
+  - `qwen2.5:3b`'s non-commercial licence;
+  - the hardware: `s3` + `qwen3.5:4b` peaks at 14 GB on a 16 GB CPU runner; 7B is ~2× slower than 3B;
+  - thresholds not recalibrated per model.
+
+## s3 on natural_dev_v1 -- 2026-11-17 (owner decided: s3 does not win on natural; next, the model hypothesis)
 
 - **DONE:** owner decisions applied (s4, s5 dropped; gold approved and locked; 11 overlap items kept); `set=natural` runner with proxy keys from the locked gold; legacy and s3 measured in 2 jobs; s3's wrong-subject answers listed; eaka-verify on `a0c1c08` and `2a1973f`.
 - **Result:** natural_dev_v1 legacy 3–7–1–9, s3 4–8–2–6 / 4–8–1–7, leaks 0. s3 has one more false refusal (real under DEC-027) and two fewer wrong answers; it does not win on natural_dev_v1. Wrong subject under s3: ND-002, ND-003, ND-011, ND-019 (+ ND-014 in one job). Default unchanged.

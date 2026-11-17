@@ -1,6 +1,42 @@
 # Project Status
 
-## s3 measured on natural_dev_v1 -- 2026-11-17 (STOPPED for the owner's review)
+## Model comparison (DEC-028) -- 2026-11-17 (STOPPED for the owner's review)
+
+- **DEC-028**, written before measuring, set the candidates and the rule:
+  - `qwen2.5:7b` (owner), `sailor2:8b` (Vietnamese continued pre-training), `qwen3.5:4b` (newest generation);
+  - all Apache 2.0, at most 8B, runnable on a 16 GB CPU machine.
+  - `qwen2.5:3b` itself is under the Qwen Research licence: no commercial use without a licence from Alibaba Cloud.
+- **Measured:** {`legacy`, `s3`} × {3B, 7B, `qwen3.5:4b`, `sailor2:8b`} on `natural_dev_v1` and the 5 dev sets.
+  - 2 rounds in separate jobs, each job with its own `legacy` + 3B; 24 jobs. UAT was not run.
+  - LLM timeout 600 s for every configuration (`eval.yml` `llm_timeout`).
+  - Leaks 0 everywhere. Results: `docs/design/model-comparison.md`.
+- **6 sets, correct–false refusal–(false answer + wrong), round a / b:**
+
+  | Combination | Correct | False refusal | False answer + wrong |
+  |---|---|---|---|
+  | `legacy` + 3B | 75 / 75 | 34 / 35 | 28 / 27 |
+  | `s3` + 7B | 110 / 114 | 7 / 8 | 20 / 15 |
+  | `s3` + `qwen3.5:4b` | 117 / 116 | 5 / 11 | 15 / 10 |
+  | `legacy` + `qwen3.5:4b` | 78 / 79 | 31 / 33 | 28 / 25 |
+
+  - **DEC-026/027 against `legacy` + 3B:**
+    - **Win:** `s3` + `qwen3.5:4b`, `s3` + 7B, `legacy` + `qwen3.5:4b`. `s3` + `qwen3.5:4b` and `s3` + 7B tie with each other.
+    - **Do not win:** `legacy` + 7B and both `sailor2:8b` combinations (more false refusals).
+  - **Default not changed.**
+- **ND-002, ND-003, ND-014 stay wrong with every model.** ND-011 is fixed by `s3` with 7B or `qwen3.5:4b`; ND-019 by `s3` with `qwen3.5:4b` or `sailor2:8b`.
+- **Hardware (CPU runner):**
+  - Model memory: 3B 2.3 GiB, 7B 5.1, `qwen3.5:4b` 3.8 (its unused vision encoder included), `sailor2:8b` 5.7.
+  - Latency against 3B: 7B ×2.1-2.2, `qwen3.5:4b` ×1.6-2.7, `sailor2:8b` ×3-4.7.
+  - `s3` + `qwen3.5:4b` peaks at 14.0 GB of 15.6 GiB on the runner.
+  - ADR 0003 updated with these figures.
+- `qwen3.5:4b` is less stable between rounds: natural false refusals 4 / 9. Its reworded drafts were rejected by the s3 claim validator; this was not a timeout.
+- **Oracle with `qwen3.5:4b` (step 4):** 5 dev sets, 1 run; natural_dev_v1 has no oracle map and UAT was not run.
+  - `s3` + `qwen3.5:4b`: 104–3–9–1 with gold context, against 106 / 107 correct with real retrieval. On these sets real retrieval already reaches the ceiling.
+  - What is left is mostly false answers on items to refuse, which the oracle does not change. Six of them are stable: REL-103, REL-203, FR-N07, FR-A07, FR2-C05, CP1-R02.
+  - `legacy` still refuses 22–23 items with the gold context, with either model.
+  - The ceiling on natural questions is still unknown.
+
+## s3 measured on natural_dev_v1 -- 2026-11-17 (owner: s3 does not win on natural; default stays legacy; next, DEC-028)
 
 - Owner decisions applied: s4 and s5 dropped (code stays behind its flags, off), s3 the only candidate; `natural_dev_v1` gold approved (ND-002, ND-008, ND-011, ND-014 as decided) and locked (`natural_dev_v1_gold.lock`, approved by "owner (NQThai-7803)"); all 11 overlap items kept, reported near UAT (7) / rest (13).
 - New eval set `set=natural` (`scripts/eval/run_natural_dev.py`): 20 questions as staff over corpus V2, proxy-graded on keys written from the locked gold before the run.

@@ -264,3 +264,11 @@ Checked locally before measuring: with the app's payload `qwen3.5:4b` answers di
 - For ND-002, 003, 011, 014 and 019: every model's answer, read against the gold.
 - **Rule:** each combination against `legacy` + 3B of its own job, DEC-026 (leaks = 0; dev false answers + wrong, `natural_dev_v1` included, not above; then fewer false refusals on `natural_dev_v1`, then on the other dev sets) and DEC-027 across the two rounds. **The default is not changed in this step.**
 - **Known limits:** the prompts and the thresholds (s3's e5 relevance check at 0.78, legacy's responsiveness check at 0.80) were calibrated with 3B and are not recalibrated per model; a model can lose answers to a threshold, not to its reading. Hardware figures are CPU-only (4 vCPU); VRAM needs are estimated from the model size, not measured.
+- **Result (2026-11-17):**
+  - Leaks 0 everywhere.
+  - **Win against `legacy` + 3B under DEC-026/027:** `s3` + `qwen3.5:4b`, `s3` + 7B, and `legacy` + `qwen3.5:4b`.
+    - Compared directly, `s3` + `qwen3.5:4b` and `s3` + 7B tie on every count.
+  - **Do not win:** `legacy` + 7B and `legacy` + `sailor2:8b` (more false refusals), and `s3` + `sailor2:8b` (more natural false refusals).
+  - Default unchanged.
+  - Oracle (5 dev sets, 1 run): `s3` + `qwen3.5:4b` gets 104 of 117 correct with gold context, against 106 / 107 with real retrieval.
+  - Details: `docs/design/model-comparison.md`; hardware per model: ADR 0003.
