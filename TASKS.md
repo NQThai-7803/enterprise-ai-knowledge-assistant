@@ -8,6 +8,28 @@
 3. **Embedding fine-tune** (`docs/design/embedding-finetune.md` and DEC-015 on branch `feat/embedding-finetune-infra`): infrastructure only so far; the baseline measurement and training come after FIX 3.
 4. The final held-out v2 measurement, once, after the choices above are made (DEC-012).
 
+## Candidate `s3` + `qwen3.5:4b` (DEC-029) -- 2026-11-17 (STOPPED for the owner's review)
+
+- **DONE:**
+  - Docker cleanup: old verify images and dangling images; no volume or Ollama model touched.
+  - DEC-029 written before measuring.
+  - Round c: 6 jobs, with `qwen3.5-text:4b` built in `eval.yml`.
+  - UAT in 2 rounds × 2 halves; uB2 re-run after a lost runner, plus uB2m with the prompt cache capped.
+  - Local GPU placement and latency on the GTX 1650.
+  - Table chunking diagnosis, no code.
+  - Results in `docs/design/s3-q35-candidate.md` and DEC-029.
+- **Result:**
+  - (a) holds.
+  - The text-only copy gives the same answers with less memory.
+  - (c) CPU is not met with Ollama's defaults because of llama-server's prompt cache; it is met on one half with a 2048 MiB cap.
+  - (c) GPU needs `num_gpu` 99.
+  - Default unchanged.
+- **WAITING FOR OWNER:**
+  - Read and accept or reject the UAT list (`docs/review/uat-s3-q35-2026-11-17.md`, 19 items, 9 real errors by Claude's first reading).
+  - Name the target hardware (CPU-only 16 GB, or GPU ≥ 4 GB).
+  - Decide on the prompt cache cap: `LLAMA_ARG_CACHE_RAM` on the Ollama host. It affects the current default too, and the effect on answers needs a capped re-measurement.
+  - Decide whether to implement row-per-unit table chunking (`docs/design/table-chunking.md`, behind `DOCUMENT_TABLE_ROW_CHUNKING_ENABLED`, off).
+
 ## Model comparison (DEC-028) -- 2026-11-17 (STOPPED for the owner's review)
 
 - **DONE:**

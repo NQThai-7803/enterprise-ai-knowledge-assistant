@@ -6,6 +6,19 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### Candidate `s3` + `qwen3.5:4b` (DEC-029) -- 2026-11-17
+
+- **DEC-029:** the conditions before the default can change to `s3` + `qwen3.5:4b`: three-job variation, the owner's reading of the UAT errors, and the target hardware. Written before measuring.
+- **Eval (`eval.yml`):**
+  - A model named `<name>-text:<tag>` is built from `<name>:<tag>` without its vision projector.
+  - New input `ollama_cache_ram` caps llama-server's prompt cache through `LLAMA_ARG_CACHE_RAM`; `default` keeps Ollama's 8192 MiB.
+- **Measured:**
+  - round c on `natural_dev_v1` and the 5 dev sets;
+  - UAT in two rounds;
+  - local GPU placement and latency.
+  - (a) holds. The text-only copy gives the same answers with 0.5-0.7 GB less. (b) waits for the owner's reading of `docs/review/uat-s3-q35-2026-11-17.md`. (c) CPU is not met with Ollama's default prompt cache. The default is unchanged (`docs/design/s3-q35-candidate.md`).
+- **Table chunking diagnosis and a row-per-unit proposal, no code:** `docs/design/table-chunking.md`.
+
 ### Model comparison (DEC-028) -- 2026-11-17
 
 - DEC-028: candidate models and selection rule, fixed before measuring (`qwen2.5:7b`, `qwen3.5:4b`, `sailor2:8b`; Apache 2.0, ≤ 8B, Vietnamese, 16 GB CPU).

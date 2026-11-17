@@ -1,5 +1,28 @@
 # Project Status
 
+## Candidate `s3` + `qwen3.5:4b` (DEC-029) -- 2026-11-17 (STOPPED for the owner's review)
+
+- **The owner picked the candidate and set DEC-029:** the default changes only when (a) it still wins over three jobs, (b) the owner accepts its UAT errors, and (c) it runs on the target hardware. **Default unchanged.** Details: `docs/design/s3-q35-candidate.md`.
+- **(a) holds.** Round c added a third job per set (aA / bA / cA, against `legacy` + 3B):
+  - false answers + wrong on the six sets 15 / 10 / 12 against 28 / 27 / 28 (real);
+  - natural false refusals 4 / 9 / 5 against 7 / 7 / 7 (tie);
+  - other five sets 1 / 2 / 1 against 27 / 28 / 27 (real); leaks 0.
+- **`qwen3.5-text:4b`** (built in `eval.yml` without the vision projector; the library has no text-only tag): same answers on 137 of 137 items, runner peak 0.5-0.7 GB lower.
+- **(b) UAT, two rounds:** `s3` + `qwen3.5:4b` 67-23-1-9 / 69-22-1-8 against `legacy` 98-1-0-1 / 99-0-0-1 (proxy).
+  - List for the owner: `docs/review/uat-s3-q35-2026-11-17.md`, 19 items.
+  - Claude's first reading: 9 real errors, the same in both rounds, 6 of them a wrong table row or column. `legacy` gets all 9 right on its deterministic route.
+- **(c) CPU: not met with Ollama's defaults.** llama-server's prompt cache (up to 8192 MiB in host RAM) reached 6.6-8.0 GiB per UAT half.
+  - One job lost its runner, and two halves had 1240 and 1249 MB free.
+  - Capped at 2048 MiB (`LLAMA_ARG_CACHE_RAM`, new `eval.yml` input `ollama_cache_ram`), one half kept 6.8 GB free.
+  - The cache affects any model on Ollama 0.40, the current default included.
+- **(c) GPU (GTX 1650 4 GB):**
+  - Fully on the GPU only when forced (`num_gpu` 99): 3841 MiB, or 2971 MiB for the text copy.
+  - LLM time per question: median 20.7 s on the GPU; 29.4 s (or 24.4 s for the text copy) with Ollama's own placement.
+- **Table chunking diagnosis** (no code): `docs/design/table-chunking.md`.
+  - 77 data tables in corpus V2. 45% of their rows are interleaved in the chunk text, and 29 tables spread over several chunks without their header.
+  - ND-002 and the UAT table errors come from this. A row-per-unit proposal behind a flag, with risks and a measurement plan.
+- **Cleanup:** old `eaka-backend:verify-*` images and dangling images removed (1.25 GB inside Docker). C: free space did not change, because the WSL disk does not shrink.
+
 ## Model comparison (DEC-028) -- 2026-11-17 (STOPPED for the owner's review)
 
 - **DEC-028**, written before measuring, set the candidates and the rule:

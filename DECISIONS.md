@@ -317,3 +317,22 @@ Set by the owner on 2026-11-17, after DEC-028.
   - Placement from `ollama ps` for both builds, once with Ollama's own placement and once with all layers forced to the GPU (`num_gpu` 99).
   - Latency: the s3 LLM calls of ND-001 to ND-010 (the first 10 `natural_dev_v1` items), replayed from the `simple_trace` of CI run 44018356568 (round a, job A). Same prompts, temperature 0, seed, `num_ctx` 8192. The figure is LLM time per question; retrieval and validation are not included.
   - No eval runs locally: the local Docker VM has 4 GB and runs the protected stacks.
+
+**Results, 2026-11-17** (`docs/design/s3-q35-candidate.md`). **The default is not changed.**
+
+- **(a) holds.** Over aA, bA and cA, with the three-job rule:
+  - leaks 0;
+  - false answers + wrong on the six sets: 15 / 10 / 12 against 28 / 27 / 28, real;
+  - false refusals on `natural_dev_v1`: 4 / 9 / 5 against 7 / 7 / 7, a tie;
+  - false refusals on the other five sets: 1 / 2 / 1 against 27 / 28 / 27, real.
+- **`qwen3.5-text:4b` is a valid option.** In round c it gives the same answer and status as `qwen3.5:4b` on 137 of 137 items, with a runner peak 0.5-0.7 GB lower.
+- **(b) waits for the owner.** The list of 19 items is in `docs/review/uat-s3-q35-2026-11-17.md`.
+  - Proxy counts: round A / B, 67-23-1-9 / 69-22-1-8 against `legacy` 98-1-0-1 / 99-0-0-1.
+  - Claude's first reading: 9 real errors in both rounds (1 false answer, 8 wrong or incomplete values; 6 of them a wrong table row or column), 1 right value with an unsupporting citation, and 7 right values from another document.
+- **(c) CPU is not met with Ollama's defaults.**
+  - Ollama 0.40's llama-server keeps a prompt cache of up to 8192 MiB in host RAM. With `qwen3.5:4b` it reached 6.6-8.0 GiB on each UAT half.
+  - One UAT job lost its runner, and two halves had only 1240 and 1249 MB free.
+  - With `LLAMA_ARG_CACHE_RAM=2048` on the Ollama server (new `eval.yml` input `ollama_cache_ram`), one half kept 6.8 GB free at the same speed. That cap was not in the plan above; relying on it needs a capped re-measurement.
+  - The cache is not specific to the candidate: any model on a long-running Ollama 0.40 server can grow by up to 8 GiB.
+- **(c) GPU (GTX 1650):** the model is fully on the GPU only when forced (`num_gpu` 99). Ollama's own placement keeps a reserve and puts 52% (`qwen3.5:4b`) or 36% (text copy) on the CPU.
+- **Still open:** the owner's reading of the UAT list, and which hardware is the target.
