@@ -1,33 +1,33 @@
-import { formatDistanceToNowStrict } from "date-fns";
+import { format, formatDistanceToNowStrict } from "date-fns";
+import { vi } from "date-fns/locale";
+
+const UNAVAILABLE = "Không có";
 
 export function formatDateTime(value: string | null | undefined): string {
   if (!value) {
-    return "Unavailable";
+    return UNAVAILABLE;
   }
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
-    return "Unavailable";
+    return UNAVAILABLE;
   }
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
+  return format(date, "dd/MM/yyyy HH:mm");
 }
 
 export function formatRelative(value: string | null | undefined): string {
   if (!value) {
-    return "Unavailable";
+    return UNAVAILABLE;
   }
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
-    return "Unavailable";
+    return UNAVAILABLE;
   }
-  return `${formatDistanceToNowStrict(date)} ago`;
+  return `${formatDistanceToNowStrict(date, { locale: vi })} trước`;
 }
 
 export function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes < 0) {
-    return "Unavailable";
+    return UNAVAILABLE;
   }
   const units = ["B", "KB", "MB", "GB"];
   let value = bytes;

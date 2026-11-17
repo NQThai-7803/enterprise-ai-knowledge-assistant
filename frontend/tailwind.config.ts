@@ -29,8 +29,19 @@ export default {
       borderRadius: {
         token: "var(--radius-md)",
       },
+      // D-2: the bare `transition` class may animate colour (hover/focus), opacity and transform only.
+      transitionProperty: {
+        DEFAULT: "color, background-color, border-color, text-decoration-color, opacity, transform",
+      },
+      transitionDuration: {
+        DEFAULT: "150ms",
+        fast: "150ms",
+        base: "220ms",
+        slow: "320ms",
+      },
       transitionTimingFunction: {
-        product: "cubic-bezier(.2,.8,.2,1)",
+        DEFAULT: "cubic-bezier(0.2, 0, 0, 1)",
+        product: "cubic-bezier(0.2, 0, 0, 1)",
       },
     },
   },

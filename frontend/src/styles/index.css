@@ -19,6 +19,10 @@
   --radius-lg: 12px;
   --shadow-panel: 0 18px 60px rgb(15 23 42 / 0.10);
   --sidebar-width: 17rem;
+  --motion-fast: 150ms;
+  --motion-base: 220ms;
+  --motion-slow: 320ms;
+  --ease: cubic-bezier(0.2, 0, 0, 1);
 }
 
 [data-theme="dark"] {
@@ -93,25 +97,23 @@ textarea {
   right: -12rem;
   border-radius: 999px;
   background: radial-gradient(circle, rgb(var(--color-accent) / 0.18), transparent 65%);
-  transform: translate3d(0, 0, 0);
-  animation: signal-drift 12s ease-in-out infinite alternate;
 }
 
+/* Progress text: an opacity pulse, never background-position. */
 .motion-shimmer {
-  background: linear-gradient(
-    110deg,
-    rgb(var(--color-ink)) 0%,
-    rgb(var(--color-ink)) 28%,
-    rgb(var(--color-accent)) 45%,
-    rgb(var(--color-ink)) 62%,
-    rgb(var(--color-ink)) 100%
-  );
-  background-size: 220% 100%;
-  background-clip: text;
-  -webkit-background-clip: text;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
-  animation: shimmer-text 3s ease-in-out infinite;
+  animation: motion-pulse 1.2s var(--ease) infinite alternate;
+}
+
+.fade-up {
+  animation: motion-fade-up var(--motion-slow) var(--ease) both;
+}
+
+.slide-in {
+  animation: motion-slide-in var(--motion-slow) var(--ease) both;
+}
+
+.pop {
+  animation: motion-pop var(--motion-base) var(--ease) both;
 }
 
 .spotlight-panel {
@@ -127,48 +129,61 @@ textarea {
   pointer-events: none;
   background: radial-gradient(circle at var(--spotlight-x, 50%) var(--spotlight-y, 0%), rgb(var(--color-accent) / 0.16), transparent 42%);
   opacity: var(--spotlight-opacity, 0);
-  transition: opacity 180ms ease;
+  transition: opacity var(--motion-fast) var(--ease);
   z-index: -1;
 }
 
-@keyframes signal-drift {
+@keyframes motion-pulse {
   from {
-    transform: translate3d(-1rem, 0, 0) scale(1);
+    opacity: 1;
   }
   to {
-    transform: translate3d(1rem, 1rem, 0) scale(1.04);
+    opacity: 0.45;
   }
 }
 
-@keyframes shimmer-text {
-  0% {
-    background-position: 220% 0;
+@keyframes motion-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
   }
-  100% {
-    background-position: -120% 0;
+  to {
+    opacity: 1;
+    transform: none;
   }
 }
 
+@keyframes motion-slide-in {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes motion-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Same rule as the design canvas: no motion at all when the user asks for less. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
+    animation: none !important;
+    transition: none !important;
     scroll-behavior: auto !important;
-    transition-duration: 0.01ms !important;
   }
-
-    .motion-signal::before,
-    .motion-shimmer {
-      animation: none !important;
-    }
-
-    .citation-inline::after,
-    .citation-evidence,
-    .citation-card-highlight {
-      animation: none !important;
-    }
 }
 
 .citation-inline {
@@ -185,10 +200,11 @@ textarea {
 
   cursor: pointer;
 
+  /* D-2: colour may change on hover/focus; everything else is transform. */
   transition:
-    color 160ms ease,
-    background-color 160ms ease,
-    transform 160ms ease;
+    color var(--motion-fast) var(--ease),
+    background-color var(--motion-fast) var(--ease),
+    transform var(--motion-fast) var(--ease);
 }
 
 .citation-inline::after {
@@ -205,8 +221,7 @@ textarea {
 
   transform-origin: left;
 
-  animation: citation-underline-in 420ms
-    cubic-bezier(.2, .8, .2, 1) both;
+  animation: citation-underline-in var(--motion-slow) var(--ease) both;
 }
 
 .citation-inline:hover {
@@ -220,8 +235,7 @@ textarea {
   outline-offset: 3px;
 }
 
-
-/* Evidence text inside the Citation card */
+/* Evidence text inside the Citation card: static, the card's entrance carries the motion. */
 .citation-evidence {
   color: rgb(var(--color-ink));
   font-weight: 600;
@@ -230,17 +244,13 @@ textarea {
   text-decoration-color: rgb(var(--color-danger));
   text-decoration-thickness: 2px;
   text-underline-offset: 3px;
-
-  animation: citation-evidence-in 520ms
-    cubic-bezier(.2, .8, .2, 1) both;
 }
 
-
-/* Flash the Citation card after clicking [1], [2], ... */
+/* Selected Citation card after clicking [1], [2], ...: static ring, opacity entrance. */
 .citation-card-highlight {
-  animation: citation-card-highlight 1.4s ease-out;
+  box-shadow: 0 0 0 3px rgb(var(--color-danger) / 0.18);
+  animation: citation-card-highlight var(--motion-slow) var(--ease) both;
 }
-
 
 @keyframes citation-underline-in {
   from {
@@ -254,38 +264,12 @@ textarea {
   }
 }
 
-
-@keyframes citation-evidence-in {
+@keyframes citation-card-highlight {
   from {
-    text-decoration-color: transparent;
-    background-color: rgb(var(--color-danger) / 0);
-  }
-
-  45% {
-    background-color: rgb(var(--color-danger) / 0.08);
+    opacity: 0.55;
   }
 
   to {
-    text-decoration-color: rgb(var(--color-danger));
-    background-color: transparent;
+    opacity: 1;
   }
 }
-
-
-@keyframes citation-card-highlight {
-  0% {
-    box-shadow:
-      0 0 0 0 rgb(var(--color-danger) / 0);
-  }
-
-  30% {
-    box-shadow:
-      0 0 0 4px rgb(var(--color-danger) / 0.18);
-  }
-
-  100% {
-    box-shadow:
-      0 0 0 10px rgb(var(--color-danger) / 0);
-  }
-}
-

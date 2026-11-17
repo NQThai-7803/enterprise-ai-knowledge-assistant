@@ -28,6 +28,7 @@ describe("permission helpers", () => {
   });
 
   it("renders stable role labels", () => {
-    expect(roleLabel("STAFF")).toBe("Staff");
+    expect(roleLabel("STAFF")).toBe("Nhân viên");
+    expect(roleLabel("ADMIN")).toBe("Quản trị viên");
   });
 });

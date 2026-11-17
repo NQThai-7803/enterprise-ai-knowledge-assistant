@@ -1,4 +1,5 @@
 import type { AuthenticatedUser, UserRole } from "../api/types";
+import { roleLabels } from "./labels";
 
 export function hasRole(user: AuthenticatedUser | null, roles: UserRole[]): boolean {
   return Boolean(user && roles.includes(user.role));
@@ -29,10 +30,5 @@ export function canViewAuditLogs(user: AuthenticatedUser | null): boolean {
 }
 
 export function roleLabel(role: UserRole): string {
-  const labels: Record<UserRole, string> = {
-    ADMIN: "Admin",
-    MANAGER: "Manager",
-    STAFF: "Staff",
-  };
-  return labels[role];
+  return roleLabels[role];
 }
