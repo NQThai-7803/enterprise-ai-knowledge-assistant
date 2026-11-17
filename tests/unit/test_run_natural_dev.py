@@ -69,6 +69,21 @@ def test_the_committed_gold_is_locked_and_the_proxy_keys_name_it() -> None:
     assert all(item.get("near_uat_group") in {"near_uat", "other"} for item in inputs["items"])
 
 
+def test_every_gold_answer_passes_its_own_proxy_keys() -> None:
+    inputs = run_natural_dev.verified_inputs()
+    keys = inputs["keys"]
+    failing = []
+    for item in inputs["items"]:
+        codes = {"g": item["gold_citations"][0]["document"]}
+        answer = case(" ".join(item["gold_answer"]), "g")
+        graded = run_natural_dev.grade_case(
+            answer, item, keys["items"][item["id"]], keys["limit_forms"], codes
+        )
+        if not graded["passed"] or graded["leak_reasons"]:
+            failing.append(item["id"])
+    assert failing == []
+
+
 def test_lock_gold_refuses_open_decisions_and_verify_gold_catches_an_edit(tmp_path) -> None:
     gold = tmp_path / "gold.yaml"
     lock = tmp_path / "gold.lock"

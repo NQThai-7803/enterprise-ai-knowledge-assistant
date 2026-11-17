@@ -43,7 +43,7 @@ items:
   ND-008:
     facts: [["sản phẩm & công nghệ", "sản phẩm và công nghệ"], ["kinh doanh & khách hàng", "kinh doanh và khách hàng"], ["vận hành doanh nghiệp"]]
   ND-009:
-    facts: [["được phê duyệt", "đã phê duyệt", "được duyệt", "đã được duyệt"]]
+    facts: [["phê duyệt", "được duyệt", "đã duyệt"]]
   ND-010:
     facts: [["đề nghị tạm ứng", "xin tạm ứng", "có thể tạm ứng", "được tạm ứng"]]
     wrong: ["không được tạm ứng", "không thể tạm ứng"]
