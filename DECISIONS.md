@@ -337,6 +337,15 @@ Set by the owner on 2026-11-17, after DEC-028.
 - **(c) GPU (GTX 1650):** the model is fully on the GPU only when forced (`num_gpu` 99). Ollama's own placement keeps a reserve and puts 52% (`qwen3.5:4b`) or 36% (text copy) on the CPU.
 - **Still open:** the owner's reading of the UAT list, and which hardware is the target.
 
+**Owner decisions, 2026-11-18** (the default is still not changed):
+
+- **(c) Target hardware: an NVIDIA GPU with at least 4 GB VRAM, model `qwen3.5-text:4b`** built from a Modelfile with `PARAMETER num_gpu 99`.
+  - Built with `scripts/deploy/ollama_text_model.py`; setup in `DEPLOYMENT.md` 3.3.
+  - Checked on the GTX 1650 on 2026-11-18: 100% GPU through the app's `/v1` endpoint with no options, 2971 MiB. The GPU part of (c) holds.
+- **A CPU-only host with 16 GB is supported, but slow.**
+- **The prompt cache is capped at 2048 MiB** in eval (`eval.yml` default, `heldout-v2.yml`) and in the deployment documentation, for the current configuration too (DEC-031).
+- **Still open:** (b), the owner's reading of the UAT list.
+
 ## DEC-030 — Held-out v3: a team member's 20 questions with gold, frozen
 
 Set by the owner on 2026-11-18.
