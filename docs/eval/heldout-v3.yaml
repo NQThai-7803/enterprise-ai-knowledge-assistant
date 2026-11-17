@@ -1,0 +1,148 @@
+version: heldout_v3
+author: a member of the project team (not the owner, not Claude)
+source_file: Held-out_20_cau_Nova_Digital.xlsx
+source_sheet: Held-out
+source_sha256: 5059fea79460584639ef5f4f56d5b108cb5a1bd30ec6d1dff36fbbb0170c68f3
+converted_at: '2026-11-18'
+rule: 'DEC-030: word for word from the workbook; never used to design a fix; run only at the measurement milestone with the owner''s approval'
+items:
+- id: HO3-01
+  group: A. Tra cứu 1 tài liệu
+  question: Mình mới vào được 2 tháng, muốn làm remote 2 ngày/tuần luôn có được không?
+  test_account: Bất kỳ
+  expected_answer: Tối đa 02 ngày/tuần, tùy vị trí và quản lý duyệt; nhân viên đang onboarding cần kèm cặp trực tiếp có thể không phù hợp để remote.
+  expected_sources: ND-HR-003 §05
+  number: 1
+- id: HO3-02
+  group: A. Tra cứu 1 tài liệu
+  question: Mình làm ở công ty được 6 năm rồi thì có bao nhiêu ngày phép năm?
+  test_account: Bất kỳ
+  expected_answer: 13 ngày (12 ngày cơ bản + 1 ngày cho mỗi 5 năm thâm niên).
+  expected_sources: ND-HR-004 §02
+  number: 2
+- id: HO3-03
+  group: A. Tra cứu 1 tài liệu
+  question: Mình muốn nghỉ phép 7 ngày làm việc dịp cuối năm thì phải gửi đơn trước bao lâu?
+  test_account: Bất kỳ
+  expected_answer: Trước ít nhất 10 ngày làm việc; chỉ được nghỉ khi đơn ở trạng thái Approved.
+  expected_sources: ND-HR-004 §04, §07
+  number: 3
+- id: HO3-04
+  group: A. Tra cứu 1 tài liệu
+  question: Hình thức kỷ luật "kéo dài thời hạn nâng lương" tối đa bao lâu?
+  test_account: Bất kỳ
+  expected_answer: Không quá 06 tháng.
+  expected_sources: ND-HR-002 Điều 33
+  number: 4
+- id: HO3-05
+  group: A. Tra cứu 1 tài liệu
+  question: Nghỉ việc rồi thì mình có còn dùng được dịch vụ tư vấn tâm lý không?
+  test_account: Bất kỳ
+  expected_answer: EAP được dùng thêm 30 ngày sau khi nghỉ việc rồi kết thúc; bình thường tối đa 04 phiên/năm.
+  expected_sources: ND-HR-006 §06, §08
+  number: 5
+- id: HO3-06
+  group: A. Tra cứu 1 tài liệu
+  question: Ai chủ trì Ủy ban An toàn thông tin & Dữ liệu?
+  test_account: Bất kỳ
+  expected_answer: CTO (Lê Thu Hà) và COO (Võ Ngọc Linh) đồng chủ trì.
+  expected_sources: ND-CORP-001 §06
+  number: 6
+- id: HO3-07
+  group: A. Tra cứu 1 tài liệu
+  question: Payslip tháng 10 bị thiếu tiền OT thì mình phải báo trong bao lâu, khi nào có phản hồi?
+  test_account: Bất kỳ
+  expected_answer: Gửi Payroll Query trong 05 ngày làm việc; phản hồi sơ bộ trong 03 ngày làm việc; chưa thống nhất thì đề nghị HR Head/Finance Head rà soát, rồi khiếu nại theo ND-HR-010; không được trả đũa.
+  expected_sources: ND-HR-005 §03, §10
+  number: 7
+- id: HO3-08
+  group: B. Tính toán / suy luận số
+  question: Senior Engineer lương base 40 triệu, xếp loại Exceeds Expectations thì thưởng năm khoảng bao nhiêu?
+  test_account: Bất kỳ
+  expected_answer: Khoảng 40–60 triệu (1,0–1,5 tháng lương); không được bảo đảm, phụ thuộc kết quả công ty và ngân sách.
+  expected_sources: ND-HR-005 §07
+  number: 8
+- id: HO3-09
+  group: B. Tính toán / suy luận số
+  question: Offer Junior Developer 16 triệu thì lương thử việc thấp nhất là bao nhiêu?
+  test_account: Tài khoản Phòng Nhân sự
+  expected_answer: 13,6 triệu (85% mức lương). Tài khoản ngoài HR phải bị từ chối.
+  expected_sources: ND-HR-007 §05
+  number: 9
+- id: HO3-10
+  group: B. Tính toán / suy luận số
+  question: Mình đã qua thử việc, hóa đơn gym cả năm 3,6 triệu thì được hoàn bao nhiêu?
+  test_account: Bất kỳ
+  expected_answer: Tối đa 2,4 triệu/năm; gửi qua HRM > Reimbursement, thanh toán trong kỳ kế tiếp nếu hồ sơ hợp lệ.
+  expected_sources: ND-HR-006 §06, §09
+  number: 10
+- id: HO3-11
+  group: B. Tính toán / suy luận số
+  question: Mình khám ngoại trú 3 lần, mỗi lần 1,5 triệu thì NovaCare trả tối đa bao nhiêu?
+  test_account: Bất kỳ
+  expected_answer: 3,6 triệu (trần 1,2 triệu/lần × 3, trong hạn mức 12 triệu/năm); cần chứng từ hợp lệ, đã qua thử việc, tùy điều khoản loại trừ.
+  expected_sources: ND-HR-006 §03
+  number: 11
+- id: HO3-12
+  group: C. Kết hợp nhiều tài liệu
+  question: Tháng sau mình cưới, được nghỉ mấy ngày và công ty hỗ trợ gì?
+  test_account: Bất kỳ
+  expected_answer: Nghỉ 03 ngày việc riêng hưởng lương, không trừ phép năm; hỗ trợ thêm 2 triệu qua HRM > Welfare Request.
+  expected_sources: ND-HR-004 §04 + ND-HR-006 §07
+  number: 12
+- id: HO3-13
+  group: C. Kết hợp nhiều tài liệu
+  question: Offer cho Tech Lead 78 triệu thì ai duyệt?
+  test_account: Tài khoản Phòng Nhân sự
+  expected_answer: Trần N5 là 70 triệu → 78 triệu vượt ~11,4% (>10%) → Tổng Giám đốc duyệt.
+  expected_sources: ND-HR-005 §02 + ND-HR-007 §05
+  number: 13
+- id: HO3-14
+  group: C. Kết hợp nhiều tài liệu
+  question: Kỹ sư on-call xử lý sự cố từ 23:00 đến 01:00 đêm thứ Bảy thì được trả thế nào?
+  test_account: Bất kỳ
+  expected_answer: On-call không tự động là OT; ghi nhận thời gian thực tế kèm mã incident, quản lý duyệt. Thứ Bảy là nghỉ hằng tuần → OT ≥200%, + ≥30% làm đêm, + ≥20% làm thêm ban đêm; phụ cấp on-call không thay tiền OT; được bố trí nghỉ phục hồi.
+  expected_sources: ND-HR-003 §06 + ND-HR-005 §05 + ND-HR-004 §08
+  number: 14
+- id: HO3-15
+  group: C. Kết hợp nhiều tài liệu
+  question: Tháng này mình đi muộn 3 lần không báo, chắc bị trừ lương rồi đúng không? (tiền đề sai)
+  test_account: Bất kỳ
+  expected_answer: Không. Công ty không phạt tiền/cắt lương thay kỷ luật; phải xác minh, quản lý trao đổi, lập kế hoạch cải thiện; chỉ xử lý theo nội quy khi đủ căn cứ.
+  expected_sources: ND-HR-003 §07 + ND-HR-005 §08 + ND-HR-002 Điều 35
+  number: 15
+- id: HO3-16
+  group: D. Phát hiện mâu thuẫn
+  question: Muộn nhất mấy giờ mình phải bắt đầu làm việc?
+  test_account: Bất kỳ
+  expected_answer: 'Phải nêu cả hai: ND-HR-003 ghi 08:00–09:00; ND-HR-002 Điều 5 ghi 08:00–09:30; khuyên xác nhận với HR. Fail nếu chỉ đưa 1 con số.'
+  expected_sources: ND-HR-003 §02 vs ND-HR-002 Điều 5
+  number: 16
+- id: HO3-17
+  group: D. Phát hiện mâu thuẫn
+  question: Hạn cuối để quản lý duyệt điều chỉnh chấm công là ngày nào?
+  test_account: Bất kỳ
+  expected_answer: 'Phải chỉ ra chỗ lệch: ND-HR-003 ghi ngày 01–03 tháng sau, HR khóa ngày 04–05; ND-HR-005 ghi khóa sơ bộ ngày làm việc thứ 2, quản lý xác nhận đến ngày làm việc thứ 4.'
+  expected_sources: ND-HR-003 §08 vs ND-HR-005 §03
+  number: 17
+- id: HO3-18
+  group: D. Phát hiện mâu thuẫn
+  question: Phát hiện sự cố bảo mật thì gửi email nào?
+  test_account: Bất kỳ
+  expected_answer: 'Phải nêu cả hai: soc@novadigital.example (ND-CORP-001) và security@novadigital.example, máy lẻ 222 (ND-HR-002).'
+  expected_sources: ND-CORP-001 §06 vs ND-HR-002 Điều 19
+  number: 18
+- id: HO3-19
+  group: E. Không có đáp án / phân quyền
+  question: Văn phòng Đà Nẵng có bao nhiêu nhân viên, địa chỉ ở đâu?
+  test_account: Bất kỳ
+  expected_answer: Tài liệu chỉ nói có văn phòng Đà Nẵng, tổng ~180 người; không có số liệu/địa chỉ riêng → báo thiếu nguồn, không bịa.
+  expected_sources: ND-CORP-001 §01
+  number: 19
+- id: HO3-20
+  group: E. Không có đáp án / phân quyền
+  question: Ngân sách tuyển dụng 2026 của Trung tâm AI & Dữ liệu là bao nhiêu?
+  test_account: Tài khoản phòng Kỹ thuật (ngoài HR)
+  expected_answer: 'Phải từ chối, không có trích dẫn tới ND-HR-007. (Nếu hỏi bằng tài khoản HR: 300 triệu, 9 vị trí.)'
+  expected_sources: ND-HR-007 §02, §10
+  number: 20

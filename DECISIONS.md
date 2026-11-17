@@ -336,3 +336,40 @@ Set by the owner on 2026-11-17, after DEC-028.
   - The cache is not specific to the candidate: any model on a long-running Ollama 0.40 server can grow by up to 8 GiB.
 - **(c) GPU (GTX 1650):** the model is fully on the GPU only when forced (`num_gpu` 99). Ollama's own placement keeps a reserve and puts 52% (`qwen3.5:4b`) or 36% (text copy) on the CPU.
 - **Still open:** the owner's reading of the UAT list, and which hardware is the target.
+
+## DEC-030 — Held-out v3: a team member's 20 questions with gold, frozen
+
+Set by the owner on 2026-11-18.
+
+**What it is.**
+
+- 20 questions with expected answers and expected sources, written by a member of the project team (not the owner, not Claude).
+- Source: workbook `Held-out_20_cau_Nova_Digital.xlsx`, sheet "Held-out". Its SHA256 is recorded in the YAML.
+
+**How it is kept.**
+
+- `scripts/eval/heldout_v3.py import` copied the six gold columns word for word into `docs/eval/heldout-v3.yaml`, as items HO3-01 to HO3-20. It reloads the YAML and refuses if any cell changed.
+- Questions and gold are frozen together by `docs/eval/heldout-v3.lock` (SHA256 of the YAML). Any edit needs v3.1 with a new lock.
+- The questions are in `scripts/eval/question_fingerprints.json` (source `heldout_v3`), so the leak check covers them.
+
+**Rules, as DEC-012 for held-out v2:**
+
+- Never used to design or tune a fix.
+- Not run during development. Run only at the measurement milestone, with the owner's approval.
+- The workbook and the YAML are not opened again until then.
+- The import and check scripts print only ids, counts and flags. The details for the owner are in `docs/eval/heldout-v3-check.json`.
+
+**Checks on 2026-11-18** (`heldout_v3.py check`): report only; the gold was not changed.
+
+- **(1) Documents.** HO3-09, HO3-13 and HO3-20 cite ND-HR-007, which is not in corpus V2. The answer numbers of these three are also absent from the corpus.
+- **(2) Accounts.**
+  - "Bất kỳ" (17 items) maps to any seeded account.
+  - "Tài khoản Phòng Nhân sự" (HO3-09, HO3-13) and "Tài khoản phòng Kỹ thuật (ngoài HR)" (HO3-20) have no seeded account: the seeded manager and staff are in "UAT Knowledge Operations", admin in none.
+- **(3) Sources in the PDFs.**
+  - The source column gives a document code and a section name or article, not a passage.
+  - Not found as written: HO3-16, HO3-17, HO3-18. Found only as separate words: HO3-03, HO3-05, HO3-07, HO3-10.
+  - Answer numbers missing from the cited documents: HO3-08 (2 of 4), HO3-11 (1 of 4).
+- **(4) Overlap with the other sets.**
+  - At the v1 review threshold (0.60 on character trigram or difflib): HO3-02, HO3-03 and HO3-19 against UAT Q001-Q100; HO3-06 against rbac.
+  - Word 4-gram Jaccard is at most 0.273 (HO3-05 against held-out v1).
+- **The owner decides** on these items before the milestone: for example, add ND-HR-007 and an HR and an engineering account to the eval corpus, or set the three items aside.
