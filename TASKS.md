@@ -8,6 +8,12 @@
 3. **Embedding fine-tune** (`docs/design/embedding-finetune.md` and DEC-015 on branch `feat/embedding-finetune-infra`): infrastructure only so far; the baseline measurement and training come after FIX 3.
 4. The final held-out v2 measurement, once, after the choices above are made (DEC-012).
 
+## s3 on natural_dev_v1 -- 2026-11-17 (STOPPED for the owner's review)
+
+- **DONE:** owner decisions applied (s4, s5 dropped; gold approved and locked; 11 overlap items kept); `set=natural` runner with proxy keys from the locked gold; legacy and s3 measured in 2 jobs; s3's wrong-subject answers listed; eaka-verify on `a0c1c08` and `2a1973f`.
+- **Result:** natural_dev_v1 legacy 3–7–1–9, s3 4–8–2–6 / 4–8–1–7, leaks 0. s3 has one more false refusal (real under DEC-027) and two fewer wrong answers; it does not win on natural_dev_v1. Wrong subject under s3: ND-002, ND-003, ND-011, ND-019 (+ ND-014 in one job). Default unchanged.
+- **WAITING FOR OWNER:** the next direction for simple mode (or legacy) given these results.
+
 ## Rule cleanup (later round, owner 2026-11-17)
 
 - `app/retrieval/reranker.py:644` (from `206cee3`, 2026-08-14): a hard-coded topic rule that penalises "giá trị cốt lõi" (core values) passages for time-range questions; found by the `natural_dev_v1` 4-gram check (ND-003). Handle it in the rule-cleanup round; **not changed now**.

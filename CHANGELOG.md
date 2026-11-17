@@ -6,6 +6,12 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### natural_dev_v1 gold locked, set=natural, s3 measured -- 2026-11-17
+
+- `natural_dev_v1` gold approved by the owner and locked (`natural_dev_check.py --lock-gold`, `natural_dev_v1_gold.lock`); each item carries its near-UAT group.
+- New eval set `set=natural` (`eval.yml`, `ci_batch.sh`): `scripts/eval/run_natural_dev.py` asks the 20 questions as staff over corpus V2 and grades them with proxy keys (`natural_dev_v1_proxy.yaml`) written from the locked gold; it refuses to run if the questions, gold or keys do not match. `summarize_ablation.py` counts its leaks.
+- s4 and s5 dropped by the owner (flags stay, off). Measured legacy and s3 on `natural_dev_v1` in 2 jobs: s3 4–8–2–6 / 4–8–1–7 against legacy 3–7–1–9; s3 does not win there under DEC-026. Not adopted (`docs/design/simple-answer-mode.md`).
+
 ### Simple answer mode: s4-s5 behind flags, natural_dev_v1 frozen -- 2026-11-17
 
 - DEC-027: Actions measurements rest on at least 2 separate jobs, each with its own `legacy`; a smaller difference than the between-job variation is a tie.
