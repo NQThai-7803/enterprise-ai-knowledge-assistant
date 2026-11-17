@@ -46,6 +46,11 @@ on:
         type: choice
         options: ["180", "600"]
         default: "180"
+      ollama_cache_ram:
+        description: "llama-server prompt cache cap in MiB (LLAMA_ARG_CACHE_RAM); 'default' keeps Ollama's 8192 (DEC-029)"
+        type: choice
+        options: ["default", "0", "2048", "4096"]
+        default: "default"
 
 permissions:
   contents: read
@@ -166,7 +171,12 @@ jobs:
           sudo systemctl stop ollama || true
           echo "EVAL_OLLAMA_LOG=$RUNNER_TEMP/ollama.log" >> "$GITHUB_ENV"
           # One model in memory at a time: a configuration with another model evicts the last one.
-          OLLAMA_HOST=0.0.0.0:11434 OLLAMA_CONTEXT_LENGTH=8192 OLLAMA_NUM_PARALLEL=1 OLLAMA_MAX_LOADED_MODELS=1 \
+          # DEC-029: llama-server keeps a prompt cache in host RAM (8192 MiB unless capped); Ollama passes
+          # LLAMA_ARG_CACHE_RAM through to it.
+          cache_ram=()
+          [ "${{ inputs.ollama_cache_ram }}" = default ] || cache_ram=("LLAMA_ARG_CACHE_RAM=${{ inputs.ollama_cache_ram }}")
+          env ${cache_ram[@]+"${cache_ram[@]}"} \
+            OLLAMA_HOST=0.0.0.0:11434 OLLAMA_CONTEXT_LENGTH=8192 OLLAMA_NUM_PARALLEL=1 OLLAMA_MAX_LOADED_MODELS=1 \
             nohup ollama serve > "$RUNNER_TEMP/ollama.log" 2>&1 &
           for _ in $(seq 1 30); do curl -sf http://127.0.0.1:11434/api/version && break; sleep 2; done
           for attempt in 1 2 3; do ollama pull qwen2.5:3b && break; sleep 15; done
