@@ -93,6 +93,7 @@ Storage variable rules:
 PDF_MAX_PAGES=500
 PDF_MIN_USABLE_CHARACTERS=20
 PDF_TEXT_SORT=true
+DOCUMENT_TABLE_ROW_CHUNKING_ENABLED=false
 ```
 
 PDF extraction variable rules:
@@ -100,6 +101,10 @@ PDF extraction variable rules:
 - `PDF_MAX_PAGES` is an integer greater than `0`.
 - `PDF_MIN_USABLE_CHARACTERS` is an integer greater than or equal to `0`.
 - `PDF_TEXT_SORT` is a boolean.
+- `DOCUMENT_TABLE_ROW_CHUNKING_ENABLED` (boolean, default `false`; added 2026-11-18, DEC-031): write each data table of a native PDF page as one paragraph per row, `<table title> | <column>: <cell>; ...`.
+  - It is read by the worker at ingestion, so it changes a corpus only when documents are processed again through the pipeline.
+  - A page without a data table (at least 2 columns and 3 rows) keeps its text unchanged.
+  - Design and measurement: `docs/design/table-chunking.md`.
 - These values are not secrets.
 - No PDF password environment variable is supported in MVP.
 

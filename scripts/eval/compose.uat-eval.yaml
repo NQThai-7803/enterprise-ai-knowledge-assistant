@@ -17,6 +17,9 @@ services:
     <<: *p3d_image
   worker:
     <<: *p3d_image
+    environment:
+      # Ingestion-time flag: ci_batch.sh rebuilds the corpus for EVAL_TABLE_ROWS configurations.
+      DOCUMENT_TABLE_ROW_CHUNKING_ENABLED: ${EVAL_TABLE_ROWS:-false}
   api:
     <<: *p3d_image
     ports: !override
@@ -42,6 +45,7 @@ services:
       RAG_EXCERPT_FALLBACK_ENABLED: ${EVAL_EXCERPT_FALLBACK:-true}
       RAG_COMPOUND_PARTIAL_ANSWER_ENABLED: ${EVAL_COMPOUND_PARTIAL:-false}
       RAG_ANSWER_MODE: ${EVAL_ANSWER_MODE:-legacy}
+      DOCUMENT_TABLE_ROW_CHUNKING_ENABLED: ${EVAL_TABLE_ROWS:-false}
       RAG_NUMBER_NORMALIZATION_ENABLED: ${EVAL_NUMBER_NORMALIZATION:-false}
       # One switch per measured configuration (docs/design/simple-answer-mode.md), so the
       # configs input stays under the 400-character concurrency group of eval.yml.

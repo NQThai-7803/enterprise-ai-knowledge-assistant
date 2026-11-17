@@ -41,9 +41,19 @@ for entry in "${ENTRIES[@]}"; do
     vars+=",EVAL_ANSWER_MODE=simple"
     for n in $(seq 1 "${BASH_REMATCH[1]}"); do vars+=",EVAL_SIMPLE_S$n=true"; done
   fi
+  # EVAL_TABLE_ROWS=true acts at ingestion: these configurations run last, on a corpus ingested
+  # again with the flag on (reingest_table_rows), so they must follow every other one.
+  if [[ ",$vars," == *",EVAL_TABLE_ROWS=true,"* ]]; then
+    ROWS_FROM="${ROWS_FROM:-${#NAMES[@]}}"
+  elif [ -n "${ROWS_FROM:-}" ]; then
+    echo "configuration $name without EVAL_TABLE_ROWS follows one with it"; exit 2
+  fi
   NAMES+=("$name"); ENVS+=("$vars")
 done
 [ "${#NAMES[@]}" -ge 1 ] || { echo "no configuration"; exit 2; }
+# A second run of the baseline would find the re-ingested corpus.
+[ -n "${ROWS_FROM:-}" ] && [ "$RUNS" != 1 ] && { echo "EVAL_TABLE_ROWS needs runs=1"; exit 2; }
+REINGESTED=""
 
 backend() {
   python - "$EVAL_OLLAMA_LOG" <<'PY'
@@ -67,10 +77,36 @@ start_api() {  # $1 = comma-separated EVAL_ settings of the configuration
   echo "api not healthy"; return 1
 }
 
+reingest_table_rows() {  # fresh database and redis on this throwaway CI stack, worker with the flag
+  echo "$(date -u +%FT%TZ) re-ingest, DOCUMENT_TABLE_ROW_CHUNKING_ENABLED=true" | tee -a "$OUT/batch.log"
+  export EVAL_TABLE_ROWS=true
+  local compose=(docker compose -p "$PROJECT" "${FILES[@]}")
+  "${compose[@]}" rm --stop --force api worker postgres redis >/dev/null || return 1
+  docker volume rm "${PROJECT}_postgres_data" "${PROJECT}_redis_data" >/dev/null || return 1
+  "${compose[@]}" up -d --wait --no-build postgres redis >/dev/null || return 1
+  "${compose[@]}" run --rm --no-deps migration >/dev/null || return 1
+  "${compose[@]}" run --rm --no-deps uat-v2-accounts >/dev/null || return 1
+  "${compose[@]}" up -d --no-build --no-deps worker >/dev/null || return 1
+  docker inspect "$PROJECT-worker-1" --format '{{range .Config.Env}}{{println .}}{{end}}' \
+    | grep -x 'DOCUMENT_TABLE_ROW_CHUNKING_ENABLED=true' >/dev/null \
+    || { echo "worker without the flag"; return 1; }
+}
+
 run_one() {  # $1 = config index, $2 = run number
   local name="${NAMES[$1]}" vars="${ENVS[$1]}" dir
   dir="$OUT/$name/run$2"; mkdir -p "$dir"
-  start_api "$vars" || return 1
+  if [ -n "${ROWS_FROM:-}" ] && [ "$1" -ge "$ROWS_FROM" ] && [ -z "$REINGESTED" ]; then
+    reingest_table_rows || return 1
+    start_api "$vars" || return 1
+    if [ "$SET" = uat ] || [ "$SET" = natural ]; then  # new document ids: a new runtime manifest
+      mv "$OUT/runtime-manifest.json" "$OUT/runtime-manifest-before-rows.json"
+      python scripts/eval/bootstrap_corpus_v2.py . "$API" "$OUT/runtime-manifest.json" \
+        > "$OUT/reingest.log" 2>&1 || { echo "corpus V2 reload failed"; return 1; }
+    fi
+    REINGESTED=1
+  else
+    start_api "$vars" || return 1
+  fi
   # grep reads to the end: with pipefail, grep -q exiting early SIGPIPEs docker logs (false miss)
   if [[ ",$vars," == *",EVAL_ABLATION="* ]] \
     && ! docker logs "$PROJECT-api-1" 2>&1 | grep "ABLATION applied" >/dev/null; then

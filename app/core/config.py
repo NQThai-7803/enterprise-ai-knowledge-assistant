@@ -83,6 +83,8 @@ class Settings(BaseSettings):
     pdf_max_pages: int = Field(default=500, gt=0)
     pdf_min_usable_characters: int = Field(default=20, ge=0)
     pdf_text_sort: bool = True
+    # One text unit per table row, with title and column names (docs/design/table-chunking.md).
+    document_table_row_chunking_enabled: bool = False
     ocr_enabled: bool = True
     ocr_languages: Annotated[list[str], NoDecode] = Field(default_factory=lambda: ["vie", "eng"])
     ocr_max_pages: int = Field(default=100, ge=1, le=1000)

@@ -7,6 +7,7 @@ import pymupdf
 
 from app.core.config import Settings, get_settings
 from app.document_processing.errors import PDFExtractionError, PDFExtractionFailureCode
+from app.document_processing.extractors.table_rows import page_text_with_table_rows
 from app.document_processing.models import ExtractedPage, ExtractionResult
 from app.document_processing.normalization import (
     count_usable_characters,
@@ -22,6 +23,7 @@ class PyMuPDFTextExtractor:
     max_pages: int
     min_usable_characters: int
     sort_text: bool = True
+    table_rows: bool = False
 
     def __post_init__(self) -> None:
         if self.max_pages <= 0:
@@ -57,11 +59,17 @@ class PyMuPDFTextExtractor:
             raise PDFExtractionError(PDFExtractionFailureCode.PDF_PAGE_LIMIT_EXCEEDED)
 
         pages: list[ExtractedPage] = []
+        carried = None  # a data table that may continue on the next page (table_rows only)
         for index in range(page_count):
             page_number = index + 1
             page = document.load_page(index)
             try:
-                raw_text = page.get_text("text", sort=self.sort_text) or ""
+                if self.table_rows:
+                    raw_text, carried = page_text_with_table_rows(
+                        page, carried, sort=self.sort_text
+                    )
+                else:
+                    raw_text = page.get_text("text", sort=self.sort_text) or ""
             except Exception as exc:
                 logger.warning(
                     "PDF page text extraction failed.",
@@ -101,6 +109,7 @@ def create_pdf_text_extractor(settings: Settings | None = None) -> PyMuPDFTextEx
         max_pages=resolved_settings.pdf_max_pages,
         min_usable_characters=resolved_settings.pdf_min_usable_characters,
         sort_text=resolved_settings.pdf_text_sort,
+        table_rows=resolved_settings.document_table_row_chunking_enabled,
     )
 
 

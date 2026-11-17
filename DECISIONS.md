@@ -373,3 +373,47 @@ Set by the owner on 2026-11-18.
   - At the v1 review threshold (0.60 on character trigram or difflib): HO3-02, HO3-03 and HO3-19 against UAT Q001-Q100; HO3-06 against rbac.
   - Word 4-gram Jaccard is at most 0.273 (HO3-05 against held-out v1).
 - **The owner decides** on these items before the milestone: for example, add ND-HR-007 and an HR and an engineering account to the eval corpus, or set the three items aside.
+
+## DEC-031 — Table rows behind a flag, prompt cache capped: how they are measured
+
+Set on 2026-11-18, from the owner's items C and D, before any run.
+
+**Table rows (D).** Flag `DOCUMENT_TABLE_ROW_CHUNKING_ENABLED`, default off (`app/document_processing/extractors/table_rows.py`). At extraction, each data table of a native PDF page becomes one paragraph per row:
+
+```
+<table title> | <column>: <cell>; <column>: <cell>; ...
+```
+
+- **Data table:** PyMuPDF `find_tables()`, at least 2 columns and 3 rows. A page without one keeps its text byte for byte.
+- **Column names:** the first row, when it has at least two distinct short labels (≤ 60 characters, no final full stop), every cell is bold, and the next row is not all bold. Otherwise every row is data, written `<first cell>: <other cells>`.
+- **Title:** the nearest line above the table, outside every table region, within 60 points.
+- **Merged cells:** a cell merged from above takes its text; one merged from the left is written once.
+- **A table that ends low on its page** carries its title and columns to a first table on the next page that has no title, the same number of columns, and either no header or the same header.
+- **The chunker is unchanged.** Rows are separate paragraphs, so a chunk boundary falls between rows.
+
+**Offline, before any run** (corpus V2 with the app's extractor and chunker; the 5 dev sets' generated PDFs):
+
+- The 18 dev-set documents are unchanged with the flag on, so the 5 dev sets are a no-change control.
+- Corpus V2: 143 chunks without the flag, 167 with it. Every row line sits whole in one chunk.
+- The organisation chart (ND-CORP-001 page 6) is still read as a table and stays garbled, as it is today (risk 1 of the design).
+
+**Measurement (D):**
+
+- **Two rounds**, dA and dB, each in its own jobs: `natural_dev_v1`, the 5 dev sets, and UAT in two halves (Q001-Q050, Q051-Q100).
+- **Three configurations per job, in this order:**
+  1. `legacy` + `qwen2.5:3b`;
+  2. `s3` + `qwen3.5-text:4b` (the target model, DEC-029 B);
+  3. the same with `EVAL_TABLE_ROWS=true`.
+- **The third configuration** runs after `ci_batch.sh` has rebuilt the job's database and redis, started the worker with the flag, and loaded the corpus again (corpus V2, or the dev set's documents). One run per configuration.
+- **Settings:** LLM timeout 600 s for `natural_dev_v1` and the dev sets, 180 s for UAT, as in DEC-028/029. Prompt cache capped at 2048 MiB (the new eval default).
+- **Rule:**
+  - DEC-026 with DEC-027 over the two jobs, comparing `s3` + text + rows against `s3` + text: leaks 0; false answers + wrong on the 6 sets not up; then false refusals on `natural_dev_v1`, then the other sets.
+  - UAT is monitoring only, reported by route, with the 9 UAT errors of DEC-029 and ND-002/ND-003 reported item by item.
+  - On the 5 dev sets any difference is job variation, since their chunks are unchanged.
+- **The default stays off** whatever the result. Turning it on in a deployment needs the corpus processed again.
+
+**Prompt cache (C).**
+
+- `LLAMA_ARG_CACHE_RAM=2048` is the default of `eval.yml` and is set in `heldout-v2.yml`, matching the deployment documentation.
+- **Measurement:** one more UAT job on Q051-Q100 with `s3` + `qwen3.5:4b` and the cap (uC2m, run 44144537645), the same configuration as uB2m.
+- **Rule:** an item's change counts as an effect of the cap only if uB2m and uC2m agree on it and both differ from the two uncapped jobs (uA2, uB2), which agree. Anything else is job variation.
