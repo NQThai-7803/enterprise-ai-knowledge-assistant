@@ -9,7 +9,8 @@ name: Eval
 # against eval-data/uat/reference-grade.json), `rbac` (tests/acceptance/rbac_dev_v1.yaml, with the
 # retrieval-level leak check), `relevance` (answer_relevance_dev_v1), `false_refusal`
 # (false_refusal_dev_v1), `false_refusal_v2` (false_refusal_dev_v2) and `compound`
-# (compound_partial_dev_v1, half-answerable two-part questions). Never runs held-out v2 (DEC-012). Held-out v1 only through
+# (compound_partial_dev_v1, half-answerable two-part questions) and `natural` (natural_dev_v1, the
+# owner's questions over corpus V2, proxy-graded on the locked gold). Never runs held-out v2 (DEC-012). Held-out v1 only through
 # `trace_heldout_v1`, a layer-by-layer diagnostic trace that is not scored (DEC-008).
 on:
   workflow_dispatch:
@@ -17,7 +18,7 @@ on:
       set:
         description: "Question set"
         type: choice
-        options: [uat, rbac, relevance, false_refusal, false_refusal_v2, compound]
+        options: [uat, rbac, relevance, false_refusal, false_refusal_v2, compound, natural]
         default: relevance
       configs:
         description: "Configurations, ';'-separated, baseline first: name or name:EVAL_VAR=value,..."
@@ -222,7 +223,7 @@ jobs:
           docker inspect "$PROJECT-api-1" --format '{{.State.Health.Status}}' | grep -q healthy
 
       - name: Load corpus V2
-        if: inputs.set == 'uat'
+        if: inputs.set == 'uat' || inputs.set == 'natural'
         run: >
           python scripts/eval/bootstrap_corpus_v2.py . http://127.0.0.1:18190
           "$OUT/runtime-manifest.json"

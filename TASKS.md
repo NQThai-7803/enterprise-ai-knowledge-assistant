@@ -8,7 +8,11 @@
 3. **Embedding fine-tune** (`docs/design/embedding-finetune.md` and DEC-015 on branch `feat/embedding-finetune-infra`): infrastructure only so far; the baseline measurement and training come after FIX 3.
 4. The final held-out v2 measurement, once, after the choices above are made (DEC-012).
 
-## Simple mode s4-s5 and natural_dev_v1 -- 2026-11-17 (STOPPED for the owner's review)
+## Rule cleanup (later round, owner 2026-11-17)
+
+- `app/retrieval/reranker.py:644` (from `206cee3`, 2026-08-14): a hard-coded topic rule that penalises "giá trị cốt lõi" (core values) passages for time-range questions; found by the `natural_dev_v1` 4-gram check (ND-003). Handle it in the rule-cleanup round; **not changed now**.
+
+## Simple mode s4-s5 and natural_dev_v1 -- 2026-11-17 (owner decided: s4, s5 dropped; s3 only candidate)
 
 - **DONE:** DEC-027; s4 (subject binding) and s5 (cross-encoder claim relevance, t = −4.2 from dev drafts) behind flags, off; measured legacy/s3/s4/s5 on 6 sets in 2 jobs each (`docs/design/simple-answer-mode.md`, "Results of s4-s5"); `natural_dev_v1` questions frozen and fingerprinted; gold drafted from the PDFs with its check and review file.
 - **Result:** s3 = s4 rank first on the dev sets (97–7–13–0 / 98–7–12–0 against legacy 72–28–16–1); s5 one false refusal worse (DEC-027: real). s4 does not reduce the UAT wrong-subject answers; s5's threshold refuses 25-27 UAT questions. Default unchanged.

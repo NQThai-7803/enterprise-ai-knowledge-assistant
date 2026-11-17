@@ -6,7 +6,7 @@
 #
 #   bash scripts/eval/ci_batch.sh <set> "<configs>" <runs> <out> [case ids...]
 #
-# set:     uat | rbac | relevance | false_refusal | false_refusal_v2 | compound
+# set:     uat | rbac | relevance | false_refusal | false_refusal_v2 | compound | natural
 # configs: ";"-separated "name" or "name:EVAL_VAR=value,EVAL_VAR=value", first one is the baseline,
 #          e.g. "base; f303:EVAL_SHORT_ANSWER_QUESTION_TERMS=true". EVAL_* variables are read by
 #          scripts/eval/compose.uat-eval.yaml; EVAL_UAT_UNACCENTED=1 asks UAT without diacritics.
@@ -19,7 +19,7 @@ read -r -a FILES <<< "${COMPOSE_FILES:?space-separated -f arguments}"
 API=http://127.0.0.1:18190
 mkdir -p "$OUT"
 
-case "$SET" in uat|rbac|relevance|false_refusal|false_refusal_v2|compound) ;; *) echo "unknown set $SET"; exit 2 ;; esac
+case "$SET" in uat|rbac|relevance|false_refusal|false_refusal_v2|compound|natural) ;; *) echo "unknown set $SET"; exit 2 ;; esac
 [[ "$RUNS" =~ ^[12]$ ]] || { echo "runs must be 1 or 2"; exit 2; }
 
 NAMES=(); ENVS=()
@@ -109,6 +109,10 @@ run_one() {  # $1 = config index, $2 = run number
       python scripts/eval/run_answer_relevance_dev.py --set "$frozen" \
         --output "$dir/results.json" > "$dir/runner.log" 2>&1 \
         || echo "runner exit $?" >> "$dir/runner.log" ;;
+    natural)  # owner-written questions over corpus V2, proxy-graded on the locked gold
+      python scripts/eval/run_natural_dev.py --manifest "$OUT/runtime-manifest.json" \
+        --output "$dir/results.json" > "$dir/runner.log" 2>&1 \
+        || echo "runner exit $?" >> "$dir/runner.log" ;;
   esac
   echo "seconds=$(( $(date +%s) - started ))" > "$dir/timing.txt"
   if [[ ",$vars," == *",EVAL_ABLATION="*simple_trace* ]]; then  # every simple-mode draft
@@ -144,7 +148,7 @@ for run in $(seq 1 "$RUNS"); do
 done
 
 # Compare every later configuration with the first one (needs 2 runs per side).
-KIND="$SET"; [[ "$SET" == false_refusal* || "$SET" == compound ]] && KIND=relevance
+KIND="$SET"; [[ "$SET" == false_refusal* || "$SET" == compound || "$SET" == natural ]] && KIND=relevance
 if [ "$RUNS" = 2 ]; then
   base="${NAMES[0]}"
   for name in "${NAMES[@]:1}"; do

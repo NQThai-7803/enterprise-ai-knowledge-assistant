@@ -1,13 +1,17 @@
 # Gold of natural_dev_v1, written from the corpus V2 PDFs only (no system run on this set).
-# DRAFT until the owner approves it; then status: APPROVED and natural_dev_v1_gold.lock.
+# Approved by the owner on 2026-11-17 (ND-002, ND-008, ND-011, ND-014 as decided, the other 16
+# as drafted) and locked in natural_dev_v1_gold.lock; any edit needs a new approval and lock.
 # Fields as held-out v2; `not_stated` lists what the documents do not say (situational items).
+# near_uat_group: e5 cosine to the nearest Q001-Q100 question >= 0.90 (held-out v2 rule), from
+# natural_dev_v1_check.json; the owner kept all 11 items flagged for overlap (2026-11-17).
 version: natural_dev_v1
-status: DRAFT
+status: APPROVED
 questions_sha256: c899d75a86baab36981ed8a424081885cdb7c102441311b97be10c509b19bc94
 items:
   - id: ND-001
     question: "Tổng thời gian nghỉ lễ là bao nhiêu ngày trong một năm?"
     role: staff
+    near_uat_group: near_uat  # e5 0.9061 to Q043
     gold_status: ANSWERED
     gold_answer:
       - "11 ngày nghỉ lễ, Tết trong năm, hưởng nguyên lương."
@@ -32,16 +36,16 @@ items:
   - id: ND-002
     question: "Tôi là ứng viên được tuyển và hoàn thành mốc thử việc thì được thưởng thêm gì không?"
     role: staff
+    near_uat_group: other  # e5 0.8657 to Q096
     gold_status: ANSWERED_LIMITED
     gold_answer:
-      - "Chính sách thưởng có Employee Referral Bonus 3 - 15 triệu đồng, điều kiện: ứng viên được tuyển và hoàn thành mốc thử việc/điều kiện chương trình."
-      - "Đó là thưởng giới thiệu ứng viên; tài liệu không nói chính người được tuyển nhận khoản thưởng này."
+      - "Đính chính: khoản thưởng gắn với việc ứng viên được tuyển và hoàn thành mốc thử việc là Employee Referral Bonus (thưởng giới thiệu, 3 - 15 triệu đồng), dành cho NGƯỜI GIỚI THIỆU ứng viên, không phải cho chính ứng viên."
+      - "Tài liệu không nêu khoản thưởng nào cho chính ứng viên khi hoàn thành thử việc."
     missing_points:
       - "Khoản thưởng nào dành cho chính ứng viên/người mới khi qua thử việc."
-      - "Ai nhận Employee Referral Bonus (ngoài tên chương trình)."
-    limited_pass: "Nêu Employee Referral Bonus 3 - 15 triệu đồng với điều kiện ứng viên được tuyển và qua thử việc, và nói rõ tài liệu không xác nhận chính ứng viên nhận khoản này."
+    limited_pass: "Đính chính rằng Employee Referral Bonus là thưởng cho người giới thiệu khi ứng viên được tuyển hoàn thành thử việc, không phải thưởng cho ứng viên (có thể kèm mức 3 - 15 triệu đồng)."
     fail_examples:
-      - "Khẳng định người được tuyển nhận 3 - 15 triệu đồng khi qua thử việc."
+      - "Nói ứng viên (người được tuyển) nhận 3 - 15 triệu đồng khi qua thử việc."
       - "Nói không có khoản thưởng nào liên quan mà không nhắc Employee Referral Bonus."
     gold_citations:
       - {document: ND-HR-005, pages: [9]}
@@ -49,11 +53,12 @@ items:
       - {document: ND-HR-005, page: 9, text: "Employee Referral Bonus 3 - 15 triệu đồng Ứng viên được tuyển và hoàn thành mốc thử việc/điều kiện chương trình."}
     forbidden:
       - {document: UAT-GROUNDING-001, value: "travel approval"}
-    owner_decision: "Người hỏi tự nhận là ứng viên; tài liệu chỉ có thưởng giới thiệu (Employee Referral Bonus) với điều kiện ứng viên qua thử việc. Giữ ANSWERED_LIMITED như bản nháp, hay ANSWERED nếu coi câu hỏi là hỏi về thưởng giới thiệu?"
+    notes: "Owner 2026-11-17: ANSWERED_LIMITED; thưởng giới thiệu dành cho người giới thiệu, đạt khi đính chính, FAIL nếu nói ứng viên nhận 3 - 15 triệu. Trang 9 xếp khoản này trong mục 'Hiệu suất, dự án, sáng kiến, giới thiệu và thưởng đặc biệt'."
 
   - id: ND-003
     question: "Năm giá trị cốt lõi của công ty Nova Digital là gì? Hãy liệt kê."
     role: staff
+    near_uat_group: other  # e5 0.8951 to Q009
     gold_status: ANSWERED
     gold_answer:
       - "Tin cậy."
@@ -79,6 +84,7 @@ items:
   - id: ND-004
     question: "Tôi kết hôn thì được nghỉ việc riêng mà vẫn hưởng lương mấy ngày?"
     role: staff
+    near_uat_group: near_uat  # e5 0.9348 to Q043
     gold_status: ANSWERED
     gold_answer:
       - "03 ngày."
@@ -100,6 +106,7 @@ items:
   - id: ND-005
     question: "Tôi lần đầu lỡ quên chấm công thì có bị phạt gì không?"
     role: staff
+    near_uat_group: near_uat  # e5 0.9044 to Q038
     gold_status: ANSWERED
     gold_answer:
       - "Quên chấm công / vi phạm quy trình lần đầu, không gây hậu quả thuộc nhóm nhẹ: nhắc nhở, hướng dẫn, bổ sung hồ sơ; chỉ xem xét kỷ luật nếu có căn cứ và tái diễn."
@@ -127,6 +134,7 @@ items:
   - id: ND-006
     question: "Nhân viên được phép nói về lương của chính mình cho người khác không?"
     role: staff
+    near_uat_group: near_uat  # e5 0.9308 to Q073
     gold_status: ANSWERED
     gold_answer:
       - "Được: chính sách không cấm người lao động sử dụng, trao đổi hoặc cung cấp thông tin lương của chính mình khi thực hiện quyền hợp pháp."
@@ -148,6 +156,7 @@ items:
   - id: ND-007
     question: "Tôi chia sẻ tài khoản của tôi cho đồng nghiệp để làm hộ phần cần thiết thì có bị kỷ luật không?"
     role: staff
+    near_uat_group: other  # e5 0.8944 to Q089
     gold_status: ANSWERED
     gold_answer:
       - "Nội quy cấm chia sẻ: mỗi người dùng tài khoản cá nhân; cấm chia sẻ mật khẩu, mã OTP, khóa API, khóa SSH hoặc token."
@@ -174,6 +183,7 @@ items:
   - id: ND-008
     question: "Công ty Nova Digital có bao nhiêu khối và giám đốc của từng khối là ai?"
     role: staff
+    near_uat_group: near_uat  # e5 0.9426 to Q002
     gold_status: ANSWERED_LIMITED
     gold_answer:
       - "Ba khối trong sơ đồ cơ cấu: Khối Sản phẩm & Công nghệ, Khối Kinh doanh & Khách hàng, Khối Vận hành Doanh nghiệp."
@@ -182,7 +192,7 @@ items:
       - "Người đứng đầu từng khối."
     limited_pass: "Nêu đúng 3 khối và nói rõ tài liệu không ghi giám đốc từng khối; có thể kèm Ban điều hành và phạm vi phụ trách."
     fail_examples:
-      - "Gán chắc chắn một giám đốc cho từng khối, ví dụ giám đốc Khối Kinh doanh & Khách hàng là COO."
+      - "Tự gán một giám đốc cho từng khối, ví dụ giám đốc Khối Kinh doanh & Khách hàng là COO."
       - "Một số khối khác 3 mà không giải thích."
     gold_citations:
       - {document: ND-CORP-001, pages: [6]}
@@ -194,11 +204,12 @@ items:
       - {document: ND-CORP-001, page: 6, text: "Giám đốc Vận hành (COO) Võ Ngọc Linh - phụ trách triển khai, dịch vụ khách hàng và vận hành nội bộ"}
     forbidden:
       - {document: UAT-GROUNDING-001, value: "travel approval"}
-    owner_decision: "Trang 7-8 cũng gọi một số đơn vị là 'Khối' (Khối Sản phẩm, Khối Kỹ thuật Phần mềm, Khối Kinh doanh & Marketing, Khối Customer Success & Managed Services). Bản nháp lấy 3 khối của sơ đồ trang 6. Duyệt, hay đổi số khối?"
+    notes: "Owner 2026-11-17: ANSWERED_LIMITED; nêu 3 khối theo sơ đồ trang 6 và nói rõ tài liệu không quy định giám đốc riêng cho từng khối; FAIL nếu tự gán giám đốc cho từng khối. Trang 7-8 cũng gọi một số đơn vị là 'Khối'; số khối theo trang 6."
 
   - id: ND-009
     question: "Tôi dùng công cụ AI để làm việc thì có bị kỷ luật không?"
     role: staff
+    near_uat_group: other  # e5 0.8864 to Q094
     gold_status: ANSWERED
     gold_answer:
       - "Được dùng công cụ AI được Công ty phê duyệt cho mục đích công việc."
@@ -224,6 +235,7 @@ items:
   - id: ND-010
     question: "Tôi là nhân viên thì có thể xin tạm ứng lương trước được không?"
     role: staff
+    near_uat_group: other  # e5 0.8876 to Q046
     gold_status: ANSWERED
     gold_answer:
       - "Có thể đề nghị tạm ứng trong trường hợp khó khăn hoặc tình huống được pháp luật/chính sách cho phép."
@@ -246,6 +258,7 @@ items:
   - id: ND-011
     question: "Ví dụ tôi muốn tố giác nội bộ công ty thì liên lạc qua mail nào?"
     role: staff
+    near_uat_group: other  # e5 0.8656 to Q097
     gold_status: ANSWERED
     gold_answer:
       - "compliance@novadigital.example (đầu mối Tuân thủ và tố giác nội bộ)."
@@ -258,15 +271,20 @@ items:
     source_excerpt:
       - {document: ND-CORP-001, page: 9, text: "Tuân thủ và tố giác nội bộ compliance@novadigital.example"}
       - {document: ND-HR-002, page: 9, text: "Người lao động có thể phản ánh với quản lý, HR Business Partner, Ethics Officer hoặc kênh ethics@novadigital.example."}
+      - {document: ND-HR-002, page: 15, text: "Đạo đức và phản ánh ethics@novadigital.example"}
+    designated_channels:
+      - "compliance@novadigital.example: kênh duy nhất tài liệu chỉ định cho tố giác nội bộ (ND-CORP-001 tr. 9, 'Tuân thủ và tố giác nội bộ')."
+      - "ethics@novadigital.example: tài liệu chỉ định cho 'Đạo đức và phản ánh' (ND-HR-002 tr. 15) và là kênh phản ánh của Điều 22 (bình đẳng, quấy rối; ND-HR-002 tr. 9); không tài liệu nào gọi nó là kênh tố giác."
     fail_examples:
-      - "Một địa chỉ email khác (hr@, people@, ...) cho việc tố giác."
+      - "Một địa chỉ email khác không được chỉ định cho tố giác (hr@, people@, ethics@, ...) mà không có compliance@."
     forbidden:
       - {document: UAT-GROUNDING-001, value: "travel approval"}
-    owner_decision: "Câu trả lời chỉ nêu ethics@novadigital.example (kênh phản ánh của nội quy), không có compliance@: bản nháp xếp KHÔNG ĐẠT. Duyệt, hay chấp nhận như đạt một phần?"
+    notes: "Owner 2026-11-17: nếu tài liệu chỉ định ethics@ là kênh tố giác thì chỉ nêu ethics@ = PASS; nếu tài liệu liệt kê nhiều kênh dành riêng cho tố giác thì thiếu kênh = PARTIAL; email sai mục đích = FAIL. Theo PDF chỉ compliance@ được chỉ định cho tố giác, nên: nêu compliance@ = PASS (kèm ethics@ cũng được); chỉ nêu ethics@ hoặc email khác = FAIL."
 
   - id: ND-012
     question: "Nếu trường hợp khẩn cấp thì tôi xin nghỉ không lương có được không?"
     role: staff
+    near_uat_group: near_uat  # e5 0.9102 to Q046
     gold_status: ANSWERED
     gold_answer:
       - "Ngoài trường hợp luật định, người lao động có thể đề nghị nghỉ không hưởng lương nhưng phải được công ty chấp thuận."
@@ -294,6 +312,7 @@ items:
   - id: ND-013
     question: "Ví dụ trong trường hợp tôi sinh con thì có hỗ trợ phần tiền nào không?"
     role: staff
+    near_uat_group: near_uat  # e5 0.9329 to Q087
     gold_status: ANSWERED
     gold_answer:
       - "Có: phúc lợi 2.000.000 đ/lần khi sinh con hoặc nhận con nuôi hợp pháp."
@@ -316,6 +335,7 @@ items:
   - id: ND-014
     question: "Công ty tổ chức team building mấy lần trong năm?"
     role: staff
+    near_uat_group: other  # e5 0.8735 to Q008
     gold_status: ANSWERED_LIMITED
     gold_answer:
       - "Tài liệu không ghi số lần tổ chức team building trong năm."
@@ -324,7 +344,7 @@ items:
       - "Số lần team building trong năm."
     limited_pass: "Nói tài liệu không ghi số lần team building; có thể kèm company trip/retreat dự kiến 01 lần/năm và ngân sách 1.200.000 đ/người/năm."
     fail_examples:
-      - "Khẳng định team building 01 lần/năm (đánh đồng với company trip)."
+      - "Khẳng định team building 01 lần/năm (lấy từ company trip: sai chủ thể)."
       - "Một số lần không có trong tài liệu."
     gold_citations:
       - {document: ND-HR-006, pages: [9]}
@@ -333,11 +353,12 @@ items:
       - {document: ND-HR-006, page: 9, text: "Team building budget mô phỏng: 1.200.000 đ/người/năm, quản lý theo đầu người đủ điều kiện và hóa đơn hợp lệ."}
     forbidden:
       - {document: UAT-GROUNDING-001, value: "travel approval"}
-    owner_decision: "Company trip/retreat dự kiến 01 lần/năm có được coi là câu trả lời cho 'team building mấy lần' không? Bản nháp: không, nên ANSWERED_LIMITED."
+    notes: "Owner 2026-11-17: ANSWERED_LIMITED; tài liệu không nêu số lần team building (chỉ có ngân sách/người/năm); trả '01 lần/năm' lấy từ company trip = FAIL (sai chủ thể)."
 
   - id: ND-015
     question: "Quy trình khiếu nại của Payroll Query là như nào? Giải thích chi tiết."
     role: staff
+    near_uat_group: other  # e5 0.8615 to Q024
     gold_status: ANSWERED
     gold_answer:
       - "Gửi yêu cầu: nhân viên tạo ticket HRM, nêu kỳ lương, khoản sai lệch và tài liệu hỗ trợ."
@@ -367,6 +388,7 @@ items:
   - id: ND-016
     question: "Thưởng hiệu suất exceptional là bao nhiêu?"
     role: staff
+    near_uat_group: other  # e5 0.8355 to Q072
     gold_status: ANSWERED
     gold_answer:
       - "1,5 - 2,0 tháng Base Salary."
@@ -384,6 +406,7 @@ items:
   - id: ND-017
     question: "Vai trò của HR Benefits thì gồm những trách nhiệm gì?"
     role: staff
+    near_uat_group: other  # e5 0.8601 to Q026
     gold_status: ANSWERED
     gold_answer:
       - "Đăng ký/điều chỉnh (bảo hiểm, phúc lợi)."
@@ -409,6 +432,7 @@ items:
   - id: ND-018
     question: "Đánh giá hiệu suất làm việc vào tháng mấy trong năm?"
     role: staff
+    near_uat_group: other  # e5 0.8771 to Q071
     gold_status: ANSWERED
     gold_answer:
       - "Tháng 01 - 02 (đánh giá hiệu suất năm trong chu kỳ salary review mô phỏng)."
@@ -426,6 +450,7 @@ items:
   - id: ND-019
     question: "Trong trường hợp tôi là người lao động bị ốm nặng thì cần làm gì?"
     role: staff
+    near_uat_group: other  # e5 0.8826 to Q051
     gold_status: ANSWERED
     gold_answer:
       - "Thông báo cho quản lý càng sớm càng tốt, ưu tiên trước giờ làm; khi cấp cứu có thể nhờ người thân thông báo."
@@ -458,6 +483,7 @@ items:
   - id: ND-020
     question: "Tôi quên check-in nhưng có bằng chứng hợp lệ thực tế về việc đi làm thì tôi phải báo cáo ai?"
     role: staff
+    near_uat_group: other  # e5 0.8867 to Q038
     gold_status: ANSWERED
     gold_answer:
       - "Tạo yêu cầu điều chỉnh chấm công trên HRM, nêu ngày, thời gian cần sửa, lý do và bằng chứng; nên gửi trong 03 ngày làm việc."

@@ -27,3 +27,4 @@ tests/acceptance/natural_dev_v1.yaml text eol=lf
 tests/acceptance/natural_dev_v1.lock text eol=lf
 tests/acceptance/natural_dev_v1_gold.yaml text eol=lf
 tests/acceptance/natural_dev_v1_gold.lock text eol=lf
+tests/acceptance/natural_dev_v1_proxy.yaml text eol=lf

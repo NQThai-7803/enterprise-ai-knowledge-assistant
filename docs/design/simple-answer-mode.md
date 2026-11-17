@@ -610,3 +610,19 @@ Correct – false refusal – false answer – wrong. Legacy is 98–1–0–1 o
 - **s4 = s3 on the dev sets** (no item changes) and does not reduce the UAT wrong-subject answers (8 and 6 against 7 and 6); on UAT it ends 4 questions per job, mostly correct ones. The wrong-subject risk is not handled by s4.
 - **s5 is worse than s4 on the dev sets under DEC-027** (one more false refusal in both jobs), and its dev-calibrated threshold refuses 25-27 UAT questions per job. The calibration rule missed drafts that the relevance check ends before another check would have retried them.
 - **s3 (= s4) meets DEC-026 in both jobs and wins against legacy under DEC-027**, as in s1-s3. Per the owner's rule it stays a candidate: `natural_dev_v1` is not measured yet (gold waiting for approval) and the wrong-subject risk is still open.
+
+#### Owner decision (2026-11-17)
+
+**s4 and s5 are dropped; s3 is the only candidate.** Their code stays behind `RAG_SIMPLE_SUBJECT_BINDING_ENABLED` and `RAG_SIMPLE_CLAIM_CROSS_ENCODER_ENABLED` (off) and is not measured further. The conclusion stands as recorded above: s4 changes no dev item and catches no UAT wrong-subject answer; s5 loses a dev item in both jobs and refuses a quarter of UAT.
+
+## s3 on `natural_dev_v1` (owner decision 2026-11-17)
+
+The owner approved the gold (ND-002, ND-008, ND-011, ND-014 as decided, the other 16 as drafted) and kept all 11 items flagged for overlap. Gold locked in `tests/acceptance/natural_dev_v1_gold.lock` (sha256 `0e942996…`, approved by "owner (NQThai-7803)") before any run on the set.
+
+### Measurement plan (written before measuring, DEC-026, DEC-027)
+
+- **Set:** `natural_dev_v1`, 20 questions as `staff` over corpus V2 (`eval.yml` `set=natural`, `scripts/eval/run_natural_dev.py`), one session per question.
+- **Configurations:** `legacy`; `s3` = `EVAL_ABLATION=simple_trace,EVAL_SIMPLE_LEVEL=3`. **Two separate jobs, each with its own `legacy`, 1 run per configuration** (DEC-027).
+- **Proxy grade** (`tests/acceptance/natural_dev_v1_proxy.yaml`, written from the locked gold before the run): leak = a citation of `UAT-GROUNDING-001` or a forbidden value; an ANSWERED item is correct when it answers, cites a gold or acceptable document, states every fact group of its keys and hits no `wrong` form; an ANSWERED_LIMITED item must also say what the documents do not state, and is a false answer (over-claim) without that, or wrong when a `wrong` form shows. Categories as on the other dev sets: correct – false refusal – false answer – wrong.
+- **Report:** per job and configuration: correct – false refusal – false answer – wrong, leaks; split near UAT (7 items: e5 to the nearest Q001-Q100 ≥ 0.90, the held-out v2 rule: ND-001, 004, 005, 006, 008, 012, 013) / the rest (13); changes between the two jobs; every s3 answer with a value of the wrong subject, read one by one against the gold (the proxy cannot see a subject). Where a reading of an answer disagrees with the proxy, both are reported; the proxy is not edited after the run.
+- **Rule:** DEC-026 with `natural_dev_v1` first (leaks = 0; dev false answers + wrong not above legacy; then fewer false refusals on `natural_dev_v1`), and DEC-027 across the two jobs. The other dev sets are as measured in "Results of s4-s5" (s3 meets DEC-026 there). **The default is not changed in this step.**
