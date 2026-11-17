@@ -6,6 +6,15 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### Model comparison (DEC-028) -- 2026-11-17
+
+- DEC-028: candidate models and selection rule, fixed before measuring (`qwen2.5:7b`, `qwen3.5:4b`, `sailor2:8b`; Apache 2.0, ≤ 8B, Vietnamese, 16 GB CPU).
+- Eval: `eval.yml` input `llm_timeout` (180 or 600 s for every configuration; the eval clients wait 4 × that through `EVAL_HTTP_TIMEOUT_SECONDS`), `OLLAMA_MAX_LOADED_MODELS=1`, and `ollama-config.txt` records disk and pulled models.
+- Measured {`legacy`, `s3`} × {3B, 7B, `qwen3.5:4b`, `sailor2:8b`} on `natural_dev_v1` and the 5 dev sets, 2 jobs each. Leaks were 0 everywhere.
+  - `s3` + `qwen3.5:4b`, `s3` + 7B and `legacy` + `qwen3.5:4b` win against `legacy` + 3B under DEC-026/027.
+  - The default is unchanged (`docs/design/model-comparison.md`, ADR 0003 updated with hardware per model).
+- Oracle context with `qwen3.5:4b` on the 5 dev sets (1 run): with `s3` it does not beat real retrieval (104 against 106 / 107 correct of 117).
+
 ### natural_dev_v1 gold locked, set=natural, s3 measured -- 2026-11-17
 
 - `natural_dev_v1` gold approved by the owner and locked (`natural_dev_check.py --lock-gold`, `natural_dev_v1_gold.lock`); each item carries its near-UAT group.

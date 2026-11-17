@@ -235,3 +235,40 @@ Set by the owner on 2026-11-16, before s4 and s5 are measured.
 - **A difference smaller than the variation between the jobs counts as a tie.** Applied per count (false refusals, false answers + wrong, ...): the difference between two configurations is taken in each job; it counts only when it has the same sign in both jobs and its smaller size is larger than the largest change of either configuration between the two jobs on that count.
 - DEC-011/016 (baseline in the same job) and DEC-026 (selection order) still apply inside each job.
 - Recorded with it, at the owner's instruction: s5 uses a cross-encoder (`cross-encoder/mmarco-mMiniLMv2-L12-H384-v1`) as a per-claim relevance check behind its flag, for measurement. DEC-025 (no cross-encoder reranker) is unchanged; the eval workflow downloads that model only for a configuration that turns the check on.
+
+## DEC-028 — Model comparison: candidates and rule, fixed before measuring
+
+Set by the owner on 2026-11-17, after s3 did not win on `natural_dev_v1`. Hypothesis: the 3B model is the main bottleneck (with oracle context it is still wrong on about 44% of UAT; the wrong-subject answers of s3 on ND-002/003/011/014/019 are reading errors; some answers mix in another language).
+
+**Eligibility** (all must hold): (1) in the Ollama library and runs on the pinned Ollama 0.40.15; (2) at most 8B parameters; (3) a licence that allows commercial use without a user-count threshold (Apache 2.0 or MIT); (4) the developer's model card names Vietnamese, or a language list known to include it; (5) the Q4 download is at most about 5.5 GB, so it fits next to the eval stack (6-7 GB peak) on the 15.7 GB runner; (6) a chat model that answers without a thinking block under the app's `reasoning_effort=none`. Ranking among the eligible: explicit Vietnamese training first, then the newest generation, then the smaller model (CPU latency).
+
+**Models measured** (all Q4_K_M, used with `num_ctx` 8192 as before):
+
+| Model | Why | Parameters | Download | Native context | Licence |
+|---|---|---|---|---|---|
+| `qwen2.5:3b` | baseline (ADR 0003) | 3.1B | 1.9 GB | 32K | **Qwen Research: non-commercial only**; commercial use needs a licence from Alibaba Cloud (LICENSE §2) |
+| `qwen2.5:7b` | the owner's addition; same family, measured before in ADR 0003 | 7.6B | 4.7 GB | 32K | Apache 2.0 |
+| `sailor2:8b` (= `8b-chat-q4_K_M`) | explicit Vietnamese: Qwen2.5-7B continued on 500B tokens of 15 South-East Asian languages, chat-tuned | 8B (9B on its card) | 5.2 GB | 32K | Apache 2.0 |
+| `qwen3.5:4b` | newest generation (201 languages; Qwen3 lists Vietnamese among its 119), smallest candidate; vision encoder unused | 4.2B | 3.4 GB | 256K | Apache 2.0 |
+
+Checked locally before measuring: with the app's payload `qwen3.5:4b` answers directly (no reasoning field).
+
+**Not eligible:** `gemma4:e4b` (Apache 2.0, 140+ languages, but a 6.6-9.5 GB download with its audio and vision encoders: rule 5); `qwen3.5:9b`, `gemma4:12b` (rule 2); `granite4.x`, `ministral-3`, `phi4-mini` (their language lists have no Vietnamese: rule 4); `aya-expanse:8b` (CC-BY-NC: rule 3); `llama3.1:8b` (licence with a user threshold, and Vietnamese is not among its supported languages: rules 3, 4); `qwen3:8b` (same family as `qwen3.5`, older generation; ranking).
+
+**Measurement:**
+
+- Sets: `natural_dev_v1` and the 5 dev sets (RBAC, relevance, false refusal v1 and v2, compound). **UAT is not run.**
+- Configurations: {`legacy`, `s3`} × {3B, 7B, `qwen3.5:4b`, `sailor2:8b`} (`EVAL_LLM_MODEL`). So that a job stays under the 340-minute limit and the runner disk, each set and round has two jobs, each with its own `legacy` + 3B and `s3` + 3B: job A adds 7B and `qwen3.5:4b`, job B adds `sailor2:8b`. Two rounds (a, b) on separate jobs, 1 run per configuration (DEC-027).
+- Every configuration in these jobs runs with an LLM timeout of 600 s per call (`eval.yml` `llm_timeout`; the runners wait 4 × that), so that a slower model is judged on its answers, not cut off; latency is reported separately. Ollama keeps one model in memory (`OLLAMA_MAX_LOADED_MODELS=1`). Seed, temperature, prompts and every threshold stay as they are.
+- Per set and configuration: correct – false refusal – false answer – wrong, leaks; `natural_dev_v1` also near UAT / rest; right number, wrong subject (a wrong answer whose numbers are all in its cited sources, as for s1-s5); answers in the wrong language (an answered case with a CJK character, or a sentence of at least 5 ASCII words with 2 English stopwords); latency median and p95 per question; runner peak memory while the configuration ran. s3 drafts are saved (`simple_trace`).
+- For ND-002, 003, 011, 014 and 019: every model's answer, read against the gold.
+- **Rule:** each combination against `legacy` + 3B of its own job, DEC-026 (leaks = 0; dev false answers + wrong, `natural_dev_v1` included, not above; then fewer false refusals on `natural_dev_v1`, then on the other dev sets) and DEC-027 across the two rounds. **The default is not changed in this step.**
+- **Known limits:** the prompts and the thresholds (s3's e5 relevance check at 0.78, legacy's responsiveness check at 0.80) were calibrated with 3B and are not recalibrated per model; a model can lose answers to a threshold, not to its reading. Hardware figures are CPU-only (4 vCPU); VRAM needs are estimated from the model size, not measured.
+- **Result (2026-11-17):**
+  - Leaks 0 everywhere.
+  - **Win against `legacy` + 3B under DEC-026/027:** `s3` + `qwen3.5:4b`, `s3` + 7B, and `legacy` + `qwen3.5:4b`.
+    - Compared directly, `s3` + `qwen3.5:4b` and `s3` + 7B tie on every count.
+  - **Do not win:** `legacy` + 7B and `legacy` + `sailor2:8b` (more false refusals), and `s3` + `sailor2:8b` (more natural false refusals).
+  - Default unchanged.
+  - Oracle (5 dev sets, 1 run): `s3` + `qwen3.5:4b` gets 104 of 117 correct with gold context, against 106 / 107 with real retrieval.
+  - Details: `docs/design/model-comparison.md`; hardware per model: ADR 0003.

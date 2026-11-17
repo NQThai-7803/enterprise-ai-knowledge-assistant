@@ -177,7 +177,8 @@ class _Admin:
     def __init__(self, base_url: str, password: str) -> None:
         import httpx
 
-        self.http = httpx.Client(base_url=base_url, timeout=300, trust_env=False)
+        timeout = float(os.environ.get("EVAL_HTTP_TIMEOUT_SECONDS", "300"))
+        self.http = httpx.Client(base_url=base_url, timeout=timeout, trust_env=False)
         self.password = password
         self._login()
 

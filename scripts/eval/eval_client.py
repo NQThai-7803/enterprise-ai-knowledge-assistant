@@ -10,6 +10,7 @@ A 401 triggers one re-login and one retry of the same request.
 
 from __future__ import annotations
 
+import os
 import time
 from dataclasses import dataclass
 from typing import Any
@@ -41,7 +42,7 @@ class EvalClient:
         *,
         email: str,
         password: str,
-        timeout_seconds: float = 420.0,
+        timeout_seconds: float = float(os.environ.get("EVAL_HTTP_TIMEOUT_SECONDS", "420")),
         rate_limit_retries: int = 3,
         retry_sleep_seconds: float = 2.0,
         transport: httpx.BaseTransport | None = None,
