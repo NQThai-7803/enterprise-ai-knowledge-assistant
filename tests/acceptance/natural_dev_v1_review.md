@@ -11,9 +11,9 @@ Cách duyệt: với mỗi câu, đánh dấu **DUYỆT**, hoặc **SỬA** và 
 ## Kiểm tra
 
 - Lỗi cấu trúc: không có
-- Đoạn trích khớp đúng trang PDF: 46/46
+- Đoạn trích khớp đúng trang PDF: 47/47
 - Câu trùng 4-gram trong `app/`: {'ND-003': ['gia tri cot loi']}
-- Câu cần bạn quyết định: ND-002, ND-008, ND-011, ND-014
+- Câu cần bạn quyết định: không có
 - Câu gần một câu của bộ khác (bề mặt >= 0,60 hoặc e5 >= 0,90): ND-001, ND-003, ND-004, ND-005, ND-006, ND-008, ND-010, ND-011, ND-012, ND-013, ND-016
 
 ## ND-001: ANSWERED
@@ -51,25 +51,24 @@ Cách duyệt: với mỗi câu, đánh dấu **DUYỆT**, hoặc **SỬA** và 
 **Câu hỏi:** Tôi là ứng viên được tuyển và hoàn thành mốc thử việc thì được thưởng thêm gì không?
 
 **Ý bắt buộc:**
-1. Chính sách thưởng có Employee Referral Bonus 3 - 15 triệu đồng, điều kiện: ứng viên được tuyển và hoàn thành mốc thử việc/điều kiện chương trình.
-2. Đó là thưởng giới thiệu ứng viên; tài liệu không nói chính người được tuyển nhận khoản thưởng này.
+1. Đính chính: khoản thưởng gắn với việc ứng viên được tuyển và hoàn thành mốc thử việc là Employee Referral Bonus (thưởng giới thiệu, 3 - 15 triệu đồng), dành cho NGƯỜI GIỚI THIỆU ứng viên, không phải cho chính ứng viên.
+2. Tài liệu không nêu khoản thưởng nào cho chính ứng viên khi hoàn thành thử việc.
 
 **Tài liệu không nêu (phần của câu hỏi):**
 - Khoản thưởng nào dành cho chính ứng viên/người mới khi qua thử việc.
-- Ai nhận Employee Referral Bonus (ngoài tên chương trình).
 
 **Citation:** ND-HR-005 tr. 9
 
 **Đoạn trích:**
 - ND-HR-005 tr. 9 (khớp): "Employee Referral Bonus 3 - 15 triệu đồng Ứng viên được tuyển và hoàn thành mốc thử việc/điều kiện chương trình."
 
-**Điều kiện đạt:** Nêu Employee Referral Bonus 3 - 15 triệu đồng với điều kiện ứng viên được tuyển và qua thử việc, và nói rõ tài liệu không xác nhận chính ứng viên nhận khoản này.
+**Điều kiện đạt:** Đính chính rằng Employee Referral Bonus là thưởng cho người giới thiệu khi ứng viên được tuyển hoàn thành thử việc, không phải thưởng cho ứng viên (có thể kèm mức 3 - 15 triệu đồng).
 
 **Ví dụ không đạt:**
-- Khẳng định người được tuyển nhận 3 - 15 triệu đồng khi qua thử việc.
+- Nói ứng viên (người được tuyển) nhận 3 - 15 triệu đồng khi qua thử việc.
 - Nói không có khoản thưởng nào liên quan mà không nhắc Employee Referral Bonus.
 
-**CẦN BẠN QUYẾT ĐỊNH:** Người hỏi tự nhận là ứng viên; tài liệu chỉ có thưởng giới thiệu (Employee Referral Bonus) với điều kiện ứng viên qua thử việc. Giữ ANSWERED_LIMITED như bản nháp, hay ANSWERED nếu coi câu hỏi là hỏi về thưởng giới thiệu?
+**Ghi chú:** Owner 2026-11-17: ANSWERED_LIMITED; thưởng giới thiệu dành cho người giới thiệu, đạt khi đính chính, FAIL nếu nói ứng viên nhận 3 - 15 triệu. Trang 9 xếp khoản này trong mục 'Hiệu suất, dự án, sáng kiến, giới thiệu và thưởng đặc biệt'.
 
 - [ ] DUYỆT
 - [ ] SỬA:
@@ -240,12 +239,12 @@ Cách duyệt: với mỗi câu, đánh dấu **DUYỆT**, hoặc **SỬA** và 
 **Điều kiện đạt:** Nêu đúng 3 khối và nói rõ tài liệu không ghi giám đốc từng khối; có thể kèm Ban điều hành và phạm vi phụ trách.
 
 **Ví dụ không đạt:**
-- Gán chắc chắn một giám đốc cho từng khối, ví dụ giám đốc Khối Kinh doanh & Khách hàng là COO.
+- Tự gán một giám đốc cho từng khối, ví dụ giám đốc Khối Kinh doanh & Khách hàng là COO.
 - Một số khối khác 3 mà không giải thích.
 
 **Gần câu của bộ khác:** uat: bề mặt 0.582 (Q009), e5 0.9426 (Q002); heldout_v1: bề mặt 0.489 (HO-014), e5 0.916 (HO-014)
 
-**CẦN BẠN QUYẾT ĐỊNH:** Trang 7-8 cũng gọi một số đơn vị là 'Khối' (Khối Sản phẩm, Khối Kỹ thuật Phần mềm, Khối Kinh doanh & Marketing, Khối Customer Success & Managed Services). Bản nháp lấy 3 khối của sơ đồ trang 6. Duyệt, hay đổi số khối?
+**Ghi chú:** Owner 2026-11-17: ANSWERED_LIMITED; nêu 3 khối theo sơ đồ trang 6 và nói rõ tài liệu không quy định giám đốc riêng cho từng khối; FAIL nếu tự gán giám đốc cho từng khối. Trang 7-8 cũng gọi một số đơn vị là 'Khối'; số khối theo trang 6.
 
 - [ ] DUYỆT
 - [ ] SỬA:
@@ -323,13 +322,14 @@ Cách duyệt: với mỗi câu, đánh dấu **DUYỆT**, hoặc **SỬA** và 
 **Đoạn trích:**
 - ND-CORP-001 tr. 9 (khớp): "Tuân thủ và tố giác nội bộ compliance@novadigital.example"
 - ND-HR-002 tr. 9 (khớp): "Người lao động có thể phản ánh với quản lý, HR Business Partner, Ethics Officer hoặc kênh ethics@novadigital.example."
+- ND-HR-002 tr. 15 (khớp): "Đạo đức và phản ánh ethics@novadigital.example"
 
 **Ví dụ không đạt:**
-- Một địa chỉ email khác (hr@, people@, ...) cho việc tố giác.
+- Một địa chỉ email khác không được chỉ định cho tố giác (hr@, people@, ethics@, ...) mà không có compliance@.
 
 **Gần câu của bộ khác:** heldout_v2: bề mặt 0.63 (HO2-014), e5 0.8773 (HO2-014)
 
-**CẦN BẠN QUYẾT ĐỊNH:** Câu trả lời chỉ nêu ethics@novadigital.example (kênh phản ánh của nội quy), không có compliance@: bản nháp xếp KHÔNG ĐẠT. Duyệt, hay chấp nhận như đạt một phần?
+**Ghi chú:** Owner 2026-11-17: nếu tài liệu chỉ định ethics@ là kênh tố giác thì chỉ nêu ethics@ = PASS; nếu tài liệu liệt kê nhiều kênh dành riêng cho tố giác thì thiếu kênh = PARTIAL; email sai mục đích = FAIL. Theo PDF chỉ compliance@ được chỉ định cho tố giác, nên: nêu compliance@ = PASS (kèm ethics@ cũng được); chỉ nêu ethics@ hoặc email khác = FAIL.
 
 - [ ] DUYỆT
 - [ ] SỬA:
@@ -412,10 +412,10 @@ Cách duyệt: với mỗi câu, đánh dấu **DUYỆT**, hoặc **SỬA** và 
 **Điều kiện đạt:** Nói tài liệu không ghi số lần team building; có thể kèm company trip/retreat dự kiến 01 lần/năm và ngân sách 1.200.000 đ/người/năm.
 
 **Ví dụ không đạt:**
-- Khẳng định team building 01 lần/năm (đánh đồng với company trip).
+- Khẳng định team building 01 lần/năm (lấy từ company trip: sai chủ thể).
 - Một số lần không có trong tài liệu.
 
-**CẦN BẠN QUYẾT ĐỊNH:** Company trip/retreat dự kiến 01 lần/năm có được coi là câu trả lời cho 'team building mấy lần' không? Bản nháp: không, nên ANSWERED_LIMITED.
+**Ghi chú:** Owner 2026-11-17: ANSWERED_LIMITED; tài liệu không nêu số lần team building (chỉ có ngân sách/người/năm); trả '01 lần/năm' lấy từ company trip = FAIL (sai chủ thể).
 
 - [ ] DUYỆT
 - [ ] SỬA:

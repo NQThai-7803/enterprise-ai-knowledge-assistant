@@ -610,3 +610,67 @@ Correct – false refusal – false answer – wrong. Legacy is 98–1–0–1 o
 - **s4 = s3 on the dev sets** (no item changes) and does not reduce the UAT wrong-subject answers (8 and 6 against 7 and 6); on UAT it ends 4 questions per job, mostly correct ones. The wrong-subject risk is not handled by s4.
 - **s5 is worse than s4 on the dev sets under DEC-027** (one more false refusal in both jobs), and its dev-calibrated threshold refuses 25-27 UAT questions per job. The calibration rule missed drafts that the relevance check ends before another check would have retried them.
 - **s3 (= s4) meets DEC-026 in both jobs and wins against legacy under DEC-027**, as in s1-s3. Per the owner's rule it stays a candidate: `natural_dev_v1` is not measured yet (gold waiting for approval) and the wrong-subject risk is still open.
+
+#### Owner decision (2026-11-17)
+
+**s4 and s5 are dropped; s3 is the only candidate.** Their code stays behind `RAG_SIMPLE_SUBJECT_BINDING_ENABLED` and `RAG_SIMPLE_CLAIM_CROSS_ENCODER_ENABLED` (off) and is not measured further. The conclusion stands as recorded above: s4 changes no dev item and catches no UAT wrong-subject answer; s5 loses a dev item in both jobs and refuses a quarter of UAT.
+
+## s3 on `natural_dev_v1` (owner decision 2026-11-17)
+
+The owner approved the gold (ND-002, ND-008, ND-011, ND-014 as decided, the other 16 as drafted) and kept all 11 items flagged for overlap. Gold locked in `tests/acceptance/natural_dev_v1_gold.lock` (sha256 `0e942996…`, approved by "owner (NQThai-7803)") before any run on the set.
+
+### Measurement plan (written before measuring, DEC-026, DEC-027)
+
+- **Set:** `natural_dev_v1`, 20 questions as `staff` over corpus V2 (`eval.yml` `set=natural`, `scripts/eval/run_natural_dev.py`), one session per question.
+- **Configurations:** `legacy`; `s3` = `EVAL_ABLATION=simple_trace,EVAL_SIMPLE_LEVEL=3`. **Two separate jobs, each with its own `legacy`, 1 run per configuration** (DEC-027).
+- **Proxy grade** (`tests/acceptance/natural_dev_v1_proxy.yaml`, written from the locked gold before the run): leak = a citation of `UAT-GROUNDING-001` or a forbidden value; an ANSWERED item is correct when it answers, cites a gold or acceptable document, states every fact group of its keys and hits no `wrong` form; an ANSWERED_LIMITED item must also say what the documents do not state, and is a false answer (over-claim) without that, or wrong when a `wrong` form shows. Categories as on the other dev sets: correct – false refusal – false answer – wrong.
+- **Report:** per job and configuration: correct – false refusal – false answer – wrong, leaks; split near UAT (7 items: e5 to the nearest Q001-Q100 ≥ 0.90, the held-out v2 rule: ND-001, 004, 005, 006, 008, 012, 013) / the rest (13); changes between the two jobs; every s3 answer with a value of the wrong subject, read one by one against the gold (the proxy cannot see a subject). Where a reading of an answer disagrees with the proxy, both are reported; the proxy is not edited after the run.
+- **Rule:** DEC-026 with `natural_dev_v1` first (leaks = 0; dev false answers + wrong not above legacy; then fewer false refusals on `natural_dev_v1`), and DEC-027 across the two jobs. The other dev sets are as measured in "Results of s4-s5" (s3 meets DEC-026 there). **The default is not changed in this step.**
+
+### Results on `natural_dev_v1` (2026-11-17)
+
+Jobs on `2a1973f`: round a 44003367867, round b 44003391323; `legacy` then `s3`, 1 run each. Gold `0e942996…`, proxy keys `7a883219…` (recorded in every `results.json`). Correct – false refusal – false answer – wrong, job a / job b:
+
+| | legacy | s3 |
+|---|---|---|
+| **All (20)** | **3–7–1–9 / same** | **4–8–2–6 / 4–8–1–7** |
+| Near UAT (7) | 1–3–0–3 / same | 3–4–0–0 / same |
+| Rest (13) | 2–4–1–6 / same | 1–4–2–6 / 1–4–1–7 |
+| Leaks | 0 / 0 | 0 / 0 |
+| Median latency, s | 26.4 / 34.6 | 33.2 / 49.5 |
+
+- **Between the jobs:** legacy changes on 2 items (ND-007, ND-009 swap wrong and false refusal; same totals), s3 on 1 (ND-014, false answer → wrong).
+- **Per item, s3 against legacy (both jobs):** correct only under s3: ND-001, ND-010, ND-013; correct only under legacy: ND-016, ND-017 (by the proxy; see below); both correct: ND-004. s3 refuses ND-005, 006, 015 (and ND-007), which legacy answered wrongly (ND-007 in job a only), and answers ND-003 and ND-014, which legacy refused.
+
+#### DEC-026 and DEC-027
+
+1. Leaks: 0 on `natural_dev_v1` in both jobs (and on the other sets, "Results of s4-s5").
+2. False answers + wrong over the dev sets including `natural_dev_v1`: legacy 17 + 10 = 27 in each job; s3 13 + 8 = 21 / 12 + 8 = 20. Does not increase.
+3. False refusals on `natural_dev_v1`: legacy 7 / 7, s3 8 / 8. **Under DEC-027 this is a real difference against s3** (+1 in both jobs; neither configuration's count changes between the jobs). On the other dev sets s3 has 21 fewer (7 against 28).
+4. Also on `natural_dev_v1`: false answers + wrong −2 / −2 for s3 (real), correct +1 / +1.
+
+**So s3 does not win on `natural_dev_v1` under the order of DEC-026: it has one more false refusal there, though fewer wrong answers.** Both configurations answer few questions correctly (legacy 3, s3 4 of 20). The default is not changed.
+
+#### s3 answers with a value or source of the wrong subject (read one by one against the gold)
+
+| Item | Jobs | What s3 says | Gold |
+|---|---|---|---|
+| ND-002 | a, b | the candidate who passes probation receives the Employee Referral Bonus, 3-15 million | the bonus goes to the referrer (FAIL in the gold) |
+| ND-003 | a, b | the company's positioning statement (long-term technology partner …) | the five core values (ND-CORP-001 p. 4) |
+| ND-011 | a, b | soc@ and the incident channel, for reporting security incidents | compliance@, the channel named for internal whistleblowing |
+| ND-019 | a, b | leave to care for a sick child under the social-insurance law | what an employee who is seriously ill must do (notify the manager, Sick Leave on HRM) |
+| ND-014 | b | team building "planned once a year" | that is the company trip; the documents give no team-building count (FAIL in the gold) |
+
+Other s3 answers that are wrong but not of another subject: ND-014 in job a ("2. Hoạt động tập thể", no content), ND-016 (only the upper bound, "up to 2.0 months"), ND-017 (responsibilities not in the document's list in job a, two of five in job b), ND-020 (only "the direct manager decides" in job a, a page header in job b).
+
+#### Where a reading disagrees with the proxy (proxy not edited, DEC-011)
+
+- s3 ND-002 (both jobs) is a false answer by the proxy (no limit said) and a wrong-subject answer by reading; ND-014 job a is a false answer by the proxy and an empty answer by reading. Either way neither is correct.
+- s3 ND-020 job a is wrong by the proxy (no HRM request) and half right by reading (it names the manager).
+- legacy ND-017 is correct by the proxy (all five responsibilities) but **fails by reading**: it adds Payroll/Finance duties, which is the gold's FAIL example. legacy ND-005 (no fine, without "reminder") and ND-019 (notify, complete HRM later, without "manager") are wrong by the proxy and close to right by reading; legacy ND-009 job b (rules for AI tools, without "approved") the same. Read this way legacy has 2 correct answers and 3 close to right (ND-005, ND-019, ND-009 in job b); s3 has 4 correct and 1 half right (ND-020 in job a).
+
+#### Summary (for the owner; nothing is switched on)
+
+- On `natural_dev_v1` s3 has one more false refusal than legacy (8 against 7, in both jobs) and two fewer wrong answers (8 against 10); 4 against 3 correct by the proxy.
+- s3 gives 4 wrong-subject answers in both jobs (ND-002, ND-003, ND-011, ND-019) and a fifth in one job (ND-014). The wrong-subject risk is not handled.
+- Under DEC-026 (natural first) s3 does not win on `natural_dev_v1`, so by the owner's rule of 2026-11-16 the default stays `legacy`.

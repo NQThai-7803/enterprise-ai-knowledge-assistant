@@ -2,20 +2,25 @@
 
 usage (repo root, project venv):
   python scripts/eval/natural_dev_check.py [--e5-model-cache data/models]
+      [--lock-gold "<owner>"]
 
 Refuses a question file that differs from its lock, and gold whose ids or questions differ from
 it. Verifies every source_excerpt on its PDF page (corpus V2) and writes natural_dev_v1_review.md
 and natural_dev_v1_check.json next to the set. Overlap with UAT Q001-Q100, held-out v1/v2 and
 the dev sets is reported as numbers and nearest ids only (never another set's text) and rejects
 nothing; the review thresholds are surface >= 0.60 and e5 >= 0.90 (DEC-026 intake procedure).
+--lock-gold writes natural_dev_v1_gold.lock once the owner has approved the gold: it refuses gold
+with problems, excerpts not found on their page or an open owner_decision.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from collections.abc import Mapping, Sequence
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -31,6 +36,7 @@ LOCK = SET_DIR / "natural_dev_v1.lock"
 GOLD = SET_DIR / "natural_dev_v1_gold.yaml"
 REVIEW = SET_DIR / "natural_dev_v1_review.md"
 REPORT = SET_DIR / "natural_dev_v1_check.json"
+GOLD_LOCK = SET_DIR / "natural_dev_v1_gold.lock"
 STATUSES = heldout_check.STATUSES
 RESTRICTED = heldout_check.RESTRICTED
 
@@ -82,6 +88,48 @@ def gold_problems(items: Sequence[Mapping[str, Any]], frozen: Mapping[str, str])
         if not item.get("source_excerpt"):
             problems.append(f"{where}: no source excerpt")
     return problems
+
+
+class GoldNotLockedError(RuntimeError):
+    """The gold is not approved and locked, or differs from its lock."""
+
+
+def lock_gold(
+    approved_by: str, refusals: Sequence[str], gold: Path = GOLD, gold_lock: Path = GOLD_LOCK
+) -> dict[str, Any]:
+    """Write the gold lock; refuses without approved_by, with refusals or an open decision."""
+    items = heldout_v2_check._yaml(gold)["items"]
+    reasons = list(refusals) + [
+        f"{i['id']}: owner_decision open" for i in items if i.get("owner_decision")
+    ]
+    if not approved_by.strip():
+        reasons.append("approved_by is required")
+    if reasons:
+        raise GoldNotLockedError("; ".join(reasons))
+    payload = {
+        "version": "natural_dev_v1_gold",
+        "file": gold.name,
+        "sha256": hashlib.sha256(gold.read_bytes()).hexdigest(),
+        "items": len(items),
+        "approved_by": approved_by.strip(),
+        "locked_at": datetime.now(UTC).isoformat(timespec="seconds"),
+        "rule": "any edit needs a new approval and a new lock",
+    }
+    text = json.dumps(payload, ensure_ascii=False, indent=1) + "\n"
+    gold_lock.write_text(text, encoding="utf-8", newline="\n")  # LF on every OS
+    return payload
+
+
+def verify_gold(gold: Path = GOLD, gold_lock: Path = GOLD_LOCK) -> dict[str, Any]:
+    """The gold lock, once the gold matches it byte for byte and names its approver."""
+    if not gold_lock.is_file():
+        raise GoldNotLockedError(f"{gold_lock.name} missing: the gold is not approved yet")
+    lock = json.loads(gold_lock.read_text(encoding="utf-8"))
+    if hashlib.sha256(gold.read_bytes()).hexdigest() != lock.get("sha256"):
+        raise GoldNotLockedError("the gold differs from its lock; a new approval is needed")
+    if not str(lock.get("approved_by") or "").strip():
+        raise GoldNotLockedError("the gold lock has no approved_by")
+    return lock
 
 
 def e5_nearest(
@@ -226,6 +274,7 @@ def render_review(
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--e5-model-cache", help="folder holding multilingual-e5-small")
+    parser.add_argument("--lock-gold", metavar="APPROVED_BY", help="lock the approved gold")
     args = parser.parse_args(argv)
     try:
         lock = heldout_v2_check.verify_frozen(QUESTIONS, LOCK)
@@ -268,7 +317,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     shown = {k: v for k, v in report.items() if k not in ("overlap", "e5")}
     print(json.dumps(shown, ensure_ascii=False, indent=1))
-    return 1 if problems or report["excerpts_not_found"] else 0
+    refusals = problems + [
+        f"{r['id']}: excerpt not on its page" for r in report["excerpts_not_found"]
+    ]
+    if args.lock_gold is not None:
+        try:
+            print(json.dumps(lock_gold(args.lock_gold, refusals), ensure_ascii=False, indent=1))
+        except GoldNotLockedError as exc:
+            print(f"REFUSED: {exc}", file=sys.stderr)
+            return 2
+    return 1 if refusals else 0
 
 
 if __name__ == "__main__":

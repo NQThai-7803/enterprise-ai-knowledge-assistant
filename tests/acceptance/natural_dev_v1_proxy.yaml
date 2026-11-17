@@ -1,0 +1,70 @@
+# Proxy keys for grading natural_dev_v1 automatically (scripts/eval/run_natural_dev.py).
+# Written from the locked gold (gold_sha256) before any run on this set; the gold stays the
+# reference, and a reading of the answers can overrule the proxy (reported, never edited back).
+#
+# facts:  every group must be stated; a group holds alternative forms. Matching is folded (case,
+#         diacritics, dash forms ignored) and no digit may touch a form ("1 lần" is not "11 lần").
+# limits: ANSWERED_LIMITED only. The answer must say what the documents do not state: a form of
+#         the item's `limits` or of `limit_forms` below.
+# wrong:  forms that mark a wrong value or subject. On an ANSWERED item a hit fails the item; on an
+#         ANSWERED_LIMITED item it counts only when no limit is said (then wrong, not false answer).
+# Citations: a correct answer cites at least one gold or acceptable document of the item.
+version: natural_dev_v1_proxy
+gold_sha256: 0e942996165f33a3ab4e5436b2a1261ae74952e53724b2421c38071a0f0f9b96
+limit_forms:
+  - "không ghi"
+  - "không nêu"
+  - "không quy định"
+  - "không đề cập"
+  - "không có thông tin"
+  - "không nói"
+  - "không được nêu"
+  - "không được ghi"
+  - "không cung cấp"
+  - "không có quy định"
+  - "không xác định"
+  - "chưa xác minh được"
+items:
+  ND-001:
+    facts: [["11 ngày"]]
+  ND-002:
+    facts: [["giới thiệu", "referral"]]
+    limits: ["người giới thiệu", "không phải cho ứng viên", "không dành cho ứng viên", "không phải dành cho ứng viên", "không phải thưởng cho ứng viên", "không phải là thưởng cho ứng viên"]
+  ND-003:
+    facts: [["tin cậy"], ["khách hàng làm trung tâm"], ["chất lượng kỹ thuật"], ["hợp tác có trách nhiệm"], ["học hỏi liên tục"]]
+  ND-004:
+    facts: [["03 ngày", "3 ngày", "ba ngày"]]
+  ND-005:
+    facts: [["nhắc nhở"]]
+  ND-006:
+    facts: [["không cấm", "được phép", "có quyền", "không bị hạn chế", "có thể trao đổi", "có thể chia sẻ", "có thể nói", "được trao đổi", "được chia sẻ", "được nói"]]
+  ND-007:
+    facts: [["chia sẻ"], ["cấm", "không được"], ["kỷ luật"]]
+  ND-008:
+    facts: [["sản phẩm & công nghệ", "sản phẩm và công nghệ"], ["kinh doanh & khách hàng", "kinh doanh và khách hàng"], ["vận hành doanh nghiệp"]]
+  ND-009:
+    facts: [["phê duyệt", "được duyệt", "đã duyệt"]]
+  ND-010:
+    facts: [["đề nghị tạm ứng", "xin tạm ứng", "có thể tạm ứng", "được tạm ứng"]]
+    wrong: ["không được tạm ứng", "không thể tạm ứng"]
+  ND-011:
+    facts: [["compliance@"]]
+  ND-012:
+    facts: [["chấp thuận", "phê duyệt", "duyệt", "đồng ý"]]
+  ND-013:
+    facts: [["2.000.000", "2 triệu"]]
+  ND-014:
+    facts: []
+    wrong: ["01 lần", "1 lần", "một lần"]
+  ND-015:
+    facts: [["ticket"], ["đối chiếu", "xác minh"], ["03 ngày", "3 ngày"]]
+  ND-016:
+    facts: [["1,5 - 2,0", "1,5-2,0", "1.5 - 2.0", "1.5-2.0", "1,5 đến 2,0", "1,5 tới 2,0"]]
+  ND-017:
+    facts: [["đăng ký"], ["hướng dẫn hồ sơ"], ["nhà bảo hiểm"], ["ticket"], ["bảo mật dữ liệu"]]
+  ND-018:
+    facts: [["tháng 01 - 02", "tháng 1 - 2", "tháng 01-02", "tháng 1-2", "tháng 01 đến tháng 02", "tháng 1 đến tháng 2", "tháng 01 và 02", "tháng 1 và 2", "tháng 01 và tháng 02", "tháng 1 và tháng 2", "tháng 01 - tháng 02", "tháng 1 - tháng 2"]]
+  ND-019:
+    facts: [["quản lý"], ["HRM", "sick leave", "BHXH"]]
+  ND-020:
+    facts: [["HRM"], ["quản lý"]]

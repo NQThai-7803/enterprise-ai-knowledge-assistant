@@ -1,5 +1,13 @@
 # Project Status
 
+## s3 measured on natural_dev_v1 -- 2026-11-17 (STOPPED for the owner's review)
+
+- Owner decisions applied: s4 and s5 dropped (code stays behind its flags, off), s3 the only candidate; `natural_dev_v1` gold approved (ND-002, ND-008, ND-011, ND-014 as decided) and locked (`natural_dev_v1_gold.lock`, approved by "owner (NQThai-7803)"); all 11 overlap items kept, reported near UAT (7) / rest (13).
+- New eval set `set=natural` (`scripts/eval/run_natural_dev.py`): 20 questions as staff over corpus V2, proxy-graded on keys written from the locked gold before the run.
+- **natural_dev_v1, 2 jobs, correct–false refusal–false answer–wrong:** legacy 3–7–1–9 in both; s3 4–8–2–6 / 4–8–1–7. Leaks 0. Under DEC-026/027 s3 has one more false refusal (real) and two fewer wrong answers; **it does not win on natural_dev_v1. Default stays `legacy`.**
+- s3 gives wrong-subject answers on ND-002, ND-003, ND-011, ND-019 (both jobs) and ND-014 (one job) (`docs/design/simple-answer-mode.md`, "Results on natural_dev_v1").
+- eaka-verify green on `a0c1c08` and `2a1973f` (covers `6e699f5`, `5450a29`, `1b70cc4`).
+
 ## Simple mode s4-s5 measured; natural_dev_v1 gold drafted -- 2026-11-17 (STOPPED for the owner's review)
 
 - Owner decision 2026-11-16: `legacy` stays the default; s3 is the candidate, switched on only once it wins on `natural_dev_v1` and the wrong-subject risk is handled. DEC-027 recorded before measuring: decisions rest on at least 2 separate Actions jobs, each with its own `legacy`; a difference smaller than the between-job variation is a tie.

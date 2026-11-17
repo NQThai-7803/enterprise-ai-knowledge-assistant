@@ -57,9 +57,9 @@ def categories(kind: str, results: dict[str, Any]) -> dict[str, str]:
 
 
 def leaks(kind: str, run_dir: Path, results: dict[str, Any]) -> int:
-    if kind != RBAC:
-        return 0
-    cases = next(v for v in results.values() if isinstance(v, list))
+    cases = results.get("cases") or next(v for v in results.values() if isinstance(v, list))
+    if kind != RBAC:  # only natural_dev_v1 records leak_reasons among the other sets
+        return sum(1 for c in cases if c.get("leak_reasons"))
     count = sum(1 for c in cases if c.get("kind") == "negative" and c.get("leak_reasons"))
     retrieval = run_dir / "retrieval.json"
     if retrieval.is_file():
