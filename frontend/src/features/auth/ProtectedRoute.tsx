@@ -19,7 +19,7 @@ export function ProtectedRoute({
   }
 
   if (status !== "authenticated" || !user) {
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+    return <Navigate to="/login" replace state={{ from: `${location.pathname}${location.search}` }} />;
   }
 
   if (roles && !hasRole(user, roles)) {

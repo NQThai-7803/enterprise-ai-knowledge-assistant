@@ -18,7 +18,7 @@ export function ConfirmDialog({
   open,
   title,
   message,
-  confirmLabel = "Confirm",
+  confirmLabel = "Xác nhận",
   onConfirm,
   onCancel,
   loading = false,
@@ -128,7 +128,7 @@ export function ConfirmDialog({
         </div>
         <div className="mt-5 flex justify-end gap-2">
           <Button type="button" variant="secondary" onClick={onCancel} disabled={loading}>
-            Cancel
+            Hủy
           </Button>
           <Button type="button" variant="danger" onClick={onConfirm} loading={loading}>
             {confirmLabel}

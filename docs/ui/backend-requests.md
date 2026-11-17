@@ -35,6 +35,7 @@ Tình trạng 17/11/2026: BR-1 → BR-9 đều ở trạng thái CHỜ OWNER CHU
 - Hiện API_SPEC nói gì: §7 cuối: "Not implemented yet: … Preview endpoint. Signed download URLs." `/download` trả `Content-Disposition: attachment`. Citation đã có `document_id` và `page_number` (§8A).
 - Có làm đổi hành vi/API hiện tại không: Không, chỉ thêm endpoint.
 - UI tạm thời đang xử lý thế nào: Owner đã duyệt (17/11/2026). Liên kết "Mở tài liệu tại trang N" mở tab mới tới route `/documents/:id/view?page=N` của app. Trang này gọi `GET /documents/{id}/download` (có Bearer), tạo `blob:` URL, nhúng vào khung PDF với `#page=N`. Chỉ tới được trang, không tô được câu; nhược điểm: tải cả tệp mỗi lần. Có `TODO(BR-2)` để đổi sang endpoint preview khi có. Tài liệu PNG/JPEG hiện ảnh, bỏ `#page`.
+  - Ghi nhận khi làm (17/11/2026): token nằm trong `sessionStorage`, nên liên kết dùng `rel="opener"` để tab mới nhận bản sao token (đã kiểm bằng Playwright). Hệ quả: hai tab dùng chung một refresh token; refresh xoay vòng token (API_SPEC §4), nên nếu tab xem tài liệu phải refresh thì tab gốc sẽ bị đăng xuất ở lần refresh sau. Chỉ xảy ra khi access token sắp hết hạn lúc mở tab. Endpoint preview vẫn cần Bearer nên không gỡ được rủi ro này; URL ký tạm thời (phương án thay thế ở trên) thì gỡ được.
 - Trạng thái: CHỜ OWNER CHUYỂN
 
 ### BR-3: `grounding_status` trong lịch sử chat và hợp đồng của câu "Chưa xác minh được…" (kèm bản tiếng Anh)

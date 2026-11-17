@@ -1,26 +1,24 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import {Bot, Plus, Send, Square, ThumbsDown, ThumbsUp, Trash2, UserRound,} from "lucide-react";
+import { clsx } from "clsx";
+import { ArrowRight, Plus, Square, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { apiClient } from "../../api/client";
 import { ApiError, safeErrorMessage } from "../../api/errors";
 import { streamChatMessage } from "../../api/sse";
-import type {ChatMessage, ChatSessionSummary, Citation, ListResponse,} from "../../api/types";
+import type { ChatSessionSummary, FeedbackRating, ListResponse } from "../../api/types";
 import { useToast } from "../../components/feedback/ToastProvider";
-import { PageHeader } from "../../components/layout/PageHeader";
-import { ShimmerText } from "../../components/motion/ShimmerText";
-import { SpotlightPanel } from "../../components/motion/SpotlightPanel";
-import { Badge } from "../../components/ui/Badge";
-import { Button } from "../../components/ui/Button";
-import { TextArea } from "../../components/ui/Field";
-import { Panel } from "../../components/ui/Panel";
+import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { EmptyState, ErrorState, LoadingState } from "../../components/ui/State";
-import { formatDateTime } from "../../lib/format";
-import {applyChatStreamEvent, cancelChatStreamState, connectingChatStreamState, initialChatStreamState,} from "./streamState";
+import { AnswerCard } from "./AnswerCard";
+import { CitationPanel, type ConversationCitation } from "./CitationPanel";
+import {
+  applyChatStreamEvent,
+  cancelChatStreamState,
+  connectingChatStreamState,
+  initialChatStreamState,
+} from "./streamState";
 
-type ConversationCitation = Citation & {
-  globalOrder: number;
-  messageId: string | null;
-};
+const UNTITLED_SESSION = "Cuộc trò chuyện chưa đặt tên";
 
 export function ChatPage() {
   const queryClient = useQueryClient();
@@ -32,18 +30,14 @@ export function ChatPage() {
   const abortRef = useRef<AbortController | null>(null);
   const messagesContainerRef = useRef<HTMLDivElement | null>(null);
   const [autoFollowConversation, setAutoFollowConversation] = useState(true);
-  const citationHighlightTimerRef = useRef<number | null>(null);
-  const [highlightedCitation, setHighlightedCitation] = useState<number | null>(
+  const [selectedCitation, setSelectedCitation] = useState<{ sessionId: string | null; order: number } | null>(
     null,
   );
+  const [sessionToDelete, setSessionToDelete] = useState<ChatSessionSummary | null>(null);
 
   useEffect(() => {
     return () => {
       abortRef.current?.abort();
-
-      if (citationHighlightTimerRef.current !== null) {
-        window.clearTimeout(citationHighlightTimerRef.current);
-      }
     };
   }, []);
 
@@ -55,8 +49,6 @@ export function ChatPage() {
   const sessions = sessionsQuery.data?.data ?? [];
   const selectedSessionId = activeSessionId ?? sessions[0]?.id ?? null;
 
-
-
   const sessionQuery = useQuery({
     queryKey: ["chat", "session", selectedSessionId],
     queryFn: () =>
@@ -66,10 +58,7 @@ export function ChatPage() {
       }),
     enabled: Boolean(selectedSessionId),
     retry: (failureCount, error) => {
-      if (
-        error instanceof ApiError &&
-        error.code === "CHAT_SESSION_NOT_FOUND"
-      ) {
+      if (error instanceof ApiError && error.code === "CHAT_SESSION_NOT_FOUND") {
         return false;
       }
 
@@ -86,44 +75,35 @@ export function ChatPage() {
   });
 
   const feedbackMutation = useMutation({
-    mutationFn: ({ messageId, rating }: { messageId: string; rating: "HELPFUL" | "NOT_HELPFUL" }) =>
+    mutationFn: ({ messageId, rating }: { messageId: string; rating: FeedbackRating }) =>
       apiClient.feedback.upsert(messageId, { rating }),
-    onSuccess: () => pushToast({ tone: "success", title: "Feedback saved" }),
-    onError: (error) => pushToast({ tone: "error", title: "Feedback failed", message: safeErrorMessage(error) }),
+    onSuccess: () => pushToast({ tone: "success", title: "Đã lưu đánh giá" }),
+    onError: (error) => pushToast({ tone: "error", title: "Lưu đánh giá thất bại", message: safeErrorMessage(error) }),
   });
 
   const deleteSessionMutation = useMutation({
-    mutationFn: (sessionId: string) =>
-      apiClient.chat.deleteSession(sessionId),
+    mutationFn: (sessionId: string) => apiClient.chat.deleteSession(sessionId),
 
     onSuccess: async (_, deletedSessionId) => {
-      queryClient.setQueryData<ListResponse<ChatSessionSummary>>(
-        ["chat", "sessions"],
-        (current) => {
-          if (!current) {
-            return current;
-          }
+      queryClient.setQueryData<ListResponse<ChatSessionSummary>>(["chat", "sessions"], (current) => {
+        if (!current) {
+          return current;
+        }
 
-          const nextData = current.data.filter(
-            (session) => session.id !== deletedSessionId,
-          );
+        const nextData = current.data.filter((session) => session.id !== deletedSessionId);
 
-          const nextTotal = Math.max(0, current.meta.total - 1);
+        const nextTotal = Math.max(0, current.meta.total - 1);
 
-          return {
-            ...current,
-            data: nextData,
-            meta: {
-              ...current.meta,
-              total: nextTotal,
-              total_pages:
-                nextTotal === 0
-                  ? 0
-                  : Math.ceil(nextTotal / current.meta.page_size),
-            },
-          };
-        },
-      );
+        return {
+          ...current,
+          data: nextData,
+          meta: {
+            ...current.meta,
+            total: nextTotal,
+            total_pages: nextTotal === 0 ? 0 : Math.ceil(nextTotal / current.meta.page_size),
+          },
+        };
+      });
 
       queryClient.removeQueries({
         queryKey: ["chat", "session", deletedSessionId],
@@ -137,9 +117,10 @@ export function ChatPage() {
         setAutoFollowConversation(true);
       }
 
+      setSessionToDelete(null);
       pushToast({
         tone: "success",
-        title: "Conversation deleted",
+        title: "Đã xóa cuộc trò chuyện",
       });
 
       await queryClient.invalidateQueries({
@@ -148,59 +129,40 @@ export function ChatPage() {
     },
 
     onError: (error, deletedSessionId) => {
-      if (
-        error instanceof ApiError &&
-        error.code === "CHAT_SESSION_NOT_FOUND"
-      ) {
-        queryClient.setQueryData<ListResponse<ChatSessionSummary>>(
-          ["chat", "sessions"],
-          (current) => {
-            if (!current) {
-              return current;
-            }
+      setSessionToDelete(null);
+      if (error instanceof ApiError && error.code === "CHAT_SESSION_NOT_FOUND") {
+        queryClient.setQueryData<ListResponse<ChatSessionSummary>>(["chat", "sessions"], (current) => {
+          if (!current) {
+            return current;
+          }
 
-            const nextData = current.data.filter(
-              (session) => session.id !== deletedSessionId,
-            );
+          const nextData = current.data.filter((session) => session.id !== deletedSessionId);
 
-            const removed =
-              nextData.length !== current.data.length;
+          const removed = nextData.length !== current.data.length;
 
-            if (!removed) {
-              return current;
-            }
+          if (!removed) {
+            return current;
+          }
 
-            const nextTotal = Math.max(
-              0,
-              current.meta.total - 1,
-            );
+          const nextTotal = Math.max(0, current.meta.total - 1);
 
-            return {
-              ...current,
-              data: nextData,
-              meta: {
-                ...current.meta,
-                total: nextTotal,
-                total_pages:
-                  nextTotal === 0
-                    ? 0
-                    : Math.ceil(
-                        nextTotal / current.meta.page_size,
-                      ),
-              },
-            };
-          },
-        );
+          return {
+            ...current,
+            data: nextData,
+            meta: {
+              ...current.meta,
+              total: nextTotal,
+              total_pages: nextTotal === 0 ? 0 : Math.ceil(nextTotal / current.meta.page_size),
+            },
+          };
+        });
 
         queryClient.removeQueries({
           queryKey: ["chat", "session", deletedSessionId],
           exact: true,
         });
 
-        if (
-          activeSessionId === deletedSessionId ||
-          selectedSessionId === deletedSessionId
-        ) {
+        if (activeSessionId === deletedSessionId || selectedSessionId === deletedSessionId) {
           setActiveSessionId(null);
           setPendingUserMessage(null);
           setStreamState(initialChatStreamState);
@@ -209,7 +171,7 @@ export function ChatPage() {
 
         pushToast({
           tone: "info",
-          title: "Conversation already removed",
+          title: "Cuộc trò chuyện đã được xóa trước đó",
         });
 
         void queryClient.invalidateQueries({
@@ -221,38 +183,25 @@ export function ChatPage() {
 
       pushToast({
         tone: "error",
-        title: "Delete failed",
+        title: "Xóa thất bại",
         message: safeErrorMessage(error),
       });
     },
   });
 
-  
-  const messages = sessionQuery.data?.data.messages ?? [];
+  const messages = useMemo(() => sessionQuery.data?.data.messages ?? [], [sessionQuery.data]);
+  // Global citation numbers restart per conversation, so a selection only counts for its own session.
+  const selectedOrder = selectedCitation?.sessionId === selectedSessionId ? selectedCitation.order : null;
 
   const focusCitation = (globalOrder: number) => {
-    setHighlightedCitation(globalOrder);
+    setSelectedCitation({ sessionId: selectedSessionId, order: globalOrder });
 
     window.requestAnimationFrame(() => {
-      document
-        .getElementById(`citation-${globalOrder}`)
-        ?.scrollIntoView({
-          behavior: "smooth",
-          block: "center",
-        });
+      document.getElementById(`citation-${globalOrder}`)?.scrollIntoView({
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+        block: "center",
+      });
     });
-
-    if (citationHighlightTimerRef.current !== null) {
-      window.clearTimeout(citationHighlightTimerRef.current);
-    }
-
-    citationHighlightTimerRef.current = window.setTimeout(() => {
-      setHighlightedCitation((current) =>
-        current === globalOrder ? null : current,
-      );
-
-      citationHighlightTimerRef.current = null;
-    }, 1400);
   };
 
   const citationView = useMemo(() => {
@@ -263,27 +212,20 @@ export function ChatPage() {
     let nextGlobalOrder = 1;
 
     for (const message of messages) {
-      if (
-        message.role !== "ASSISTANT" ||
-        message.citations.length === 0
-      ) {
+      if (message.role !== "ASSISTANT" || message.citations.length === 0) {
         continue;
       }
 
       const localMap = new Map<number, number>();
 
       const orderedCitations = [...message.citations].sort(
-        (left, right) =>
-          left.citation_order - right.citation_order,
+        (left, right) => left.citation_order - right.citation_order,
       );
 
       for (const citation of orderedCitations) {
         const globalOrder = nextGlobalOrder++;
 
-        localMap.set(
-          citation.citation_order,
-          globalOrder,
-        );
+        localMap.set(citation.citation_order, globalOrder);
 
         items.push({
           ...citation,
@@ -295,33 +237,20 @@ export function ChatPage() {
       byMessage.set(message.id, localMap);
     }
 
-    const completedMessageId =
-      streamState.completed?.message_id ?? null;
+    const completedMessageId = streamState.completed?.message_id ?? null;
 
     const streamAlreadyInHistory =
-      completedMessageId !== null &&
-      messages.some(
-        (message) => message.id === completedMessageId,
-      );
+      completedMessageId !== null && messages.some((message) => message.id === completedMessageId);
 
-    if (
-      !streamAlreadyInHistory &&
-      streamState.citations.length > 0
-    ) {
-      const orderedStreamCitations = [
-        ...streamState.citations,
-      ].sort(
-        (left, right) =>
-          left.citation_order - right.citation_order,
+    if (!streamAlreadyInHistory && streamState.citations.length > 0) {
+      const orderedStreamCitations = [...streamState.citations].sort(
+        (left, right) => left.citation_order - right.citation_order,
       );
 
       for (const citation of orderedStreamCitations) {
         const globalOrder = nextGlobalOrder++;
 
-        streamMap.set(
-          citation.citation_order,
-          globalOrder,
-        );
+        streamMap.set(citation.citation_order, globalOrder);
 
         items.push({
           ...citation,
@@ -336,13 +265,10 @@ export function ChatPage() {
       byMessage,
       streamMap,
     };
-  }, [
-    messages,
-    streamState.citations,
-    streamState.completed?.message_id,
-  ]);
+  }, [messages, streamState.citations, streamState.completed?.message_id]);
+
   const startNewSession = async () => {
-    const response = await createSessionMutation.mutateAsync("New chat");
+    const response = await createSessionMutation.mutateAsync("Cuộc trò chuyện mới");
     setActiveSessionId(response.data.id);
     setStreamState(initialChatStreamState);
     setPendingUserMessage(null);
@@ -351,7 +277,12 @@ export function ChatPage() {
 
   const sendMessage = async () => {
     const content = draft.trim();
-    if (!content || streamState.status === "connecting" || streamState.status === "started" || streamState.status === "receiving") {
+    if (
+      !content ||
+      streamState.status === "connecting" ||
+      streamState.status === "started" ||
+      streamState.status === "receiving"
+    ) {
       return;
     }
 
@@ -381,7 +312,7 @@ export function ChatPage() {
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
         setStreamState((current) => cancelChatStreamState(current));
-        pushToast({ tone: "info", title: "Stream cancelled" });
+        pushToast({ tone: "info", title: "Đã dừng câu trả lời" });
       } else if (error instanceof ApiError) {
         setStreamState((current) => ({
           ...current,
@@ -409,8 +340,7 @@ export function ChatPage() {
 
   const streamingActive = ["connecting", "started", "receiving"].includes(streamState.status);
   const sessionNotFound =
-    (sessionQuery.error instanceof ApiError &&
-      sessionQuery.error.code === "CHAT_SESSION_NOT_FOUND") ||
+    (sessionQuery.error instanceof ApiError && sessionQuery.error.code === "CHAT_SESSION_NOT_FOUND") ||
     streamState.error?.code === "CHAT_SESSION_NOT_FOUND";
 
   useEffect(() => {
@@ -420,46 +350,36 @@ export function ChatPage() {
 
     const staleSessionId = selectedSessionId;
 
-    queryClient.setQueryData<ListResponse<ChatSessionSummary>>(
-      ["chat", "sessions"],
-      (current) => {
-        if (!current) {
-          return current;
-        }
+    queryClient.setQueryData<ListResponse<ChatSessionSummary>>(["chat", "sessions"], (current) => {
+      if (!current) {
+        return current;
+      }
 
-        const nextData = current.data.filter(
-          (session) => session.id !== staleSessionId,
-        );
+      const nextData = current.data.filter((session) => session.id !== staleSessionId);
 
-        if (nextData.length === current.data.length) {
-          return current;
-        }
+      if (nextData.length === current.data.length) {
+        return current;
+      }
 
-        const nextTotal = Math.max(0, current.meta.total - 1);
+      const nextTotal = Math.max(0, current.meta.total - 1);
 
-        return {
-          ...current,
-          data: nextData,
-          meta: {
-            ...current.meta,
-            total: nextTotal,
-            total_pages:
-              nextTotal === 0
-                ? 0
-                : Math.ceil(nextTotal / current.meta.page_size),
-          },
-        };
-      },
-    );
+      return {
+        ...current,
+        data: nextData,
+        meta: {
+          ...current.meta,
+          total: nextTotal,
+          total_pages: nextTotal === 0 ? 0 : Math.ceil(nextTotal / current.meta.page_size),
+        },
+      };
+    });
 
     queryClient.removeQueries({
       queryKey: ["chat", "session", staleSessionId],
       exact: true,
     });
 
-    setActiveSessionId((current) =>
-      current === staleSessionId ? null : current,
-    );
+    setActiveSessionId((current) => (current === staleSessionId ? null : current));
 
     setPendingUserMessage(null);
     setStreamState(initialChatStreamState);
@@ -468,11 +388,7 @@ export function ChatPage() {
     void queryClient.invalidateQueries({
       queryKey: ["chat", "sessions"],
     });
-  }, [
-    queryClient,
-    selectedSessionId,
-    sessionNotFound,
-  ]);
+  }, [queryClient, selectedSessionId, sessionNotFound]);
 
   useEffect(() => {
     const container = messagesContainerRef.current;
@@ -500,549 +416,277 @@ export function ChatPage() {
     streamState.status,
   ]);
 
+  const completed = streamState.completed;
+  // buffer_after_validation: the answer only appears once message.completed arrives, in one piece.
+  const showStreamAnswer =
+    streamState.status === "completed" &&
+    completed !== null &&
+    !messages.some((message) => message.id === completed.message_id);
+  const sessionTitle = selectedSessionId
+    ? (sessions.find((session) => session.id === selectedSessionId)?.title ?? UNTITLED_SESSION)
+    : "Cuộc trò chuyện mới";
+
   return (
-    <div>
-      <PageHeader
-        title="AI Chat workspace"
-        description="Grounded answers use selected document context and validated citations before content is shown."
-        actions={
-          <Button type="button" variant="secondary" onClick={startNewSession} loading={createSessionMutation.isPending} icon={<Plus className="h-4 w-4" aria-hidden="true" />}>
-            New session
-          </Button>
-        }
-      />
+    <div className="flex flex-col gap-4 xl:-m-10 xl:grid xl:h-[100dvh] xl:grid-cols-[14rem_minmax(0,1fr)_20rem] xl:gap-0">
+      <h1 className="sr-only">Trò chuyện</h1>
 
-      <div className="grid gap-4 xl:grid-cols-[18rem_minmax(0,1fr)_22rem]">
-        <Panel className="min-h-[28rem] overflow-hidden">
-          <div className="shrink-0 border-b border-border px-4 py-3">
-            <h3 className="text-sm font-semibold">Sessions</h3>
-          </div>
-          <div className="app-scrollbar max-h-[calc(100dvh-13rem)] overflow-y-auto p-2">
-            {sessionsQuery.isLoading ? <LoadingState label="Loading sessions" /> : null}
-            {sessionsQuery.isError ? <ErrorState message={safeErrorMessage(sessionsQuery.error)} onRetry={() => void sessionsQuery.refetch()} /> : null}
-            {!sessionsQuery.isLoading && sessions.length === 0 ? <EmptyState title="No chat sessions" /> : null}
-            {sessions.map((session) => {
-              const isSelected = selectedSessionId === session.id;
+      <section
+        aria-label="Danh sách cuộc trò chuyện"
+        className="flex min-h-0 flex-col bg-surface max-xl:rounded-xl max-xl:border max-xl:border-border xl:border-r xl:border-border/70"
+      >
+        <div className="flex items-center justify-between gap-2 px-4 py-4">
+          <h2 className="text-sm font-semibold">Cuộc trò chuyện</h2>
+          <button
+            type="button"
+            className="flex h-8 w-8 items-center justify-center rounded-token border border-border/70 text-ink transition hover:bg-canvas disabled:opacity-50"
+            onClick={() => void startNewSession()}
+            disabled={createSessionMutation.isPending}
+            aria-label="Cuộc trò chuyện mới"
+            title="Cuộc trò chuyện mới"
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+          </button>
+        </div>
+        <div className="app-scrollbar min-h-0 flex-1 overflow-y-auto px-2 pb-3 max-xl:max-h-64">
+          {sessionsQuery.isLoading ? <LoadingState label="Đang tải danh sách" /> : null}
+          {sessionsQuery.isError ? (
+            <ErrorState
+              title="Không tải được danh sách"
+              message={safeErrorMessage(sessionsQuery.error)}
+              onRetry={() => void sessionsQuery.refetch()}
+            />
+          ) : null}
+          {!sessionsQuery.isLoading && !sessionsQuery.isError && sessions.length === 0 ? (
+            <p className="px-2 py-4 text-[13px] text-muted">Chưa có cuộc trò chuyện nào.</p>
+          ) : null}
+          {sessions.map((session) => {
+            const isSelected = selectedSessionId === session.id;
+            const title = session.title ?? UNTITLED_SESSION;
+            const deleteDisabled = deleteSessionMutation.isPending || (streamingActive && isSelected);
 
-              const deleteDisabled =
-                deleteSessionMutation.isPending ||
-                (streamingActive && isSelected);
-
-              return (
-                <div
-                  key={session.id}
-                  className={`mb-2 flex w-full items-stretch overflow-hidden rounded-token border text-sm transition ${
-                    isSelected
-                      ? "border-accent bg-accent/10"
-                      : "border-border bg-surface"
-                  }`}
-                >
-                  <button
-                    type="button"
-                    className="min-w-0 flex-1 px-3 py-2 text-left transition hover:bg-elevated/70"
-                    onClick={() => {
-                      setActiveSessionId(session.id);
-                      setStreamState(initialChatStreamState);
-                      setPendingUserMessage(null);
-                      setAutoFollowConversation(true);
-                    }}
-                  >
-                    <span className="block truncate font-semibold text-ink">
-                      {session.title ?? "Untitled chat"}
-                    </span>
-
-                    <span className="mt-1 block text-xs text-muted">
-                      {session.message_count} messages
-                    </span>
-                  </button>
-
-                  <button
-                    type="button"
-                    className="flex w-10 shrink-0 items-center justify-center border-l border-border text-muted transition hover:bg-danger/10 hover:text-danger disabled:cursor-not-allowed disabled:opacity-40"
-                    disabled={deleteDisabled}
-                    title={
-                      streamingActive && isSelected
-                        ? "Stop the active response before deleting this session"
-                        : "Delete conversation"
-                    }
-                    aria-label={`Delete ${session.title ?? "Untitled chat"}`}
-                    onClick={() => {
-                      const confirmed = window.confirm(
-                        `Delete "${session.title ?? "Untitled chat"}"?\n\nThis conversation and its messages will be permanently deleted.`,
-                      );
-
-                      if (!confirmed) {
-                        return;
-                      }
-
-                      deleteSessionMutation.mutate(session.id);
-                    }}
-                  >
-                    <Trash2 className="h-4 w-4" aria-hidden="true" />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        </Panel>
-
-        <SpotlightPanel className="h-[calc(100dvh-13rem)] min-h-[34rem] overflow-hidden border border-border bg-surface shadow-sm">
-          <div className="flex h-full min-h-0 flex-col">
-            <div className="shrink-0 border-b border-border px-4 py-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <h3 className="text-sm font-semibold">Conversation</h3>
-                  <p className="text-xs text-muted">SSE strategy: buffer_after_validation</p>
-                </div>
-                {streamingActive ? <Badge tone="warning">Checking sources</Badge> : null}
-              </div>
-            </div>
-
-            <div
-              ref={messagesContainerRef}
-              className="app-scrollbar min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4"
-              aria-live="polite"
-              onScroll={(event) => {
-                const container = event.currentTarget;
-
-                const distanceFromBottom =
-                  container.scrollHeight -
-                  container.scrollTop -
-                  container.clientHeight;
-
-                setAutoFollowConversation(distanceFromBottom <= 96);
-              }}
-            >
-              {sessionQuery.isLoading && selectedSessionId ? <LoadingState label="Loading messages" /> : null}
-              {sessionQuery.isError &&
-              selectedSessionId &&
-              !sessionNotFound ? (
-                <ErrorState
-                  message={safeErrorMessage(sessionQuery.error)}
-                  onRetry={() => void sessionQuery.refetch()}
-                />
-              ) : null}
-              {!sessionQuery.isLoading && !selectedSessionId ? <EmptyState title="Start a chat session" description="Create a session or send a question to begin." /> : null}
-              {!sessionQuery.isLoading && selectedSessionId && messages.length === 0 && !pendingUserMessage && streamState.status === "idle" ? (
-                <EmptyState title="No messages yet" description="Ask a question about documents you can access." />
-              ) : null}
-
-              {messages.map((message) => (
-                <MessageBubble
-                  key={message.id}
-                  message={message}
-                  citationMap={citationView.byMessage.get(message.id)}
-                  onCitationClick={focusCitation}
-                  onFeedback={(rating) =>
-                    feedbackMutation.mutate({
-                      messageId: message.id,
-                      rating,
-                    })
-                  }
-                /> 
-             ))}
-              {pendingUserMessage ? <UserBubble content={pendingUserMessage} /> : null}
-              {streamingActive ? <AssistantWaiting status={streamState.status} /> : null}
-              {streamState.content && (streamingActive || !messages.some((message) => message.id === streamState.completed?.message_id)) ? (
-                <AssistantStreamBubble
-                  content={streamState.content}
-                  citations={streamState.citations}
-                  completedMessageId={streamState.completed?.message_id ?? null}
-                  citationMap={citationView.streamMap}
-                  onCitationClick={focusCitation}
-                  onFeedback={(rating) => {
-                    const messageId = streamState.completed?.message_id;
-                    if (messageId) {
-                      feedbackMutation.mutate({ messageId, rating });
-                    }
-                  }}
-                />
-              ) : null}
-              {streamState.status === "error" &&
-              streamState.error &&
-              selectedSessionId &&
-              !sessionNotFound ? (
-                <ErrorState
-                  title={streamState.error.code}
-                  message={streamState.error.message}
-                />
-              ) : null}
-              {streamState.status === "cancelled" ? <ErrorState title="STREAM_CANCELLED" message="The active request was cancelled before completion." /> : null}
-            </div>
-
-            <div className="shrink-0 border-t border-border bg-surface p-4">
-              <label htmlFor="chat-composer" className="sr-only">Message</label>
-              <TextArea
-                id="chat-composer"
-                value={draft}
-                onChange={(event) => setDraft(event.target.value)}
-                placeholder="Ask a grounded question"
-                disabled={streamingActive}
-                onKeyDown={(event) => {
-                  if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-                    void sendMessage();
-                  }
-                }}
-              />
-              <div className="mt-3 flex flex-wrap justify-between gap-2">
-                <p className="text-xs text-muted">Validated answer content appears after grounding and citation checks.</p>
-                <div className="flex gap-2">
-                  {streamingActive ? (
-                    <Button type="button" variant="secondary" onClick={abortStream} icon={<Square className="h-4 w-4" aria-hidden="true" />}>
-                      Stop
-                    </Button>
-                  ) : null}
-                  <Button type="button" onClick={sendMessage} disabled={!draft.trim() || streamingActive} icon={<Send className="h-4 w-4" aria-hidden="true" />}>
-                    Send
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </SpotlightPanel>
-
-        <Panel className="min-h-[28rem] overflow-hidden">
-          <div className="shrink-0 border-b border-border px-4 py-3">
-            <h3 className="text-sm font-semibold">Citations</h3>
-          </div>
-          <div className="app-scrollbar max-h-[calc(100dvh-13rem)] space-y-3 overflow-y-auto p-4">
-            {citationView.items.length === 0 ?  <EmptyState title="No citations" description="Citations appear when the validated answer includes sources." /> : null}
-            {citationView.items.map((citation) => (
-              <article
-                id={`citation-${citation.globalOrder}`}
-                key={`${citation.messageId ?? "stream"}-${citation.globalOrder}`}
-                className={`rounded-token border bg-elevated p-3 text-sm transition ${
-                  highlightedCitation === citation.globalOrder
-                    ? "citation-card-highlight border-danger/60"
-                    : "border-border"
-                }`}
+            return (
+              <div
+                key={session.id}
+                className={clsx(
+                  "mb-0.5 flex items-stretch rounded-token text-sm transition",
+                  isSelected ? "bg-accent/10" : "hover:bg-canvas",
+                )}
               >
-                <div className="flex items-start justify-between gap-3">
-                  <h4 className="font-semibold text-ink">
-                    [{citation.globalOrder}]{" "}
-                    {citation.document_title}
-                  </h4>
-                  <Badge tone="accent">Page {citation.page_number}</Badge>
-                </div>
-                <div className="mt-3 rounded-token border border-border/70 bg-surface/70 px-3 py-2">
-                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
-                    Evidence
-                  </p>
+                <button
+                  type="button"
+                  className="min-w-0 flex-1 px-2.5 py-2 text-left"
+                  aria-current={isSelected ? "true" : undefined}
+                  onClick={() => {
+                    setActiveSessionId(session.id);
+                    setStreamState(initialChatStreamState);
+                    setPendingUserMessage(null);
+                    setAutoFollowConversation(true);
+                  }}
+                >
+                  <span
+                    className={clsx(
+                      "block truncate",
+                      isSelected ? "font-medium text-accent-strong" : "text-ink/80",
+                    )}
+                  >
+                    {title}
+                  </span>
+                  <span className="mt-0.5 block text-xs text-muted">{session.message_count} tin nhắn</span>
+                </button>
 
-                  <p className="line-clamp-5 text-sm leading-6">
-                    <CitationEvidenceText
-                      excerpt={citation.excerpt}
-                      evidenceText={citation.evidence_text}
-                    />
-                  </p>
-                </div>
-              </article>
-            ))}
+                <button
+                  type="button"
+                  className="flex w-9 shrink-0 items-center justify-center rounded-token text-muted transition hover:text-danger disabled:cursor-not-allowed disabled:opacity-40"
+                  disabled={deleteDisabled}
+                  title={
+                    streamingActive && isSelected
+                      ? "Dừng câu trả lời đang chạy trước khi xóa cuộc trò chuyện này"
+                      : "Xóa cuộc trò chuyện"
+                  }
+                  aria-label={`Xóa ${title}`}
+                  onClick={() => setSessionToDelete(session)}
+                >
+                  <Trash2 className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      <section
+        aria-label="Cuộc trò chuyện"
+        className="flex h-[75dvh] min-h-[32rem] min-w-0 flex-col overflow-hidden bg-canvas max-xl:rounded-xl max-xl:border max-xl:border-border xl:h-auto xl:min-h-0"
+      >
+        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-border/70 bg-surface px-5 py-4 sm:px-7">
+          <div className="min-w-0">
+            <h2 className="truncate text-[15px] font-semibold">{sessionTitle}</h2>
+            <p className="text-xs text-muted">Chỉ trả lời từ tài liệu bạn được phép xem</p>
           </div>
-        </Panel>
-      </div>
-    </div>
-  );
-}
+        </header>
 
-function CitationEvidenceText({
-  excerpt,
-  evidenceText,
-}: {
-  excerpt: string;
-  evidenceText?: string | null;
-}) {
-  const evidence = evidenceText?.trim();
-
-  if (!evidence) {
-    return <>{excerpt}</>;
-  }
-
-  const exactIndex = excerpt.indexOf(evidence);
-
-  if (exactIndex >= 0) {
-    return (
-      <>
-        {excerpt.slice(0, exactIndex)}
-
-        <span className="citation-evidence font-bold underline decoration-danger decoration-2 underline-offset-4">
-          {excerpt.slice(
-            exactIndex,
-            exactIndex + evidence.length,
-          )}
-        </span>
-
-        {excerpt.slice(
-          exactIndex + evidence.length,
-        )}
-      </>
-    );
-  }
-
-  /*
-   * Fallback:
-   * evidence có thể đúng nhưng whitespace trong excerpt
-   * đã được normalize khác source_text.
-   *
-   * Ví dụ:
-   * "8 giờ / ngày"
-   * vs
-   * "8 giờ/ngày"
-   */
-  const escapedParts = evidence
-    .split(/\s+/)
-    .filter(Boolean)
-    .map((part) =>
-      part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
-    );
-
-  if (escapedParts.length === 0) {
-    return <>{excerpt}</>;
-  }
-
-  const flexiblePattern = new RegExp(
-    escapedParts.join("\\s+"),
-    "iu",
-  );
-
-  const match = flexiblePattern.exec(excerpt);
-
-  if (!match) {
-    /*
-     * Không tìm thấy evidence thật trong excerpt:
-     * tuyệt đối không highlight gần đúng/bừa.
-     */
-    return <>{excerpt}</>;
-  }
-
-  const start = match.index;
-  const end = start + match[0].length;
-
-  return (
-    <>
-      {excerpt.slice(0, start)}
-
-      <span className="citation-evidence font-bold underline decoration-danger decoration-2 underline-offset-4">
-        {excerpt.slice(start, end)}
-      </span>
-
-      {excerpt.slice(end)}
-    </>
-  );
-}
-
-function MessageBubble({
-  message,
-  citationMap,
-  onCitationClick,
-  onFeedback,
-}: {
-  message: ChatMessage;
-  citationMap?: ReadonlyMap<number, number>;
-  onCitationClick: (globalOrder: number) => void;
-  onFeedback: (
-    rating: "HELPFUL" | "NOT_HELPFUL",
-  ) => void;
-}) {
-  if (message.role === "USER") {
-    return (
-      <UserBubble
-        content={message.content}
-        timestamp={message.created_at}
-      />
-    );
-  }
-
-  return (
-    <div className="flex gap-3">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-token bg-accent/10 text-accent">
-        <Bot
-          className="h-4 w-4"
-          aria-hidden="true"
-        />
-      </div>
-
-      <article className="min-w-0 flex-1 rounded-token border border-border bg-elevated p-3">
-        <CitationContent
-          content={message.content}
-          citationMap={citationMap}
-          onCitationClick={onCitationClick}
-        />
-
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
-          <span>
-            {formatDateTime(message.created_at)}
-          </span>
-
-          <div className="flex gap-1">
-            <button
-              className="rounded-token p-1 hover:bg-surface"
-              type="button"
-              onClick={() =>
-                onFeedback("HELPFUL")
-              }
-              aria-label="Mark answer helpful"
-            >
-              <ThumbsUp
-                className="h-4 w-4"
-                aria-hidden="true"
+        <div
+          ref={messagesContainerRef}
+          className="app-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain"
+          aria-live="polite"
+          onScroll={(event) => {
+            const container = event.currentTarget;
+            const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight;
+            setAutoFollowConversation(distanceFromBottom <= 96);
+          }}
+        >
+          <div className="mx-auto flex w-full max-w-[760px] flex-col gap-5 px-5 py-7 sm:px-7">
+            {sessionQuery.isLoading && selectedSessionId ? <LoadingState label="Đang tải tin nhắn" /> : null}
+            {sessionQuery.isError && selectedSessionId && !sessionNotFound ? (
+              <ErrorState
+                title="Không tải được cuộc trò chuyện"
+                message={safeErrorMessage(sessionQuery.error)}
+                onRetry={() => void sessionQuery.refetch()}
               />
-            </button>
-
-            <button
-              className="rounded-token p-1 hover:bg-surface"
-              type="button"
-              onClick={() =>
-                onFeedback("NOT_HELPFUL")
-              }
-              aria-label="Mark answer not helpful"
-            >
-              <ThumbsDown
-                className="h-4 w-4"
-                aria-hidden="true"
+            ) : null}
+            {!sessionQuery.isLoading && !selectedSessionId && !pendingUserMessage ? (
+              <EmptyState
+                title="Bắt đầu cuộc trò chuyện"
+                description="Đặt câu hỏi về chính sách, quy trình nội bộ trong tài liệu bạn được phép xem."
               />
-            </button>
+            ) : null}
+            {!sessionQuery.isLoading &&
+            selectedSessionId &&
+            messages.length === 0 &&
+            !pendingUserMessage &&
+            streamState.status === "idle" ? (
+              <EmptyState title="Chưa có tin nhắn" description="Hỏi về tài liệu bạn được phép xem." />
+            ) : null}
+
+            {messages.map((message) =>
+              message.role === "USER" ? (
+                <UserBubble key={message.id} content={message.content} />
+              ) : (
+                <AnswerCard
+                  key={message.id}
+                  content={message.content}
+                  citations={message.citations}
+                  citationMap={citationView.byMessage.get(message.id)}
+                  // TODO(BR-3): history has no grounding_status; NO_ANSWER always comes with no citations.
+                  noAnswer={message.citations.length === 0}
+                  createdAt={message.created_at}
+                  onCitationClick={focusCitation}
+                  onFeedback={(rating) => feedbackMutation.mutate({ messageId: message.id, rating })}
+                />
+              ),
+            )}
+            {pendingUserMessage ? <UserBubble content={pendingUserMessage} /> : null}
+            {streamingActive ? <WaitingLine model={streamState.model} /> : null}
+            {showStreamAnswer ? (
+              <AnswerCard
+                animate
+                content={streamState.content}
+                citations={streamState.citations}
+                citationMap={citationView.streamMap}
+                noAnswer={completed.grounding_status === "NO_ANSWER"}
+                onCitationClick={focusCitation}
+                onFeedback={(rating) => feedbackMutation.mutate({ messageId: completed.message_id, rating })}
+              />
+            ) : null}
+            {streamState.status === "error" && streamState.error && selectedSessionId && !sessionNotFound ? (
+              <ErrorState title="Không nhận được câu trả lời" message={streamState.error.message} />
+            ) : null}
+            {streamState.status === "cancelled" ? (
+              <p className="text-center text-xs text-muted">Đã dừng câu trả lời trước khi hoàn tất.</p>
+            ) : null}
           </div>
         </div>
-      </article>
+
+        <form
+          className="shrink-0 px-5 pb-5 pt-3 sm:px-7"
+          onSubmit={(event) => {
+            event.preventDefault();
+            void sendMessage();
+          }}
+        >
+          <div className="mx-auto flex w-full max-w-[760px] items-end gap-2 rounded-xl border border-border bg-surface p-2 pl-4 transition focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/15">
+            <label htmlFor="chat-composer" className="sr-only">
+              Câu hỏi
+            </label>
+            <textarea
+              id="chat-composer"
+              rows={1}
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              placeholder="Hỏi về chính sách, quy trình nội bộ…"
+              disabled={streamingActive}
+              onKeyDown={(event) => {
+                if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+                  event.preventDefault();
+                  void sendMessage();
+                }
+              }}
+              className="max-h-40 min-h-10 flex-1 resize-none self-center bg-transparent py-2 text-sm text-ink outline-none [field-sizing:content] placeholder:text-muted focus-visible:outline-none disabled:opacity-60"
+            />
+            {streamingActive ? (
+              <button
+                type="button"
+                className="flex h-10 shrink-0 items-center gap-2 rounded-token border border-border px-3 text-sm text-ink transition hover:bg-canvas"
+                onClick={abortStream}
+              >
+                <Square className="h-4 w-4" aria-hidden="true" />
+                Dừng
+              </button>
+            ) : null}
+            <button
+              type="submit"
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-token bg-accent text-accent-contrast transition hover:bg-accent-strong disabled:cursor-not-allowed disabled:opacity-40"
+              disabled={!draft.trim() || streamingActive}
+              aria-label="Gửi câu hỏi"
+              title="Gửi câu hỏi"
+            >
+              <ArrowRight className="h-4 w-4" aria-hidden="true" />
+            </button>
+          </div>
+          <p className="mx-auto mt-2 w-full max-w-[760px] text-xs text-muted">
+            Ctrl + Enter để gửi. Câu trả lời chỉ hiện sau khi đã kiểm tra nguồn.
+          </p>
+        </form>
+      </section>
+
+      <CitationPanel items={citationView.items} selectedOrder={selectedOrder} />
+
+      <ConfirmDialog
+        open={sessionToDelete !== null}
+        title="Xóa cuộc trò chuyện?"
+        message={`"${sessionToDelete?.title ?? UNTITLED_SESSION}" và toàn bộ tin nhắn của nó sẽ bị xóa vĩnh viễn.`}
+        confirmLabel="Xóa"
+        loading={deleteSessionMutation.isPending}
+        onCancel={() => setSessionToDelete(null)}
+        onConfirm={() => sessionToDelete && deleteSessionMutation.mutate(sessionToDelete.id)}
+      />
     </div>
   );
 }
 
-function CitationContent({
-  content,
-  citationMap,
-  onCitationClick,
-}: {
-  content: string;
-  citationMap?: ReadonlyMap<number, number>;
-  onCitationClick: (globalOrder: number) => void;
-}) {
-  const parts: React.ReactNode[] = [];
-
-  const citationPattern = /\[(\d+)\]/g;
-
-  let lastIndex = 0;
-  let match: RegExpExecArray | null;
-
-  while (
-    (match = citationPattern.exec(content)) !== null
-  ) {
-    if (match.index > lastIndex) {
-      parts.push(
-        content.slice(lastIndex, match.index),
-      );
-    }
-
-    const localOrder = Number(match[1]);
-    const globalOrder =
-      citationMap?.get(localOrder);
-
-    if (globalOrder !== undefined) {
-      parts.push(
-        <button
-          key={`${match.index}-${globalOrder}`}
-          type="button"
-          className="citation-inline"
-          onClick={() =>
-            onCitationClick(globalOrder)
-          }
-          aria-label={`Open citation ${globalOrder}`}
-          title={`Open citation ${globalOrder}`}
-        >
-          [{globalOrder}]
-        </button>,
-      );
-    } else {
-      parts.push(match[0]);
-    }
-
-    lastIndex = citationPattern.lastIndex;
-  }
-
-  if (lastIndex < content.length) {
-    parts.push(content.slice(lastIndex));
-  }
-
+function UserBubble({ content }: { content: string }) {
   return (
-    <p className="whitespace-pre-wrap text-sm leading-6 text-ink">
-      {parts}
+    <p className="max-w-[80%] self-end whitespace-pre-wrap rounded-[12px_12px_4px_12px] bg-ink px-4 py-3 text-sm leading-6 text-surface">
+      {content}
     </p>
   );
 }
 
-function UserBubble({ content, timestamp }: { content: string; timestamp?: string }) {
+function WaitingLine({ model }: { model: string | null }) {
+  // No staged progress: the SSE stream has no stage events yet (TODO(BR-6)), so one honest status line.
   return (
-    <div className="flex justify-end gap-3">
-      <article className="max-w-[min(42rem,85%)] rounded-token bg-accent px-3 py-2 text-sm leading-6 text-accent-contrast">
-        <p className="whitespace-pre-wrap">{content}</p>
-        {timestamp ? <p className="mt-2 text-xs opacity-80">{formatDateTime(timestamp)}</p> : null}
-      </article>
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-token bg-elevated text-muted">
-        <UserRound className="h-4 w-4" aria-hidden="true" />
+    <div
+      role="status"
+      className="fade-up flex max-w-[520px] items-center gap-3 rounded-xl border border-border/70 bg-surface px-4 py-3.5"
+    >
+      <span
+        className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-border border-t-accent"
+        aria-hidden="true"
+      />
+      <div className="flex min-w-0 flex-col">
+        <span className="text-sm font-medium">Đang tìm và kiểm tra nguồn…</span>
+        {model ? <span className="truncate font-mono text-xs text-muted">Mô hình: {model}</span> : null}
       </div>
-    </div>
-  );
-}
-
-function AssistantWaiting({ status }: { status: string }) {
-  const label = status === "connecting" ? "Finding relevant documents" : "Generating and validating citations";
-  return (
-    <div className="flex gap-3" role="status">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-token bg-accent/10 text-accent">
-        <Bot className="h-4 w-4" aria-hidden="true" />
-      </div>
-      <div className="rounded-token border border-accent/25 bg-accent/5 px-3 py-2 text-sm shadow-sm">
-        <ShimmerText className="font-medium tracking-[0.01em]">
-          {label}
-        </ShimmerText>
-      </div>
-    </div>
-  );
-}
-
-function AssistantStreamBubble({
-  content,
-  citations,
-  citationMap,
-  onCitationClick,
-  completedMessageId,
-  onFeedback,
-}: {
-  content: string;
-  citations: Citation[];
-  citationMap: ReadonlyMap<number, number>;
-  onCitationClick: (globalOrder: number) => void;
-  completedMessageId: string | null;
-  onFeedback: (
-    rating: "HELPFUL" | "NOT_HELPFUL",
-  ) => void;
-}) {
-    return (
-    <div className="flex gap-3">
-      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-token bg-accent/10 text-accent">
-        <Bot className="h-4 w-4" aria-hidden="true" />
-      </div>
-      <article className="min-w-0 flex-1 rounded-token border border-accent/25 bg-accent/5 p-3">
-      <CitationContent
-        content={content}
-        citationMap={citationMap}
-        onCitationClick={onCitationClick}
-      /> 
-       <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-muted">
-          {citations.length ? <span>{citations.length} validated citations</span> : <span>Completed</span>}
-          {completedMessageId ? (
-            <div className="flex gap-1">
-              <button className="rounded-token p-1 hover:bg-surface" type="button" onClick={() => onFeedback("HELPFUL")} aria-label="Mark answer helpful">
-                <ThumbsUp className="h-4 w-4" aria-hidden="true" />
-              </button>
-              <button className="rounded-token p-1 hover:bg-surface" type="button" onClick={() => onFeedback("NOT_HELPFUL")} aria-label="Mark answer not helpful">
-                <ThumbsDown className="h-4 w-4" aria-hidden="true" />
-              </button>
-            </div>
-          ) : null}
-        </div>
-      </article>
     </div>
   );
 }

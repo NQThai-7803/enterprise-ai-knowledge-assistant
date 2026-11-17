@@ -101,11 +101,6 @@ textarea {
   background: radial-gradient(circle, rgb(var(--color-accent) / 0.18), transparent 65%);
 }
 
-/* Progress text: an opacity pulse, never background-position. */
-.motion-shimmer {
-  animation: motion-pulse 1.2s var(--ease) infinite alternate;
-}
-
 .fade-up {
   animation: motion-fade-up var(--motion-slow) var(--ease) both;
 }
@@ -116,32 +111,6 @@ textarea {
 
 .pop {
   animation: motion-pop var(--motion-base) var(--ease) both;
-}
-
-.spotlight-panel {
-  position: relative;
-  isolation: isolate;
-}
-
-.spotlight-panel::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  background: radial-gradient(circle at var(--spotlight-x, 50%) var(--spotlight-y, 0%), rgb(var(--color-accent) / 0.16), transparent 42%);
-  opacity: var(--spotlight-opacity, 0);
-  transition: opacity var(--motion-fast) var(--ease);
-  z-index: -1;
-}
-
-@keyframes motion-pulse {
-  from {
-    opacity: 1;
-  }
-  to {
-    opacity: 0.45;
-  }
 }
 
 @keyframes motion-fade-up {
@@ -188,90 +157,38 @@ textarea {
   }
 }
 
-.citation-inline {
-  position: relative;
+/* Citation number inside an answer. D-2: colour on hover; movement is transform only. */
+.citation-chip {
   display: inline-flex;
   align-items: center;
-  margin-inline: 0.08rem;
-  padding-inline: 0.14rem;
-  border-radius: 4px;
-
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  margin-left: 4px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: rgb(var(--color-accent) / 0.12);
   color: rgb(var(--color-accent));
-  font-weight: 700;
-  line-height: 1.25;
-
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  vertical-align: 1px;
   cursor: pointer;
-
-  /* D-2: colour may change on hover/focus; everything else is transform. */
   transition:
-    color var(--motion-fast) var(--ease),
     background-color var(--motion-fast) var(--ease),
     transform var(--motion-fast) var(--ease);
 }
 
-.citation-inline::after {
-  content: "";
-  position: absolute;
-  left: 0.1rem;
-  right: 0.1rem;
-  bottom: -2px;
-
-  height: 2px;
-  border-radius: 999px;
-
-  background: rgb(var(--color-danger));
-
-  transform-origin: left;
-
-  animation: citation-underline-in var(--motion-slow) var(--ease) both;
-}
-
-.citation-inline:hover {
-  color: rgb(var(--color-accent));
-  background: rgb(var(--color-accent) / 0.10);
+.citation-chip:hover {
+  background: rgb(var(--color-accent) / 0.2);
   transform: translateY(-1px);
 }
 
-.citation-inline:focus-visible {
-  outline: 2px solid rgb(var(--color-accent));
-  outline-offset: 3px;
-}
-
-/* Evidence text inside the Citation card: static, the card's entrance carries the motion. */
+/* Evidence span inside a citation card: a static highlight; the card's slide-in carries the motion. */
 .citation-evidence {
   color: rgb(var(--color-ink));
-  font-weight: 600;
-
-  text-decoration-line: underline;
-  text-decoration-color: rgb(var(--color-danger));
-  text-decoration-thickness: 2px;
-  text-underline-offset: 3px;
-}
-
-/* Selected Citation card after clicking [1], [2], ...: static ring, opacity entrance. */
-.citation-card-highlight {
-  box-shadow: 0 0 0 3px rgb(var(--color-danger) / 0.18);
-  animation: citation-card-highlight var(--motion-slow) var(--ease) both;
-}
-
-@keyframes citation-underline-in {
-  from {
-    transform: scaleX(0);
-    opacity: 0;
-  }
-
-  to {
-    transform: scaleX(1);
-    opacity: 1;
-  }
-}
-
-@keyframes citation-card-highlight {
-  from {
-    opacity: 0.55;
-  }
-
-  to {
-    opacity: 1;
-  }
+  background: rgb(var(--color-accent) / 0.16);
+  border-radius: 2px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
 }

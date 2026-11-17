@@ -107,7 +107,7 @@ test("dialog traps both Tab directions, labels its message, and restores focus o
   const trigger = page.getByRole("button", { name: "Deactivate" }).first();
   await trigger.click();
   const dialog = page.getByRole("dialog", { name: "Deactivate user" });
-  const cancel = dialog.getByRole("button", { name: "Cancel" });
+  const cancel = dialog.getByRole("button", { name: "Hủy" });
   const confirm = dialog.getByRole("button", { name: "Deactivate" });
   await page.getByRole("button", { name: "Create user" }).focus();
   await expect(cancel).toBeFocused();
@@ -141,7 +141,7 @@ test("dialog traps both Tab directions, labels its message, and restores focus o
   expect(observed.modal).toBe("true");
   expect(descriptionId).toBeTruthy();
   expect(descriptionText).toContain("refresh tokens");
-  expect(observed.activeText).toBe("Cancel");
+  expect(observed.activeText).toBe("Hủy");
   expect(afterShiftTab.insideDialog).toBe(true);
   expect(afterTab.insideDialog).toBe(true);
   expect(afterCancel.activeTag).toBe("BUTTON");

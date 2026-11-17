@@ -127,8 +127,8 @@ test("mobile navigation closes with Escape and does not block composer", async (
   await page.keyboard.press("Escape");
   await expect(page.getByRole("navigation", { name: "Điều hướng chính" })).toHaveCount(0);
 
-  await page.getByLabel("Message").fill("What is the policy?");
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByLabel("Câu hỏi", { exact: true }).fill("What is the policy?");
+  await page.getByRole("button", { name: "Gửi câu hỏi" }).click();
   await expect(page.getByText("Validated final answer")).toBeVisible();
 });
 test("chat renders completed SSE answer and citations", async ({ page }) => {
@@ -136,13 +136,13 @@ test("chat renders completed SSE answer and citations", async ({ page }) => {
   await mockChat(page);
   await page.goto("/chat");
 
-  await page.getByLabel("Message").fill("What is the policy?");
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByLabel("Câu hỏi", { exact: true }).fill("What is the policy?");
+  await page.getByRole("button", { name: "Gửi câu hỏi" }).click();
 
   await expect(page.getByText("Validated final answer")).toBeVisible();
-  await expect(page.getByText("Policy Handbook")).toBeVisible();
+  await expect(page.getByRole("complementary", { name: "Trích dẫn" }).getByText("Policy Handbook")).toBeVisible();
   await expect(page.getByText("Approved source excerpt")).toBeVisible();
-  await expect(page.getByLabel("Mark answer helpful")).toBeVisible();
+  await expect(page.getByLabel("Câu trả lời hữu ích")).toBeVisible();
 });
 async function mockUsersApi(page: Page) {
   const now = "2026-07-30T00:00:00Z";
