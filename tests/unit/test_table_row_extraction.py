@@ -217,3 +217,14 @@ def test_the_flag_reaches_both_extractors_and_is_off_by_default(enabled: bool) -
     settings = Settings(document_table_row_chunking_enabled=enabled)
     assert create_pdf_text_extractor(settings).table_rows is enabled
     assert create_extraction_router(settings).native_pdf_extractor.table_rows is enabled
+
+
+def test_the_extraction_router_keeps_the_rows_of_a_native_page() -> None:
+    import asyncio
+
+    settings = Settings(document_table_row_chunking_enabled=True)
+    router = create_extraction_router(settings)
+    result = asyncio.run(router._extract_pdf(_pdf(_benefits_page)))
+    assert [row.search_text for row in result.pages[0].table_rows] == [
+        "; ".join(row) for row in BODY
+    ]

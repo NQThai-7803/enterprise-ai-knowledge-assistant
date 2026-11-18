@@ -188,6 +188,7 @@ def _copy_page_with_metadata(
         width=page.width,
         height=page.height,
         warnings=page.warnings,
+        table_rows=page.table_rows,
     )
 
 
