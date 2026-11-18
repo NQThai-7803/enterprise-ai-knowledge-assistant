@@ -151,7 +151,8 @@ run_one() {  # $1 = config index, $2 = run number
         || echo "runner exit $?" >> "$dir/runner.log" ;;
   esac
   echo "seconds=$(( $(date +%s) - started ))" > "$dir/timing.txt"
-  if [[ ",$vars," == *",EVAL_ABLATION="*simple_trace* ]]; then  # every simple-mode draft
+  if [[ ",$vars," == *",EVAL_ABLATION="*simple_trace* || ",$vars," == *",EVAL_ABLATION="*retrieval_oracle* ]]; then
+    # every simple-mode draft, or the retrieval gate's chosen chunks (DEC-034)
     docker cp "$PROJECT-api-1:/tmp/simple_trace.jsonl" "$dir/simple_trace.jsonl" >/dev/null 2>&1 \
       || echo "no simple trace" >> "$dir/runner.log"
   fi

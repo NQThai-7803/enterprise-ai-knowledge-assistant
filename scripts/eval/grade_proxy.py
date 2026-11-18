@@ -29,6 +29,20 @@ def load(path):
         return json.load(handle)
 
 
+def check_lock(path) -> None:
+    """A gold file next to a gold.lock (eval-data/uat, DEC-033) must match it byte for byte."""
+    import hashlib
+
+    path = Path(path)
+    lock_path = path.parent / "gold.lock"
+    if not lock_path.is_file():
+        return
+    expected = json.loads(lock_path.read_text(encoding="utf-8"))["files"].get(path.name)
+    actual = hashlib.sha256(path.read_bytes()).hexdigest()
+    if expected != actual:
+        raise SystemExit(f"{path} sha256 {actual} differs from {lock_path} ({expected})")
+
+
 def code_map(manifest):
     return {d["id"]: d["code"] for d in manifest["documents"]}
 
@@ -126,6 +140,7 @@ def grade(reference, v2_manifest, run_manifest, run):
 
 def main():
     reference, v2_manifest, run_manifest, run, out = sys.argv[1:6]
+    check_lock(reference)
     result = grade(load(reference), load(v2_manifest), load(run_manifest), load(run))
     with open(out, "w", encoding="utf-8") as handle:
         json.dump(result, handle, ensure_ascii=False, indent=1)

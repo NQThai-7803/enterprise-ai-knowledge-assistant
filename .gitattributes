@@ -31,3 +31,7 @@ tests/acceptance/natural_dev_v1_proxy.yaml text eol=lf
 # Held-out v3 is hashed byte for byte too (DEC-030).
 docs/eval/heldout-v3.yaml text eol=lf
 docs/eval/heldout-v3.lock text eol=lf
+# The UAT gold used on Actions is hashed byte for byte too (eval-data/uat/gold.lock, DEC-033).
+eval-data/uat/reference-grade.json text eol=lf
+eval-data/uat/retrieval-gold.json text eol=lf
+eval-data/uat/gold.lock text eol=lf

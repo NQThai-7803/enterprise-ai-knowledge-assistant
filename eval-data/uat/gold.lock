@@ -1,0 +1,10 @@
+{
+ "version": "uat_reference_v2",
+ "files": {
+  "reference-grade.json": "4806f0444cd2084cd506de0cfaa97d8b291b8709c912676604e93a300079f1f9",
+  "retrieval-gold.json": "35e4f9da2dba89dd4b62888af013c57efd518e6adb717e248d67e517f2f2fc56"
+ },
+ "approved_by": "owner (NQThai-7803), edit of 2026-11-18 (DEC-033): Q044 -> ND-HR-004 p6",
+ "locked_at": "2026-11-18T04:37:39+00:00",
+ "rule": "any edit needs the owner's approval, a DECISIONS.md entry and a new lock"
+}

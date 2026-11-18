@@ -1,6 +1,9 @@
 # Gold of natural_dev_v1, written from the corpus V2 PDFs only (no system run on this set).
 # Approved by the owner on 2026-11-17 (ND-002, ND-008, ND-011, ND-014 as decided, the other 16
 # as drafted) and locked in natural_dev_v1_gold.lock; any edit needs a new approval and lock.
+# Edited 2026-11-18 with the owner's approval (DEC-033): UAT-LEAVE-AUTHORITY-001 is a template
+# (chưa phải văn bản ban hành) and no longer gold or acceptable; ND-001 gold is ND-HR-004 p. 5,
+# and ND-004, ND-012, ND-019 drop it from acceptable citations and excerpts. Re-locked.
 # Fields as held-out v2; `not_stated` lists what the documents do not say (situational items).
 # near_uat_group: e5 cosine to the nearest Q001-Q100 question >= 0.90 (held-out v2 rule), from
 # natural_dev_v1_check.json; the owner kept all 11 items flagged for overlap (2026-11-17).
@@ -20,18 +23,15 @@ items:
       - "Người lao động nước ngoài được nghỉ thêm 01 ngày Tết cổ truyền và 01 ngày Quốc khánh của nước họ."
       - "Lịch nghỉ cụ thể do HR/doanh nghiệp thông báo hằng năm."
     gold_citations:
-      - {document: UAT-LEAVE-AUTHORITY-001, pages: [3]}
-    acceptable_extra_citations:
       - {document: ND-HR-004, pages: [5]}
     source_excerpt:
-      - {document: UAT-LEAVE-AUTHORITY-001, page: 3, text: "Tổng số ngày nghỉ lễ, Tết theo lịch quốc gia là 11 ngày trong năm."}
       - {document: ND-HR-004, page: 5, text: "Tết Dương lịch 01 ngày Tết Âm lịch 05 ngày Ngày Chiến thắng 30/4 01 ngày Ngày Quốc tế Lao động 01/5 01 ngày Quốc khánh 02 ngày Giỗ Tổ Hùng Vương 01 ngày"}
     fail_examples:
       - "Một tổng khác 11 ngày."
       - "Cộng nghỉ hằng năm (12 ngày) vào nghỉ lễ."
     forbidden:
       - {document: UAT-GROUNDING-001, value: "travel approval"}
-    notes: "ND-HR-004 liệt kê từng dịp (cộng lại 11) nhưng không ghi tổng; UAT-LEAVE-AUTHORITY-001 ghi tổng 11 nhưng là tài liệu mẫu cần rà soát. Trích tài liệu nào cũng được."
+    notes: "ND-HR-004 liệt kê từng dịp, cộng lại 11 (01 + 05 + 01 + 01 + 02 + 01), nhưng không ghi tổng. Sửa ngày 2026-11-18 (DEC-033, owner duyệt): UAT-LEAVE-AUTHORITY-001 ghi tổng 11 nhưng là tài liệu mẫu (chưa phải văn bản ban hành), nên không còn là citation gold hay được chấp nhận; gold là bảng ND-HR-004 tr. 5."
 
   - id: ND-002
     question: "Tôi là ứng viên được tuyển và hoàn thành mốc thử việc thì được thưởng thêm gì không?"
@@ -93,11 +93,8 @@ items:
       - "Phúc lợi kết hôn 2.000.000 đ là khoản tiền, không phải ngày nghỉ."
     gold_citations:
       - {document: ND-HR-004, pages: [6]}
-    acceptable_extra_citations:
-      - {document: UAT-LEAVE-AUTHORITY-001, pages: [4]}
     source_excerpt:
       - {document: ND-HR-004, page: 6, text: "Kết hôn 03 ngày Con đẻ hoặc con nuôi kết hôn 01 ngày"}
-      - {document: UAT-LEAVE-AUTHORITY-001, page: 4, text: "Kết hôn 03 ngày Con kết hôn 01 ngày"}
     fail_examples:
       - "01 ngày (mức khi con kết hôn)."
     forbidden:
@@ -298,7 +295,6 @@ items:
       - {document: ND-HR-004, pages: [6]}
     acceptable_extra_citations:
       - {document: ND-HR-004, pages: [9]}
-      - {document: UAT-LEAVE-AUTHORITY-001, pages: [4, 5]}
     source_excerpt:
       - {document: ND-HR-004, page: 6, text: "Ngoài các trường hợp luật định, người lao động có thể đề nghị nghỉ không hưởng lương và phải được công ty chấp thuận trước."}
       - {document: ND-HR-004, page: 6, text: "Đề nghị từ 05 ngày làm việc liên tục trở lên nên gửi trước ít nhất 10 ngày làm việc, trừ trường hợp khẩn cấp."}
@@ -467,13 +463,11 @@ items:
       - {document: ND-HR-004, pages: [7]}
     acceptable_extra_citations:
       - {document: ND-HR-004, pages: [9]}
-      - {document: UAT-LEAVE-AUTHORITY-001, pages: [4]}
       - {document: ND-HR-006, pages: [10]}
       - {document: ND-HR-003, pages: [9]}
     source_excerpt:
       - {document: ND-HR-004, page: 7, text: "Thông báo cho quản lý càng sớm càng tốt, ưu tiên trước giờ bắt đầu làm việc; trong trường hợp cấp cứu có thể nhờ người thân thông báo."}
       - {document: ND-HR-004, page: 7, text: "Đăng ký loại nghỉ Sick Leave / BHXH trên HRM và cung cấp chứng từ khi pháp luật hoặc cơ quan BHXH yêu cầu."}
-      - {document: UAT-LEAVE-AUTHORITY-001, page: 4, text: "Trường hợp cấp cứu hoặc điều trị nội trú, thân nhân có thể thay người lao động thông báo ban đầu."}
     fail_examples:
       - "Phải đi làm hoặc họp khi đang ốm."
       - "Nghỉ ốm luôn được công ty trả nguyên lương."

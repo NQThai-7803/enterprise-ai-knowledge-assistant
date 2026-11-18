@@ -94,6 +94,7 @@ def main():
                     "document_code": doc["code"],
                     "document_version": manifest["corpus_version"],
                     "description": f"UAT Corpus v2: {doc['category']}",
+                    "lifecycle_status": doc.get("lifecycle_status", "ACTIVE"),  # DEC-033
                 },
                 source,
             )
