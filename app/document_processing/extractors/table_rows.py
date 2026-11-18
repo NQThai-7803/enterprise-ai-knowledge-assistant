@@ -1,20 +1,21 @@
-"""One text unit per table row (DOCUMENT_TABLE_ROW_CHUNKING_ENABLED, docs/design/table-chunking.md).
+"""Table rows as extra units (DOCUMENT_TABLE_ROW_CHUNKING_ENABLED, DEC-034, version 2).
 
-A page with no data table keeps the extractor's own text, byte for byte. On a page with one, the
-lines inside each data table are replaced, at the table's place in reading order, by one paragraph
-per body row:
+The page text is not changed. Each body row of a data table is also returned on its own:
 
     <table title> | <column 1>: <cell 1>; <column 2>: <cell 2>; ...
 
-so every row carries its title and column names into whatever chunk it lands in, and a chunk
-boundary can only fall between rows. A data table has at least 2 columns and 2 body rows; boxes,
-notes and page headers or footers are left as they are.
+with its cells alone as keyword text, so the title and column names are indexed once (in the page
+text) and not once per row. A data table has at least 3 columns and 3 rows: a two-column
+key-value table already reads as "label value" in the page text. Boxes, notes and page headers
+or footers are left alone.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
+
+from app.document_processing.models import TableRow
 
 # The title is the nearest line above the table, outside every table region, if it is this close
 # (PDF points); it is cut to this many characters.
@@ -41,8 +42,8 @@ def _clean(text: str | None) -> str:
 
 
 def is_data_table(table: Any) -> bool:
-    """At least 2 columns and 3 rows: 2 body rows even when the first row is a header."""
-    return table.col_count >= 2 and table.row_count >= 3
+    """At least 3 columns and 3 rows: 2 body rows even when the first row is a header."""
+    return table.col_count >= 3 and table.row_count >= 3
 
 
 def _bold(page: Any, box: Any) -> bool | None:
@@ -112,8 +113,8 @@ def header_and_body(
 
 
 def render_rows(title: str, columns: list[str], body: list[list[str]]) -> list[str]:
-    """One line per body row with text. Without column names (a key-value table) a row is written
-    as 'first cell: other cells'."""
+    """One line per body row with text. Without column names a row is written 'first cell: other
+    cells'."""
     lines = []
     for row in body:
         values = [value for value in row if value]
@@ -136,15 +137,15 @@ def _inside(bbox: Any, rect: Any) -> bool:
     return rect[0] <= x <= rect[2] and rect[1] <= y <= rect[3]
 
 
-def page_text_with_table_rows(
+def page_table_rows(
     page: Any, carried: TableContext | None, *, sort: bool = True
-) -> tuple[str, TableContext | None]:
-    """The page's text with each data table written row by row, and the context of a data table
-    that may continue on the next page (None when the page does not end in one)."""
+) -> tuple[tuple[TableRow, ...], TableContext | None]:
+    """The body rows of the page's data tables, and the context of a data table that may continue
+    on the next page (None when the page does not end in one)."""
     regions = page.find_tables().tables
     tables = sorted((t for t in regions if is_data_table(t)), key=lambda t: t.bbox[1])
     if not tables:
-        return page.get_text("text", sort=sort) or "", None
+        return (), None
     lines = [
         (line["bbox"], "".join(span["text"] for span in line["spans"]))
         for block in page.get_text("dict", sort=sort)["blocks"]
@@ -152,7 +153,7 @@ def page_text_with_table_rows(
         for line in block["lines"]
     ]
     outside = [(b, s) for b, s in lines if not any(_inside(b, t.bbox) for t in regions)]
-    rendered: dict[int, str] = {}
+    units: list[TableRow] = []
     context = None
     for n, table in enumerate(tables):
         above = [(b, s) for b, s in outside if b[3] <= table.bbox[1] + 1 and s.strip()]
@@ -171,19 +172,15 @@ def page_text_with_table_rows(
         ):
             # The table from the previous page goes on, with or without its header repeated.
             title, columns = carried.title, list(carried.columns)
-        rendered[n] = "\n\n" + "\n\n".join(render_rows(title, columns, body)) + "\n\n"
+        for row, text in zip(
+            [r for r in body if any(r)], render_rows(title, columns, body), strict=True
+        ):
+            cells = tuple(value for value in row if value)
+            units.append(TableRow(table=n, text=text, search_text="; ".join(cells), cells=cells))
         text_after = any(
             b[1] >= table.bbox[3] and b[1] < page.rect.height * BOTTOM_MARGIN and s.strip()
             for b, s in outside
         )
         low = table.bbox[3] >= page.rect.height * CONTINUE_FROM
         context = TableContext(title, tuple(columns)) if low and not text_after else None
-    pieces: list[str] = []
-    for bbox, text in lines:
-        owner = next((n for n, t in enumerate(tables) if _inside(bbox, t.bbox)), None)
-        for n in [n for n in rendered if n == owner or tables[n].bbox[3] <= bbox[1]]:
-            pieces.append(rendered.pop(n))  # a table goes where its first line was
-        if owner is None:
-            pieces.append(text + "\n")
-    pieces += rendered.values()
-    return "".join(pieces), context
+    return tuple(units), context

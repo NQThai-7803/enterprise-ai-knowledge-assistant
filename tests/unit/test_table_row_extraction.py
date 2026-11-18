@@ -1,4 +1,4 @@
-"""Table rows as text units (DOCUMENT_TABLE_ROW_CHUNKING_ENABLED), on made-up PDFs."""
+"""Table rows as extra units (DOCUMENT_TABLE_ROW_CHUNKING_ENABLED, DEC-034), on made-up PDFs."""
 
 from __future__ import annotations
 
@@ -59,9 +59,23 @@ def _pdf(build) -> bytes:
     return data
 
 
-def _text(data: bytes, table_rows: bool = True) -> list[str]:
+def _pages(data: bytes, table_rows: bool = True):
     extractor = PyMuPDFTextExtractor(max_pages=50, min_usable_characters=0, table_rows=table_rows)
-    return [page.text for page in extractor.extract(data).pages]
+    return extractor.extract(data).pages
+
+
+def _rows(data: bytes, page: int = 0) -> list[str]:
+    return [row.text for row in _pages(data)[page].table_rows]
+
+
+def _chunker() -> PageAwareTokenChunker:
+    return PageAwareTokenChunker(
+        token_counter=TiktokenTokenCounter("cl100k_base"),
+        target_tokens=120,
+        max_tokens=160,
+        overlap_tokens=20,
+        min_tokens=10,
+    )
 
 
 HEADER = ["Plan", "Limit per year", "Main condition"]
@@ -82,21 +96,22 @@ def _benefits_page(document: pymupdf.Document) -> None:
     )
 
 
-def test_a_page_without_a_data_table_is_unchanged() -> None:
+def test_the_page_text_is_the_same_with_the_flag() -> None:
     def build(document: pymupdf.Document) -> None:
+        _benefits_page(document)
         page = document.new_page()
         page.insert_text((50, 60), "Plain policy text.", fontname="helv", fontsize=10)
-        page.insert_text((50, 80), "Second line of text.", fontname="helv", fontsize=10)
-        _table(page, 120, [200, 200], [["Only one row", "of a box"]], bold_header=False)
 
     data = _pdf(build)
-    assert _text(data, table_rows=True) == _text(data, table_rows=False)
+    on, off = _pages(data, table_rows=True), _pages(data, table_rows=False)
+    assert [page.text for page in on] == [page.text for page in off]
+    assert all(not page.table_rows for page in off)
+    assert not on[1].table_rows
 
 
-def test_each_row_carries_the_table_title_and_column_names_in_reading_order() -> None:
-    text = _text(_pdf(_benefits_page))[0]
-    rows = [line for line in text.split("\n") if " | " in line]
-    assert rows == [
+def test_each_row_carries_title_and_column_names_and_its_cells_as_keyword_text() -> None:
+    rows = _pages(_pdf(_benefits_page))[0].table_rows
+    assert [row.text for row in rows] == [
         "2. Health insurance plan | Plan: Inpatient; Limit per year: 150 million; "
         "Main condition: After probation",
         "2. Health insurance plan | Plan: Outpatient; Limit per year: 12 million; "
@@ -104,11 +119,18 @@ def test_each_row_carries_the_table_title_and_column_names_in_reading_order() ->
         "2. Health insurance plan | Plan: Dental; Limit per year: 3 million; "
         "Main condition: Basic care",
     ]
-    order = [
-        text.index(s) for s in ("Intro text", "2. Health insurance plan\n", rows[0], "Closing")
-    ]
-    assert order == sorted(order)
-    assert "\n\n" + rows[0] + "\n\n" in text  # each row is its own paragraph
+    assert rows[0].search_text == "Inpatient; 150 million; After probation"  # no labels
+    assert {row.table for row in rows} == {0}
+
+
+def test_a_two_column_table_gets_no_rows() -> None:
+    def build(document: pymupdf.Document) -> None:
+        page = document.new_page()
+        page.insert_text((50, 100), "Document control", fontname="hebo", fontsize=11)
+        rows = [["Code", "HR-007"], ["Version", "1.0"], ["Owner", "People team"]]
+        _table(page, 110, [150, 200], rows, bold_header=False)
+
+    assert _rows(_pdf(build)) == []
 
 
 def test_a_table_continued_on_the_next_page_keeps_title_and_columns() -> None:
@@ -125,8 +147,7 @@ def test_a_table_continued_on_the_next_page_keeps_title_and_columns() -> None:
         _table(second, 60, [150, 150, 150], rest, bold_header=repeat_header)
 
     for repeat_header in (False, True):
-        text = _text(_pdf(lambda document, r=repeat_header: build(document, r)))[1]
-        rows = [line for line in text.split("\n") if " | " in line]
+        rows = _rows(_pdf(lambda document, r=repeat_header: build(document, r)), page=1)
         assert rows == [
             f"3. Event support | Event: Event {n}; Amount: {n} million; Papers: Form"
             for n in range(7, 10)
@@ -145,30 +166,14 @@ def test_merged_cells_fill_down_and_are_written_once_across() -> None:
         ]
         _table(page, 110, [120, 160, 120], rows, merge_down={(1, 0)}, merge_right={(3, 1)})
 
-    rows = [line for line in _text(_pdf(build))[0].split("\n") if " | " in line]
-    assert rows == [
+    assert _rows(_pdf(build)) == [
         "Leave by group | Group: Family; Case: Own wedding; Days: 3 days",
         "Leave by group | Group: Family; Case: Child wedding; Days: 1 day",
         "Leave by group | Group: Other; Case: Unpaid leave by agreement",
     ]
 
 
-def test_a_table_without_a_bold_header_is_written_key_value() -> None:
-    def build(document: pymupdf.Document) -> None:
-        page = document.new_page()
-        page.insert_text((50, 100), "Document control", fontname="hebo", fontsize=11)
-        rows = [["Code", "HR-007"], ["Version", "1.0"], ["Owner", "People team"]]
-        _table(page, 110, [150, 200], rows, bold_header=False)
-
-    rows = [line for line in _text(_pdf(build))[0].split("\n") if " | " in line]
-    assert rows == [
-        "Document control | Code: HR-007",
-        "Document control | Version: 1.0",
-        "Document control | Owner: People team",
-    ]
-
-
-def test_a_chunk_boundary_never_cuts_a_row() -> None:
+def test_row_chunks_follow_the_text_chunks_with_the_table_chunk_as_parent() -> None:
     def build(document: pymupdf.Document) -> None:
         page = document.new_page()
         page.insert_text((50, 60), "Long table", fontname="hebo", fontsize=11)
@@ -176,20 +181,34 @@ def test_a_chunk_boundary_never_cuts_a_row() -> None:
             [f"Item {n}", f"Rule number {n} applies", f"Note {n} for staff"] for n in range(30)
         ]
         _table(page, 70, [100, 200, 160], rows)
+        second = document.new_page()
+        second.insert_text((50, 60), "Unrelated text on the next page.", fontsize=10)
 
-    extraction = PyMuPDFTextExtractor(max_pages=5, min_usable_characters=0, table_rows=True)
-    result = extraction.extract(_pdf(build))
-    chunker = PageAwareTokenChunker(
-        token_counter=TiktokenTokenCounter("cl100k_base"),
-        target_tokens=120,
-        max_tokens=160,
-        overlap_tokens=20,
-        min_tokens=10,
+    data = _pdf(build)
+    extractor = PyMuPDFTextExtractor(max_pages=5, min_usable_characters=0, table_rows=True)
+    with_rows = _chunker().chunk(extractor.extract(data))
+    without = _chunker().chunk(
+        PyMuPDFTextExtractor(max_pages=5, min_usable_characters=0).extract(data)
     )
-    chunks = [chunk.text for chunk in chunker.chunk(result).chunks]
-    rows = [line for line in result.pages[0].text.split("\n") if " | " in line]
-    assert len(rows) == 30 and len(chunks) > 1
-    assert all(any(row in chunk for chunk in chunks) for row in rows)
+    text_chunks = [c for c in with_rows.chunks if c.kind == "TEXT"]
+    row_chunks = [c for c in with_rows.chunks if c.kind == "TABLE_ROW"]
+    assert [c.text for c in text_chunks] == [c.text for c in without.chunks]  # page text as is
+    assert len(row_chunks) == 30
+    assert [c.chunk_index for c in with_rows.chunks] == list(range(len(with_rows.chunks)))
+    assert row_chunks[0].chunk_index == len(text_chunks)
+    assert {c.page_numbers for c in row_chunks} == {(1,)}
+    parent = with_rows.chunks[row_chunks[0].parent_index]
+    on_page = [c for c in text_chunks if 1 in c.page_numbers and "Rule number" in c.text]
+    assert parent.kind == "TEXT" and len(on_page) > 1  # the table spans text chunks
+    assert parent.text.count("Rule number") == max(c.text.count("Rule number") for c in on_page)
+    assert {c.parent_index for c in row_chunks} == {row_chunks[0].parent_index}  # one table
+    assert row_chunks[3].search_text == "Item 3; Rule number 3 applies; Note 3 for staff"
+    assert with_rows.total_tokens == sum(c.token_count for c in with_rows.chunks)
+
+
+def test_without_rows_the_chunking_result_is_unchanged() -> None:
+    off = PyMuPDFTextExtractor(max_pages=5, min_usable_characters=0).extract(_pdf(_benefits_page))
+    assert all(c.kind == "TEXT" and c.parent_index is None for c in _chunker().chunk(off).chunks)
 
 
 @pytest.mark.parametrize("enabled", [False, True])

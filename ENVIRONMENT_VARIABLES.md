@@ -101,9 +101,11 @@ PDF extraction variable rules:
 - `PDF_MAX_PAGES` is an integer greater than `0`.
 - `PDF_MIN_USABLE_CHARACTERS` is an integer greater than or equal to `0`.
 - `PDF_TEXT_SORT` is a boolean.
-- `DOCUMENT_TABLE_ROW_CHUNKING_ENABLED` (boolean, default `false`; added 2026-11-18, DEC-031): write each data table of a native PDF page as one paragraph per row, `<table title> | <column>: <cell>; ...`.
+- `DOCUMENT_TABLE_ROW_CHUNKING_ENABLED` (boolean, default `false`; added 2026-11-18 by DEC-031, version 2 by DEC-034): adds one `TABLE_ROW` chunk per body row of each data table, `<table title> | <column>: <cell>; ...`.
+  - The page text and its chunks stay exactly as with the flag off.
+  - A row chunk's parent is the page's text chunk that holds its table. Hybrid retrieval keeps one hit per text chunk and its rows. A row's keyword text is its cells only.
+  - A data table has at least 3 columns and 3 rows.
   - It is read by the worker at ingestion, so it changes a corpus only when documents are processed again through the pipeline.
-  - A page without a data table (at least 2 columns and 3 rows) keeps its text unchanged.
   - Design and measurement: `docs/design/table-chunking.md`.
 - These values are not secrets.
 - No PDF password environment variable is supported in MVP.
@@ -228,6 +230,7 @@ HYBRID_KEYWORD_WEIGHT=1.0
 HYBRID_SEMANTIC_MIN_RELEVANCE_SCORE=0.30
 RAG_SEMANTIC_EXACT_PERMITTED_KNN_ENABLED=true
 RAG_DETERMINISTIC_ROUTE_MODE=strict
+RAG_DRAFT_DOCUMENT_POLICY=off
 RAG_REPAIR_AFTER_LLM_REFUSAL_ENABLED=false
 RAG_ANSWER_UNIT_GUARD_ENABLED=true
 RAG_RESELECT_REQUIRES_STRONG_SUPPORT_ENABLED=false
@@ -283,6 +286,11 @@ Retrieval variable rules:
 - `HYBRID_SEMANTIC_WEIGHT` and `HYBRID_KEYWORD_WEIGHT` are finite numbers greater than or equal to `0.0`; they cannot both be `0.0`.
 - `HYBRID_SEMANTIC_MIN_RELEVANCE_SCORE` is a finite number in `[0.0, 1.0]`.
 - `RAG_SEMANTIC_EXACT_PERMITTED_KNN_ENABLED` (boolean, default `true` since PROMPT 3f, added in PROMPT 3e): semantic retrieval ranks every chunk the user may read exactly. Set `false` only to roll back to the statement the planner can serve through the HNSW index; that path applies permission and visibility after `hnsw.ef_search` candidates and can lose permitted chunks. See `docs/design/hnsw-permission-recall.md`, including the latency budget and the cells that are not verified yet.
+- `RAG_DRAFT_DOCUMENT_POLICY` (`off` or `exclude`; default `off`; added 2026-11-18, DEC-033): what answers do with documents whose `lifecycle_status` is `DRAFT` (templates and drafts, set by the uploader or an admin).
+  - `off`: they rank and answer like `ACTIVE` documents, as before.
+  - `exclude`: none of their chunks enters retrieval, the retrieval supplements or the citation lookup.
+  - Document management and permissions are the same either way.
+  - Design: `docs/design/document-authority.md`.
 - `RAG_DETERMINISTIC_ROUTE_MODE` (`legacy`, `strict` or `off`; default `strict` since FIX 1, DEC-010; set `legacy` to roll back): the condition copier `_structured_condition_value_answer`, before and after the LLM. `strict` matches cues as whole words on text that keeps its diacritics and requires the chosen source span to share the question's topic. `off` removes this branch. The other deterministic branches are not affected.
 - `RAG_REPAIR_AFTER_LLM_REFUSAL_ENABLED` (boolean, default `false` since DEC-011; FIX 2 group 1): `true` restores the old behaviour. `false` stops the deterministic repair once the LLM has refused in the request. A repair after the validator rejects an LLM answer still runs.
 - `RAG_ANSWER_UNIT_GUARD_ENABLED` (boolean, default `true` since DEC-011; FIX 2 group 2): `false` restores the old behaviour. With `true`, "đồng ý" no longer makes a question a money question, and an answer to "bao nhiêu <unit>" must hold a number with that unit, on every route. An answer saying the documents do not specify the value is exempt.

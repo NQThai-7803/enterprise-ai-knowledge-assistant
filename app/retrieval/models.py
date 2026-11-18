@@ -22,6 +22,7 @@ class RetrievalHit:
     end_page: int
     token_count: int
     relevance_score: float
+    group_id: UUID | None = None  # DEC-034: the parent TEXT chunk of a row, else the chunk
 
     def __post_init__(self) -> None:
         _validate_common_hit_fields(self)
@@ -70,6 +71,7 @@ class KeywordRetrievalHit:
     end_page: int
     token_count: int
     keyword_rank: float
+    group_id: UUID | None = None  # DEC-034
 
     def __post_init__(self) -> None:
         _validate_common_hit_fields(self)
@@ -120,6 +122,7 @@ class HybridRetrievalHit:
     keyword_rank: int | None
     matched_by: tuple[str, ...]
     reranker_score: float | None = None
+    group_id: UUID | None = None  # DEC-034: the parent TEXT chunk of a row, else the chunk
 
     def __post_init__(self) -> None:
         _validate_common_hit_fields(self)

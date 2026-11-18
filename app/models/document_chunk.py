@@ -76,6 +76,18 @@ class DocumentChunk(Base):
             func.to_tsvector(literal_column("'simple'::regconfig"), literal_column("text")),
             postgresql_using="gin",
         ),
+        Index(
+            "ix_document_chunks_search_fts_simple",
+            func.to_tsvector(
+                literal_column("'simple'::regconfig"),
+                func.coalesce(literal_column("search_text"), literal_column("text")),
+            ),
+            postgresql_using="gin",
+        ),
+        Index("ix_document_chunks_parent_chunk_id", "parent_chunk_id"),
+        CheckConstraint(
+            "chunk_kind IN ('TEXT', 'TABLE_ROW')", name="ck_document_chunks_chunk_kind"
+        ),
         {"extend_existing": True},
     )
 
@@ -105,6 +117,15 @@ class DocumentChunk(Base):
         nullable=False,
         server_default=func.now(),
     )
+    # DEC-034: a TABLE_ROW chunk is one data-table row, extra to the page text; its parent is the
+    # TEXT chunk that holds its table, and its keyword text (search_text) is its cells only.
+    chunk_kind: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="TEXT", server_default="TEXT"
+    )
+    parent_chunk_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid, ForeignKey("document_chunks.id", ondelete="CASCADE"), nullable=True
+    )
+    search_text: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     document: Mapped[Document] = relationship("Document", back_populates="chunks")
     message_citations: Mapped[list[MessageCitation]] = relationship(

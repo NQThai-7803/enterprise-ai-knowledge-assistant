@@ -134,6 +134,9 @@ class Settings(BaseSettings):
     rag_semantic_exact_permitted_knn_enabled: bool = True
     # legacy, strict or off for _structured_condition_value_answer (DEC-010).
     rag_deterministic_route_mode: Literal["legacy", "strict", "off"] = "strict"
+    # DEC-033: exclude keeps DRAFT documents (templates, drafts) out of every answer path;
+    # off answers from them like ACTIVE ones. Document management is unchanged either way.
+    rag_draft_document_policy: Literal["off", "exclude"] = "off"
     # FIX 2 groups 1 and 2 are on by default (DEC-011); set these to roll back.
     # FIX 2 group 1: false stops the deterministic repair once the LLM has refused.
     rag_repair_after_llm_refusal_enabled: bool = False
