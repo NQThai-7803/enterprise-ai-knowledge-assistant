@@ -66,7 +66,7 @@ services:
       PYTHONPATH: /app/scripts/diagnostics/ablation_site:/app
       EVAL_ABLATION: ${EVAL_ABLATION:-}
       LLM_OLLAMA_MODEL: ${EVAL_LLM_MODEL:-qwen2.5:3b}
-      EVAL_ORACLE_FILE: ${EVAL_ORACLE_FILE:-}
+      EVAL_ORACLE_FILE: ${EVAL_ORACLE_FILE:-/oracle/oracle.json}  # read by the oracle ablations only
       # DEC-025: the app default (heuristic) unless a configuration sets it; no cross-encoder
       # model is downloaded or mounted on Actions.
       RERANKER_PROVIDER: ${EVAL_RERANKER_PROVIDER:-heuristic}

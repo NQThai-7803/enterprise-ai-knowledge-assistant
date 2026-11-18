@@ -35,6 +35,9 @@ for entry in "${ENTRIES[@]}"; do
     # Git Bash rewrites /path arguments to C:/Program Files/Git/path when dispatching from Windows.
     [[ "${pair#*=}" =~ ^[A-Za-z]:/ ]] && { echo "host-rewritten path in $pair (MSYS_NO_PATHCONV=1)"; exit 2; }
   done
+  # EVAL_S3T=1: the DEC-029/034 candidate's answer path, s3 with the simple-mode trace (keeps
+  # four configurations under the 400-character concurrency group; name the model explicitly).
+  [[ ",$vars," == *",EVAL_S3T=1,"* ]] && vars+=",EVAL_ABLATION=simple_trace,EVAL_SIMPLE_LEVEL=3"
   # EVAL_SIMPLE_LEVEL=n: simple mode with s1..sn (docs/design/simple-answer-mode.md), so that a
   # configuration stays short; the configs input is part of a 400-character concurrency group.
   if [[ ",$vars," =~ ,EVAL_SIMPLE_LEVEL=([1-9]), ]]; then
