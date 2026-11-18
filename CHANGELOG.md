@@ -6,6 +6,22 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### Draft documents, table rows v2 (DEC-033/034/035) -- 2026-11-18
+
+- **RAG:** `DRAFT` lifecycle and `RAG_DRAFT_DOCUMENT_POLICY` (`off` default, `exclude`) in every answer retrieval path.
+- **Ingestion:** table rows v2 behind `DOCUMENT_TABLE_ROW_CHUNKING_ENABLED`:
+  - extra `TABLE_ROW` chunks with a parent and keyword text of their cells only;
+  - one hit per group in fusion;
+  - tables of 3 or more columns only.
+  - The extraction router now keeps the rows.
+- **DB:** migration `20261118_0012`, adding the enum value plus `chunk_kind`, `parent_chunk_id`, `search_text` and a GIN index.
+- **Eval:**
+  - ablation `retrieval_oracle`, and `build_oracle --set natural`;
+  - `EVAL_DRAFT_POLICY`, and the `EVAL_S3T` alias;
+  - the UAT gold lock;
+  - owner-approved gold edits (Q044, ND-001, ND-004, ND-012, ND-019).
+- **Measured** (DEC-034 results): rows fail the retrieval gate, exclude is not adopted. Defaults unchanged.
+
 ### Held-out v3, table rows, value-aware grading -- 2026-11-18
 
 - **Held-out v3 (DEC-030):** 20 questions with gold from a team member, frozen with a lock and in the question fingerprints (`scripts/eval/heldout_v3.py`).

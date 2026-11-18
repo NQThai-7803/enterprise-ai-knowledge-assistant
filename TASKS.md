@@ -8,6 +8,38 @@
 3. **Embedding fine-tune** (`docs/design/embedding-finetune.md` and DEC-015 on branch `feat/embedding-finetune-infra`): infrastructure only so far; the baseline measurement and training come after FIX 3.
 4. The final held-out v2 measurement, once, after the choices above are made (DEC-012).
 
+## Draft documents, table rows v2 (DEC-033/034/035) -- 2026-11-18 (STOPPED for the owner's review)
+
+- **DONE:**
+  - DEC-033/034/035 written before measuring.
+  - DRAFT policy, rows v2, migration `20261118_0012`.
+  - Gold edits with locks (UAT `eval-data/uat/gold.lock`, natural gold re-locked).
+  - `retrieval_oracle` gate, run twice: the first run was void because of a router bug, fixed.
+  - LLM measurement in 2 rounds.
+  - UAT list for the best configuration.
+  - Docker cleanup.
+- **WAITING FOR OWNER:**
+  - Read `docs/review/uat-s3-q35-text-2026-11-18.md`.
+  - Exclude: adopt it for its UAT gain despite natural's +2 false refusals, or keep it off.
+  - Rows v2: repeat the gate over two jobs or with a load-independent tie-break, and decide whether 2-column tables (all of ND-HR-004) should get rows.
+  - Held-out v3 (DEC-035) after the decisions above; the DEC-030 findings first.
+- **Defaults unchanged.**
+
+## Known limits of the value-aware grader (DEC-032, `scripts/eval/value_grading.py`) -- 2026-11-18
+
+These are open items. Each one can make a right answer count as wrong, or the reverse. Read the owner's lists before trusting a single-item difference.
+
+- [ ] **Values inside a condition are required.** Every value of the reference must be stated, so a condition counts as well as the answer itself.
+  - Q039: the reference "12 ngày … khi đủ 12 tháng" also requires "12 tháng".
+  - A fix needs to tell the answer value from the condition values in the reference: by its unit and the question's unit, or by a `required` list in the gold.
+- [ ] **Numbers written in words** count only for 1-10, and only right before a unit ("ba ngày").
+  - "mười hai ngày", "nửa ngày" and "hai mươi phần trăm" are missed.
+- [ ] **False conflicts.** A second, correct value in a reference unit, about another case, is a conflict.
+  - Q069 with row chunks: "30 %" plus the separate night-overtime rule "20 %".
+  - Only thresholds ("từ X trở lên", "trên X") are exempt today.
+- [ ] **Units** are recognized from a fixed list (`UNITS`). A number followed by any other word has no unit and matches loosely.
+- [ ] **A range with one scale word** ("3 - 15 triệu") is handled. A range written with two different scales is not.
+
 ## Held-out v3, table rows, value-aware grading -- 2026-11-18 (STOPPED for the owner's review)
 
 - **DONE:**

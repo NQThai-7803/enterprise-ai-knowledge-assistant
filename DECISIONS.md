@@ -592,3 +592,44 @@ Set on 2026-11-18 by the owner, before held-out v3 is run or opened.
   - The report says plainly that held-out v3 was used both to choose between the two configurations and to measure them, so its figures are not an unbiased estimate of the chosen one.
   - The open findings of DEC-030 are decided by the owner before the run: references to ND-HR-007, test accounts without a seeded user, and references not found.
 - **Who runs it:** the owner starts the run. Changing the default after it needs the owner's approval.
+
+**Results of DEC-033 and DEC-034 (2026-11-18, value-aware grading on the DEC-033 gold):**
+
+- **Retrieval gate** (no LLM; the simple mode's 5 chosen chunks), items whose gold chunk is among them:
+  - The first run was void: the extraction router dropped the rows, so no row chunk was written. Fixed in b637d76.
+  - Second run: UAT 76/98 (`s3t`), 78/98 (exclude), **77/98** (exclude + rows). natural 18/20 in all three; the 5 dev sets reach every item in all three.
+  - **Rows fail the gate** (77 < 78). They lose Q027 and Q063 and gain Q017; none of the three involves a row chunk in the 5. Row chunks fill 4 of 500 slots.
+  - Between the two gate jobs, Q096 flips with nothing changed (ties are ordered by document id, drawn anew at every load), so a one-item difference is within one job's variation.
+  - **Every table of ND-HR-004 has 2 columns**, so under the 3-column rule none of them gets rows. That includes the tables behind Q041, ND-001, Q048 and Q049.
+  - The rows configuration was dropped from the LLM measurement, as the rule says.
+- **LLM measurement:**
+  - Jobs:
+    - `natural_dev_v1`: 44254283048 (fA), 44254365338 (gA);
+    - the 5 dev sets: 44254296297-44254352830 (fA), 44254379416-44254431753 (gA);
+    - UAT in quarters: 44254446663-44254485549 (A), 44254500045-44254541309 (B).
+  - Leaks 0 everywhere.
+
+  | Comparison (DEC-026/027, jobs f/g) | false answers + wrong, 6 sets | natural false refusals | natural correct |
+  |---|---|---|---|
+  | `s3t` vs `legacy` + 3B | 12/13 vs 28/29 (real) | 5/5 vs 7/7 (real) | 10/10 vs 2/2 |
+  | exclude vs `s3t` | 13/13 vs 12/13 (tie) | **7/7 vs 5/5 (+2, real)** | 7/8 vs 10/10 |
+
+  - **Exclude is not adopted.** Its false answers + wrong tie, and its natural false refusals rise by 2 in both jobs.
+    - ND-018 and ND-015 become refusals and ND-012 wrong. In all three the evidence is in the context with and without the flag (gate: natural 18/20 both).
+    - Without the template chunks the sources are renumbered and partly replaced. The model words its answer differently and the validator rejects it, or it drops "phải được công ty chấp thuận".
+  - **UAT** (monitoring), correct - false refusal - false answer - wrong:
+
+    | Configuration | Round A | Round B |
+    |---|---|---|
+    | `legacy` | 99-0-0-1 | 98-1-0-1 |
+    | `s3t` | 61-21-1-17 | 59-24-1-16 |
+    | exclude | 69-20-1-10 | 65-23-1-11 |
+
+    - With exclude, 7 items improve in both rounds (Q040, Q043, Q044, Q052, Q055 correct; Q039, Q042 wrong → refusal) and 1 gets worse (Q066).
+    - `legacy`'s one wrong answer is Q044: it still cites the template, which the new gold no longer accepts.
+- **Best configuration of this round:** `s3` + `qwen3.5-text:4b`, without exclude and without rows. Its UAT list is `docs/review/uat-s3-q35-text-2026-11-18.md`.
+- **No default changed.**
+- **Owner's decisions:**
+  - whether UAT's gain justifies exclude despite natural's +2 refusals;
+  - whether to gate rows over two jobs, or with a load-independent tie-break;
+  - whether the 3-column rule should admit the 2-column tables behind Q041, Q048 and Q049.

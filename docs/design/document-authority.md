@@ -1,6 +1,14 @@
-# Template and draft documents: company documents win (design, not implemented)
+# Template and draft documents: company documents win
 
-Status: proposal of 2026-11-18, for the owner to approve. No code yet; the default behaviour is unchanged.
+Status:
+
+- **Proposed** on 2026-11-18.
+- **Approved and implemented the same day (DEC-033):**
+  - `exclude` only;
+  - the lifecycle value `DRAFT`;
+  - the flag `RAG_DRAFT_DOCUMENT_POLICY`, default `off`;
+  - the gold edits below, with new locks.
+- `demote` and the citation mark are not implemented. The default behaviour is unchanged.
 
 Owner decision this builds on: **a company document wins over a template.**
 

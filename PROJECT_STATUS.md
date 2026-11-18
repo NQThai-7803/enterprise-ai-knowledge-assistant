@@ -1,5 +1,24 @@
 # Project Status
 
+## Draft documents, table rows v2, held-out v3 protocol (DEC-033/034/035) -- 2026-11-18 (STOPPED for the owner's review)
+
+- **Owner decisions applied:**
+  - **DRAFT lifecycle** and `RAG_DRAFT_DOCUMENT_POLICY=off|exclude` (default `off`). UAT-LEAVE-AUTHORITY-001 is marked DRAFT in the corpus V2 manifest.
+  - **Gold edits, re-locked:** UAT Q044 → ND-HR-004 p6; natural ND-001 → ND-HR-004 p5; ND-004, ND-012, ND-019 without the template.
+  - **Table rows v2** (all four adjustments, flag still off).
+  - **DEC-035:** held-out v3 protocol, written before any run.
+- **Retrieval gate (no LLM):**
+  - Rows **fail**: UAT 77/98 vs 78/98, which is within one job's variation. Natural and the dev sets are unchanged.
+  - Every table of ND-HR-004 has 2 columns, so the 3-column rule gives them no rows (Q041, Q048, Q049, ND-001).
+  - A router bug that dropped the rows was found by the first gate run and fixed.
+- **LLM measurement** (2 rounds, value-aware):
+  - `s3` + `qwen3.5-text:4b` stays best on the 6 sets.
+  - Exclude is **not adopted**: natural false refusals +2 in both jobs, with the evidence still in context (the model words its answer differently).
+  - On UAT, exclude would be better: 69/65 correct vs 61/59.
+- **UAT list for the owner:** `docs/review/uat-s3-q35-text-2026-11-18.md` (19 items).
+- **Docker cleanup** as approved: 17 networks, 2 containers and 4 old verify images removed. No volume or Ollama model touched.
+- **Defaults unchanged.**
+
 ## Held-out v3, table rows, value-aware grading (DEC-030/031/032) -- 2026-11-18 (STOPPED for the owner's review)
 
 - **Held-out v3 (DEC-030):** a team member's 20 questions with gold, frozen in `docs/eval/heldout-v3.yaml` + lock and in the fingerprints. Not opened since. The automatic checks list questions for the owner (`docs/eval/heldout-v3-check.json`).

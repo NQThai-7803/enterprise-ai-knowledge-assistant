@@ -323,3 +323,51 @@ UAT: 27 items change the same way in both rounds and 10 differ between rounds.
    - Compare: flag off, flag on, and 1-3.
    - Run an LLM job only when 1-3 keeps every gold page that is reached today and adds the table ones (Q041, Q077, ND-003, ND-017).
 5. **Template documents** (Q045, Q048, Q049, Q051 with the flag): `docs/design/document-authority.md`. That change does not depend on the table format.
+
+## Version 2 (DEC-034): implemented, stopped at the retrieval gate
+
+The owner approved adjustments 1-4 above on 2026-11-18. They are implemented under the same flag (still off), version 1 replaced:
+
+- `app/document_processing/extractors/table_rows.py` returns the rows; the page text is left alone.
+- `app/document_processing/chunking/table_rows.py` adds the `TABLE_ROW` chunks and their parent.
+- Migration `20261118_0012` adds `chunk_kind`, `parent_chunk_id` and `search_text`.
+- `fusion.one_per_group` keeps one hit per group. Keyword retrieval reads `COALESCE(search_text, text)`.
+
+**Offline on corpus V2** (router + chunker as the worker runs them):
+
+- 150 text chunks with or without the flag, identical.
+- 108 row chunks, each with a parent:
+  - ND-CORP-001 23, ND-HR-002 16, ND-HR-003 2, ND-HR-004 2, ND-HR-005 24, ND-HR-006 35;
+  - the template 6, the two UAT fixtures 0.
+- **Every table of ND-HR-004 has 2 columns** (checked with `find_tables()`), so none gets rows. Under the 3-column rule this includes the tables behind items that version 1 fixed or aimed at:
+  - seniority, page 4: Q041;
+  - public holidays, page 5: ND-001;
+  - notice periods, page 9: Q048, Q049.
+- Only the 4-column version history of ND-HR-004 page 13 qualifies, and it is the one source of that document's 2 rows.
+
+**Gate** (ablation `retrieval_oracle`: no LLM, the simple mode's 5 chosen chunks; DEC-034 rule fixed before):
+
+- **The first run is void.** The extraction router copied each native page without its rows, so no row chunk was written: 143 chunks after re-ingestion, the same as without the flag.
+  - Fixed in `extraction_router._copy_page_with_metadata`, with a test through the router.
+  - Its configurations without rows stay valid.
+- **Second run** (runs 44247482034 UAT, 44247492099 natural, 44247502567-44247545834 the 5 dev sets; 251 chunks after re-ingestion), items with gold whose gold chunk is in the 5:
+
+| Set | `s3t` | `s3tx` (exclude) | `s3tx-rows` |
+|---|---|---|---|
+| UAT | 76/98 | 78/98 | **77/98** |
+| natural_dev_v1 | 18/20 | 18/20 | 18/20 |
+| relevance, false refusal v1/v2, compound, RBAC | all items | all items | all items |
+
+- **UAT with rows:**
+  - It loses Q027 and Q063 and gains Q017. None of the three changes comes from a row chunk taking a slot: the 5 chunks around them hold no row.
+  - Row chunks take 4 of the 500 chosen slots (Q033, Q058, Q079, Q088). For Q079, the NovaCare row is chosen at rank 1 in place of its own table chunk.
+  - Q041's and Q048/Q049's gold pages reach the 5 neither with nor without rows, as expected: their tables have 2 columns and get no rows.
+- **Job variation:** between the two jobs, without any change, Q096 flips in both `s3t` and `s3tx`.
+  - Chunks that tie are ordered by document id, which every corpus load draws anew.
+  - A one-item difference is therefore within the variation of one job.
+- **Verdict by the rule fixed before measuring:** 77 < 78 on UAT, so the gate **fails** and rows version 2 is left out of the LLM measurement.
+  - The rule asked for one job per set. A two-job gate (DEC-027) would tell a real loss of one item from noise.
+  - Another option is a tie-break that does not depend on the load, such as the document code and chunk index. Either is the owner's decision.
+- **Exclude, measured in the same jobs:**
+  - It removes every template chunk from the 5. There were 53 such hits on UAT and 15 on natural without it.
+  - UAT gains Q027 and Q055 in both jobs. Nothing is lost.
