@@ -30,7 +30,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.eval import branch_counters, reranker_check  # noqa: E402
+from scripts.eval import branch_counters, reranker_check, value_grading  # noqa: E402
 from scripts.eval.eval_client import INFRA_ERROR, EvalClient, EvalInfraError, extract  # noqa: E402
 
 SOURCE = ROOT / "tests" / "acceptance" / "rbac_dev_v1.yaml"
@@ -100,10 +100,13 @@ def leak_reasons(
 def control_passed(
     case: Mapping[str, Any], item: Mapping[str, Any], codes: Mapping[str, str]
 ) -> bool:
+    # DEC-032: the fact with no digit touching it, and no other value in its unit
+    answer = case.get("answer") or ""
     return (
         case.get("status") == "ANSWERED"
         and item["document"] in cited_codes(case, codes)
-        and _fold(item["fact"]) in _fold(case.get("answer") or "")
+        and value_grading.says(item["fact"], answer)
+        and not value_grading.check(answer, item["fact"], item.get("question", ""))["conflicting"]
     )
 
 

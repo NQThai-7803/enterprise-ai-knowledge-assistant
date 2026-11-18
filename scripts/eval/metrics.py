@@ -227,12 +227,13 @@ def proxy_records(graded: Mapping[str, Any]) -> list[CaseRecord]:
     for row in graded["cases"]:
         reference = frozenset(row.get("reference_cited_codes", []))
         infra = row.get("execution_status") == INFRA_ERROR
+        match = row.get("value_match", row["proxy_match"])  # DEC-032
         records.append(
             CaseRecord(
                 id=row["id"],
                 gold_status=row["reference_status"],
                 run_status=INFRA_ERROR if infra else row["grounding_status"],
-                grade=None if infra else (PASS if row["proxy_match"] else FAIL),
+                grade=None if infra else (PASS if match else FAIL),
                 cited_docs=frozenset(row.get("cited_codes", [])),
                 required_docs=reference,
                 allowed_docs=reference,

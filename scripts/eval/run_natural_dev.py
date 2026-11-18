@@ -44,6 +44,7 @@ from scripts.eval import (  # noqa: E402
     reranker_check,
     run_heldout,
     run_rbac_dev,
+    value_grading,
 )
 
 PROXY = natural_dev_check.SET_DIR / "natural_dev_v1_proxy.yaml"
@@ -125,11 +126,17 @@ def grade_case(
     wrong_hit = any(_says(f, folded) for f in keys.get("wrong", []))
     limit_said = any(_says(f, folded) for f in (*keys.get("limits", []), *limit_forms))
     cites_gold = bool(allowed & set(cited))
+    # DEC-032: no other value in the unit of a fact; the fact and wrong forms stay as they are
+    values = value_grading.check(
+        answer,
+        [form for group in keys.get("facts", []) for form in group],
+        item.get("question", ""),
+    )
     if limited:
-        passed = answered and cites_gold and facts and limit_said
+        passed = answered and cites_gold and facts and limit_said and not values["conflicting"]
         false_answer = answered and not limit_said and not wrong_hit
     else:
-        passed = answered and cites_gold and facts and not wrong_hit
+        passed = answered and cites_gold and facts and not wrong_hit and not values["conflicting"]
         false_answer = False
     return {
         "id": item["id"],
@@ -150,6 +157,7 @@ def grade_case(
             "limit_said": limit_said,
             "cites_gold": cites_gold,
         },
+        "values": values,
     }
 
 
