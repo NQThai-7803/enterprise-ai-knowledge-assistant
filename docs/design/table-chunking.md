@@ -1,4 +1,4 @@
-# Table chunking: diagnosis and proposal (no behaviour change)
+# Table chunking: diagnosis, proposal and implementation behind a flag
 
 Measured 2026-11-17. The owner asked for a diagnosis first and no code.
 
@@ -126,7 +126,9 @@ The three items that stay wrong with every model, and the other wrong-subject it
 - **`legacy` answers all six correctly on its deterministic route,** which reads the values itself.
 - **The answers the proxy grades wrong** (a different document, mostly with the right value): 1 of 17 cites a table.
 
-## Proposal: one unit per table row (not implemented)
+## Proposal: one unit per table row
+
+Implemented on 2026-11-18 behind `DOCUMENT_TABLE_ROW_CHUNKING_ENABLED` (off), with changes from this proposal listed in the next section.
 
 **Extraction.** On a page with a data table (at least 2 columns and 2 body rows), take the table's region out of the page text and emit one line per row:
 
@@ -173,3 +175,151 @@ The three items that stay wrong with every model, and the other wrong-subject it
   - Sets: `natural_dev_v1`, UAT (monitoring only, DEC-026), and the 5 dev sets as the no-change control.
   - Rule: DEC-026.
   - Diagnostics: the 41 table-cited natural answers, ND-002, ND-003, ND-006 and ND-010, and the UAT items in the list above.
+
+## Implementation (2026-11-18, DEC-031)
+
+`app/document_processing/extractors/table_rows.py`, called by `PyMuPDFTextExtractor` when the flag is on. It differs from the proposal in these points:
+
+- **No chunker change.** Each row is its own paragraph and carries its title and column names, so the existing chunker cuts only between rows. Tables are therefore not kept in one chunk, and rows of two tables can share a chunk; each row stays readable on its own.
+- **Data table:** at least 2 columns and **3 rows**. PyMuPDF's header guess is not used for this.
+- **Column names**, against risk 2:
+  - The first row counts as a header only if it has at least two distinct short labels (≤ 60 characters, no final full stop), every cell is bold, and the next row is not all bold.
+  - PyMuPDF's own header guess is not used: it took the title line above a table as an "external" header, and the first value of the core-values table as column names.
+  - Without a header, a row is written `<first cell>: <other cells>`. The document-control and contact tables come out as `Mã tài liệu: ND-HR-002`, `Sự cố an ninh mạng: Security Operations: …`.
+- **Merged cells:** a cell merged from above takes its text; one merged from the left is written once.
+- **Tables across pages:** a table that ends in the lower quarter of its page, with no body text after it above the footer, passes its title and columns to the next page's first table. That table must have no title of its own, the same number of columns, and no header or the same header.
+- **Title:** the nearest line above the table, outside every table region (so not the page's header band), within 60 points.
+
+**Offline on corpus V2** (the app's extractor and chunker at the corpus V2 settings):
+
+- 143 chunks without the flag, 167 with it. Every row line sits whole in one chunk. The largest chunk is 700 tokens.
+- The 18 documents of the 5 dev sets are unchanged with the flag on.
+- Risk 1 is still open: the organisation chart (ND-CORP-001 page 6) is read as a table and stays garbled, as it is without the flag.
+
+**Unit tests:** `tests/unit/test_table_row_extraction.py`, on made-up PDFs. They cover:
+
+- a page without a table, unchanged;
+- a multi-column table with title and reading order;
+- a table continued on the next page, with and without a repeated header;
+- vertical and horizontal merges;
+- a key-value table without a bold header;
+- a long table, where no chunk boundary cuts a row;
+- the flag reaching both extractors, off by default.
+
+## Measurement (DEC-031)
+
+**Setup.**
+
+- Two job rounds (`d`, `e`) per set. Each job runs `legacy` + 3B, then `s3` + `qwen3.5-text:4b`, then the same with the flag on.
+- For the flag run, the job rebuilds its own postgres and redis volumes and reloads corpus V2 with the worker started with the flag. The V2 volume is never touched.
+- Re-ingestion was checked in every job: `re-ingest, DOCUMENT_TABLE_ROW_CHUNKING_ENABLED=true` in `batch.log`, and all 9 documents READY in `reingest.log`.
+- Prompt cache capped at 2048 MiB in every job.
+- Runs: natural 44148260972 and 44148409028. The 5 dev sets: 44148286143 to 44148384526 and 44148432685 to 44148534878. UAT: 44148578890, 44148605005, 44148631493 and 44148657545.
+- **Graded value-aware (DEC-032).** Regrading the dev sets changed no case. The UAT figures moved; both gradings are given below.
+
+**Dev sets (DEC-026 / DEC-027)**, flag on vs flag off, both `s3` + `qwen3.5-text:4b`, jobs d / e:
+
+| Set | Correct | False refusal | False answer + wrong |
+|---|---|---|---|
+| natural_dev_v1 | 9/9 vs 11/11 (**−2, real**) | 7/7 vs 5/5 (**+2, real**) | 4/4 vs 4/4 |
+| the 5 dev sets | 107/108 vs 108/107 | 1/1 vs 1/1 | 9/8 vs 8/9 (tie) |
+| all six | 116/117 vs 119/118 | 8/8 vs 6/6 (**+2, real**) | 13/12 vs 12/13 (tie) |
+
+- Leaks: 0 everywhere.
+- Rule (DEC-026): false answers + wrong are tied, and false refusals on `natural_dev_v1` rise by 2 in both jobs. The flag is **not adopted**; the default stays off.
+
+**UAT** (monitoring only), correct - false refusal - false answer - wrong per round of 100:
+
+| Configuration | A, proxy | A, value-aware | B, proxy | B, value-aware |
+|---|---|---|---|---|
+| `legacy` + 3B | 100-0-0-0 | 100-0-0-0 | 98-1-0-1 | 98-1-0-1 |
+| `s3` + `qwen3.5-text:4b` | 69-23-1-7 | 62-23-1-14 | 67-24-1-8 | 60-24-1-15 |
+| same + row chunks | 54-35-1-10 | 53-35-1-11 | 56-33-1-10 | 55-33-1-11 |
+
+- **Proxy grading** (no values): the flag looked worse on every count.
+- **Value-aware grading:** with the flag, false answers + wrong fall by 3 and 4 (12 vs 15 and 16). Correct falls by 9 and 5, and false refusals rise by 12 and 9.
+  - Several answers that gave a wrong value now refuse instead.
+  - The conclusion does not change: UAT is not the rule, and the rule set already decides.
+
+**The nine UAT items read as wrong on 2026-11-17** (value-aware, rounds A / B):
+
+| Item | flag off | flag on | |
+|---|---|---|---|
+| Q041 | wrong / wrong | correct / correct | seniority row: 10 years → 2 more days |
+| Q077 | wrong / wrong | correct / correct | NovaCare inpatient row: 150 million per year |
+| Q019 | wrong / wrong | false refusal / wrong | |
+| Q020, Q054, Q079 | wrong / wrong | false refusal / false refusal | the right value no longer reaches the context, or the model refuses |
+| Q048, Q049 | wrong / wrong | wrong / wrong | now cite the template UAT-LEAVE-AUTHORITY-001 (10 and 03 days) |
+| Q018 | false answer / false answer | false answer / false answer | conflicting sources, not a table |
+
+**ND-002 and ND-003** (natural, both jobs):
+
+- **ND-003 is fixed.**
+  - Flag off: none of the 5 core values is in the first context.
+  - Flag on: all 5 are, and the answer is correct.
+- **ND-002 stays a false answer.**
+  - With the flag, the row reads correctly: `Chương trình: Employee Referral Bonus; Mức mô phỏng: 3 - 15 triệu đồng; Điều kiện: Ứng viên được tuyển và hoàn thành mốc thử việc…`.
+  - The model still says the hired candidate receives the bonus. That is a subject error (who receives it), which chunking cannot fix.
+
+### Per item: what the flag changes
+
+UAT: 27 items change the same way in both rounds and 10 differ between rounds.
+
+**Fixed (6):**
+
+- Q041 and Q077: a table row reaches the context.
+- Q039 and Q040: ND-HR-004 cited instead of the template.
+- Q017 and Q046.
+
+**Broken: 11 correct answers become false refusals.** In the evidence check, "share" is the share of word 5-grams of the passage cited with the flag off that also appear in the first context with the flag on.
+
+- **8 lose their evidence** (share 0.00): Q004, Q010, Q032, Q035, Q038, Q056, Q073, Q099.
+  - The context still has 5 sources of about the same size, but the passage that held the answer is not among them.
+  - The model then writes "Chưa xác minh được…".
+- **3 keep it but are rejected** (share 0.60-1.00): Q013 and Q014 (`claim_irrelevant`), Q074 (`claim_contradicted`).
+
+**Other changes:**
+
+- **3 correct answers become wrong:**
+  - Q016: ND-HR-003 cited instead of ND-HR-002, with the same value.
+  - Q051: the template is cited as well.
+  - Q069: the answer adds the separate 20 % night-overtime rule. This is a false conflict of the value check; the answer is right.
+- **3 false refusals become wrong:** Q037, Q045 (template) and Q096.
+- **4 wrong answers become false refusals:** Q002, Q020, Q054, Q079.
+
+**natural_dev_v1:**
+
+- **Fixed:** ND-003, ND-006, ND-017. For ND-003 and ND-017, the table facts now reach the context (0/5 → 5/5 and 3/5 → 5/5).
+- **Broken:**
+  - ND-018: its evidence leaves the context.
+  - ND-005, ND-013, ND-019 and ND-020: the facts are still in the context, but the model refuses, words the answer differently, or is rejected. In ND-013 it copies the table label: "mức hỗ trợ **mô phỏng** là 2.000.000 đ/lần" → `claim_insufficient`.
+  - ND-015: the model breaks its markers (`…escalationsource_1`).
+
+**Why the evidence moves.** In the contexts read for Q048 and Q049:
+
+- **Repeated labels crowd the context.** The title and column names repeat in every row, so a table's chunk repeats its labels many times. A chunk with many matching labels then outranks the passage with the answer.
+  - The benefits matrix of ND-HR-006 (`Quyền lợi: …; Trong nghỉ không lương dài ngày: …`) enters the context of both leave-notice questions.
+- **The template gains slots.** UAT-LEAVE-AUTHORITY-001 has the same title as ND-HR-004 without the company name. Its chunks now take 2 of the 5 sources for Q049.
+- **Answers cite the template more.** Wrong answers citing it: 4 per round with the flag off (Q039, Q040, Q042, Q043), 6 with it on (Q042, Q043, Q045, Q048, Q049, Q051).
+- **Chunk boundaries shift.** The flag adds 24 chunks over corpus V2 (143 → 167). The prose next to a table now falls into different chunks.
+
+### Proposed adjustment (not implemented; needs owner approval)
+
+1. **Keep both representations.**
+   - The page text is chunked exactly as without the flag, so every answer of today keeps its chunk.
+   - The row lines become additional units of a `table_row` kind, linked to the chunk that holds the table.
+   - Retrieval scores both kinds.
+   - Context admission counts a chunk and its own rows as one source: one slot per table, so a row never takes a second slot from the passage it came from.
+   - Citations keep the page of the row.
+2. **Write the labels once for keyword retrieval.**
+   - The keyword index of a row unit holds the cells only. The title and column names are indexed once per table.
+   - The embedded text keeps `title | column: cell`.
+   - This removes the repeated-label effect.
+3. **Rows only where the page text loses the structure.**
+   - These are tables with at least 3 columns, or with numeric cells in more than one column.
+   - Two-column key-value tables already read correctly in the page text ("Ngày làm việc Thứ Hai - Thứ Sáu").
+4. **Measure retrieval before any LLM job.**
+   - For the UAT items and natural items with a gold page, check whether the gold page reaches the first 5 sources.
+   - Compare: flag off, flag on, and 1-3.
+   - Run an LLM job only when 1-3 keeps every gold page that is reached today and adds the table ones (Q041, Q077, ND-003, ND-017).
+5. **Template documents** (Q045, Q048, Q049, Q051 with the flag): `docs/design/document-authority.md`. That change does not depend on the table format.

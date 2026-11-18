@@ -8,6 +8,25 @@
 3. **Embedding fine-tune** (`docs/design/embedding-finetune.md` and DEC-015 on branch `feat/embedding-finetune-infra`): infrastructure only so far; the baseline measurement and training come after FIX 3.
 4. The final held-out v2 measurement, once, after the choices above are made (DEC-012).
 
+## Held-out v3, table rows, value-aware grading -- 2026-11-18 (STOPPED for the owner's review)
+
+- **DONE:**
+  - A: held-out v3 frozen (DEC-030).
+  - B: target hardware in DEC-029, ADR 0003, DEPLOYMENT/SETUP.
+  - C: cache cap in eval and docs, third capped UAT job.
+  - D: table rows behind a flag, with unit tests, measured in 2 jobs (DEC-031).
+  - E: `docker builder prune`.
+  - Value-aware grading for every set and a regrade of all D and model-comparison runs (DEC-032).
+  - Row-chunking analysis per item.
+  - Template-document design.
+  - UAT list for the best configuration.
+- **WAITING FOR OWNER:**
+  - Read `docs/review/uat-s3-q35-text-2026-11-18.md`.
+  - Decide on the held-out v3 findings (`docs/eval/heldout-v3-check.json`).
+  - Approve or change the row-chunking adjustment (`docs/design/table-chunking.md`, "Proposed adjustment").
+  - Approve the template-document design: `exclude` or `demote`, and the expected citation of Q044 and ND-001 (`docs/design/document-authority.md`).
+  - The default is unchanged.
+
 ## Candidate `s3` + `qwen3.5:4b` (DEC-029) -- 2026-11-17 (STOPPED for the owner's review)
 
 - **DONE:**

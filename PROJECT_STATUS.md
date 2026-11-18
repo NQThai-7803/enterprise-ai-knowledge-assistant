@@ -1,5 +1,25 @@
 # Project Status
 
+## Held-out v3, table rows, value-aware grading (DEC-030/031/032) -- 2026-11-18 (STOPPED for the owner's review)
+
+- **Held-out v3 (DEC-030):** a team member's 20 questions with gold, frozen in `docs/eval/heldout-v3.yaml` + lock and in the fingerprints. Not opened since. The automatic checks list questions for the owner (`docs/eval/heldout-v3-check.json`).
+- **Target hardware (owner):** NVIDIA GPU ≥ 4 GB with `qwen3.5-text:4b` (`PARAMETER num_gpu 99`, `scripts/deploy/ollama_text_model.py`). 16 GB CPU is supported but slow. Recorded in DEC-029, ADR 0003 and `DEPLOYMENT.md`. Default unchanged.
+- **Prompt cache:** `LLAMA_ARG_CACHE_RAM=2048` for eval and in the deployment docs, current default included.
+  - The third capped UAT job shows the same totals (36-11-0-3) as both uncapped ones.
+  - 4 items change only with the cap: Q063 and Q064 correct → refusal, Q076 and Q090 refusal → correct.
+- **Value-aware grading (DEC-032, `scripts/eval/value_grading.py`):** the UAT proxy did not read values.
+  - An answer must state every value of its reference and no other value in the same unit.
+  - The dev-set runners add the conflict check, and RBAC controls now use a digit boundary.
+  - All runs of D and of the model comparison were regraded without rerunning. The dev sets do not change, so the DEC-026/027 conclusions stand.
+  - UAT `s3` + `qwen3.5-text:4b` falls to 62-23-1-14 / 60-24-1-15 (proxy 69/67 correct).
+- **Table rows (DEC-031)**, flag `DOCUMENT_TABLE_ROW_CHUNKING_ENABLED`, default off, two jobs on natural, the 5 dev sets and UAT:
+  - **Not adopted:** natural false refusals +2 in both jobs; false answers + wrong tied.
+  - Fixes Q041, Q077, ND-003, ND-017. Breaks 11 correct UAT answers into refusals, 8 of them because the evidence left the context.
+  - Fix proposed, not coded: `docs/design/table-chunking.md`.
+- **Template document** UAT-LEAVE-AUTHORITY-001 cited by 4 wrong UAT answers per round (6 with rows): design `docs/design/document-authority.md` (DRAFT lifecycle, flag `off`/`demote`/`exclude`, gold impact). Not coded.
+- **Best configuration:** `s3` + `qwen3.5-text:4b` without rows. UAT list for the owner: `docs/review/uat-s3-q35-text-2026-11-18.md` (16 items).
+- **Cleanup:** `docker builder prune` freed 18 GB.
+
 ## Candidate `s3` + `qwen3.5:4b` (DEC-029) -- 2026-11-17 (STOPPED for the owner's review)
 
 - **The owner picked the candidate and set DEC-029:** the default changes only when (a) it still wins over three jobs, (b) the owner accepts its UAT errors, and (c) it runs on the target hardware. **Default unchanged.** Details: `docs/design/s3-q35-candidate.md`.

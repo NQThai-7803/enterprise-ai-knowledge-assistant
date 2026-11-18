@@ -426,3 +426,84 @@ Set on 2026-11-18, from the owner's items C and D, before any run.
 - `LLAMA_ARG_CACHE_RAM=2048` is the default of `eval.yml` and is set in `heldout-v2.yml`, matching the deployment documentation.
 - **Measurement:** one more UAT job on Q051-Q100 with `s3` + `qwen3.5:4b` and the cap (uC2m, run 44144537645), the same configuration as uB2m.
 - **Rule:** an item's change counts as an effect of the cap only if uB2m and uC2m agree on it and both differ from the two uncapped jobs (uA2, uB2), which agree. Anything else is job variation.
+
+**Results (2026-11-18, graded value-aware, DEC-032).** Details per item: `docs/design/table-chunking.md` ("Measurement").
+
+- **Runs:**
+  - `natural_dev_v1`: 44148260972, 44148409028.
+  - The 5 dev sets: 44148286143-44148384526 and 44148432685-44148534878.
+  - UAT: 44148578890, 44148605005, 44148631493, 44148657545.
+  - Every job reloaded its corpus with the flag (`batch.log`, `reingest.log`: 9 documents READY).
+- **D, rows vs no rows** (both `s3` + `qwen3.5-text:4b`, two jobs):
+  - Leaks 0.
+  - False answers + wrong on the 6 sets are tied: 13/12 vs 12/13.
+  - On `natural_dev_v1`, false refusals rise by 2 in both jobs (7 vs 5) and correct falls by 2 (9 vs 11).
+  - By DEC-026 the flag is **not adopted**.
+  - UAT (monitoring), with rows:
+    - correct 53/55 vs 62/60, false refusals 35/33 vs 23/24;
+    - false answers + wrong 12/12 vs 15/16. With the proxy grading this last count was 11/11 vs 8/9.
+  - Mechanism, with the fix proposed but not coded:
+    - Repeated titles and column names make table chunks crowd out the passage with the answer: 8 of the 11 correct answers that became refusals lost their evidence from the context.
+    - The template UAT-LEAVE-AUTHORITY-001 gains slots.
+  - ND-003 is fixed. ND-002 stays a false answer (a subject error, not the table text).
+- **C, prompt cache cap** (`s3` + `qwen3.5:4b`, Q051-Q100):
+  - Totals are 36-11-0-3 in all four jobs.
+  - 4 items change in both capped jobs against both uncapped ones: Q063 and Q064 correct → refusal, Q076 and Q090 refusal → correct.
+  - By the rule above that is an effect of the cache, with no net change. Every configuration in a job runs under the same cap, so comparisons within a job stay fair.
+  - Comparisons across jobs with a different cap must not count those 4 items.
+
+## DEC-032 — Value-aware grading for every set
+
+Set on 2026-11-18 by the owner. The UAT proxy (status and cited document codes) does not read the values of an answer. It graded as correct answers with the wrong number:
+
+| Item | Expected | Answered |
+|---|---|---|
+| Q048 | 02 days | 10 days |
+| Q079 | 1,2 million | 12 million |
+| Q077 | 150 million | 1,2 million |
+| Q019 | 18:00 | 17:00 |
+| Q054 | the 10th | no date |
+
+**Rule.** An answered case counts as correct only when it states every value of its reference and gives no other value in the same unit. Otherwise it is wrong. Implementation: `scripts/eval/value_grading.py`.
+
+- **Values:** numbers with their unit, money, clock times and dates, written one way.
+  - Numbers go through `canonical_number_unit_pairs` of the claim validator (FIX 3c F): "02 ngày" = "2 ngày", "1.200.000 đ" = "1,2 triệu đồng".
+  - Times: "9h30" = "09:30". A number word before a unit is a digit ("ba ngày" = "3 ngày").
+- **Required:** every value of the reference, including one the question holds ("nghỉ 2 ngày báo trước mấy ngày" → 02 days).
+- **Conflicting:** a value in a reference unit that is neither a reference value nor a question value. A threshold ("từ 05 ngày trở lên") is not a conflict.
+- **Not values:** citation markers, codes (ND-HR-004, N3), article and section numbers, list numbering.
+
+**Per set:**
+
+- **UAT** (`grade_proxy.py`): `value_match` = `proxy_match` + both checks. The categories use `value_match` when a result has it.
+- **The dev sets already checked values**, by their fact forms with no digit touching (`natural_dev_v1` also by its `wrong` forms). They keep that check and add the conflict check:
+  - `run_answer_relevance_dev.py`: relevance, false refusal v1/v2, compound;
+  - `run_natural_dev.py`;
+  - `run_rbac_dev.py`. RBAC controls used a plain substring ("1 lần" matched "11 lần") and now use the digit boundary.
+- **Old runs are regraded, not rerun:** `python scripts/eval/value_grading.py regrade <set> <results.json> <out.json>`. The old flag is kept as `<flag>_before_values`.
+
+**Calibration.** On 1,200 UAT answers of `legacy` + 3B, `s3` + `qwen3.5:4b`, `s3` + `qwen3.5-text:4b` and the rows configuration:
+
+- No `legacy` answer is flagged.
+- `s3` + `qwen3.5-text:4b` and `s3` + `qwen3.5:4b`: exactly the 7 value errors of the 2026-11-17 reading (Q019, Q041, Q048, Q049, Q054, Q077, Q079).
+- One false conflict, with rows: Q069 adds a separate 20 % rule to a right 30 %.
+
+**Regrade of the existing runs** (D, the model comparison of DEC-028/029, the UAT runs of DEC-029, uB2m, uC2m):
+
+- **Dev sets:** no case changes. Every conflict found was already in a failed case (ND-001 16 days, CP1-P02).
+- **UAT**, correct - false refusal - false answer - wrong, proxy → value-aware:
+
+  | Configuration | Round A | Round B |
+  |---|---|---|
+  | `legacy` + 3B | unchanged | unchanged |
+  | `s3` + `qwen3.5-text:4b` | 69-23-1-7 → 62-23-1-14 | 67-24-1-8 → 60-24-1-15 |
+  | `s3` + `qwen3.5:4b` (2026-11-17) | 67-23-1-9 → 60-23-1-16 | 69-22-1-8 → 63-22-1-14 |
+  | rows | 54-35-1-10 → 53-35-1-11 | 56-33-1-10 → 55-33-1-11 |
+
+- **DEC-026/027 conclusions:** unchanged. They rest on the dev sets, which do not move: `s3` + `qwen3.5(-text):4b` beats `legacy` + 3B, and rows are not adopted.
+- **What changes is the UAT monitoring:**
+  - `s3` + `qwen3.5-text:4b` gives 14-15 wrong answers per round instead of 7-8.
+  - Rows show fewer false answers + wrong than no rows (12 vs 15/16), where the proxy showed more.
+  - The UAT list for the owner is `docs/review/uat-s3-q35-text-2026-11-18.md`.
+
+**From now on** every set is graded this way. Any figure taken from results graded before 2026-11-18 is regraded first.
