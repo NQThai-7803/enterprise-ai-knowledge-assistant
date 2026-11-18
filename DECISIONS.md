@@ -633,3 +633,35 @@ Set on 2026-11-18 by the owner, before held-out v3 is run or opened.
   - whether UAT's gain justifies exclude despite natural's +2 refusals;
   - whether to gate rows over two jobs, or with a load-independent tie-break;
   - whether the 3-column rule should admit the 2-column tables behind Q041, Q048 and Q049.
+
+## DEC-036 — Documents that are not issued do not answer: `exclude` is the data policy
+
+Set on 2026-11-18 by the owner. This is a decision about the data, not a measured choice.
+
+- **Rule:** a document that has not been issued (a template or a draft, `lifecycle_status=DRAFT`) is never used to answer.
+  - `RAG_DRAFT_DOCUMENT_POLICY` defaults to `exclude` for every configuration, legacy and simple, in the app, `.env.example` and the eval stack.
+  - `off` stays as the rollback.
+- **It overrides DEC-026 for this one question.** By DEC-026, DEC-034 found exclude not adopted: false answers + wrong tied, and natural false refusals were +2 in both jobs. The owner takes that cost knowingly.
+- **Measured cost and gain** (DEC-034 round, value-aware, DEC-033 gold, `s3` + `qwen3.5-text:4b`):
+  - **`natural_dev_v1`: +2 false refusals in both jobs**, correct 7/8 vs 10/10.
+    - ND-018 and ND-015 become refusals and ND-012 wrong. Their evidence stays in the context.
+    - Without the template chunks the sources are renumbered and partly replaced. The model words its answer differently and the validator rejects it, or it drops a required part.
+  - **UAT: +8 / +6 correct** (69/65 vs 61/59), false answers + wrong 11/12 vs 18/17.
+    - 7 items get better in both rounds (Q040, Q043, Q044, Q052, Q055 correct; Q039, Q042 wrong → refusal), 1 gets worse (Q066).
+  - **The 5 dev sets:** unchanged. They contain no DRAFT document.
+- **Scope:**
+  - The policy acts only on documents marked DRAFT. Documents uploaded before DEC-033 stay ACTIVE until an admin marks them.
+  - The protected V2 stack is not changed. The eval stacks mark UAT-LEAVE-AUTHORITY-001 at upload (corpus V2 manifest).
+- **DEC-035 is updated accordingly** (below): held-out v3 compares the two configurations with exclude.
+
+**DEC-035, update of 2026-11-18 (owner):**
+
+- **Configurations:** `legacy` + `qwen2.5:3b` + exclude against `s3` + `qwen3.5-text:4b` + exclude. Exclude is now the default of both.
+- **Runs:**
+  - One gated job (`.github/workflows/heldout-v3.yml`) with two interleaved runs (legacy, s3, legacy, s3), as for held-out v2.
+  - DEC-027's rule is applied to the two runs: a difference counts only with the same sign in both and larger than the spread between the runs.
+  - The two runs share one runner, so runner variation is not separated. The owner may dispatch the workflow a second time for that.
+- **Items:**
+  - An item whose test account maps to no seeded user is not asked, and is listed. The same holds for any item set aside by the owner's decisions on the DEC-030 findings.
+  - An item expects a refusal when its expected sources name no document code; otherwise it expects an answer that cites one of those documents and states the expected answer's values (DEC-032).
+- **Rule:** unchanged. Leaks must be 0; the lower false answers + wrong wins; on a tie, fewer false refusals; still tied, the current default stays.

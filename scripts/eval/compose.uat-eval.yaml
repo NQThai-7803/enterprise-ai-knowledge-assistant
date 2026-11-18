@@ -45,7 +45,7 @@ services:
       RAG_EXCERPT_FALLBACK_ENABLED: ${EVAL_EXCERPT_FALLBACK:-true}
       RAG_COMPOUND_PARTIAL_ANSWER_ENABLED: ${EVAL_COMPOUND_PARTIAL:-false}
       RAG_ANSWER_MODE: ${EVAL_ANSWER_MODE:-legacy}
-      RAG_DRAFT_DOCUMENT_POLICY: ${EVAL_DRAFT_POLICY:-off}  # DEC-033
+      RAG_DRAFT_DOCUMENT_POLICY: ${EVAL_DRAFT_POLICY:-exclude}  # DEC-036: the data policy
       DOCUMENT_TABLE_ROW_CHUNKING_ENABLED: ${EVAL_TABLE_ROWS:-false}
       RAG_NUMBER_NORMALIZATION_ENABLED: ${EVAL_NUMBER_NORMALIZATION:-false}
       # One switch per measured configuration (docs/design/simple-answer-mode.md), so the

@@ -36,6 +36,7 @@ Nginx
 - Debug disabled.
 - **Ollama context length set on the Ollama server (mandatory when `LLM_PROVIDER=ollama`).**
 - **Ollama prompt cache capped with `LLAMA_ARG_CACHE_RAM=2048` (mandatory when `LLM_PROVIDER=ollama`, section 3.2).**
+- Templates and drafts marked `lifecycle_status=DRAFT` by an admin. With `RAG_DRAFT_DOCUMENT_POLICY=exclude` (the default, DEC-036) they never answer. Documents uploaded before DEC-033 are `ACTIVE` until marked.
 
 ### 3.1 Ollama server context length (mandatory)
 

@@ -15,8 +15,8 @@ def _sql(expression) -> str:
     )
 
 
-def test_off_by_default_and_then_no_filter(monkeypatch) -> None:
-    assert Settings.model_fields["rag_draft_document_policy"].default == "off"
+def test_off_means_no_filter_and_exclude_is_the_default(monkeypatch) -> None:
+    assert Settings.model_fields["rag_draft_document_policy"].default == "exclude"  # DEC-036
     monkeypatch.setattr(
         authority, "get_settings", lambda: Settings(rag_draft_document_policy="off")
     )

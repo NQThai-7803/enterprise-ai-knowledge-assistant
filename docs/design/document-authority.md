@@ -8,7 +8,8 @@ Status:
   - the lifecycle value `DRAFT`;
   - the flag `RAG_DRAFT_DOCUMENT_POLICY`, default `off`;
   - the gold edits below, with new locks.
-- `demote` and the citation mark are not implemented. The default behaviour is unchanged.
+- `demote` and the citation mark are not implemented.
+- **Since DEC-036, `exclude` is the default** for every configuration (the owner's data policy).
 
 Owner decision this builds on: **a company document wins over a template.**
 

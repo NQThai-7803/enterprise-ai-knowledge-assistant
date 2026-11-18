@@ -230,7 +230,7 @@ HYBRID_KEYWORD_WEIGHT=1.0
 HYBRID_SEMANTIC_MIN_RELEVANCE_SCORE=0.30
 RAG_SEMANTIC_EXACT_PERMITTED_KNN_ENABLED=true
 RAG_DETERMINISTIC_ROUTE_MODE=strict
-RAG_DRAFT_DOCUMENT_POLICY=off
+RAG_DRAFT_DOCUMENT_POLICY=exclude
 RAG_REPAIR_AFTER_LLM_REFUSAL_ENABLED=false
 RAG_ANSWER_UNIT_GUARD_ENABLED=true
 RAG_RESELECT_REQUIRES_STRONG_SUPPORT_ENABLED=false
@@ -286,9 +286,9 @@ Retrieval variable rules:
 - `HYBRID_SEMANTIC_WEIGHT` and `HYBRID_KEYWORD_WEIGHT` are finite numbers greater than or equal to `0.0`; they cannot both be `0.0`.
 - `HYBRID_SEMANTIC_MIN_RELEVANCE_SCORE` is a finite number in `[0.0, 1.0]`.
 - `RAG_SEMANTIC_EXACT_PERMITTED_KNN_ENABLED` (boolean, default `true` since PROMPT 3f, added in PROMPT 3e): semantic retrieval ranks every chunk the user may read exactly. Set `false` only to roll back to the statement the planner can serve through the HNSW index; that path applies permission and visibility after `hnsw.ef_search` candidates and can lose permitted chunks. See `docs/design/hnsw-permission-recall.md`, including the latency budget and the cells that are not verified yet.
-- `RAG_DRAFT_DOCUMENT_POLICY` (`off` or `exclude`; default `off`; added 2026-11-18, DEC-033): what answers do with documents whose `lifecycle_status` is `DRAFT` (templates and drafts, set by the uploader or an admin).
-  - `off`: they rank and answer like `ACTIVE` documents, as before.
-  - `exclude`: none of their chunks enters retrieval, the retrieval supplements or the citation lookup.
+- `RAG_DRAFT_DOCUMENT_POLICY` (`off` or `exclude`; default `exclude` since DEC-036, the owner's data policy; added 2026-11-18, DEC-033): what answers do with documents whose `lifecycle_status` is `DRAFT` (templates and drafts, set by the uploader or an admin).
+  - `exclude`: none of their chunks enters retrieval, the retrieval supplements or the citation lookup. It acts only on documents marked `DRAFT`. A document uploaded before DEC-033 stays `ACTIVE` until an admin marks it.
+  - `off`: they rank and answer like `ACTIVE` documents. This is the rollback.
   - Document management and permissions are the same either way.
   - Design: `docs/design/document-authority.md`.
 - `RAG_DETERMINISTIC_ROUTE_MODE` (`legacy`, `strict` or `off`; default `strict` since FIX 1, DEC-010; set `legacy` to roll back): the condition copier `_structured_condition_value_answer`, before and after the LLM. `strict` matches cues as whole words on text that keeps its diacritics and requires the chosen source span to share the question's topic. `off` removes this branch. The other deterministic branches are not affected.
