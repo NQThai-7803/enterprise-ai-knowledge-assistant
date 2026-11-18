@@ -507,3 +507,88 @@ Set on 2026-11-18 by the owner. The UAT proxy (status and cited document codes) 
   - The UAT list for the owner is `docs/review/uat-s3-q35-text-2026-11-18.md`.
 
 **From now on** every set is graded this way. Any figure taken from results graded before 2026-11-18 is regraded first.
+
+## DEC-033 — Template and draft documents are excluded from answers; gold moved to the company document
+
+Set on 2026-11-18 by the owner, from `docs/design/document-authority.md`. "A company document wins over a template."
+
+- **Metadata:** a new lifecycle value `DRAFT` (not an issued document).
+  - It is set by a person: the uploader or an admin, through the existing `lifecycle_status` field. It is never inferred from the text.
+  - Corpus V2's manifest marks UAT-LEAVE-AUTHORITY-001 (`Tài liệu mẫu - chưa phải văn bản ban hành`) as DRAFT. `bootstrap_corpus_v2.py` uploads it with that value as the admin.
+  - The V2 volume is not touched.
+- **Flag `RAG_DRAFT_DOCUMENT_POLICY`:** `off` (default) or `exclude`.
+  - `off`: a DRAFT document ranks and answers exactly like an ACTIVE one, as today.
+  - `exclude`: no DRAFT chunk enters any answer path. That covers semantic and keyword retrieval, the explicit-document, topic and policy supplements, and the citation source lookup.
+  - Document management, listing and permissions are unchanged. The filter is added to the permission filter, never in place of it.
+  - `demote` from the design is not implemented: the owner chose `exclude`.
+- **Gold, edited with the owner's approval of 2026-11-18** (the reason is written in each file; new locks):
+  - UAT Q044 (`eval-data/uat/reference-grade.json`, `retrieval-gold.json`): the expected citation becomes ND-HR-004 page 6 ("Con đẻ hoặc con nuôi kết hôn 01 ngày") instead of the template's page 3. The answer is unchanged.
+  - `natural_dev_v1` ND-001: the gold citation becomes ND-HR-004 page 5. "11 ngày" is the sum of its holiday table (01 + 05 + 01 + 01 + 02 + 01). The template is no longer acceptable.
+  - `natural_dev_v1` ND-004, ND-012, ND-019: the template is removed from the acceptable citations and the excerpts.
+  - Held-out v2 and v3 are not opened (DEC-012, DEC-030).
+
+## DEC-034 — Table rows, version 2, and a retrieval gate before any LLM job
+
+Set on 2026-11-18 by the owner: all four adjustments of `docs/design/table-chunking.md`. Measured as below, fixed before measuring.
+
+**Version 2** replaces version 1 under the same flag `DOCUMENT_TABLE_ROW_CHUNKING_ENABLED` (default off). Version 1 was measured and not adopted (DEC-031).
+
+1. **Both representations.**
+   - The page text is extracted and chunked exactly as with the flag off.
+   - Each row of a data table becomes one extra chunk of kind `TABLE_ROW`, holding `<title> | <column>: <cell>; …` (the text the prompt and the embedding see). It carries the page of its table.
+2. **One slot per table.**
+   - A row chunk has a parent: the page's text chunk that holds most of its table's cells.
+   - Hybrid retrieval keeps one hit per group (a text chunk with its rows), the best-ranked.
+   - The retrieval supplements read text chunks only.
+3. **Labels indexed once.**
+   - A row chunk's keyword text (`search_text`) is its cells only.
+   - Keyword retrieval reads `coalesce(search_text, text)`. Text chunks keep their text, which already holds the title and header once.
+4. **At least 3 columns** (and 3 rows). Two-column key-value tables stay as page text only.
+
+**Retrieval gate (no LLM).**
+
+- Ablation `retrieval_oracle`: in the simple answer mode, it records the 5 chunks selected for the prompt (at most 2 per document) and whether one is gold, then returns no answer without calling the LLM.
+- **Gold:** the oracle map of `build_oracle.py`, with the gold of DEC-033:
+  - UAT: the reviewed citation's document and page;
+  - dev sets: the item's document and a form of its fact;
+  - `natural_dev_v1`: the document and pages of its gold and acceptable citations.
+- **Configurations:**
+  - `s3` + `qwen3.5-text:4b` + `exclude`;
+  - the same with rows, after re-ingestion.
+- **Jobs:** one job per set (UAT, natural, the 5 dev sets). Retrieval has no sampling.
+- **Pass:** on every set, the rows configuration has at least as many items with a gold chunk in the 5 as without rows. Items lost and gained are listed.
+- If it fails on any set, the rows configuration is dropped from the LLM measurement.
+
+**LLM measurement (two rounds, value-aware grading, DEC-032).**
+
+- **Jobs:**
+  - `natural_dev_v1` and the 5 dev sets: one job per round each.
+  - UAT: 4 jobs per round, Q001-Q025, Q026-Q050, Q051-Q075 and Q076-Q100, so that every job stays under the 340-minute limit.
+- **Configurations, in this order, each job:**
+  1. `legacy` + 3B;
+  2. `s3` + `qwen3.5-text:4b`;
+  3. the same with `RAG_DRAFT_DOCUMENT_POLICY=exclude`;
+  4. the same with rows version 2, only if the gate passed. It runs last, after the job reloads its corpus with the flag.
+- Every configuration is graded on the DEC-033 gold. Prompt cache 2048 MiB, LLM timeout 600 s (180 s for UAT).
+- **Rule (DEC-026, DEC-027 over the two jobs):**
+  - 3 against 2, then 4 against 3: leaks 0; false answers + wrong on the 6 sets not up; then fewer false refusals on `natural_dev_v1`, then on the other sets.
+  - The best configuration is the last one of this chain that the rule accepts.
+  - UAT is monitored. Its list for the owner is written for the best configuration.
+- **The defaults stay unchanged.**
+
+## DEC-035 — Held-out v3: how it is run and what it decides (written before any run)
+
+Set on 2026-11-18 by the owner, before held-out v3 is run or opened.
+
+- **When:** after the DEC-034 round, once its best configuration is known. Not before, and not for design.
+- **What:** held-out v3 (DEC-030, locked) is run for `legacy` + `qwen2.5:3b` and for the best candidate.
+  - Both run in the same job, interleaved, over two rounds (two jobs, DEC-027).
+  - Graded value-aware (DEC-032) against its locked gold.
+- **Rule:**
+  - Leaks must be 0, or the configuration is rejected.
+  - The default becomes the configuration with the lower total of false answers + wrong (wrong values included), counted over both rounds and applying DEC-027 to the two jobs.
+  - If equal, the one with fewer false refusals. If still equal, the current default stays.
+- **Reporting:**
+  - The report says plainly that held-out v3 was used both to choose between the two configurations and to measure them, so its figures are not an unbiased estimate of the chosen one.
+  - The open findings of DEC-030 are decided by the owner before the run: references to ND-HR-007, test accounts without a seeded user, and references not found.
+- **Who runs it:** the owner starts the run. Changing the default after it needs the owner's approval.
