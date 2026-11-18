@@ -178,6 +178,9 @@ These are open items. Each one can make a right answer count as wrong, or the re
 - [ ] **Rows for 2-column tables.** Every table of ND-HR-004 has 2 columns, so the 3-column rule of DEC-034 gives no rows to the tables behind Q041 (seniority), ND-001 (holidays), Q048 and Q049 (notice periods). Try rows for 2-column tables with a real header, and keep the key-value tables without one as page text.
 - [ ] **A stable order on ties.** Chunks that tie in retrieval are ordered by document id, which every corpus load draws anew. Between two jobs with nothing changed, Q096 flipped. Order ties by `document_code` and `chunk_index` (or another load-independent key), behind a flag, before any one-job gate is read again.
 - [ ] Then repeat the DEC-034 retrieval gate over two jobs, and the LLM round only if it passes.
+- [ ] **PyMuPDF 2.** `pyproject.toml` now caps PyMuPDF below 2 (`requirements.lock` pins 1.28.2).
+  - On 2.1, `find_tables()` returns cell text without spaces ("Basiccare") and splits a 2-column table into 3. Backend CI failed on every commit of PR #44 until the cap.
+  - Upgrading needs the table-row tests and the DEC-034 offline counts redone on 2.x.
 
 ## Phase 5 backlog -- English questions (recorded 2026-11-15)
 
