@@ -16,12 +16,23 @@ class TextChunk:
     end_page: int
     overlap_token_count: int
     content_sha256: str
+    # DEC-034: TABLE_ROW chunks follow the page-text chunks; parent_index is the TEXT chunk that
+    # holds the row's table (None when no text chunk of its page does), search_text its cells.
+    kind: str = "TEXT"
+    search_text: str | None = None
+    parent_index: int | None = None
 
     def __post_init__(self) -> None:
         page_numbers = tuple(self.page_numbers)
         object.__setattr__(self, "page_numbers", page_numbers)
         if self.chunk_index < 0:
             msg = "chunk_index must not be negative."
+            raise ValueError(msg)
+        if self.kind not in ("TEXT", "TABLE_ROW"):
+            msg = "kind must be TEXT or TABLE_ROW."
+            raise ValueError(msg)
+        if self.parent_index is not None and not 0 <= self.parent_index < self.chunk_index:
+            msg = "parent_index must name an earlier chunk."
             raise ValueError(msg)
         if not self.text.strip():
             msg = "text must not be empty."

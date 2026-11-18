@@ -1,6 +1,9 @@
 {
  "source": "artifacts/task-035-3b-20261013/case-level-semantic-citation-grade.json",
  "rule": "SUPPORTED_BY_V2 cases; each [document_code, page] a reviewed answer cited",
+ "changes": [
+  "Q044: DEC-033, owner-approved 2026-11-18, UAT-LEAVE-AUTHORITY-001 p3 (a template) -> ND-HR-004 p6"
+ ],
  "items": {
   "Q001": [
    [
@@ -260,8 +263,8 @@
   ],
   "Q044": [
    [
-    "UAT-LEAVE-AUTHORITY-001",
-    3
+    "ND-HR-004",
+    6
    ]
   ],
   "Q045": [

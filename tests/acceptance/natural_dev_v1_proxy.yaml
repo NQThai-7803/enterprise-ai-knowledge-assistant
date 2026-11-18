@@ -10,7 +10,7 @@
 #         ANSWERED_LIMITED item it counts only when no limit is said (then wrong, not false answer).
 # Citations: a correct answer cites at least one gold or acceptable document of the item.
 version: natural_dev_v1_proxy
-gold_sha256: 0e942996165f33a3ab4e5436b2a1261ae74952e53724b2421c38071a0f0f9b96
+gold_sha256: c5d6f08d54782b5d652b662ed67fe225d7fb6b4247b3d07805e080ffb7948a82  # gold re-locked 2026-11-18 (DEC-033)
 limit_forms:
   - "không ghi"
   - "không nêu"

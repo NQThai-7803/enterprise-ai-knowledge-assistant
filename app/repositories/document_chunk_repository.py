@@ -4,7 +4,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from math import isfinite
 from numbers import Real
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,6 +28,9 @@ class DocumentChunkCreate:
     embedding_provider: str
     embedding_model: str
     embedding_dimensions: int
+    chunk_kind: str = "TEXT"  # DEC-034
+    search_text: str | None = None
+    parent_index: int | None = None  # chunk_index of the parent TEXT chunk
 
     def __post_init__(self) -> None:
         page_numbers = tuple(self.page_numbers)
@@ -124,8 +127,10 @@ class DocumentChunkRepository:
             raise ValueError(msg)
 
         await self.delete_by_document(document_id)
+        ids = {chunk.chunk_index: uuid4() for chunk in chunk_payload}
         rows = [
             DocumentChunk(
+                id=ids[chunk.chunk_index],
                 document_id=document_id,
                 chunk_index=chunk.chunk_index,
                 text=chunk.text,
@@ -140,6 +145,9 @@ class DocumentChunkRepository:
                 embedding_provider=chunk.embedding_provider,
                 embedding_model=chunk.embedding_model,
                 embedding_dimensions=chunk.embedding_dimensions,
+                chunk_kind=chunk.chunk_kind,
+                search_text=chunk.search_text,
+                parent_chunk_id=None if chunk.parent_index is None else ids[chunk.parent_index],
             )
             for chunk in chunk_payload
         ]

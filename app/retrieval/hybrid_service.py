@@ -9,7 +9,7 @@ from typing import Protocol
 from app.core.config import Settings
 from app.models import User
 from app.retrieval.errors import RetrievalError, RetrievalFailureCode
-from app.retrieval.fusion import fuse_retrieval_hits
+from app.retrieval.fusion import fuse_retrieval_hits, one_per_group
 from app.retrieval.models import (
     HybridRetrievalResult,
     KeywordRetrievalResult,
@@ -216,13 +216,15 @@ def _merge_variant_fusions(results: list[tuple[object, int, int]], *, top_k: int
             existing = merged.get(hit.chunk_id)
             if existing is None or score > existing[0]:
                 merged[hit.chunk_id] = (score, hit)
-    hits = tuple(
-        replace(hit, hybrid_score=score)
-        for score, hit in sorted(
-            merged.values(),
-            key=lambda item: (-item[0], item[1].document_id.hex, item[1].chunk_index),
-        )[:top_k]
-    )
+    hits = one_per_group(
+        tuple(
+            replace(hit, hybrid_score=score)
+            for score, hit in sorted(
+                merged.values(),
+                key=lambda item: (-item[0], item[1].document_id.hex, item[1].chunk_index),
+            )
+        )
+    )[:top_k]
     # The concrete result is constructed by the caller; this small object keeps the
     # fusion helper independent from branch result accounting.
     return _MergedFusion(

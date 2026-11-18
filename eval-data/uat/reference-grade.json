@@ -884,12 +884,13 @@
       "citation_count": 1,
       "citation_ids": [
         {
-          "document_id": "b983593e-6416-4039-9202-322ea9ee699c",
-          "chunk_id": "382a6c05-54eb-4e78-94ab-81fb9224b141",
-          "page_number": 3
+          "document_id": "0392b990-0522-447e-92b1-23c8927a5908",
+          "chunk_id": null,
+          "page_number": 6
         }
       ],
-      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Leave allocation, notice, approval and incident clauses checked."
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Leave allocation, notice, approval and incident clauses checked.",
+      "gold_change": "DEC-033, owner-approved 2026-11-18: the expected citation moved from UAT-LEAVE-AUTHORITY-001 page 3 (a template, 'chưa phải văn bản ban hành') to ND-HR-004 page 6 ('Con đẻ hoặc con nuôi kết hôn 01 ngày'). The answer is unchanged; no V2 chunk id is recorded for the new page."
     },
     {
       "id": "Q045",

@@ -75,7 +75,15 @@ from app.document_processing.tokenization.tiktoken_counter import TiktokenTokenC
 from app.llm.base import LLMProvider
 from app.llm.errors import LLMError, LLMFailureCode
 from app.llm.models import LLMGenerationResult, LLMMessage
-from app.models import ChatMessage, ChatMessageRole, Document, DocumentChunk, DocumentStatus, User
+from app.models import (
+    ChatMessage,
+    ChatMessageRole,
+    Document,
+    DocumentChunk,
+    DocumentChunkKind,
+    DocumentStatus,
+    User,
+)
 from app.observability.metrics import (
     BRANCH_CLAIM_UNRESPONSIVE,
     BRANCH_COMPOUND_PARTIAL_ANSWER,
@@ -99,6 +107,7 @@ from app.repositories import (
     chat_session_repository,
     message_citation_repository,
 )
+from app.retrieval.authority import answer_document_filter
 from app.retrieval.base import HybridRetrievalService
 from app.retrieval.errors import RetrievalError
 from app.retrieval.evidence_quality import (
@@ -2198,6 +2207,8 @@ class GroundedAnswerService:
                 .where(
                     Document.status == DocumentStatus.READY,
                     build_accessible_document_filter(current_user),
+                    answer_document_filter(),
+                    DocumentChunk.chunk_kind == DocumentChunkKind.TEXT,  # rows enter via retrieval
                     or_(*conditions),
                 )
                 .order_by(Document.created_at.desc(), DocumentChunk.chunk_index.asc())
@@ -2252,6 +2263,8 @@ class GroundedAnswerService:
                 .where(
                     Document.status == DocumentStatus.READY,
                     build_accessible_document_filter(current_user),
+                    answer_document_filter(),
+                    DocumentChunk.chunk_kind == DocumentChunkKind.TEXT,  # rows enter via retrieval
                     or_(*conditions),
                 )
                 .order_by(Document.created_at.desc(), DocumentChunk.chunk_index.asc())
@@ -2291,6 +2304,8 @@ class GroundedAnswerService:
                 .where(
                     Document.status == DocumentStatus.READY,
                     build_accessible_document_filter(current_user),
+                    answer_document_filter(),
+                    DocumentChunk.chunk_kind == DocumentChunkKind.TEXT,  # rows enter via retrieval
                     or_(*conditions),
                 )
                 .order_by(Document.created_at.desc(), DocumentChunk.chunk_index.asc())
@@ -2352,6 +2367,8 @@ class GroundedAnswerService:
                 .where(
                     Document.status == DocumentStatus.READY,
                     build_accessible_document_filter(current_user),
+                    answer_document_filter(),
+                    DocumentChunk.chunk_kind == DocumentChunkKind.TEXT,  # rows enter via retrieval
                     or_(*role_match_conditions),
                 )
                 .order_by(Document.created_at.desc(), DocumentChunk.chunk_index.asc())
@@ -2410,6 +2427,8 @@ class GroundedAnswerService:
                 .where(
                     Document.status == DocumentStatus.READY,
                     build_accessible_document_filter(current_user),
+                    answer_document_filter(),
+                    DocumentChunk.chunk_kind == DocumentChunkKind.TEXT,  # rows enter via retrieval
                     or_(*conditions),
                 )
                 .order_by(Document.created_at.desc(), DocumentChunk.chunk_index.asc())
@@ -2467,6 +2486,8 @@ class GroundedAnswerService:
                 .where(
                     Document.status == DocumentStatus.READY,
                     build_accessible_document_filter(current_user),
+                    answer_document_filter(),
+                    DocumentChunk.chunk_kind == DocumentChunkKind.TEXT,  # rows enter via retrieval
                     or_(*conditions),
                 )
                 .order_by(Document.created_at.desc(), DocumentChunk.chunk_index.asc())
@@ -2527,6 +2548,8 @@ class GroundedAnswerService:
                 .where(
                     Document.status == DocumentStatus.READY,
                     build_accessible_document_filter(current_user),
+                    answer_document_filter(),
+                    DocumentChunk.chunk_kind == DocumentChunkKind.TEXT,  # rows enter via retrieval
                     or_(*conditions),
                 )
             )

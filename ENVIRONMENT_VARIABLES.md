@@ -93,6 +93,7 @@ Storage variable rules:
 PDF_MAX_PAGES=500
 PDF_MIN_USABLE_CHARACTERS=20
 PDF_TEXT_SORT=true
+DOCUMENT_TABLE_ROW_CHUNKING_ENABLED=false
 ```
 
 PDF extraction variable rules:
@@ -100,6 +101,12 @@ PDF extraction variable rules:
 - `PDF_MAX_PAGES` is an integer greater than `0`.
 - `PDF_MIN_USABLE_CHARACTERS` is an integer greater than or equal to `0`.
 - `PDF_TEXT_SORT` is a boolean.
+- `DOCUMENT_TABLE_ROW_CHUNKING_ENABLED` (boolean, default `false`; added 2026-11-18 by DEC-031, version 2 by DEC-034): adds one `TABLE_ROW` chunk per body row of each data table, `<table title> | <column>: <cell>; ...`.
+  - The page text and its chunks stay exactly as with the flag off.
+  - A row chunk's parent is the page's text chunk that holds its table. Hybrid retrieval keeps one hit per text chunk and its rows. A row's keyword text is its cells only.
+  - A data table has at least 3 columns and 3 rows.
+  - It is read by the worker at ingestion, so it changes a corpus only when documents are processed again through the pipeline.
+  - Design and measurement: `docs/design/table-chunking.md`.
 - These values are not secrets.
 - No PDF password environment variable is supported in MVP.
 
@@ -223,6 +230,7 @@ HYBRID_KEYWORD_WEIGHT=1.0
 HYBRID_SEMANTIC_MIN_RELEVANCE_SCORE=0.30
 RAG_SEMANTIC_EXACT_PERMITTED_KNN_ENABLED=true
 RAG_DETERMINISTIC_ROUTE_MODE=strict
+RAG_DRAFT_DOCUMENT_POLICY=exclude
 RAG_REPAIR_AFTER_LLM_REFUSAL_ENABLED=false
 RAG_ANSWER_UNIT_GUARD_ENABLED=true
 RAG_RESELECT_REQUIRES_STRONG_SUPPORT_ENABLED=false
@@ -278,6 +286,11 @@ Retrieval variable rules:
 - `HYBRID_SEMANTIC_WEIGHT` and `HYBRID_KEYWORD_WEIGHT` are finite numbers greater than or equal to `0.0`; they cannot both be `0.0`.
 - `HYBRID_SEMANTIC_MIN_RELEVANCE_SCORE` is a finite number in `[0.0, 1.0]`.
 - `RAG_SEMANTIC_EXACT_PERMITTED_KNN_ENABLED` (boolean, default `true` since PROMPT 3f, added in PROMPT 3e): semantic retrieval ranks every chunk the user may read exactly. Set `false` only to roll back to the statement the planner can serve through the HNSW index; that path applies permission and visibility after `hnsw.ef_search` candidates and can lose permitted chunks. See `docs/design/hnsw-permission-recall.md`, including the latency budget and the cells that are not verified yet.
+- `RAG_DRAFT_DOCUMENT_POLICY` (`off` or `exclude`; default `exclude` since DEC-036, the owner's data policy; added 2026-11-18, DEC-033): what answers do with documents whose `lifecycle_status` is `DRAFT` (templates and drafts, set by the uploader or an admin).
+  - `exclude`: none of their chunks enters retrieval, the retrieval supplements or the citation lookup. It acts only on documents marked `DRAFT`. A document uploaded before DEC-033 stays `ACTIVE` until an admin marks it.
+  - `off`: they rank and answer like `ACTIVE` documents. This is the rollback.
+  - Document management and permissions are the same either way.
+  - Design: `docs/design/document-authority.md`.
 - `RAG_DETERMINISTIC_ROUTE_MODE` (`legacy`, `strict` or `off`; default `strict` since FIX 1, DEC-010; set `legacy` to roll back): the condition copier `_structured_condition_value_answer`, before and after the LLM. `strict` matches cues as whole words on text that keeps its diacritics and requires the chosen source span to share the question's topic. `off` removes this branch. The other deterministic branches are not affected.
 - `RAG_REPAIR_AFTER_LLM_REFUSAL_ENABLED` (boolean, default `false` since DEC-011; FIX 2 group 1): `true` restores the old behaviour. `false` stops the deterministic repair once the LLM has refused in the request. A repair after the validator rejects an LLM answer still runs.
 - `RAG_ANSWER_UNIT_GUARD_ENABLED` (boolean, default `true` since DEC-011; FIX 2 group 2): `false` restores the old behaviour. With `true`, "đồng ý" no longer makes a question a money question, and an answer to "bao nhiêu <unit>" must hold a number with that unit, on every route. An answer saying the documents do not specify the value is exempt.
@@ -469,6 +482,7 @@ Validation rules:
 - `LLM_PROMPT_TRUNCATION_GUARD_ENABLED` (boolean, default `false`, added in PROMPT 3g, extended in PROMPT 4 item 0b): when `true`, the guard ends the answer with the fixed no-answer and no citations (1) **before sending**, when the estimated prompt plus `LLM_MAX_OUTPUT_TOKENS` exceeds `LLM_CONTEXT_WINDOW` (logged as `LLM_PROMPT_BUDGET_EXCEEDED`; the request is not sent), and (2) after a response with usage at or above `LLM_CONTEXT_WINDOW - LLM_MAX_OUTPUT_TOKENS` or without usage. With the flag off, both cases are logged only. In addition, a response whose `usage.prompt_tokens` is below 0.7 x the estimate logs `LLM_PROMPT_POSSIBLY_TRUNCATED` with `reason=USAGE_BELOW_ESTIMATE`. This is log-only even with the flag on. It is the signature of Ollama 0.40.13 cutting a prompt to about half its context and reporting the shortened count (2050 at 4096, 4098 at 8192), which the usage threshold alone cannot see. All guard logs carry counts only, never prompt or answer text.
 - `LLM_TOKEN_ESTIMATE_RATIO` (float, 0 < x <= 4, default `0.99`, added in PROMPT 4 item 0b): estimated provider prompt tokens = ceil(ratio x the sum of the `TOKENIZER_ENCODING_NAME` (tiktoken `cl100k_base`) counts of the message contents). Calibrated on the 36 LLM calls of a UAT Q001-Q100 run against Ollama 0.40.13 `qwen2.5:3b`; all 36 had the same case order and `prompt_tokens` as the PROMPT 3g measurement. Ollama/tiktoken was 0.779 to 0.985 (median 0.897, mean 0.898, stdev 0.053). The default 0.99 is the maximum rounded up, so no measured call is under-estimated. With it the estimate is 0.5% to 27.1% above the real count (mean 10.7%, at most 805 tokens), and the lowest real/estimate share is 0.787, above the 0.7 truncation signal. Recalibrate when the model or tokenizer changes (`scripts/eval/ollama_usage_proxy.py --tiktoken-encoding`).
 - `LLM_OLLAMA_NUM_CTX` and `LLM_OLLAMA_KEEP_ALIVE` are sent with every Ollama request. Ollama's `/v1` endpoint ignores `options`, so `num_ctx` has **no effect**. **Server-side requirement:** set `OLLAMA_CONTEXT_LENGTH` on the Ollama server, at least `LLM_CONTEXT_WINDOW`, and restart Ollama (`DEPLOYMENT.md` section 3.1). Without it the server default (4096 on Ollama 0.40.13) applies, and longer prompts lose their beginning, including the system instructions, without any error.
+- **Also on the Ollama server:** `LLAMA_ARG_CACHE_RAM=2048` caps llama-server's prompt cache, which otherwise grows to 8 GiB of host RAM (DEC-029, `DEPLOYMENT.md` section 3.2). It is not read by the app.
 - Chat SSE uses `LLM_STREAM_HEARTBEAT_SECONDS` for empty heartbeat events and `LLM_STREAM_MAX_DURATION_SECONDS` as the total bounded stream duration. Heartbeats do not extend the maximum duration.
 - The app does not call an LLM at import, migration, startup, liveness, or readiness by default.
 - The app does not add an Ollama, LM Studio, or other LLM container to Compose in TASK-026.

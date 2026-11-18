@@ -6,6 +6,47 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### Exclude by default, held-out v3 workflow (DEC-036) -- 2026-11-18
+
+- **RAG:** `RAG_DRAFT_DOCUMENT_POLICY` defaults to `exclude` (DEC-036, the owner's data policy); `off` is the rollback.
+- **Eval:**
+  - `.github/workflows/heldout-v3.yml`, gated as held-out v2;
+  - `scripts/eval/heldout_v3_release.py` (gate, run, grading with the DEC-035 verdict);
+  - `ci_batch.sh` set `heldout_v3`, allowed only with the workflow's approval.
+  - Not dispatched.
+
+### Draft documents, table rows v2 (DEC-033/034/035) -- 2026-11-18
+
+- **RAG:** `DRAFT` lifecycle and `RAG_DRAFT_DOCUMENT_POLICY` (`off` default, `exclude`) in every answer retrieval path.
+- **Ingestion:** table rows v2 behind `DOCUMENT_TABLE_ROW_CHUNKING_ENABLED`:
+  - extra `TABLE_ROW` chunks with a parent and keyword text of their cells only;
+  - one hit per group in fusion;
+  - tables of 3 or more columns only.
+  - The extraction router now keeps the rows.
+- **DB:** migration `20261118_0012`, adding the enum value plus `chunk_kind`, `parent_chunk_id`, `search_text` and a GIN index.
+- **Eval:**
+  - ablation `retrieval_oracle`, and `build_oracle --set natural`;
+  - `EVAL_DRAFT_POLICY`, and the `EVAL_S3T` alias;
+  - the UAT gold lock;
+  - owner-approved gold edits (Q044, ND-001, ND-004, ND-012, ND-019).
+- **Measured** (DEC-034 results): rows fail the retrieval gate, exclude is not adopted. Defaults unchanged.
+
+### Held-out v3, table rows, value-aware grading -- 2026-11-18
+
+- **Held-out v3 (DEC-030):** 20 questions with gold from a team member, frozen with a lock and in the question fingerprints (`scripts/eval/heldout_v3.py`).
+- **Ingestion:** one text unit per table row behind `DOCUMENT_TABLE_ROW_CHUNKING_ENABLED` (default off). Measured in DEC-031 and not adopted.
+- **Eval:**
+  - `ollama_cache_ram` defaults to 2048 MiB, and `heldout-v2.yml` sets the same.
+  - `ci_batch.sh` reloads the corpus for `EVAL_TABLE_ROWS` configurations.
+- **Grading (DEC-032):** `scripts/eval/value_grading.py`.
+  - UAT `value_match`; the dev-set runners add the conflict check; RBAC controls get a digit boundary.
+  - `value_grading.py regrade` regrades stored runs.
+  - `summarize_ablation.categories`, `metrics.py` and `compare_flag_runs.py` use `value_match`.
+- **Deployment:** GPU target `qwen3.5-text:4b` built with `scripts/deploy/ollama_text_model.py --num-gpu 99`. Prompt cache cap documented for every Ollama setup.
+- **Design, no code:**
+  - row-chunking adjustment (`docs/design/table-chunking.md`);
+  - template and draft documents (`docs/design/document-authority.md`).
+
 ### Candidate `s3` + `qwen3.5:4b` (DEC-029) -- 2026-11-17
 
 - **DEC-029:** the conditions before the default can change to `s3` + `qwen3.5:4b`: three-job variation, the owner's reading of the UAT errors, and the target hardware. Written before measuring.

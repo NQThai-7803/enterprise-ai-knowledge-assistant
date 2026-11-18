@@ -8,6 +8,83 @@
 3. **Embedding fine-tune** (`docs/design/embedding-finetune.md` and DEC-015 on branch `feat/embedding-finetune-infra`): infrastructure only so far; the baseline measurement and training come after FIX 3.
 4. The final held-out v2 measurement, once, after the choices above are made (DEC-012).
 
+## Exclude as the data policy, held-out v3 workflow (DEC-036) -- 2026-11-18 (STOPPED for the owner's review)
+
+- **DONE:**
+  - DEC-036: exclude by default in the app, `.env.example` and the eval stack, plus the deployment note.
+  - DEC-035 updated.
+  - The held-out v3 workflow and grader, with tests on invented items; not dispatched.
+  - Phase 5 tasks for table rows.
+  - Docker cleanup.
+- **WAITING FOR OWNER: the open DEC-030 findings of held-out v3** (ids only; the items are not read here). Each needs a decision before the run.
+  - [ ] **A source document not in corpus V2:** HO3-09, HO3-13, HO3-20.
+    - Proposal: add that document to the eval corpus if it exists, as a corpus V2.1 used for held-out v3 only.
+    - Otherwise set the three items aside in a v3.1 with a new lock. Asked as they are, they can only be refusals or wrong.
+  - [ ] **A test account with no seeded user:** HO3-09, HO3-13 (one department), HO3-20 (another department).
+    - Proposal: seed two eval-only accounts in those departments (`uat-v2-accounts`), with the grants the items assume, and map them in `heldout_v3.ACCOUNTS`.
+    - Until then the workflow does not ask these items and lists them as not run.
+  - [ ] **Expected source passage not found in the PDF:**
+    - not found as written: HO3-16, HO3-17, HO3-18;
+    - found only as separate words: HO3-03, HO3-05, HO3-07, HO3-10;
+    - answer numbers missing from the cited documents: HO3-08, HO3-11.
+    - Proposal: the author checks these against the PDFs.
+      - Wording or diacritics only: keep the gold; the grader needs only the document code and the answer's values.
+      - A real mismatch: correct it in v3.1 with a new lock, or set the item aside.
+  - [ ] **Near-duplicates of other sets:** HO3-02, HO3-03, HO3-19 (UAT); HO3-06 (RBAC dev).
+    - Proposal: keep them and report them as a separate group, as the "near UAT" group of held-out v2.
+    - Or replace them in v3.1 if the owner wants a cleaner estimate.
+
+## Draft documents, table rows v2 (DEC-033/034/035) -- 2026-11-18 (STOPPED for the owner's review)
+
+- **DONE:**
+  - DEC-033/034/035 written before measuring.
+  - DRAFT policy, rows v2, migration `20261118_0012`.
+  - Gold edits with locks (UAT `eval-data/uat/gold.lock`, natural gold re-locked).
+  - `retrieval_oracle` gate, run twice: the first run was void because of a router bug, fixed.
+  - LLM measurement in 2 rounds.
+  - UAT list for the best configuration.
+  - Docker cleanup.
+- **WAITING FOR OWNER:**
+  - Read `docs/review/uat-s3-q35-text-2026-11-18.md`.
+  - Exclude: adopt it for its UAT gain despite natural's +2 false refusals, or keep it off.
+  - Rows v2: repeat the gate over two jobs or with a load-independent tie-break, and decide whether 2-column tables (all of ND-HR-004) should get rows.
+  - Held-out v3 (DEC-035) after the decisions above; the DEC-030 findings first.
+- **Defaults unchanged.**
+
+## Known limits of the value-aware grader (DEC-032, `scripts/eval/value_grading.py`) -- 2026-11-18
+
+These are open items. Each one can make a right answer count as wrong, or the reverse. Read the owner's lists before trusting a single-item difference.
+
+- [ ] **Values inside a condition are required.** Every value of the reference must be stated, so a condition counts as well as the answer itself.
+  - Q039: the reference "12 ngày … khi đủ 12 tháng" also requires "12 tháng".
+  - A fix needs to tell the answer value from the condition values in the reference: by its unit and the question's unit, or by a `required` list in the gold.
+- [ ] **Numbers written in words** count only for 1-10, and only right before a unit ("ba ngày").
+  - "mười hai ngày", "nửa ngày" and "hai mươi phần trăm" are missed.
+- [ ] **False conflicts.** A second, correct value in a reference unit, about another case, is a conflict.
+  - Q069 with row chunks: "30 %" plus the separate night-overtime rule "20 %".
+  - Only thresholds ("từ X trở lên", "trên X") are exempt today.
+- [ ] **Units** are recognized from a fixed list (`UNITS`). A number followed by any other word has no unit and matches loosely.
+- [ ] **A range with one scale word** ("3 - 15 triệu") is handled. A range written with two different scales is not.
+
+## Held-out v3, table rows, value-aware grading -- 2026-11-18 (STOPPED for the owner's review)
+
+- **DONE:**
+  - A: held-out v3 frozen (DEC-030).
+  - B: target hardware in DEC-029, ADR 0003, DEPLOYMENT/SETUP.
+  - C: cache cap in eval and docs, third capped UAT job.
+  - D: table rows behind a flag, with unit tests, measured in 2 jobs (DEC-031).
+  - E: `docker builder prune`.
+  - Value-aware grading for every set and a regrade of all D and model-comparison runs (DEC-032).
+  - Row-chunking analysis per item.
+  - Template-document design.
+  - UAT list for the best configuration.
+- **WAITING FOR OWNER:**
+  - Read `docs/review/uat-s3-q35-text-2026-11-18.md`.
+  - Decide on the held-out v3 findings (`docs/eval/heldout-v3-check.json`).
+  - Approve or change the row-chunking adjustment (`docs/design/table-chunking.md`, "Proposed adjustment").
+  - Approve the template-document design: `exclude` or `demote`, and the expected citation of Q044 and ND-001 (`docs/design/document-authority.md`).
+  - The default is unchanged.
+
 ## Candidate `s3` + `qwen3.5:4b` (DEC-029) -- 2026-11-17 (STOPPED for the owner's review)
 
 - **DONE:**
@@ -95,6 +172,15 @@
 - **DONE (tooling):** `scripts/eval/heldout_v2_release.py` and `.github/workflows/heldout-v2.yml`: gate on frozen questions and an owner-approved gold lock, 2 runs at the current defaults, e5 grouping near UAT (>= 0.90) / rest, grading sheet with empty labels, report split by group, DEC-022 stated everywhere. Procedure: `docs/design/heldout-v2-release.md`.
 - **DONE (2026-11-15):** the owner approved the gold (HO2-004, 005, 020 changed; HO2-001, 003, 012, 016, 018 as proposed; the other 12 as they were); `heldout_v2_check.py check` clean; gold locked (`heldout-v2-gold.lock`, approved by owner (NQThai-7803)).
 - **WAITING FOR OWNER:** merge PR #30 and create the `heldout-v2-release` environment. The workflow is not dispatched until the owner says so (DEC-012).
+
+## Phase 5 backlog -- table rows (recorded 2026-11-18, owner; rows v2 paused, flag off)
+
+- [ ] **Rows for 2-column tables.** Every table of ND-HR-004 has 2 columns, so the 3-column rule of DEC-034 gives no rows to the tables behind Q041 (seniority), ND-001 (holidays), Q048 and Q049 (notice periods). Try rows for 2-column tables with a real header, and keep the key-value tables without one as page text.
+- [ ] **A stable order on ties.** Chunks that tie in retrieval are ordered by document id, which every corpus load draws anew. Between two jobs with nothing changed, Q096 flipped. Order ties by `document_code` and `chunk_index` (or another load-independent key), behind a flag, before any one-job gate is read again.
+- [ ] Then repeat the DEC-034 retrieval gate over two jobs, and the LLM round only if it passes.
+- [ ] **PyMuPDF 2.** `pyproject.toml` now caps PyMuPDF below 2 (`requirements.lock` pins 1.28.2).
+  - On 2.1, `find_tables()` returns cell text without spaces ("Basiccare") and splits a 2-column table into 3. Backend CI failed on every commit of PR #44 until the cap.
+  - Upgrading needs the table-row tests and the DEC-034 offline counts redone on 2.x.
 
 ## Phase 5 backlog -- English questions (recorded 2026-11-15)
 

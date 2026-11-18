@@ -47,10 +47,10 @@ on:
         options: ["180", "600"]
         default: "180"
       ollama_cache_ram:
-        description: "llama-server prompt cache cap in MiB (LLAMA_ARG_CACHE_RAM); 'default' keeps Ollama's 8192 (DEC-029)"
+        description: "llama-server prompt cache cap in MiB (LLAMA_ARG_CACHE_RAM), 2048 as deployed; 'default' is Ollama's own 8192 (DEC-029)"
         type: choice
-        options: ["default", "0", "2048", "4096"]
-        default: "default"
+        options: ["2048", "default", "0", "4096"]
+        default: "2048"
 
 permissions:
   contents: read

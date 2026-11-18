@@ -4,12 +4,12 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from uuid import UUID
 
-from sqlalchemy import Row, Select, select
+from sqlalchemy import Row, Select, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.permissions import build_accessible_document_filter
 from app.models import Document, DocumentChunk, DocumentStatus, User
-from app.retrieval.authority import current_authority_order_expression
+from app.retrieval.authority import answer_document_filter, current_authority_order_expression
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,6 +24,7 @@ class RetrievalRow:
     end_page: int
     token_count: int
     relevance_score: float
+    group_id: UUID | None = None  # DEC-034: the parent TEXT chunk of a row, else the chunk
 
 
 class SemanticRetrievalRepository:
@@ -86,11 +87,13 @@ async def search_permitted_chunks(
             DocumentChunk.end_page.label("end_page"),
             DocumentChunk.token_count.label("token_count"),
             relevance_score,
+            func.coalesce(DocumentChunk.parent_chunk_id, DocumentChunk.id).label("group_id"),
         )
         .join(Document, Document.id == DocumentChunk.document_id)
         .where(
             Document.status == DocumentStatus.READY,
             build_accessible_document_filter(current_user),
+            answer_document_filter(),
             cosine_distance <= max_cosine_distance,
         )
         .order_by(
@@ -135,12 +138,14 @@ def _exact_permitted_knn_statement(
             DocumentChunk.end_page.label("end_page"),
             DocumentChunk.token_count.label("token_count"),
             DocumentChunk.embedding.cosine_distance(vector).label("cosine_distance"),
+            func.coalesce(DocumentChunk.parent_chunk_id, DocumentChunk.id).label("group_id"),
             current_authority_order_expression().label("authority_rank"),
         )
         .join(Document, Document.id == DocumentChunk.document_id)
         .where(
             Document.status == DocumentStatus.READY,
             build_accessible_document_filter(current_user),
+            answer_document_filter(),
         )
         .offset(0)
         .subquery("permitted_chunks")
@@ -157,6 +162,7 @@ def _exact_permitted_knn_statement(
             permitted.c.end_page,
             permitted.c.token_count,
             (1.0 - permitted.c.cosine_distance).label("relevance_score"),
+            permitted.c.group_id,
         )
         .where(permitted.c.cosine_distance <= max_cosine_distance)
         .order_by(
@@ -183,6 +189,7 @@ def _retrieval_rows(rows: Sequence[Row]) -> tuple[RetrievalRow, ...]:
             end_page=row.end_page,
             token_count=row.token_count,
             relevance_score=float(row.relevance_score),
+            group_id=row.group_id,
         )
         for row in rows
     )

@@ -76,6 +76,18 @@ def test_stale_held_out_v2_lock_fails(tmp_path: Path) -> None:
     assert leak.load_fingerprints(path, lock, expected, lock_v2)
 
 
+def test_stale_held_out_v3_lock_fails(tmp_path: Path) -> None:
+    payload = leak.build_payload(DEV, HELDOUT, "abc", heldout_v3=HELDOUT, lock_v3_sha256="v3")
+    path, lock = _files(tmp_path, payload)
+    lock_v3 = tmp_path / "lock_v3.json"
+    lock_v3.write_text(json.dumps({"sha256": "other"}), encoding="utf-8")
+    expected = {**EXPECTED, "heldout_v3": 1}
+    with pytest.raises(QuestionSourceError, match="held-out v3"):
+        leak.load_fingerprints(path, lock, expected, lock_v3=lock_v3)
+    lock_v3.write_text(json.dumps({"sha256": "v3"}), encoding="utf-8")
+    assert leak.load_fingerprints(path, lock, expected, lock_v3=lock_v3)
+
+
 @pytest.mark.parametrize(
     "payload",
     [

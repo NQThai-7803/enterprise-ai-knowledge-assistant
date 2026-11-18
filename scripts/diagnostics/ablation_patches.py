@@ -22,6 +22,10 @@ more names joined by "." select what is patched:
                       /tmp/simple_trace.jsonl) with its sources, its outcome, and each sentence
                       with the markers it cites and the claim validator's status and deciding
                       rule for that sentence against its own cited sources.
+  retrieval_oracle    no LLM (DEC-034 retrieval gate): the simple answer mode records the chunks
+                      it would give the prompt (hybrid retrieval, then at most 5, at most 2 per
+                      document) and which are gold (EVAL_ORACLE_FILE), to EVAL_SIMPLE_TRACE_FILE,
+                      then answers NO_ANSWER without calling the LLM.
 
 Diagnostic only: per-request state lives in context variables, and every patch logs one
 "ABLATION ..." line per decision so a run can be audited from the stack log.
@@ -69,7 +73,7 @@ def apply(names: frozenset[str]) -> None:
     import app.services.grounded_answer_service as gas
 
     known = {"low_alignment_off", "excerpt_off", "group5", "partial_compound", "oracle"}
-    known.add("simple_trace")
+    known.update({"simple_trace", "retrieval_oracle"})
     unknown = names - known - {"deterministic_off"}
     if unknown:
         raise RuntimeError(f"unknown ablation(s): {sorted(unknown)}")
@@ -104,6 +108,8 @@ def apply(names: frozenset[str]) -> None:
         _patch_partial_compound(gas)
     if "simple_trace" in names:
         _patch_simple_trace(gas)
+    if "retrieval_oracle" in names:
+        _patch_retrieval_oracle(gas)
     logger.warning("ABLATION applied %s", ",".join(sorted(names)))
 
 
@@ -141,6 +147,48 @@ def _patch_prepared_hits(gas: Any, *, oracle: bool) -> None:
     if oracle:
         HybridRetrievalService.retrieve = retrieve
     gas.GroundedAnswerService._prepare_prompt_retrieval_hits = prepare
+
+
+def _patch_retrieval_oracle(gas: Any) -> None:
+    gold = _load_oracle()
+    path = Path(os.environ.get("EVAL_SIMPLE_TRACE_FILE") or "/tmp/simple_trace.jsonl")
+
+    async def simple_answer_draft(self: Any, *, current_user: Any, grounding_question: str) -> Any:
+        # The retrieval and hit choice of _simple_answer_draft, without the prompt and the LLM.
+        result = await self.hybrid_retrieval_service.retrieve(
+            query=grounding_question,
+            current_user=current_user,
+            top_k=gas._chat_retrieval_candidate_top_k(
+                settings=self.settings, reranker=self.retrieval_reranker
+            ),
+        )
+        hits = gas._simple_select_hits(result.hits)
+        codes = await _document_codes({hit.document_id for hit in hits})
+        asked = _question.get() or ""
+        entry = gold.get(question_key(asked))
+        rows = [
+            {
+                "rank": rank,
+                "code": codes.get(hit.document_id),
+                "pages": list(hit.page_numbers),
+                "row": hit.group_id is not None and hit.group_id != hit.chunk_id,
+                "gold": bool(entry) and is_gold(hit, codes.get(hit.document_id), entry),
+                "text": hit.text[:300],
+            }
+            for rank, hit in enumerate(hits, 1)
+        ]
+        record = {
+            "asked": asked,
+            "question": grounding_question,
+            "has_gold": entry is not None,
+            "gold_hit": any(row["gold"] for row in rows),
+            "hits": rows,
+        }
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record, ensure_ascii=False) + chr(10))
+        return self._simple_no_answer("retrieval_oracle")
+
+    gas.GroundedAnswerService._simple_answer_draft = simple_answer_draft
 
 
 def vars_of(result: Any) -> dict[str, Any]:

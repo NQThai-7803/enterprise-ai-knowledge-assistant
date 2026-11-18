@@ -4,6 +4,17 @@ from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True, slots=True)
+class TableRow:
+    """One body row of a data table (DEC-034): `text` is `<title> | <column>: <cell>; ...` for
+    the prompt and the embedding, `search_text` the cells only for keyword retrieval."""
+
+    table: int  # the table's index on its page
+    text: str
+    search_text: str
+    cells: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class ExtractedPage:
     page_number: int
     text: str = field(repr=False)
@@ -16,10 +27,12 @@ class ExtractedPage:
     width: int | None = None
     height: int | None = None
     warnings: tuple[str, ...] = ()
+    table_rows: tuple[TableRow, ...] = ()  # DOCUMENT_TABLE_ROW_CHUNKING_ENABLED only
 
     def __post_init__(self) -> None:
         warnings = tuple(self.warnings)
         object.__setattr__(self, "warnings", warnings)
+        object.__setattr__(self, "table_rows", tuple(self.table_rows))
         if self.page_number < 1:
             msg = "page_number must be 1-based."
             raise ValueError(msg)

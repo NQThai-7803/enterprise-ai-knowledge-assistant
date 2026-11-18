@@ -147,6 +147,8 @@ jobs:
           sudo systemctl stop ollama || true
           # DEC-014: the runner reads the backend from this log (run #1 failed without it).
           echo "EVAL_OLLAMA_LOG=$RUNNER_TEMP/ollama.log" >> "$GITHUB_ENV"
+          # DEC-029: llama-server's prompt cache capped as in DEPLOYMENT.md (Ollama's own cap: 8 GiB).
+          LLAMA_ARG_CACHE_RAM=2048 \
           OLLAMA_HOST=0.0.0.0:11434 OLLAMA_CONTEXT_LENGTH=8192 OLLAMA_NUM_PARALLEL=1 \
             nohup ollama serve > "$RUNNER_TEMP/ollama.log" 2>&1 &
           for _ in $(seq 1 30); do curl -sf http://127.0.0.1:11434/api/version && break; sleep 2; done

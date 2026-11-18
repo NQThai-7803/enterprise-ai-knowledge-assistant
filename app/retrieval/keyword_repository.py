@@ -10,10 +10,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.permissions import build_accessible_document_filter
 from app.models import Document, DocumentChunk, DocumentStatus, User
-from app.retrieval.authority import current_authority_order_expression, is_historical_query
+from app.retrieval.authority import (
+    answer_document_filter,
+    current_authority_order_expression,
+    is_historical_query,
+)
 from app.retrieval.question_analysis import fold_text
 
 _TEXT_SEARCH_CONFIG = literal_column("'simple'::regconfig")
+# DEC-034: a TABLE_ROW chunk matches on its cells only, so table labels count once per table.
+_KEYWORD_TEXT = func.coalesce(DocumentChunk.search_text, DocumentChunk.text)
 _IDENTIFIER_PATTERN = re.compile(r"\b[A-Za-z0-9]+(?:[-/][A-Za-z0-9]+)+\b")
 _FALLBACK_TOKEN_PATTERN = re.compile(r"[\wÀ-ỹ]+", re.UNICODE)
 _FALLBACK_MAX_TERMS = 12
@@ -111,6 +117,7 @@ class KeywordRetrievalRow:
     end_page: int
     token_count: int
     keyword_rank: float
+    group_id: UUID | None = None  # DEC-034: the parent TEXT chunk of a row, else the chunk
 
 
 class KeywordRetrievalRepository:
@@ -140,7 +147,7 @@ async def search_permitted_chunks_by_keyword(
     top_k: int,
     min_keyword_rank: float,
 ) -> tuple[KeywordRetrievalRow, ...]:
-    text_vector = func.to_tsvector(_TEXT_SEARCH_CONFIG, DocumentChunk.text)
+    text_vector = func.to_tsvector(_TEXT_SEARCH_CONFIG, _KEYWORD_TEXT)
     text_query = func.websearch_to_tsquery(_TEXT_SEARCH_CONFIG, query)
     match_expression = text_vector.bool_op("@@")(text_query)
     keyword_rank = func.ts_rank_cd(text_vector, text_query)
@@ -149,7 +156,7 @@ async def search_permitted_chunks_by_keyword(
     folded_query_text = fold_text(query)
     if _should_use_diacritic_insensitive_vector(query):
         folded_text = func.translate(
-            func.lower(DocumentChunk.text),
+            func.lower(_KEYWORD_TEXT),
             _VIETNAMESE_DIACRITIC_SOURCE,
             _VIETNAMESE_DIACRITIC_TARGET,
         )
@@ -247,11 +254,13 @@ async def _execute_keyword_search(
             DocumentChunk.end_page.label("end_page"),
             DocumentChunk.token_count.label("token_count"),
             keyword_rank_label,
+            func.coalesce(DocumentChunk.parent_chunk_id, DocumentChunk.id).label("group_id"),
         )
         .join(Document, Document.id == DocumentChunk.document_id)
         .where(
             Document.status == DocumentStatus.READY,
             build_accessible_document_filter(current_user),
+            answer_document_filter(),
             match_expression,
             keyword_rank >= min_keyword_rank,
         )
@@ -281,6 +290,7 @@ async def _execute_keyword_search(
             end_page=row.end_page,
             token_count=row.token_count,
             keyword_rank=float(row.keyword_rank),
+            group_id=row.group_id,
         )
         for row in rows.all()
     )

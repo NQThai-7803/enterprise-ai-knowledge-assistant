@@ -230,3 +230,57 @@ def test_simple_trace_follows_the_s1_s2_flags(
     assert [s["absence"] for s in record["sentences"]] == [False, False, True]
     assert [round(s["similarity"], 2) for s in record["similarities"]] == [1.0, 0.0]
     assert record["bindings"] == []  # s4 off
+
+
+def test_retrieval_oracle_records_the_chosen_chunks_and_calls_no_llm(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import app.services.grounded_answer_service as gas
+
+    oracle, trace = tmp_path / "oracle.json", tmp_path / "trace.jsonl"
+    oracle.write_text(json.dumps({"Hỏi gì?": [{"document": "DOC-1", "pages": [2]}]}), "utf-8")
+    monkeypatch.setenv("EVAL_ORACLE_FILE", str(oracle))
+    monkeypatch.setenv("EVAL_SIMPLE_TRACE_FILE", str(trace))
+    service = gas.GroundedAnswerService
+    monkeypatch.setattr(service, "_simple_answer_draft", service._simple_answer_draft)  # restored
+    monkeypatch.setattr(gas, "_chat_retrieval_candidate_top_k", lambda **_: 10)
+
+    async def codes(ids: set[Any]) -> dict[Any, str]:
+        return {"d1": "DOC-1", "d2": "DOC-2"}
+
+    monkeypatch.setattr(patches, "_document_codes", codes)
+
+    def hit(chunk: str, document: str, page: int, group: str | None = None) -> Any:
+        return SimpleNamespace(
+            chunk_id=chunk, document_id=document, page_numbers=(page,), text=f"text {chunk}",
+            group_id=group or chunk,
+        )  # fmt: skip
+
+    hits = (hit("c1", "d2", 1), hit("c2", "d1", 2, group="c9"), hit("c3", "d1", 5))
+
+    async def retrieve(**_: Any) -> Any:
+        return SimpleNamespace(hits=hits)
+
+    fake = SimpleNamespace(
+        hybrid_retrieval_service=SimpleNamespace(retrieve=retrieve),
+        settings=None,
+        retrieval_reranker=None,
+        _simple_no_answer=lambda reason: ("no answer", reason),
+    )
+    patches._patch_retrieval_oracle(gas)
+    token = patches._question.set("Hỏi gì?")
+    try:
+        outcome = asyncio.run(
+            service._simple_answer_draft(fake, current_user=None, grounding_question="Hỏi gì?")
+        )
+    finally:
+        patches._question.reset(token)
+
+    assert outcome == ("no answer", "retrieval_oracle")
+    (record,) = [json.loads(line) for line in trace.read_text("utf-8").splitlines()]
+    assert record["has_gold"] and record["gold_hit"]
+    assert [(h["code"], h["gold"], h["row"]) for h in record["hits"]] == [
+        ("DOC-2", False, False),
+        ("DOC-1", True, True),
+        ("DOC-1", False, False),
+    ]

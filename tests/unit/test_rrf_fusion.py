@@ -229,3 +229,36 @@ def test_rrf_does_not_use_raw_score_addition() -> None:
 
     assert result.hits[0].hybrid_score == pytest.approx(2.0 / 61.0)
     assert result.hits[0].hybrid_score != pytest.approx(1000.1)
+
+
+def test_a_text_chunk_and_its_table_rows_take_one_slot() -> None:
+    """DEC-034: a row chunk carries its parent's id as group; the first ranked one is kept."""
+    from dataclasses import replace
+
+    parent, row_a, row_b, other = (semantic_hit(n) for n in (1, 2, 3, 4))
+    row_a, row_b = replace(row_a, group_id=uid(1)), replace(row_b, group_id=uid(1))
+    result = fuse_retrieval_hits(
+        semantic_hits=(row_a, parent, row_b, other),
+        keyword_hits=(),
+        top_k=3,
+        rrf_k=60,
+        semantic_weight=1.0,
+        keyword_weight=1.0,
+    )
+
+    assert [hit.chunk_id for hit in result.hits] == [uid(2), uid(4)]
+    assert result.fused_candidate_count == 4
+
+
+def test_without_groups_every_hit_is_kept() -> None:
+    hits = tuple(semantic_hit(n) for n in (1, 2, 3))
+    result = fuse_retrieval_hits(
+        semantic_hits=hits,
+        keyword_hits=(),
+        top_k=3,
+        rrf_k=60,
+        semantic_weight=1.0,
+        keyword_weight=1.0,
+    )
+
+    assert [hit.chunk_id for hit in result.hits] == [uid(1), uid(2), uid(3)]
