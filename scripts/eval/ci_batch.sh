@@ -13,6 +13,8 @@
 # Needs: the eval stack started by the workflow (PROJECT, FILES), Ollama with EVAL_OLLAMA_LOG.
 set -uo pipefail
 SET="$1"; CONFIGS="$2"; RUNS="$3"; OUT="$4"; shift 4
+# Held-out v3 (DEC-035) runs only from the gated .github/workflows/heldout-v3.yml.
+[ "$SET" != heldout_v3 ] || [ "${HELDOUT_V3_APPROVED:-}" = 1 ]   || { echo "heldout_v3 runs only from heldout-v3.yml after its gate"; exit 2; }
 CASE_IDS=("$@")
 : "${PROJECT:?}" "${EVAL_OLLAMA_LOG:?}"
 read -r -a FILES <<< "${COMPOSE_FILES:?space-separated -f arguments}"
@@ -148,6 +150,8 @@ run_one() {  # $1 = config index, $2 = run number
       python scripts/eval/run_answer_relevance_dev.py --set "$frozen" \
         --output "$dir/results.json" > "$dir/runner.log" 2>&1 \
         || echo "runner exit $?" >> "$dir/runner.log" ;;
+    heldout_v3)  # DEC-035: counts only on stdout; answers stay in the artifact
+      python scripts/eval/heldout_v3_release.py run --manifest "$OUT/runtime-manifest.json"         --output "$dir/results.json" > "$dir/runner.log" 2>&1         || echo "runner exit $?" >> "$dir/runner.log" ;;
     natural)  # owner-written questions over corpus V2, proxy-graded on the locked gold
       python scripts/eval/run_natural_dev.py --manifest "$OUT/runtime-manifest.json" \
         --output "$dir/results.json" > "$dir/runner.log" 2>&1 \
@@ -188,7 +192,7 @@ for run in $(seq 1 "$RUNS"); do
 done
 
 # Compare every later configuration with the first one (needs 2 runs per side).
-KIND="$SET"; [[ "$SET" == false_refusal* || "$SET" == compound || "$SET" == natural ]] && KIND=relevance
+KIND="$SET"; [[ "$SET" == false_refusal* || "$SET" == compound || "$SET" == natural || "$SET" == heldout_v3 ]] && KIND=relevance
 if [ "$RUNS" = 2 ]; then
   base="${NAMES[0]}"
   for name in "${NAMES[@]:1}"; do

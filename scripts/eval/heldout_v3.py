@@ -169,14 +169,14 @@ def import_workbook(source: Path) -> int:
     return 0
 
 
-def verify_frozen() -> list[dict[str, Any]]:
+def verify_frozen(heldout: Path = HELDOUT, lock: Path = LOCK) -> list[dict[str, Any]]:
     import yaml
 
-    expected = json.loads(LOCK.read_text(encoding="utf-8"))["sha256"]
-    actual = hashlib.sha256(HELDOUT.read_bytes()).hexdigest()
+    expected = json.loads(lock.read_text(encoding="utf-8"))["sha256"]
+    actual = hashlib.sha256(heldout.read_bytes()).hexdigest()
     if actual != expected:
         raise FrozenSetChangedError(f"heldout-v3.yaml sha256 {actual} != frozen {expected}")
-    return yaml.safe_load(HELDOUT.read_text(encoding="utf-8"))["items"]
+    return yaml.safe_load(heldout.read_text(encoding="utf-8"))["items"]
 
 
 def source_segments(text: str) -> list[tuple[str, str]]:

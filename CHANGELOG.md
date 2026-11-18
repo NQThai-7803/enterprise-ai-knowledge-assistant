@@ -6,6 +6,15 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### Exclude by default, held-out v3 workflow (DEC-036) -- 2026-11-18
+
+- **RAG:** `RAG_DRAFT_DOCUMENT_POLICY` defaults to `exclude` (DEC-036, the owner's data policy); `off` is the rollback.
+- **Eval:**
+  - `.github/workflows/heldout-v3.yml`, gated as held-out v2;
+  - `scripts/eval/heldout_v3_release.py` (gate, run, grading with the DEC-035 verdict);
+  - `ci_batch.sh` set `heldout_v3`, allowed only with the workflow's approval.
+  - Not dispatched.
+
 ### Draft documents, table rows v2 (DEC-033/034/035) -- 2026-11-18
 
 - **RAG:** `DRAFT` lifecycle and `RAG_DRAFT_DOCUMENT_POLICY` (`off` default, `exclude`) in every answer retrieval path.

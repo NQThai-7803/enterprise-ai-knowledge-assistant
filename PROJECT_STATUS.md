@@ -1,5 +1,14 @@
 # Project Status
 
+## Exclude as the data policy, held-out v3 workflow ready (DEC-036) -- 2026-11-18 (STOPPED for the owner's review)
+
+- **DEC-036 (owner):** `RAG_DRAFT_DOCUMENT_POLICY=exclude` is the default for every configuration. A document not yet issued never answers. It overrides DEC-026 for this question, with the measured cost and gain recorded. **No other default changed.**
+- **DEC-035 updated:** held-out v3 compares `legacy` + 3B + exclude with `s3` + `qwen3.5-text:4b` + exclude.
+  - `.github/workflows/heldout-v3.yml` and `scripts/eval/heldout_v3_release.py`: main only, confirm text, `heldout-v3-release` environment, lock gate, two interleaved runs, value-aware grading, verdict, owner tables.
+  - **Not dispatched.**
+- **Table rows v2:** paused, flag off. Phase 5 tasks: 2-column tables (ND-HR-004) and a stable order on ties.
+- **Open DEC-030 findings:** listed in TASKS by type and item id, with proposals, for the owner.
+
 ## Draft documents, table rows v2, held-out v3 protocol (DEC-033/034/035) -- 2026-11-18 (STOPPED for the owner's review)
 
 - **Owner decisions applied:**
