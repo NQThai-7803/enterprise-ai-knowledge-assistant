@@ -712,8 +712,50 @@ Set on 2026-11-19 from the owner's decisions on the DEC-030 findings. The gold i
   - Confirmed: a commit of its own sets the item ACTIVE (`python scripts/eval/heldout_v3.py set-status ACTIVE <id>`, which rewrites the lock and the fingerprints).
   - Not confirmed by then: a commit of its own sets it **EXCLUDED** (`set-status EXCLUDED <id>`), and held-out v3.1 runs with the 15 items left. An EXCLUDED item is never asked and is listed under `not_run`.
   - There is no "run first, complete later": a real run (`gate --no-pending`, and `run`) refuses while any item is still PENDING_AUTHOR_REVIEW. Only `preflight_only` may run before.
+- **Resolved (owner, 2026-11-19), before the deadline:**
+  - **HO3-08: ACTIVE.** The owner confirmed it.
+  - **HO3-11: EXCLUDED.** Its gold holds a value that is not in its source document.
+  - Applied with `heldout_v3.py set-status` (both changes are recorded in the lock's `status_changes`). Lock sha256 d4481d56…; fingerprints rebuilt.
+  - **Held-out v3.1 asks 16 items** (17 minus HO3-11); `gate --no-pending` passes.
 - **Files:**
   - `docs/eval/heldout-v3.1.yaml` and `heldout-v3.1.lock`, sha256 047d0859….
   - `scripts/eval/question_fingerprints.json` rebuilt, with a `heldout_v3_1` source.
   - The gate and the run of `heldout_v3_release.py` read v3.1.
 - **Owner's grading table:** each answer is flagged when it cites another document than the gold one with the gold's values, so the owner can apply DEC-037 policy 1. The automatic grade does not apply it.
+
+## DEC-039 — Held-out results never public in plaintext; known exposure of the held-out sets
+
+Set on 2026-11-19 by the owner, before the held-out v3.1 dispatch.
+
+**What a held-out workflow may publish** (`heldout-v2.yml`, `heldout-v3.yml`):
+
+- **The artifact** (`heldout-v*-public/`) holds only:
+  - the lock;
+  - the text-free `summary.md` and `verdict.json` (ids, counts, the DEC-035 verdict);
+  - on a GitHub-hosted runner, the age ciphertext of everything else.
+- **Everything else is private:** run results, the owner's `grading.md` / `grading.csv`, stack logs and Ollama logs. `scripts/eval/heldout_publish.sh` handles them according to the runner type:
+  - **GitHub-hosted** (both workflows today, `ubuntu-latest`): `tar | age -r "$HELDOUT_AGE_RECIPIENT"`, and only the ciphertext is uploaded. Without a valid recipient in the repository variable, the job fails at its start and again at the split. There is no plaintext fallback.
+  - **Self-hosted:** the results are copied to `HELDOUT_PRIVATE_DIR/<run id>` and not uploaded. The default is `C:/dev/eaka-private/<name>/<run id>`.
+- **Scan before the upload:** `question_leak.py scan` checks every file of the public folder against all the question fingerprints. Any match fails the job. The upload runs only when both the split and the scan succeeded.
+- **Job summary:** it gets `summary.md` only after the scan. The held-out v2 step that copied the first 40 lines of `grading.md` into it is removed.
+- **Step logs:** they print ids and counts only. I checked this in the code of the gate, the runners, `ci_batch.sh` (its compare output is ids and counts) and the grading step.
+- **Dry run** (2026-11-19, fake data, Linux container with age):
+  - A missing or bad key fails.
+  - An unknown runner and a bad public folder are refused.
+  - The self-hosted copy works.
+  - The ciphertext decrypts back to the private folder.
+  - The scan passes the public folder. It fails once a sheet holding a dev question is planted there, and it names only the question id.
+- **Environments:** `heldout-v2-release` and `heldout-v3-release` both need the owner's review and deploy from `main` only.
+
+**Known exposure, accepted:**
+
+- **Held-out text in the public repository.** The questions and gold of held-out v2, v3 and v3.1 are in plaintext in `docs/eval/` and in the git history. The fingerprint salt is also public (`question_leak.py`), so the hashes let anyone confirm a question they guessed.
+  - Why it is accepted: the held-out sets guard against overfitting during development, and the development side keeps the no-read rule (DEC-012, DEC-030). The local models do not learn from GitHub.
+  - No file is deleted, the history is not rewritten, and the repository visibility is not changed.
+- **ND-001 and HO2-017:** the `gold_answer` of natural_dev_v1 ND-001 shares 75 % of the 4-grams of the HO2-017 question. This is not verified; it is probably wording shared with the source document. It is a known limit of held-out v2.
+- **Past exposure:**
+  - Three held-out v2 artifacts held the full results (runs 43697066034, 43701098015, 43701804785). They were deleted on 2026-11-19.
+  - The public job summary of run 43701804785 still shows the first 40 lines of the v2 grading sheet. This is inferred from the code; the summary was not opened. Removing it means deleting that run, which is the owner's call.
+- **Not scanned:**
+  - the contents of `docs/eval/heldout-v2-check.json`, `docs/eval/heldout-v2-e5.json` and `docs/eval/runs/`;
+  - gold text outside `docs/eval/`, because only the questions have fingerprints.

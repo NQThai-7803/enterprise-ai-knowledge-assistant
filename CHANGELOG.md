@@ -6,6 +6,19 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### Held-out v3.1 final, private results (DEC-038/039) -- 2026-11-19
+
+- **Held-out v3.1:** HO3-08 ACTIVE and HO3-11 EXCLUDED (`set-status`). The lock and the
+  fingerprints were rebuilt; 16 items will be asked.
+- **Private results (DEC-039):**
+  - New `scripts/eval/heldout_publish.sh` splits the public part from the private part. The private part is
+    age-encrypted on a GitHub-hosted runner, or kept outside the repository on a self-hosted one.
+  - New `question_leak.py scan <folder>`.
+  - `heldout-v2.yml` and `heldout-v3.yml` upload only the scanned public folder.
+  - Held-out v2 no longer copies its grading sheet into the job summary.
+- **UAT review:** Q044 A/B and Q053 A KHÔNG ĐẠT; final owner pass rate 127/200.
+- **Repository settings:** the three held-out v2 artifacts are deleted, and `heldout-v2-release` deploys from `main` only.
+
 ### Owner follow-ups (DEC-038 deadline, Q041) -- 2026-11-19
 
 - **Held-out tooling:**

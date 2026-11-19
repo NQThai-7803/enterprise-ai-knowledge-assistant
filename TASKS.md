@@ -8,6 +8,20 @@
 3. **Embedding fine-tune** (`docs/design/embedding-finetune.md` and DEC-015 on branch `feat/embedding-finetune-infra`): infrastructure only so far; the baseline measurement and training come after FIX 3.
 4. The final held-out v2 measurement, once, after the choices above are made (DEC-012).
 
+## Held-out v3.1 final, private results (DEC-038/039) -- 2026-11-19
+
+- **DONE:**
+  - HO3-08 ACTIVE and HO3-11 EXCLUDED: 16 items will be asked, and `gate --no-pending` passes.
+  - Artifacts are safe to publish (DEC-039).
+  - The old v2 artifacts are deleted, and the v2 environment deploys from `main` only.
+- **WAITING FOR OWNER, before the dispatch:**
+  1. Create an age key pair: `age-keygen -o <private place>/heldout.key`. Keep the key out of the repository.
+  2. Store the public key: `gh variable set HELDOUT_AGE_RECIPIENT --body age1...`.
+  3. Dispatch the preflight, then the real run.
+- **OPEN, the owner's call:**
+  - Delete run 43701804785: its job summary still shows the head of the v2 grading sheet.
+  - Scan `heldout-v2-check.json`, `heldout-v2-e5.json` and `docs/eval/runs/`.
+
 ## Held-out v3.1 (DEC-038) -- 2026-11-19
 
 - **DONE:**
@@ -27,7 +41,7 @@
   - Grader: `accepted_sources`, DRAFT citations fail.
   - DEC-037; the CI rule and the verify-image rule in `CONTRIBUTING.md` and the eaka-verify skill.
 - **DONE (2026-11-19):** Q041 decided by content: A KHÔNG ĐẠT (cites the template), B ĐẠT (states the rule, cites ND-HR-004). Owner rate now 127/200 (63.5-65.0 %).
-- **WAITING FOR OWNER:** verdicts for Q044 (A/B) and Q053 (A).
+- **DONE (2026-11-19):** Q044 A/B and Q053 A KHÔNG ĐẠT (template cited, policy 3). Final owner rate: A 64/100, B 63/100, total 127/200 (63.5 %), nothing undecided.
 - **Grader, low priority:** add a `question_type=rule` flag to the UAT gold so DEC-037 policy 4 (stating the rule correctly passes) is graded automatically; today the grader still asks for every value of the reference answer (Q041 B).
 
 ## Exclude as the data policy, held-out v3 workflow (DEC-036) -- 2026-11-18 (STOPPED for the owner's review)
