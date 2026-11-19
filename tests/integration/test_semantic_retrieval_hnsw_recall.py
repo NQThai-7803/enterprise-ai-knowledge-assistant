@@ -9,7 +9,12 @@ is discarded and an authorized user gets no result even though a permitted chunk
 unauthorized is returned.
 
 The searching transaction forces the index-friendly planner settings itself (``enable_seqscan``
-and ``enable_sort`` off; with only ``enable_seqscan`` off the planner still avoids HNSW).
+and ``enable_sort`` off; with only ``enable_seqscan`` off the planner still avoids HNSW). It also
+pins ``hnsw.ef_search`` to 1. With the default 40 the outcome depended on how the HNSW graph,
+whose levels pgvector draws at random, linked the equidistant nearer vectors: on 2026-11-19 both
+strict xfails XPASSed once and xfailed on 5 reruns. With 1 the greedy search always stops on a
+nearer chunk (the permitted chunk has a nearer neighbour, so it is never a local minimum), and the
+defect, a post-filter on the ``hnsw.ef_search`` candidates, shows the same way every run.
 
 - Flag off (default statement): xfail(strict). EXPLAIN in the same transaction must show the
   HNSW index; if it does not, the test raises ``RuntimeError``, which is reported as a real
@@ -46,7 +51,12 @@ from tests.integration.semantic_query_diagnostics import is_distance_query
 pytestmark = pytest.mark.integration
 
 HNSW_INDEX = "ix_document_chunks_embedding_hnsw_cosine"
-FORCE_HNSW_PLAN = ("SET LOCAL enable_seqscan = off", "SET LOCAL enable_sort = off")
+EF_SEARCH = 1  # pinned: see the module docstring
+FORCE_HNSW_PLAN = (
+    "SET LOCAL enable_seqscan = off",
+    "SET LOCAL enable_sort = off",
+    f"SET LOCAL hnsw.ef_search = {EF_SEARCH}",
+)
 DEFAULT_EF_SEARCH = 40
 # Enough distinct vectors to fill every HNSW candidate slot. Identical vectors share one index
 # element (up to 10 heap TIDs each), so each chunk below gets its own axis.
@@ -115,6 +125,9 @@ async def _search_with_forced_index_settings(
     connection = await session.connection()
     plan = await connection.exec_driver_sql("EXPLAIN " + statement, parameters)
     plan_text = "\n".join(row[0] for row in plan.all())
+    ef_search = await connection.exec_driver_sql("SELECT current_setting('hnsw.ef_search')")
+    if ef_search.scalar() != str(EF_SEARCH):
+        raise RuntimeError(f"precondition failed: hnsw.ef_search is not {EF_SEARCH}")
     if not exact_permitted_knn and HNSW_INDEX not in plan_text:
         raise RuntimeError(
             "precondition failed: the query did not use the HNSW index:\n" + plan_text
