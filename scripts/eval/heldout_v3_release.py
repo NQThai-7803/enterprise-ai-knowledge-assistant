@@ -10,8 +10,8 @@ usage (inside that workflow):
 - run asks the items of one configuration once, through ci_batch.sh, which interleaves the two
   configurations over two runs. An item with status PENDING_AUTHOR_REVIEW is not asked and is
   listed under excluded_pending; one with status EXCLUDED (or any status but ACTIVE), or whose test
-  account maps to no seeded user, under not_run. `run`, and `gate --no-pending`, refuse while an item is still
-  PENDING_AUTHOR_REVIEW (DEC-038: no "run first, complete later").
+  account maps to no seeded user, under not_run. `run`, and `gate --no-pending`, refuse while an
+  item is still PENDING_AUTHOR_REVIEW (DEC-038: no "run first, complete later").
 - An item expects a refusal when its expected sources name no document code. Otherwise it expects
   an answer that cites one of those documents and states the values of the expected answer with no
   conflicting one (value-aware grading, DEC-032).
