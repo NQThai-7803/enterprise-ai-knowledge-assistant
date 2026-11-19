@@ -1,5 +1,14 @@
 # Project Status
 
+## Owner follow-ups: deadline, approval gate, Q041 -- 2026-11-19
+
+- **HO3-08 and HO3-11:** the author has until the end of 2026-11-21. After that, they become EXCLUDED and the run uses 15 items.
+  - `heldout_v3.py set-status` changes only the status and rewrites the lock and the fingerprints.
+  - A real run refuses while any item is still pending.
+- **Environment `heldout-v3-release`:** created, with the owner as required reviewer and deployments from `main` only.
+- **UAT Q041:** decided (A KHÔNG ĐẠT, B ĐẠT). Owner pass rate 127/200, with Q044 and Q053 (A) still open.
+- **Cleanup:** stopped `eaka-verify-*` containers and their networks are removed without asking.
+
 ## Held-out v3.1 ready (DEC-038) -- 2026-11-19
 
 - v3 → v3.1: 17 items, 15 to be asked.

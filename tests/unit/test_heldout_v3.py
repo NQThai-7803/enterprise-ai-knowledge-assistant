@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import zipfile
 from pathlib import Path
 
+import pytest
 import yaml
 
 from scripts.eval import heldout_v3
@@ -132,3 +135,31 @@ def test_v31_drops_three_items_flags_weak_values_and_keeps_the_gold() -> None:
     assert by_id["HO3-02"]["near_duplicate"] == NEAR_DUPLICATE["HO3-02"]
     for new, old in zip(v31, [i for i in items if i["id"] != "HO3-09"], strict=True):
         assert {k: v for k, v in new.items() if k not in ("status", "near_duplicate")} == old
+
+
+def test_set_status_changes_only_the_status_of_pending_items(tmp_path) -> None:
+    from scripts.eval.heldout_v3 import EXCLUDED, PENDING, set_status, verify_frozen
+
+    items = [
+        {"id": "HO3-01", "question": "Câu 1?", "expected_answer": "3 ngày.", "status": "ACTIVE"},
+        {"id": "HO3-08", "question": "Câu 8?", "expected_answer": "2 ngày.", "status": PENDING},
+        {"id": "HO3-11", "question": "Câu 11?", "expected_answer": "5%.", "status": PENDING},
+    ]
+    heldout, lock = tmp_path / "v31.yaml", tmp_path / "v31.lock"
+    document = {"version": "heldout_v3_1", "rule": "r", "items": items}
+    heldout.write_text(
+        yaml.safe_dump(document, allow_unicode=True, sort_keys=False, width=10**6),
+        encoding="utf-8",
+        newline="\n",
+    )
+    digest = hashlib.sha256(heldout.read_bytes()).hexdigest()
+    lock.write_text(json.dumps({"version": "heldout_v3_1", "sha256": digest}), "utf-8")
+    assert set_status(EXCLUDED, ["HO3-08", "HO3-11"], heldout, lock) == 0
+    after = verify_frozen(heldout, lock)  # the new lock matches the new file
+    assert [i["status"] for i in after] == ["ACTIVE", EXCLUDED, EXCLUDED]
+    assert [{**i, "status": None} for i in after] == [{**i, "status": None} for i in items]
+    changes = json.loads(lock.read_text("utf-8"))["status_changes"]
+    assert changes[0]["ids"] == ["HO3-08", "HO3-11"] and changes[0]["status"] == EXCLUDED
+    for status, ids in ((EXCLUDED, ["HO3-01"]), ("ACTIVE", ["HO3-08"]), (PENDING, ["HO3-01"])):
+        with pytest.raises(ValueError):
+            set_status(status, ids, heldout, lock)  # only a PENDING item, only ACTIVE/EXCLUDED

@@ -344,6 +344,7 @@ VALUE_CHECKED = ("HO3-03", "HO3-05", "HO3-07", "HO3-08", "HO3-10", "HO3-11", "HO
 PENDING_BY_DEFAULT = {"HO3-08", "HO3-11"}
 NEAR_DUPLICATE = {"HO3-02": "UAT", "HO3-03": "UAT", "HO3-19": "UAT", "HO3-06": "rbac_dev"}
 PENDING = "PENDING_AUTHOR_REVIEW"
+EXCLUDED = "EXCLUDED"  # DEC-038: not confirmed by its author by 2026-11-21
 
 
 def gold_values_found(item: Mapping[str, Any], docs: Mapping[str, str]) -> dict[str, Any]:
@@ -438,17 +439,61 @@ def verify_v31() -> list[dict[str, Any]]:
     return verify_frozen(HELDOUT_V31, LOCK_V31)
 
 
+def set_status(
+    status: str, ids: Sequence[str], heldout: Path = HELDOUT_V31, lock: Path = LOCK_V31
+) -> int:
+    """DEC-038: resolve PENDING items, ACTIVE once the author confirms, EXCLUDED after the deadline;
+    only their status changes, and the lock is rewritten. Prints ids and counts only."""
+    import yaml
+
+    if status not in ("ACTIVE", EXCLUDED) or not ids:
+        raise ValueError(f"set-status takes ACTIVE or {EXCLUDED} and at least one id")
+    verify_frozen(heldout, lock)
+    text = heldout.read_text(encoding="utf-8")
+    document = yaml.safe_load(text)
+    by_id = {item["id"]: item for item in document["items"]}
+    for item_id in ids:
+        if by_id.get(item_id, {}).get("status") != PENDING:
+            raise ValueError(f"{item_id} is not {PENDING}")
+        by_id[item_id]["status"] = status
+    new = yaml.safe_dump(document, allow_unicode=True, sort_keys=False, width=10**6)
+
+    def rest(dumped: str) -> list[dict[str, Any]]:
+        items = yaml.safe_load(dumped)["items"]
+        return [{k: v for k, v in i.items() if k != "status"} for i in items]
+
+    if rest(new) != rest(text) or yaml.safe_load(new).keys() != document.keys():
+        raise ValueError("a field other than status would change")
+    heldout.write_text(new, encoding="utf-8", newline="\n")
+    record = json.loads(lock.read_text(encoding="utf-8"))
+    record["sha256"] = hashlib.sha256(heldout.read_bytes()).hexdigest()
+    record.setdefault("status_changes", []).append(
+        {"ids": sorted(ids), "status": status, "on": date.today().isoformat()}
+    )
+    lock.write_text(json.dumps(record, indent=1) + "\n", encoding="utf-8", newline="\n")
+    states = ("ACTIVE", PENDING, EXCLUDED)
+    counts = {s: sum(i["status"] == s for i in document["items"]) for s in states}
+    print(f"{', '.join(sorted(ids))} -> {status}; {counts}; lock sha256: {record['sha256']}")
+    return 0
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("import").add_argument("workbook", type=Path)
     sub.add_parser("check")
     sub.add_parser("derive-v3.1")
+    resolve = sub.add_parser("set-status", help="resolve PENDING v3.1 items (DEC-038)")
+    resolve.add_argument("status", choices=("ACTIVE", EXCLUDED))
+    resolve.add_argument("ids", nargs="+")
     args = parser.parse_args(argv)
     sys.stdout.reconfigure(encoding="utf-8")
     try:
         if args.command == "derive-v3.1":
             return write_v31()
+        if args.command == "set-status":
+            # The fingerprints carry the v3.1 lock hash, so they are rebuilt with it.
+            return set_status(args.status, args.ids) or question_leak.main(["build"])
         return import_workbook(args.workbook) if args.command == "import" else check()
     except (FrozenSetChangedError, question_leak.QuestionSourceError, ValueError) as exc:
         print(f"REFUSED: {exc}", file=sys.stderr)

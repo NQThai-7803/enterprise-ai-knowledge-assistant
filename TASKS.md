@@ -14,9 +14,10 @@
   - v3.1 derived: 3 items removed; HO3-08 and HO3-11 pending; 4 items tagged near_duplicate.
   - Lock and fingerprints rebuilt.
   - The workflow reads v3.1 and excludes pending items.
-- **WAITING FOR OWNER:** send **HO3-08** and **HO3-11** to their author (PENDING_AUTHOR_REVIEW: not every gold value was found in the cited documents).
-  - Clear each one in a commit of its own that updates `docs/eval/heldout-v3.1.lock`, before the dispatch.
-  - Then dispatch held-out v3.1 (DEC-035), after the approval gate (DEC-038 / phase 5).
+- **WAITING FOR OWNER:** send **HO3-08** and **HO3-11** to their author (PENDING_AUTHOR_REVIEW: not every gold value was found in the cited documents). **Deadline: end of 2026-11-21.**
+  - Confirmed: `python scripts/eval/heldout_v3.py set-status ACTIVE <id>` in a commit of its own (rewrites the lock and the fingerprints).
+  - Not confirmed by the deadline: `set-status EXCLUDED <id>` in a commit of its own; run with 15 items. No "run first, complete later": a real run refuses while an item is PENDING.
+  - Then dispatch held-out v3.1 (DEC-035). The `heldout-v3-release` environment exists (owner as required reviewer, `main` only).
 
 ## Owner's UAT review applied (DEC-037) -- 2026-11-19
 
@@ -25,7 +26,9 @@
   - UAT gold changes (Q018, Q002, Q016, Q017, Q034, Q054), re-locked.
   - Grader: `accepted_sources`, DRAFT citations fail.
   - DEC-037; the CI rule and the verify-image rule in `CONTRIBUTING.md` and the eaka-verify skill.
-- **WAITING FOR OWNER:** verdicts for Q041 (A/B, the sources of the two rounds swapped since 17/11), Q044 (A/B) and Q053 (A).
+- **DONE (2026-11-19):** Q041 decided by content: A KHÔNG ĐẠT (cites the template), B ĐẠT (states the rule, cites ND-HR-004). Owner rate now 127/200 (63.5-65.0 %).
+- **WAITING FOR OWNER:** verdicts for Q044 (A/B) and Q053 (A).
+- **Grader, low priority:** add a `question_type=rule` flag to the UAT gold so DEC-037 policy 4 (stating the rule correctly passes) is graded automatically; today the grader still asks for every value of the reference answer (Q041 B).
 
 ## Exclude as the data policy, held-out v3 workflow (DEC-036) -- 2026-11-18 (STOPPED for the owner's review)
 
