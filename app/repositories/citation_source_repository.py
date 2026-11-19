@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.permissions import build_accessible_document_filter
 from app.models import Document, DocumentChunk, DocumentStatus, User
+from app.retrieval.authority import answer_document_filter
 
 
 @dataclass(frozen=True, slots=True)
@@ -38,6 +39,7 @@ async def get_permitted_ready_chunks_by_ids(
             DocumentChunk.id.in_(unique_chunk_ids),
             Document.status == DocumentStatus.READY,
             build_accessible_document_filter(current_user),
+            answer_document_filter(),
         )
     )
     rows = (await session.execute(statement)).all()

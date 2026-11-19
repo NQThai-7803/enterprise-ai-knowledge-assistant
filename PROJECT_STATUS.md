@@ -1,5 +1,76 @@
 # Project Status
 
+## Exclude as the data policy, held-out v3 workflow ready (DEC-036) -- 2026-11-18 (STOPPED for the owner's review)
+
+- **DEC-036 (owner):** `RAG_DRAFT_DOCUMENT_POLICY=exclude` is the default for every configuration. A document not yet issued never answers. It overrides DEC-026 for this question, with the measured cost and gain recorded. **No other default changed.**
+- **DEC-035 updated:** held-out v3 compares `legacy` + 3B + exclude with `s3` + `qwen3.5-text:4b` + exclude.
+  - `.github/workflows/heldout-v3.yml` and `scripts/eval/heldout_v3_release.py`: main only, confirm text, `heldout-v3-release` environment, lock gate, two interleaved runs, value-aware grading, verdict, owner tables.
+  - **Not dispatched.**
+- **Table rows v2:** paused, flag off. Phase 5 tasks: 2-column tables (ND-HR-004) and a stable order on ties.
+- **Open DEC-030 findings:** listed in TASKS by type and item id, with proposals, for the owner.
+
+## Draft documents, table rows v2, held-out v3 protocol (DEC-033/034/035) -- 2026-11-18 (STOPPED for the owner's review)
+
+- **Owner decisions applied:**
+  - **DRAFT lifecycle** and `RAG_DRAFT_DOCUMENT_POLICY=off|exclude` (default `off`). UAT-LEAVE-AUTHORITY-001 is marked DRAFT in the corpus V2 manifest.
+  - **Gold edits, re-locked:** UAT Q044 → ND-HR-004 p6; natural ND-001 → ND-HR-004 p5; ND-004, ND-012, ND-019 without the template.
+  - **Table rows v2** (all four adjustments, flag still off).
+  - **DEC-035:** held-out v3 protocol, written before any run.
+- **Retrieval gate (no LLM):**
+  - Rows **fail**: UAT 77/98 vs 78/98, which is within one job's variation. Natural and the dev sets are unchanged.
+  - Every table of ND-HR-004 has 2 columns, so the 3-column rule gives them no rows (Q041, Q048, Q049, ND-001).
+  - A router bug that dropped the rows was found by the first gate run and fixed.
+- **LLM measurement** (2 rounds, value-aware):
+  - `s3` + `qwen3.5-text:4b` stays best on the 6 sets.
+  - Exclude is **not adopted**: natural false refusals +2 in both jobs, with the evidence still in context (the model words its answer differently).
+  - On UAT, exclude would be better: 69/65 correct vs 61/59.
+- **UAT list for the owner:** `docs/review/uat-s3-q35-text-2026-11-18.md` (19 items).
+- **Docker cleanup** as approved: 17 networks, 2 containers and 4 old verify images removed. No volume or Ollama model touched.
+- **Defaults unchanged.**
+
+## Held-out v3, table rows, value-aware grading (DEC-030/031/032) -- 2026-11-18 (STOPPED for the owner's review)
+
+- **Held-out v3 (DEC-030):** a team member's 20 questions with gold, frozen in `docs/eval/heldout-v3.yaml` + lock and in the fingerprints. Not opened since. The automatic checks list questions for the owner (`docs/eval/heldout-v3-check.json`).
+- **Target hardware (owner):** NVIDIA GPU ≥ 4 GB with `qwen3.5-text:4b` (`PARAMETER num_gpu 99`, `scripts/deploy/ollama_text_model.py`). 16 GB CPU is supported but slow. Recorded in DEC-029, ADR 0003 and `DEPLOYMENT.md`. Default unchanged.
+- **Prompt cache:** `LLAMA_ARG_CACHE_RAM=2048` for eval and in the deployment docs, current default included.
+  - The third capped UAT job shows the same totals (36-11-0-3) as both uncapped ones.
+  - 4 items change only with the cap: Q063 and Q064 correct → refusal, Q076 and Q090 refusal → correct.
+- **Value-aware grading (DEC-032, `scripts/eval/value_grading.py`):** the UAT proxy did not read values.
+  - An answer must state every value of its reference and no other value in the same unit.
+  - The dev-set runners add the conflict check, and RBAC controls now use a digit boundary.
+  - All runs of D and of the model comparison were regraded without rerunning. The dev sets do not change, so the DEC-026/027 conclusions stand.
+  - UAT `s3` + `qwen3.5-text:4b` falls to 62-23-1-14 / 60-24-1-15 (proxy 69/67 correct).
+- **Table rows (DEC-031)**, flag `DOCUMENT_TABLE_ROW_CHUNKING_ENABLED`, default off, two jobs on natural, the 5 dev sets and UAT:
+  - **Not adopted:** natural false refusals +2 in both jobs; false answers + wrong tied.
+  - Fixes Q041, Q077, ND-003, ND-017. Breaks 11 correct UAT answers into refusals, 8 of them because the evidence left the context.
+  - Fix proposed, not coded: `docs/design/table-chunking.md`.
+- **Template document** UAT-LEAVE-AUTHORITY-001 cited by 4 wrong UAT answers per round (6 with rows): design `docs/design/document-authority.md` (DRAFT lifecycle, flag `off`/`demote`/`exclude`, gold impact). Not coded.
+- **Best configuration:** `s3` + `qwen3.5-text:4b` without rows. UAT list for the owner: `docs/review/uat-s3-q35-text-2026-11-18.md` (16 items).
+- **Cleanup:** `docker builder prune` freed 18 GB.
+
+## Candidate `s3` + `qwen3.5:4b` (DEC-029) -- 2026-11-17 (STOPPED for the owner's review)
+
+- **The owner picked the candidate and set DEC-029:** the default changes only when (a) it still wins over three jobs, (b) the owner accepts its UAT errors, and (c) it runs on the target hardware. **Default unchanged.** Details: `docs/design/s3-q35-candidate.md`.
+- **(a) holds.** Round c added a third job per set (aA / bA / cA, against `legacy` + 3B):
+  - false answers + wrong on the six sets 15 / 10 / 12 against 28 / 27 / 28 (real);
+  - natural false refusals 4 / 9 / 5 against 7 / 7 / 7 (tie);
+  - other five sets 1 / 2 / 1 against 27 / 28 / 27 (real); leaks 0.
+- **`qwen3.5-text:4b`** (built in `eval.yml` without the vision projector; the library has no text-only tag): same answers on 137 of 137 items, runner peak 0.5-0.7 GB lower.
+- **(b) UAT, two rounds:** `s3` + `qwen3.5:4b` 67-23-1-9 / 69-22-1-8 against `legacy` 98-1-0-1 / 99-0-0-1 (proxy).
+  - List for the owner: `docs/review/uat-s3-q35-2026-11-17.md`, 19 items.
+  - Claude's first reading: 9 real errors, the same in both rounds, 6 of them a wrong table row or column. `legacy` gets all 9 right on its deterministic route.
+- **(c) CPU: not met with Ollama's defaults.** llama-server's prompt cache (up to 8192 MiB in host RAM) reached 6.6-8.0 GiB per UAT half.
+  - One job lost its runner, and two halves had 1240 and 1249 MB free.
+  - Capped at 2048 MiB (`LLAMA_ARG_CACHE_RAM`, new `eval.yml` input `ollama_cache_ram`), one half kept 6.8 GB free.
+  - The cache affects any model on Ollama 0.40, the current default included.
+- **(c) GPU (GTX 1650 4 GB):**
+  - Fully on the GPU only when forced (`num_gpu` 99): 3841 MiB, or 2971 MiB for the text copy.
+  - LLM time per question: median 20.7 s on the GPU; 29.4 s (or 24.4 s for the text copy) with Ollama's own placement.
+- **Table chunking diagnosis** (no code): `docs/design/table-chunking.md`.
+  - 77 data tables in corpus V2. 45% of their rows are interleaved in the chunk text, and 29 tables spread over several chunks without their header.
+  - ND-002 and the UAT table errors come from this. A row-per-unit proposal behind a flag, with risks and a measurement plan.
+- **Cleanup:** old `eaka-backend:verify-*` images and dangling images removed (1.25 GB inside Docker). C: free space did not change, because the WSL disk does not shrink.
+
 ## Model comparison (DEC-028) -- 2026-11-17 (STOPPED for the owner's review)
 
 - **DEC-028**, written before measuring, set the candidates and the rule:

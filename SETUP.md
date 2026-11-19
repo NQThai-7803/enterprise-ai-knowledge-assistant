@@ -202,6 +202,13 @@ LLM_OLLAMA_BASE_URL=http://host.docker.internal:11434
 LLM_OLLAMA_MODEL=<local-model>
 ```
 
+On the Ollama side, set two user environment variables and restart the Ollama tray app:
+
+- `OLLAMA_CONTEXT_LENGTH=8192`;
+- `LLAMA_ARG_CACHE_RAM=2048`, which caps the prompt cache that otherwise grows to 8 GiB of RAM.
+
+Details: `DEPLOYMENT.md` sections 3.1 and 3.2.
+
 LM Studio on the Windows host:
 
 ```text

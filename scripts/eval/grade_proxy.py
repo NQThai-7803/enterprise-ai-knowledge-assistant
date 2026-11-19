@@ -5,6 +5,8 @@ PROXY ONLY, not a semantic grade. A case is "match" when:
 - reference NO_ANSWER: run is NO_ANSWER with no citations.
 Document IDs are mapped to manifest codes (reference: V2 runtime manifest; run: this stack's).
 Also reports whether the answer text is identical to the reference answer.
+DEC-032: `value_match` is `proxy_match` that also states every value of the reference answer and no
+conflicting one (scripts/eval/value_grading.py); the categories use it.
 Cases with execution_status INFRA_ERROR (transport, timeout, 5xx; still failing after the runner's
 single end-of-run retry) are excluded from the score: proxy_match is null and the summary lists
 how many and which cases were excluded.
@@ -16,11 +18,29 @@ usage: grade_proxy.py <reference_grade.json> <v2_runtime_manifest.json> <run_run
 import json
 import sys
 from collections import Counter
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from scripts.eval.value_grading import regrade  # noqa: E402
 
 
 def load(path):
     with open(path, encoding="utf-8-sig") as handle:
         return json.load(handle)
+
+
+def check_lock(path) -> None:
+    """A gold file next to a gold.lock (eval-data/uat, DEC-033) must match it byte for byte."""
+    import hashlib
+
+    path = Path(path)
+    lock_path = path.parent / "gold.lock"
+    if not lock_path.is_file():
+        return
+    expected = json.loads(lock_path.read_text(encoding="utf-8"))["files"].get(path.name)
+    actual = hashlib.sha256(path.read_bytes()).hexdigest()
+    if expected != actual:
+        raise SystemExit(f"{path} sha256 {actual} differs from {lock_path} ({expected})")
 
 
 def code_map(manifest):
@@ -87,6 +107,7 @@ def grade(reference, v2_manifest, run_manifest, run):
                 "evidence_similarities": case.get("evidence_similarities"),
             }
         )
+    rows = regrade("uat", {"cases": rows})["cases"]
     excluded = [r["id"] for r in rows if r["proxy_match"] is None]
     scored = [r for r in rows if r["proxy_match"] is not None]
     summary = {
@@ -95,6 +116,7 @@ def grade(reference, v2_manifest, run_manifest, run):
         "excluded_infra_error": len(excluded),
         "excluded_infra_error_ids": excluded,
         "proxy_match": sum(r["proxy_match"] for r in scored),
+        "value_match": sum(r["value_match"] for r in scored),
         "status_counts": dict(Counter(r["grounding_status"] for r in rows)),
         "answer_identical_to_reference": sum(r["answer_identical_to_reference"] for r in scored),
         "retried_cases": sum(int(r["attempts"] or 1) > 1 for r in rows),
@@ -103,12 +125,14 @@ def grade(reference, v2_manifest, run_manifest, run):
             str(route): {
                 "cases": sum(r["answer_route"] == route for r in scored),
                 "proxy_match": sum(r["proxy_match"] for r in scored if r["answer_route"] == route),
+                "value_match": sum(r["value_match"] for r in scored if r["answer_route"] == route),
             }
             for route in sorted({r["answer_route"] for r in scored}, key=str)
         },
         "note": (
             "proxy vs TASK-035.3B manual grade (status + cited document codes); "
-            "not a semantic grade; proxy_match counts scored_cases only"
+            "not a semantic grade; proxy_match counts scored_cases only; "
+            "value_match = proxy_match + the reference's values (DEC-032)"
         ),
     }
     return {"summary": summary, "cases": rows}
@@ -116,6 +140,7 @@ def grade(reference, v2_manifest, run_manifest, run):
 
 def main():
     reference, v2_manifest, run_manifest, run, out = sys.argv[1:6]
+    check_lock(reference)
     result = grade(load(reference), load(v2_manifest), load(run_manifest), load(run))
     with open(out, "w", encoding="utf-8") as handle:
         json.dump(result, handle, ensure_ascii=False, indent=1)

@@ -125,6 +125,9 @@ async def create_chunk(
     similarity: float = 1.0,
     axis: int = 1,
     page_numbers: Sequence[int] = (1,),
+    chunk_kind: str = "TEXT",
+    parent_chunk_id: uuid.UUID | None = None,
+    search_text: str | None = None,
 ) -> DocumentChunk:
     resolved_text = text or f"Chunk text {key}"
     pages = tuple(page_numbers)
@@ -144,6 +147,9 @@ async def create_chunk(
         embedding_provider="sentence_transformers",
         embedding_model="fake-model",
         embedding_dimensions=384,
+        chunk_kind=chunk_kind,
+        parent_chunk_id=parent_chunk_id,
+        search_text=search_text,
     )
     session.add(chunk)
     await session.commit()

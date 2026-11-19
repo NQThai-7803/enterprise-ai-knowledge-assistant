@@ -100,6 +100,9 @@ def build_document_chunk_rows(
                 embedding_provider=EMBEDDING_PROVIDER_SENTENCE_TRANSFORMERS,
                 embedding_model=vector.model_name,
                 embedding_dimensions=vector.dimensions,
+                chunk_kind=chunk.kind,
+                search_text=chunk.search_text,
+                parent_index=chunk.parent_index,
             )
         )
     return tuple(rows)

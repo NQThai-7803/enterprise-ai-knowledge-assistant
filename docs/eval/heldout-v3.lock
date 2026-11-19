@@ -1,0 +1,9 @@
+{
+ "version": "heldout_v3",
+ "file": "docs/eval/heldout-v3.yaml",
+ "sha256": "436af6d4b4bed743c6bbe3293d5b655a29f186675f73d2b545e3daadcb6f79b9",
+ "frozen_at": "2026-11-18",
+ "items": 20,
+ "approved_by": "questions and gold written by a team member; frozen as received (DEC-030)",
+ "rule": "any edit needs v3.1 with a new lock"
+}

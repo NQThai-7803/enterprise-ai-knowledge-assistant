@@ -128,4 +128,5 @@ def _row_to_hit(row: KeywordRetrievalRow) -> KeywordRetrievalHit:
         end_page=row.end_page,
         token_count=row.token_count,
         keyword_rank=row.keyword_rank,
+        group_id=row.group_id,
     )

@@ -153,6 +153,7 @@ def create_extraction_router(settings: Settings | None = None) -> ExtractionRout
             max_pages=resolved_settings.pdf_max_pages,
             min_usable_characters=0,
             sort_text=resolved_settings.pdf_text_sort,
+            table_rows=resolved_settings.document_table_row_chunking_enabled,
         ),
         quality_evaluator=create_extraction_quality_evaluator(resolved_settings),
         ocr_provider=create_tesseract_ocr_provider(resolved_settings),
@@ -187,6 +188,7 @@ def _copy_page_with_metadata(
         width=page.width,
         height=page.height,
         warnings=page.warnings,
+        table_rows=page.table_rows,
     )
 
 

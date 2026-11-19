@@ -4,6 +4,7 @@ import hashlib
 from dataclasses import dataclass, field
 
 from app.document_processing.chunking.models import ChunkingResult, TextChunk
+from app.document_processing.chunking.table_rows import with_table_row_chunks
 from app.document_processing.chunking.text_units import (
     TextUnit,
     TextUnitKind,
@@ -62,7 +63,7 @@ class PageAwareTokenChunker:
                 raise ChunkingError(ChunkingFailureCode.EMPTY_EXTRACTION)
             drafts = self._assemble_units(units)
             drafts = self._merge_small_final_chunk(drafts)
-            return self._build_result(drafts)
+            return with_table_row_chunks(self._build_result(drafts), extraction, self._count)
         except ChunkingError:
             raise
         except Exception as exc:

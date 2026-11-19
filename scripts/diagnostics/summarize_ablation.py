@@ -32,7 +32,8 @@ def categories(kind: str, results: dict[str, Any]) -> dict[str, str]:
             continue
         answered = (case.get("grounding_status") or case.get("status")) == "ANSWERED"
         if kind == UAT:
-            if case["proxy_match"]:
+            # DEC-032: value-aware when graded so (grade_proxy, value_grading regrade)
+            if case.get("value_match", case["proxy_match"]):
                 category = "correct"
             elif case["reference_status"] == "ANSWERED" and not answered:
                 category = "false_refusal"
