@@ -12,6 +12,11 @@ name: Held-out v3.1 run
 # One job, two runs, the configurations interleaved (legacy, s3, legacy, s3) by ci_batch.sh. Writes
 # the counts, the DEC-035 verdict and the owner's tables (grading.md / grading.csv, labels empty).
 # The job summary and logs carry ids and counts only, never question, answer or source text.
+# DEC-039: the artifact holds only the lock, summary.md, verdict.json and, on a GitHub-hosted
+# runner, the age ciphertext of everything else (repository variable HELDOUT_AGE_RECIPIENT; the job
+# fails without it). On a self-hosted runner the full results go to HELDOUT_PRIVATE_DIR/<run id>
+# (default C:/dev/eaka-private/heldout-v3.1) and are not uploaded. The folder is scanned with the
+# question fingerprints before the upload.
 on:
   workflow_dispatch:
     inputs:
@@ -40,6 +45,7 @@ jobs:
     env:
       PROJECT: eaka-heldout-v3
       OUT: heldout-v3-out
+      PUBLIC: heldout-v3-public
       P3D_BACKEND_IMAGE: eaka-backend:ci-heldout-v3
       EVAL_BACKEND_IMAGE: eaka-backend:ci-heldout-v3
       EVAL_EXPECTED_RERANKER_MODE: lexical_fallback
@@ -84,6 +90,21 @@ jobs:
             python scripts/eval/heldout_v3_release.py gate
           else
             python scripts/eval/heldout_v3_release.py gate --no-pending
+          fi
+
+      - name: Check where the owner's full results go (DEC-039)
+        env:
+          RUNNER_KIND: ${{ runner.environment }}
+          HELDOUT_AGE_RECIPIENT: ${{ vars.HELDOUT_AGE_RECIPIENT }}
+        run: |
+          echo "runner: $RUNNER_KIND"
+          if [ "$RUNNER_KIND" = github-hosted ]; then
+            [[ "$HELDOUT_AGE_RECIPIENT" =~ ^age1[0-9a-z]{58}$ ]] || {
+              echo "set the repository variable HELDOUT_AGE_RECIPIENT to the owner's age public key"
+              exit 1
+            }
+            sudo apt-get update -qq && sudo apt-get install -y -qq age > /dev/null
+            age --version
           fi
 
       - name: Generate throwaway credentials
@@ -215,7 +236,6 @@ jobs:
         if: ${{ !inputs.preflight_only }}
         run: |
           python scripts/eval/heldout_v3_release.py grading "$OUT" "$OUT/grading"
-          cat "$OUT/grading/summary.md" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Collect logs
         if: always()
@@ -225,10 +245,28 @@ jobs:
           cp "$RUNNER_TEMP/ollama.log" "$OUT/" 2>/dev/null || true
           docker compose -p "$PROJECT" down -v || true
 
-      - name: Upload results
+      - name: Keep the full results private (DEC-039)
+        id: private
         if: always()
+        env:
+          RUNNER_KIND: ${{ runner.environment }}
+          HELDOUT_AGE_RECIPIENT: ${{ vars.HELDOUT_AGE_RECIPIENT }}
+          HELDOUT_PRIVATE_DIR: ${{ vars.HELDOUT_PRIVATE_DIR }}
+        run: >
+          bash scripts/eval/heldout_publish.sh heldout-v3.1 "$OUT" "$PUBLIC" "$GITHUB_RUN_ID"
+          docs/eval/heldout-v3.1.lock "$OUT/grading/summary.md" "$OUT/grading/verdict.json"
+
+      - name: Scan the public folder for question text (DEC-039)
+        id: scan
+        if: always() && steps.private.outcome == 'success'
+        run: |
+          python scripts/eval/question_leak.py scan "$PUBLIC"
+          if [ -f "$PUBLIC/summary.md" ]; then cat "$PUBLIC/summary.md" >> "$GITHUB_STEP_SUMMARY"; fi
+
+      - name: Upload the public folder (ids, counts, verdict, lock, ciphertext only)
+        if: always() && steps.private.outcome == 'success' && steps.scan.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: heldout-v3-${{ github.run_id }}
-          path: heldout-v3-out/
+          path: heldout-v3-public/
           retention-days: 90

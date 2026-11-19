@@ -1,5 +1,17 @@
 # Project Status
 
+## Held-out v3.1 final, private results (DEC-038/039) -- 2026-11-19
+
+- **Held-out v3.1:** final. HO3-08 is ACTIVE and HO3-11 is EXCLUDED, so 16 items will be asked.
+  `gate --no-pending` passes; the lock and the fingerprints were rebuilt.
+- **Artifacts (DEC-039):**
+  - They hold only ids, counts, the verdict, the lock and the age ciphertext.
+  - On a GitHub-hosted runner the job needs `HELDOUT_AGE_RECIPIENT`.
+  - A fingerprint scan runs before the upload.
+- **Leak clean-up:** the three old held-out v2 artifacts are deleted, and the v2 environment is restricted to `main`.
+- **UAT:** final owner pass rate 127/200 (63.5 %).
+- **Not dispatched.** The owner first sets `HELDOUT_AGE_RECIPIENT`.
+
 ## Owner follow-ups: deadline, approval gate, Q041 -- 2026-11-19
 
 - **HO3-08 and HO3-11:** the author has until the end of 2026-11-21. After that, they become EXCLUDED and the run uses 15 items.

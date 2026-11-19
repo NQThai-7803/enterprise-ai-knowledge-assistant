@@ -74,7 +74,7 @@ items:
   expected_answer: Khoảng 40–60 triệu (1,0–1,5 tháng lương); không được bảo đảm, phụ thuộc kết quả công ty và ngân sách.
   expected_sources: ND-HR-005 §07
   number: 8
-  status: PENDING_AUTHOR_REVIEW
+  status: ACTIVE
 - id: HO3-10
   group: B. Tính toán / suy luận số
   question: Mình đã qua thử việc, hóa đơn gym cả năm 3,6 triệu thì được hoàn bao nhiêu?
@@ -90,7 +90,7 @@ items:
   expected_answer: 3,6 triệu (trần 1,2 triệu/lần × 3, trong hạn mức 12 triệu/năm); cần chứng từ hợp lệ, đã qua thử việc, tùy điều khoản loại trừ.
   expected_sources: ND-HR-006 §03
   number: 11
-  status: PENDING_AUTHOR_REVIEW
+  status: EXCLUDED
 - id: HO3-12
   group: C. Kết hợp nhiều tài liệu
   question: Tháng sau mình cưới, được nghỉ mấy ngày và công ty hỗ trợ gì?

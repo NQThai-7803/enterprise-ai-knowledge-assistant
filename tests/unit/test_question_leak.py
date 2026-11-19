@@ -142,6 +142,23 @@ def test_check_exit_codes_for_a_hit_and_clean_diff(
     assert leak.main(["check"]) == 0
 
 
+def test_scan_fails_a_folder_holding_a_question_and_names_only_the_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(leak, "load_fingerprints", _payload)
+    (tmp_path / "summary.md").write_text("| legacy | run1 | 3 | 1 |\nT1 near_duplicate\n", "utf-8")
+    (tmp_path / "private-results.tar.gz.age").write_bytes(bytes(range(256)) * 64)
+    assert leak.main(["scan", str(tmp_path)]) == 0
+    (tmp_path / "grading").mkdir()
+    (tmp_path / "grading" / "grading.md").write_text(
+        "**Question**: Alpha beta gamma delta?\n", "utf-8"
+    )
+    assert leak.main(["scan", str(tmp_path)]) == 1
+    out = capsys.readouterr().out
+    assert "grading/grading.md:1: heldout T1" in out and "gamma" not in out
+    assert leak.main(["scan", str(tmp_path / "missing")]) == 2
+
+
 @pytest.mark.skipif(shutil.which("git") is None, reason="git is not installed")
 def test_added_lines_reads_real_diff_line_numbers(tmp_path: Path) -> None:
     def git(*args: str) -> None:
