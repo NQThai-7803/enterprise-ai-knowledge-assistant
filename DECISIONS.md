@@ -708,6 +708,10 @@ Set on 2026-11-19 from the owner's decisions on the DEC-030 findings. The gold i
 - **PENDING items:**
   - The workflow does not ask them and lists them as `excluded_pending`.
   - The owner clears one in a commit of its own that changes its `status` and rewrites `heldout-v3.1.lock`. That commit lands before the dispatch.
+- **Deadline (owner, 2026-11-19):** the author confirms HO3-08 and HO3-11 by the end of **2026-11-21**.
+  - Confirmed: a commit of its own sets the item ACTIVE (`python scripts/eval/heldout_v3.py set-status ACTIVE <id>`, which rewrites the lock and the fingerprints).
+  - Not confirmed by then: a commit of its own sets it **EXCLUDED** (`set-status EXCLUDED <id>`), and held-out v3.1 runs with the 15 items left. An EXCLUDED item is never asked and is listed under `not_run`.
+  - There is no "run first, complete later": a real run (`gate --no-pending`, and `run`) refuses while any item is still PENDING_AUTHOR_REVIEW. Only `preflight_only` may run before.
 - **Files:**
   - `docs/eval/heldout-v3.1.yaml` and `heldout-v3.1.lock`, sha256 047d0859….
   - `scripts/eval/question_fingerprints.json` rebuilt, with a `heldout_v3_1` source.

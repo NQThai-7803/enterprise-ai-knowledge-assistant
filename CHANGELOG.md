@@ -6,6 +6,16 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### Owner follow-ups (DEC-038 deadline, Q041) -- 2026-11-19
+
+- **Held-out tooling:**
+  - `heldout_v3.py set-status ACTIVE|EXCLUDED <ids>` resolves PENDING items and rewrites the lock and the fingerprints.
+  - `heldout_v3_release.py`: an EXCLUDED item goes to `not_run`. `run` and `gate --no-pending` refuse while an item is PENDING. The workflow's gate uses `--no-pending` unless `preflight_only` is set.
+- **Docs:**
+  - DEC-038: deadline 2026-11-21 for HO3-08 and HO3-11.
+  - UAT review: Q041 decided; pass rates updated.
+  - CONTRIBUTING and eaka-verify: stopped verify containers and networks are removed without asking.
+
 ### Held-out v3.1 (DEC-038) -- 2026-11-19
 
 - **Data:** `docs/eval/heldout-v3.1.yaml` + lock, derived by `heldout_v3.py derive-v3.1` (ids and counts only).

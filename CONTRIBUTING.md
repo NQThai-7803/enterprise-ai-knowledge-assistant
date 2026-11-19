@@ -25,6 +25,9 @@
     can disagree (PR #44: PyMuPDF 2.1 on CI, 1.28.2 in the image).
 - After each `eaka-verify` run, keep only the `eaka-backend:verify-<sha>` image of the newest head.
   Remove the older verify images; never remove volumes, Ollama models or the protected stacks.
+- Stopped `eaka-verify-*` containers and their `eaka-verify-*_testnet` networks are removed without
+  asking (owner, 2026-11-19). Still never removed: volumes, Ollama models, the verify image of the
+  newest head, and anything of V2, AUTH-02 or the original EAKA stack.
 
 ## Prohibited
 
