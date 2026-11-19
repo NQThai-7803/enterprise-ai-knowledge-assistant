@@ -722,6 +722,12 @@ Set on 2026-11-19 from the owner's decisions on the DEC-030 findings. The gold i
   - `scripts/eval/question_fingerprints.json` rebuilt, with a `heldout_v3_1` source.
   - The gate and the run of `heldout_v3_release.py` read v3.1.
 - **Owner's grading table:** each answer is flagged when it cites another document than the gold one with the gold's values, so the owner can apply DEC-037 policy 1. The automatic grade does not apply it.
+- **Run 44559765410 (2026-11-19): infrastructure failure, not counted.**
+  - In the step "Run held-out v3", `ci_batch.sh` printed `unknown set heldout_v3` and exited 2 at 16:02:28, before its first request. Its set whitelist lacked `heldout_v3`.
+  - Evidence: the public log shows that line before any request. The batch had not started yet, so no held-out question was asked: 0 asked.
+  - The run is not counted, and the owner may dispatch held-out v3.1 again.
+  - The owner does not decrypt this run's artifact.
+  - Preflight 44555016057 was green because it stops before `ci_batch.sh`. Since 2026-11-19, preflight and run both call `ci_batch.sh --validate-only` with the run's own arguments first.
 
 ## DEC-039 — Held-out results never public in plaintext; known exposure of the held-out sets
 
@@ -736,7 +742,13 @@ Set on 2026-11-19 by the owner, before the held-out v3.1 dispatch.
 - **Everything else is private:** run results, the owner's `grading.md` / `grading.csv`, stack logs and Ollama logs. `scripts/eval/heldout_publish.sh` handles them according to the runner type:
   - **GitHub-hosted** (both workflows today, `ubuntu-latest`): `tar | age -r "$HELDOUT_AGE_RECIPIENT"`, and only the ciphertext is uploaded. Without a valid recipient in the repository variable, the job fails at its start and again at the split. There is no plaintext fallback.
   - **Self-hosted:** the results are copied to `HELDOUT_PRIVATE_DIR/<run id>` and not uploaded. The default is `C:/dev/eaka-private/<name>/<run id>`.
-- **Scan before the upload:** `question_leak.py scan` checks every file of the public folder against all the question fingerprints. Any match fails the job. The upload runs only when both the split and the scan succeeded.
+- **Scan before the upload:** `question_leak.py scan` checks every file of the public folder against all the question fingerprints. Any match fails the job. The upload runs only when the scan succeeded.
+  - Until 2026-11-19 the upload also needed the split to succeed.
+  - Now a failed split still uploads the public folder: it is filled before the private part, so it then holds the text-free files only. Nothing private is uploaded in plaintext, and the job still fails.
+- **Run status (2026-11-19):** `summary.md` opens with the status block of `scripts/eval/heldout_status.py`, whether the job passed or failed. It gives:
+  - the status and whether the run was a preflight;
+  - the failing step and its exit code, recorded by an exit trap that every bash step sources through `BASH_ENV`;
+  - the questions sent to the API and the other API requests, counted from the uvicorn access log in the stack log. When the log holds no access line, it says "unknown", never 0.
 - **Job summary:** it gets `summary.md` only after the scan. The held-out v2 step that copied the first 40 lines of `grading.md` into it is removed.
 - **Step logs:** they print ids and counts only. I checked this in the code of the gate, the runners, `ci_batch.sh` (its compare output is ids and counts) and the grading step.
 - **Dry run** (2026-11-19, fake data, Linux container with age):

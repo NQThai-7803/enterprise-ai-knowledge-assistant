@@ -8,6 +8,17 @@
 3. **Embedding fine-tune** (`docs/design/embedding-finetune.md` and DEC-015 on branch `feat/embedding-finetune-infra`): infrastructure only so far; the baseline measurement and training come after FIX 3.
 4. The final held-out v2 measurement, once, after the choices above are made (DEC-012).
 
+## Held-out v3.1 batch set fix (DEC-038/039) -- 2026-11-19
+
+- **DONE:**
+  - `ci_batch.sh` accepts `heldout_v3` (registry `batch_sets.py`) and validates every batch first.
+  - The preflight validates with the run's own arguments.
+  - The failure status is written to the public summary.
+  - Actions are at v7.
+  - The HNSW xfails are stable.
+- **NOT COUNTED:** run 44559765410, 0 questions asked (DEC-038). The owner does not decrypt its artifact.
+- **WAITING FOR OWNER:** dispatch the preflight again, then the real run.
+
 ## Held-out v3.1 final, private results (DEC-038/039) -- 2026-11-19
 
 - **DONE:**
