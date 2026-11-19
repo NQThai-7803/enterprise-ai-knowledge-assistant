@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from scripts.eval import grade_proxy
 
 MANIFEST = {
@@ -61,4 +63,8 @@ def test_the_drafts_come_from_the_corpus_metadata(tmp_path: Path) -> None:
         "utf-8",
     )
     assert grade_proxy.draft_codes(manifest) == {"D1"}
-    assert "UAT-LEAVE-AUTHORITY-001" in grade_proxy.draft_codes()
+
+
+@pytest.mark.repo_layout("uat/corpus-v2/manifest.json")
+def test_the_corpus_marks_the_template_as_draft() -> None:
+    assert grade_proxy.draft_codes() == {"UAT-LEAVE-AUTHORITY-001"}
