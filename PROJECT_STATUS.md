@@ -1,5 +1,13 @@
 # Project Status
 
+## Held-out v3.1 ready (DEC-038) -- 2026-11-19
+
+- v3 → v3.1: 17 items, 15 to be asked.
+  - HO3-09/13/20 removed (source not in corpus V2).
+  - HO3-08 and HO3-11 pending author review.
+  - HO3-02/03/06/19 reported as near_duplicate.
+- Gold unchanged; v3 lock kept. Not dispatched.
+
 ## Owner's UAT review applied, grading policy (DEC-037) -- 2026-11-19
 
 - PR #43 merged into main (c92394a, CI green); eaka-verify on main: unit 1904, api-unit 51, api-integration 245, integration 408, llm-provider 3.
