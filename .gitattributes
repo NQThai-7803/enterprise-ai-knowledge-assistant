@@ -35,3 +35,5 @@ docs/eval/heldout-v3.lock text eol=lf
 eval-data/uat/reference-grade.json text eol=lf
 eval-data/uat/retrieval-gold.json text eol=lf
 eval-data/uat/gold.lock text eol=lf
+docs/eval/heldout-v3.1.yaml text eol=lf
+docs/eval/heldout-v3.1.lock text eol=lf

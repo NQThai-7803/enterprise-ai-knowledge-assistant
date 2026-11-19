@@ -5,6 +5,7 @@ Never runs the RAG system.
 usage (repo root, project venv):
   python scripts/eval/heldout_v3.py import <workbook.xlsx>   # writes heldout-v3.yaml and its lock
   python scripts/eval/heldout_v3.py check                     # writes heldout-v3-check.json
+  python scripts/eval/heldout_v3.py derive-v3.1               # writes heldout-v3.1.yaml + lock
 
 Held-out v3 was written by a member of the team, with its gold (DEC-030). It is never used to design
 a fix and is run only at the measurement milestone. Both commands print only ids, counts and flags,
@@ -333,14 +334,121 @@ def check() -> int:
     return 0
 
 
+# Held-out v3.1 (DEC-038, owner's decisions of 2026-11-18): v3 without the items whose source
+# document is not in corpus V2, with a value check on the items whose references were weak.
+HELDOUT_V31 = DOCS / "heldout-v3.1.yaml"
+LOCK_V31 = DOCS / "heldout-v3.1.lock"
+REMOVED = {"HO3-09", "HO3-13", "HO3-20"}
+VALUE_CHECKED = ("HO3-03", "HO3-05", "HO3-07", "HO3-08", "HO3-10", "HO3-11", "HO3-16", "HO3-17",
+                 "HO3-18")  # fmt: skip
+PENDING_BY_DEFAULT = {"HO3-08", "HO3-11"}
+NEAR_DUPLICATE = {"HO3-02": "UAT", "HO3-03": "UAT", "HO3-19": "UAT", "HO3-06": "rbac_dev"}
+PENDING = "PENDING_AUTHOR_REVIEW"
+
+
+def gold_values_found(item: Mapping[str, Any], docs: Mapping[str, str]) -> dict[str, Any]:
+    """Whether the cited documents are in the corpus, and how many of the expected answer's values
+    (numbers, times, dates, %) occur in their text. Counts only."""
+    from scripts.eval import value_grading
+
+    codes = sorted({code for code, _ in source_segments(item["expected_sources"])})
+    text = " ".join(docs[code] for code in codes if code in docs)
+    result = value_grading.check(text, item["expected_answer"])
+    total = len(result["required"])
+    return {
+        "in_corpus": bool(codes) and all(code in docs for code in codes),
+        "found": total - len(result["missing"]),
+        "total": total,
+    }
+
+
+def derive_v31(items: Sequence[Mapping[str, Any]], docs: Mapping[str, str]) -> tuple[list, dict]:
+    """The v3.1 items (gold fields untouched; `status` and `near_duplicate` added) and the value
+    check of VALUE_CHECKED."""
+    checks = {i["id"]: gold_values_found(i, docs) for i in items if i["id"] in VALUE_CHECKED}
+    out = []
+    for item in items:
+        if item["id"] in REMOVED:
+            continue
+        status = "ACTIVE"
+        if item["id"] in checks:
+            check_row = checks[item["id"]]
+            complete = check_row["found"] == check_row["total"]
+            if not complete or (item["id"] in PENDING_BY_DEFAULT and not check_row["total"]):
+                status = PENDING
+        new = {**item, "status": status}
+        if item["id"] in NEAR_DUPLICATE:
+            new["near_duplicate"] = NEAR_DUPLICATE[item["id"]]
+        out.append(new)
+    return out, checks
+
+
+def write_v31() -> int:
+    import yaml
+
+    items = verify_frozen()
+    pages, problems = heldout_check.load_pages()
+    if problems:
+        raise ValueError(f"corpus PDFs differ from the manifest: {problems}")
+    docs = {code: " ".join(texts) for code, texts in pages.items()}
+    v31, checks = derive_v31(items, docs)
+    v3_lock = json.loads(LOCK.read_text(encoding="utf-8"))
+    document = {
+        "version": "heldout_v3_1",
+        "derived_from": {"file": "docs/eval/heldout-v3.yaml", "sha256": v3_lock["sha256"]},
+        "rule": (
+            "DEC-038: v3 minus the items whose source document is not in corpus V2; questions "
+            "and gold word for word; status PENDING_AUTHOR_REVIEW items are not run until the "
+            "owner clears them in a commit of their own that updates this lock"
+        ),
+        "removed": sorted(REMOVED),
+        "items": v31,
+    }
+    text = yaml.safe_dump(document, allow_unicode=True, sort_keys=False, width=10**6)
+    reloaded = [
+        {k: v for k, v in i.items() if k not in ("status", "near_duplicate")}
+        for i in yaml.safe_load(text)["items"]
+    ]
+    if reloaded != [i for i in items if i["id"] not in REMOVED]:
+        raise ValueError("a gold field changed in v3.1")
+    HELDOUT_V31.write_text(text, encoding="utf-8", newline="\n")
+    lock = {
+        "version": "heldout_v3_1",
+        "file": "docs/eval/heldout-v3.1.yaml",
+        "sha256": hashlib.sha256(HELDOUT_V31.read_bytes()).hexdigest(),
+        "frozen_at": date.today().isoformat(),
+        "items": len(v31),
+        "approved_by": "owner's decisions of 2026-11-18 (DEC-038); gold unchanged from v3",
+        "rule": "clearing a PENDING item or any edit needs a commit of its own and a new lock",
+    }
+    LOCK_V31.write_text(json.dumps(lock, indent=1) + "\n", encoding="utf-8", newline="\n")
+    # Ids, counts and flags only.
+    print("ID | document in corpus | values found / total | status")
+    for item_id, row in sorted(checks.items()):
+        status = next(i["status"] for i in v31 if i["id"] == item_id)
+        corpus = "yes" if row["in_corpus"] else "no"
+        print(f"{item_id} | {corpus} | {row['found']}/{row['total']} | {status}")
+    counts = {s: sum(i["status"] == s for i in v31) for s in ("ACTIVE", PENDING)}
+    print(f"removed: {sorted(REMOVED)}; items: {len(v31)}; {counts}")
+    print(f"near_duplicate: {sorted(NEAR_DUPLICATE)}; lock sha256: {lock['sha256']}")
+    return 0
+
+
+def verify_v31() -> list[dict[str, Any]]:
+    return verify_frozen(HELDOUT_V31, LOCK_V31)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("import").add_argument("workbook", type=Path)
     sub.add_parser("check")
+    sub.add_parser("derive-v3.1")
     args = parser.parse_args(argv)
     sys.stdout.reconfigure(encoding="utf-8")
     try:
+        if args.command == "derive-v3.1":
+            return write_v31()
         return import_workbook(args.workbook) if args.command == "import" else check()
     except (FrozenSetChangedError, question_leak.QuestionSourceError, ValueError) as exc:
         print(f"REFUSED: {exc}", file=sys.stderr)

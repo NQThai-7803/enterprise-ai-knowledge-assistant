@@ -1,5 +1,5 @@
-"""Held-out v3 measurement tooling (DEC-035/036), on invented items only: no test reads
-docs/eval/heldout-v3.yaml."""
+"""Held-out v3.1 measurement tooling (DEC-035/036/038), on invented items only: no test reads
+the held-out files under docs/eval."""
 
 from __future__ import annotations
 
@@ -19,7 +19,11 @@ ITEMS = [
      "expected_answer": "Không có thông tin.", "expected_sources": "", "number": 2},
     {"id": "X-03", "group": "C", "question": "Câu cho phòng riêng?", "test_account": "Phòng X",
      "expected_answer": "3 ngày.", "expected_sources": "DOC-AA-001", "number": 3},
+    {"id": "X-04", "group": "D", "question": "Câu chờ tác giả?", "test_account": "Bất kỳ",
+     "expected_answer": "2 ngày.", "expected_sources": "DOC-AA-001", "number": 4,
+     "status": "PENDING_AUTHOR_REVIEW"},
 ]  # fmt: skip
+ITEMS[0]["near_duplicate"] = "UAT"
 CODES = {"d1": "DOC-AA-001", "d2": "UAT-GROUNDING-001"}
 
 
@@ -43,20 +47,21 @@ def _case(status: str, answer: str = "", docs: tuple[str, ...] = ()) -> dict:
 
 def test_the_gate_refuses_a_changed_file(tmp_path: Path) -> None:
     heldout, lock = _frozen(tmp_path)
-    assert len(release.gate(heldout, lock)["items"]) == 3
+    assert len(release.gate(heldout, lock)["items"]) == 4
     heldout.write_text(heldout.read_text("utf-8") + "\n# edited", "utf-8")
     with pytest.raises(release.GateRefusedError):
         release.gate(heldout, lock)
 
 
-def test_an_item_whose_account_maps_to_no_seeded_user_is_not_asked() -> None:
-    asked, not_run = release.plan(ITEMS)
+def test_pending_items_and_unseeded_accounts_are_not_asked() -> None:
+    asked, not_run, pending = release.plan(ITEMS)
     assert [(i["id"], i["role"]) for i in asked] == [("X-01", "staff"), ("X-02", "staff")]
     assert list(not_run) == ["X-03"]
+    assert pending == ["X-04"]
 
 
 def test_grading_needs_an_expected_document_and_the_values() -> None:
-    asked, _ = release.plan(ITEMS)
+    asked, _, _ = release.plan(ITEMS)
     item, refuse = asked
     right = release.grade_case(_case("ANSWERED", "Phí là 50.000 đ [1].", ("d1",)), item, CODES)
     value = release.grade_case(_case("ANSWERED", "Phí là 500.000 đ [1].", ("d1",)), item, CODES)
@@ -64,6 +69,10 @@ def test_grading_needs_an_expected_document_and_the_values() -> None:
     assert (right["expect"], right["passed"]) == ("answer", True)
     assert value["passed"] is False and value["values"]["missing"]
     assert other["passed"] is False and other["leak_reasons"] == ["cites UAT-GROUNDING-001"]
+    codes = {**CODES, "d3": "DOC-BB-002"}
+    same = release.grade_case(_case("ANSWERED", "Phí là 50.000 đ [1].", ("d3",)), item, codes)
+    assert same["passed"] is False and same["other_source_same_values"] is True  # owner's call
+    assert right["other_source_same_values"] is False
     refused = release.grade_case(_case("NO_ANSWER"), refuse, CODES)
     answered = release.grade_case(_case("ANSWERED", "Có [1].", ("d1",)), refuse, CODES)
     assert (refused["expect"], refused["passed"]) == ("refuse", True)
@@ -100,13 +109,14 @@ def test_the_verdict_follows_dec_035() -> None:
 
 
 def test_the_summary_carries_no_text_and_the_owner_tables_do(tmp_path: Path) -> None:
-    asked, not_run = release.plan(ITEMS)
+    asked, not_run, pending = release.plan(ITEMS)
     answers = {
         "X-01": _case("ANSWERED", "Phí là 50.000 đ [1].", ("d1",)),
         "X-02": _case("NO_ANSWER"),
     }
     results = {
         "not_run": not_run,
+        "excluded_pending": pending,
         "cases": [release.grade_case(answers[i["id"]], i, CODES) for i in asked],
     }
     runs = {
@@ -118,8 +128,12 @@ def test_the_summary_carries_no_text_and_the_owner_tables_do(tmp_path: Path) -> 
     for item in ITEMS:
         for field in ("question", "expected_answer"):
             assert item[field] not in summary
-    assert ITEMS[0]["question"] in md and "X-03" in summary
+    assert ITEMS[0]["question"] in md and "X-03" in summary and "X-04" in summary
+    assert ITEMS[3]["question"] not in md  # a PENDING item is not shown either
     assert {r["id"] for r in rows} == {"X-01", "X-02"} and all(r["label"] == "" for r in rows)
+    assert "| legacy | run1 | near_duplicate | 1 | 1 |" in summary
+    assert "| legacy | run1 | other | 1 | 1 |" in summary
+    assert {r["near_duplicate"] for r in rows} == {"UAT", ""}
 
 
 @pytest.mark.repo_layout(".github/workflows/heldout-v3.yml")
@@ -128,9 +142,9 @@ def test_the_workflow_is_gated_and_runs_both_configurations_twice() -> None:
     text = path.read_text(encoding="utf-8")
     job = yaml.safe_load(text)["jobs"]["heldout-v3"]
     assert job["environment"] == "heldout-v3-release"
-    assert "refs/heads/main" in text and "DEC-035 held-out v3 run approved by the owner" in text
+    assert "refs/heads/main" in text and "DEC-035 held-out v3.1 run approved by the owner" in text
     names = [step["name"] for step in job["steps"]]
-    assert names.index("Gate (held-out v3 matches its lock)") < names.index(
+    assert names.index("Gate (held-out v3.1 matches its lock)") < names.index(
         "Run held-out v3, two runs, both configurations interleaved"
     )
     assert 'ci_batch.sh heldout_v3 "$CONFIGS" 2' in text

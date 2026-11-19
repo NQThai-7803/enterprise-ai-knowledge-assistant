@@ -8,6 +8,16 @@
 3. **Embedding fine-tune** (`docs/design/embedding-finetune.md` and DEC-015 on branch `feat/embedding-finetune-infra`): infrastructure only so far; the baseline measurement and training come after FIX 3.
 4. The final held-out v2 measurement, once, after the choices above are made (DEC-012).
 
+## Held-out v3.1 (DEC-038) -- 2026-11-19
+
+- **DONE:**
+  - v3.1 derived: 3 items removed; HO3-08 and HO3-11 pending; 4 items tagged near_duplicate.
+  - Lock and fingerprints rebuilt.
+  - The workflow reads v3.1 and excludes pending items.
+- **WAITING FOR OWNER:** send **HO3-08** and **HO3-11** to their author (PENDING_AUTHOR_REVIEW: not every gold value was found in the cited documents).
+  - Clear each one in a commit of its own that updates `docs/eval/heldout-v3.1.lock`, before the dispatch.
+  - Then dispatch held-out v3.1 (DEC-035), after the approval gate (DEC-038 / phase 5).
+
 ## Owner's UAT review applied (DEC-037) -- 2026-11-19
 
 - **DONE:**

@@ -1,4 +1,4 @@
-name: Held-out v3 run
+name: Held-out v3.1 run
 
 # DEC-035 (updated by DEC-036): held-out v3 decides between `legacy` + qwen2.5:3b and
 # `s3` + qwen3.5-text:4b, both with RAG_DRAFT_DOCUMENT_POLICY=exclude (the default), and measures
@@ -6,7 +6,7 @@ name: Held-out v3 run
 #
 # Refuses to start unless: it runs on main; `confirm` is typed exactly; the job is approved in the
 # `heldout-v3-release` environment (add the owner as a required reviewer in the repository
-# settings); and scripts/eval/heldout_v3_release.py `gate` passes (heldout-v3.yaml matches its
+# settings); and scripts/eval/heldout_v3_release.py `gate` passes (heldout-v3.1.yaml matches its
 # lock). The owner decides the open DEC-030 findings before dispatching.
 #
 # One job, two runs, the configurations interleaved (legacy, s3, legacy, s3) by ci_batch.sh. Writes
@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: "Type exactly: DEC-035 held-out v3 run approved by the owner"
+        description: "Type exactly: DEC-035 held-out v3.1 run approved by the owner"
         type: string
         required: true
       preflight_only:
@@ -59,7 +59,7 @@ jobs:
           CONFIRM: ${{ inputs.confirm }}
         run: |
           [ "$GITHUB_REF" = refs/heads/main ] || { echo "held-out v3 runs only on main"; exit 1; }
-          [ "$CONFIRM" = "DEC-035 held-out v3 run approved by the owner" ] \
+          [ "$CONFIRM" = "DEC-035 held-out v3.1 run approved by the owner" ] \
             || { echo "confirm text does not match"; exit 1; }
 
       - name: Checkout repository
@@ -75,7 +75,7 @@ jobs:
       - name: Install runner dependencies
         run: python -m pip install -e ".[dev]"
 
-      - name: Gate (held-out v3 matches its lock)
+      - name: Gate (held-out v3.1 matches its lock)
         run: python scripts/eval/heldout_v3_release.py gate
 
       - name: Generate throwaway credentials

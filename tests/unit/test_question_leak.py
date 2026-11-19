@@ -180,3 +180,15 @@ def test_committed_fingerprints_cover_both_sets_without_plain_text() -> None:
             for hashes in items.values()
             for value in hashes
         )
+
+
+def test_stale_held_out_v3_1_lock_fails(tmp_path: Path) -> None:
+    payload = leak.build_payload(DEV, HELDOUT, "abc", heldout_v3_1=HELDOUT, lock_v3_1_sha256="v31")
+    path, lock = _files(tmp_path, payload)
+    lock_v31 = tmp_path / "lock_v31.json"
+    lock_v31.write_text(json.dumps({"sha256": "other"}), encoding="utf-8")
+    expected = {**EXPECTED, "heldout_v3_1": 1}
+    with pytest.raises(QuestionSourceError, match="held-out v3.1"):
+        leak.load_fingerprints(path, lock, expected, lock_v3_1=lock_v31)
+    lock_v31.write_text(json.dumps({"sha256": "v31"}), encoding="utf-8")
+    assert leak.load_fingerprints(path, lock, expected, lock_v3_1=lock_v31)

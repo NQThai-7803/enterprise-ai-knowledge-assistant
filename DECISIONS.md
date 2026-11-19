@@ -692,3 +692,24 @@ Set on 2026-11-18 by the owner, after reading the UAT list of 2026-11-17 (`docs/
 - **Check on the existing 18/11 UAT artifacts** (no new run): the regraded `s3` + `qwen3.5-text:4b` matches the owner on every decided item.
   - The grader gives 64-21-0-15 (A) and 62-24-0-14 (B).
   - Owner pass rate: 126/200, with 5 item-rounds undecided (Q041 A/B, Q044 A/B, Q053 A), so 63.0-65.5 %.
+
+## DEC-038 — Held-out v3 → v3.1
+
+Set on 2026-11-19 from the owner's decisions on the DEC-030 findings. The gold is not edited; v3 and its lock stay for reference.
+
+- **Removed (3):** HO3-09, HO3-13, HO3-20. Their source document is not in corpus V2, and no corpus is added.
+  - This also removes the only items whose test account had no seeded user.
+- **Value check** (`heldout_v3.py derive-v3.1`; ids and counts only): do the gold's values (numbers, times, dates, %) occur in the cited documents?
+  - Kept: HO3-03 1/1, HO3-05 2/2, HO3-07 2/2, HO3-10 1/1, HO3-16 4/4, HO3-17 5/5, HO3-18 1/1.
+  - **PENDING_AUTHOR_REVIEW:** HO3-08 2/4, HO3-11 3/4. Both were pending by default, and the script did not find all their values.
+  - All the cited documents are in the corpus.
+- **near_duplicate:** HO3-02, HO3-03, HO3-19 (near UAT) and HO3-06 (near RBAC dev). Reported as a separate group, as for held-out v2.
+- **Result:** 17 items. **15 will be asked**; 2 are pending. All 15 use a seeded account.
+- **PENDING items:**
+  - The workflow does not ask them and lists them as `excluded_pending`.
+  - The owner clears one in a commit of its own that changes its `status` and rewrites `heldout-v3.1.lock`. That commit lands before the dispatch.
+- **Files:**
+  - `docs/eval/heldout-v3.1.yaml` and `heldout-v3.1.lock`, sha256 047d0859….
+  - `scripts/eval/question_fingerprints.json` rebuilt, with a `heldout_v3_1` source.
+  - The gate and the run of `heldout_v3_release.py` read v3.1.
+- **Owner's grading table:** each answer is flagged when it cites another document than the gold one with the gold's values, so the owner can apply DEC-037 policy 1. The automatic grade does not apply it.

@@ -6,6 +6,17 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### Held-out v3.1 (DEC-038) -- 2026-11-19
+
+- **Data:** `docs/eval/heldout-v3.1.yaml` + lock, derived by `heldout_v3.py derive-v3.1` (ids and counts only).
+  - `status` PENDING_AUTHOR_REVIEW and `near_duplicate` fields; the gold is unchanged.
+  - Fingerprints rebuilt with `heldout_v3_1`.
+- **Grader and workflow:**
+  - `heldout_v3_release.py` and the workflow read v3.1;
+  - pending items are excluded (`excluded_pending`);
+  - counts are split near_duplicate / other;
+  - a same-value-other-source flag in the owner's tables.
+
 ### Owner's UAT review, grading policy (DEC-037) -- 2026-11-19
 
 - **Grader:** `accepted_sources` in the UAT reference; a cited DRAFT document fails, read from the corpus manifest metadata.
