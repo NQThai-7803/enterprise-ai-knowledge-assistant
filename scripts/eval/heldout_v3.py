@@ -343,6 +343,7 @@ VALUE_CHECKED = ("HO3-03", "HO3-05", "HO3-07", "HO3-08", "HO3-10", "HO3-11", "HO
                  "HO3-18")  # fmt: skip
 PENDING_BY_DEFAULT = {"HO3-08", "HO3-11"}
 NEAR_DUPLICATE = {"HO3-02": "UAT", "HO3-03": "UAT", "HO3-19": "UAT", "HO3-06": "rbac_dev"}
+ACTIVE = "ACTIVE"  # the only status a run asks
 PENDING = "PENDING_AUTHOR_REVIEW"
 EXCLUDED = "EXCLUDED"  # DEC-038: dropped by the owner (gold not confirmed against its source)
 

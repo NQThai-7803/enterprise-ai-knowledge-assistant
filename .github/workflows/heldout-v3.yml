@@ -16,7 +16,10 @@ name: Held-out v3.1 run
 # runner, the age ciphertext of everything else (repository variable HELDOUT_AGE_RECIPIENT; the job
 # fails without it). On a self-hosted runner the full results go to HELDOUT_PRIVATE_DIR/<run id>
 # (default C:/dev/eaka-private/heldout-v3.1) and are not uploaded. The folder is scanned with the
-# question fingerprints before the upload.
+# question fingerprints before the upload. summary.md opens with the run status (also on failure:
+# failing step, exit code, questions sent to the API).
+# Preflight and run both validate the batch first (`ci_batch.sh --validate-only`, same arguments):
+# run 44559765410 failed on "unknown set heldout_v3", which the old preflight never reached.
 on:
   workflow_dispatch:
     inputs:
@@ -25,7 +28,7 @@ on:
         type: string
         required: true
       preflight_only:
-        description: "Only build the stack and load the corpus; send no held-out question"
+        description: "Only validate the batch, build the stack and load the corpus; send no held-out question"
         type: boolean
         default: false
 
@@ -58,9 +61,29 @@ jobs:
       PYTHONIOENCODING: utf-8
       # The two configurations of DEC-035; exclude is the default of both (DEC-036).
       CONFIGS: "legacy;s3t:EVAL_SIMPLE_LEVEL=3,EVAL_LLM_MODEL=qwen3.5-text:4b"
+      # The validate step and the run step pass ci_batch.sh these same arguments.
+      BATCH_SET: heldout_v3
+      BATCH_RUNS: "2"
       LLM_TIMEOUT: "600"
     steps:
+      - name: Record the exit code of a failing step (DEC-039 run status)
+        id: trap
+        # Every later bash step sources this file (BASH_ENV); heldout_status.py reads its record.
+        run: |
+          cat > "$RUNNER_TEMP/step-exit.sh" <<'EOF'
+          if [ -z "${STEP_EXIT_TRAP:-}" ]; then
+            export STEP_EXIT_TRAP=1
+            trap 'rc=$?; [ "$rc" = 0 ] || echo "${GITHUB_ACTION:-unknown} $rc" >> "$RUNNER_TEMP/failed-steps.txt"' EXIT
+          fi
+          EOF
+          echo "BASH_ENV=$RUNNER_TEMP/step-exit.sh" >> "$GITHUB_ENV"
+
+      - name: Checkout repository
+        id: checkout
+        uses: actions/checkout@v7
+
       - name: Refuse anything but a confirmed run on main
+        id: refuse
         env:
           CONFIRM: ${{ inputs.confirm }}
         run: |
@@ -68,20 +91,20 @@ jobs:
           [ "$CONFIRM" = "DEC-035 held-out v3.1 run approved by the owner" ] \
             || { echo "confirm text does not match"; exit 1; }
 
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
       - name: Setup Python 3.12
-        uses: actions/setup-python@v5
+        id: python
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: pyproject.toml
 
       - name: Install runner dependencies
+        id: deps
         run: python -m pip install -e ".[dev]"
 
       - name: Gate (held-out v3.1 matches its lock)
+        id: gate
         # DEC-038: a real run refuses while an item is still PENDING_AUTHOR_REVIEW.
         env:
           PREFLIGHT: ${{ inputs.preflight_only }}
@@ -93,6 +116,7 @@ jobs:
           fi
 
       - name: Check where the owner's full results go (DEC-039)
+        id: keycheck
         env:
           RUNNER_KIND: ${{ runner.environment }}
           HELDOUT_AGE_RECIPIENT: ${{ vars.HELDOUT_AGE_RECIPIENT }}
@@ -108,6 +132,7 @@ jobs:
           fi
 
       - name: Generate throwaway credentials
+        id: credentials
         run: |
           for name in SECRET_KEY POSTGRES_PASSWORD UAT_ADMIN_PASSWORD UAT_MANAGER_PASSWORD UAT_STAFF_PASSWORD EVAL_PASSWORD_OPS; do
             value="Ci$(openssl rand -hex 16)!"
@@ -116,6 +141,7 @@ jobs:
           done
 
       - name: Write the app environment file
+        id: envfile
         # As eval.yml; the RAG flags stay at the application defaults unless a configuration sets them.
         run: |
           cat > .env <<EOF
@@ -165,7 +191,16 @@ jobs:
           echo "EVAL_PASSWORD_STAFF=${UAT_STAFF_PASSWORD}" >> "$GITHUB_ENV"
           echo "EVAL_HTTP_TIMEOUT_SECONDS=$(( LLM_TIMEOUT * 4 ))" >> "$GITHUB_ENV"
 
+      - name: Validate the batch (same set, configurations and runs as the run step)
+        id: validate
+        # Preflight and real run alike: the set, its ACTIVE questions and their accounts, the
+        # configurations; no API, no model. Prints ids and counts only.
+        env:
+          HELDOUT_V3_APPROVED: "1"
+        run: bash scripts/eval/ci_batch.sh --validate-only "$BATCH_SET" "$CONFIGS" "$BATCH_RUNS" "$OUT"
+
       - name: Install Ollama, pull qwen2.5:3b, build qwen3.5-text:4b
+        id: ollama
         run: |
           set -euo pipefail
           if ! { curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors \
@@ -193,9 +228,11 @@ jobs:
           { ollama --version; nproc; free -m; df -h /; ollama list; } > "$OUT/ollama-config.txt"
 
       - name: Build the backend image
+        id: image
         run: docker build -t "$P3D_BACKEND_IMAGE" --label eaka.commit="${GITHUB_SHA::7}" .
 
       - name: Start the eval stack
+        id: stack
         run: |
           set -euo pipefail
           cat > ci-host.yaml <<'EOF'
@@ -217,11 +254,13 @@ jobs:
           docker inspect "$PROJECT-api-1" --format '{{.State.Health.Status}}' | grep -q healthy
 
       - name: Load corpus V2 (the template marked DRAFT, DEC-033)
+        id: corpus
         run: >
           python scripts/eval/bootstrap_corpus_v2.py . http://127.0.0.1:18190
           "$OUT/runtime-manifest.json"
 
       - name: Run held-out v3, two runs, both configurations interleaved
+        id: batch
         if: ${{ !inputs.preflight_only }}
         env:
           HELDOUT_V3_APPROVED: "1"
@@ -230,20 +269,37 @@ jobs:
           echo "commit=${GITHUB_SHA}" > "$OUT/commit.txt"
           ( while true; do free -m | awk 'NR==2 {print strftime("%T"), $3, $7}'; sleep 30; done ) \
             > "$OUT/memory.log" &
-          bash scripts/eval/ci_batch.sh heldout_v3 "$CONFIGS" 2 "$OUT"
+          bash scripts/eval/ci_batch.sh "$BATCH_SET" "$CONFIGS" "$BATCH_RUNS" "$OUT"
 
       - name: Grade (counts, DEC-035 verdict, owner's tables)
+        id: grade
         if: ${{ !inputs.preflight_only }}
         run: |
           python scripts/eval/heldout_v3_release.py grading "$OUT" "$OUT/grading"
 
       - name: Collect logs
+        id: logs
         if: always()
         run: |
           mkdir -p "$OUT"
           docker compose -p "$PROJECT" logs --no-color api worker > "$OUT/stack.log" 2>&1 || true
           cp "$RUNNER_TEMP/ollama.log" "$OUT/" 2>/dev/null || true
           docker compose -p "$PROJECT" down -v || true
+
+      - name: Write the run status (DEC-039)
+        id: status
+        # Heads the public summary.md, also when the job failed: status, failing step, exit code,
+        # questions sent to the API. python3: Python may not have been set up yet.
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+          PREFLIGHT: ${{ inputs.preflight_only }}
+          STEPS_JSON: ${{ toJSON(steps) }}
+        run: >
+          python3 scripts/eval/heldout_status.py --workflow .github/workflows/heldout-v3.yml
+          --job-status "$JOB_STATUS" --preflight "$PREFLIGHT"
+          --failed-steps "$RUNNER_TEMP/failed-steps.txt" --stack-log "$OUT/stack.log"
+          --summary "$OUT/grading/summary.md" --output "$OUT/status/summary.md"
 
       - name: Keep the full results private (DEC-039)
         id: private
@@ -254,18 +310,19 @@ jobs:
           HELDOUT_PRIVATE_DIR: ${{ vars.HELDOUT_PRIVATE_DIR }}
         run: >
           bash scripts/eval/heldout_publish.sh heldout-v3.1 "$OUT" "$PUBLIC" "$GITHUB_RUN_ID"
-          docs/eval/heldout-v3.1.lock "$OUT/grading/summary.md" "$OUT/grading/verdict.json"
+          docs/eval/heldout-v3.1.lock "$OUT/status/summary.md" "$OUT/grading/verdict.json"
 
       - name: Scan the public folder for question text (DEC-039)
         id: scan
-        if: always() && steps.private.outcome == 'success'
+        # Also after a failed split: the public folder then holds the text-free files only.
+        if: always()
         run: |
-          python scripts/eval/question_leak.py scan "$PUBLIC"
+          python3 scripts/eval/question_leak.py scan "$PUBLIC"
           if [ -f "$PUBLIC/summary.md" ]; then cat "$PUBLIC/summary.md" >> "$GITHUB_STEP_SUMMARY"; fi
 
       - name: Upload the public folder (ids, counts, verdict, lock, ciphertext only)
-        if: always() && steps.private.outcome == 'success' && steps.scan.outcome == 'success'
-        uses: actions/upload-artifact@v4
+        if: always() && steps.scan.outcome == 'success'
+        uses: actions/upload-artifact@v7
         with:
           name: heldout-v3-${{ github.run_id }}
           path: heldout-v3-public/

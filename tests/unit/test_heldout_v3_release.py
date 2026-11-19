@@ -14,11 +14,14 @@ from scripts.eval import heldout_v3_release as release
 
 ITEMS = [
     {"id": "X-01", "group": "A", "question": "Phí làm thẻ là bao nhiêu?", "test_account": "Bất kỳ",
-     "expected_answer": "Phí là 50.000 đồng.", "expected_sources": "DOC-AA-001 mục 2", "number": 1},
+     "expected_answer": "Phí là 50.000 đồng.", "expected_sources": "DOC-AA-001 mục 2", "number": 1,
+     "status": "ACTIVE"},
     {"id": "X-02", "group": "B", "question": "Ai duyệt bí mật?", "test_account": "Bất kỳ",
-     "expected_answer": "Không có thông tin.", "expected_sources": "", "number": 2},
+     "expected_answer": "Không có thông tin.", "expected_sources": "", "number": 2,
+     "status": "ACTIVE"},
     {"id": "X-03", "group": "C", "question": "Câu cho phòng riêng?", "test_account": "Phòng X",
-     "expected_answer": "3 ngày.", "expected_sources": "DOC-AA-001", "number": 3},
+     "expected_answer": "3 ngày.", "expected_sources": "DOC-AA-001", "number": 3,
+     "status": "ACTIVE"},
     {"id": "X-04", "group": "D", "question": "Câu chờ tác giả?", "test_account": "Bất kỳ",
      "expected_answer": "2 ngày.", "expected_sources": "DOC-AA-001", "number": 4,
      "status": "PENDING_AUTHOR_REVIEW"},
@@ -60,6 +63,8 @@ def test_pending_items_and_unseeded_accounts_are_not_asked() -> None:
     assert pending == ["X-04"]
     asked, not_run, pending = release.plan([{**ITEMS[1], "id": "X-05", "status": "EXCLUDED"}])
     assert (asked, pending) == ([], []) and not_run["X-05"].startswith("EXCLUDED")
+    asked, not_run, _ = release.plan([{**ITEMS[1], "id": "X-06", "status": "DRAFT"}])
+    assert asked == [] and "not ACTIVE" in not_run["X-06"]  # only ACTIVE items are asked
 
 
 def test_a_real_run_refuses_while_an_item_is_pending(tmp_path: Path, monkeypatch) -> None:
@@ -160,6 +165,7 @@ def test_the_workflow_is_gated_and_runs_both_configurations_twice() -> None:
     assert names.index("Gate (held-out v3.1 matches its lock)") < names.index(
         "Run held-out v3, two runs, both configurations interleaved"
     )
-    assert 'ci_batch.sh heldout_v3 "$CONFIGS" 2' in text
+    assert (job["env"]["BATCH_SET"], job["env"]["BATCH_RUNS"]) == ("heldout_v3", "2")
+    assert 'ci_batch.sh "$BATCH_SET" "$CONFIGS" "$BATCH_RUNS"' in text
     assert "heldout_v3_release.py gate --no-pending" in text  # DEC-038
     assert job["env"]["CONFIGS"].startswith(release.BASELINE + ";" + release.CANDIDATE + ":")
