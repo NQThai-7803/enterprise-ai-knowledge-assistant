@@ -9,7 +9,9 @@ usage (inside that workflow):
 - gate refuses unless docs/eval/heldout-v3.1.yaml matches its lock (DEC-038).
 - run asks the items of one configuration once, through ci_batch.sh, which interleaves the two
   configurations over two runs. An item with status PENDING_AUTHOR_REVIEW is not asked and is
-  listed under excluded_pending; one whose test account maps to no seeded user, under not_run.
+  listed under excluded_pending; one with status EXCLUDED, or whose test account maps to no seeded
+  user, under not_run. `run`, and `gate --no-pending`, refuse while an item is still
+  PENDING_AUTHOR_REVIEW (DEC-038: no "run first, complete later").
 - An item expects a refusal when its expected sources name no document code. Otherwise it expects
   an answer that cites one of those documents and states the values of the expected answer with no
   conflicting one (value-aware grading, DEC-032).
@@ -73,6 +75,9 @@ def plan(
     for item in items:
         if item.get("status") == heldout_v3.PENDING:
             pending.append(item["id"])
+            continue
+        if item.get("status") == heldout_v3.EXCLUDED:
+            not_run[item["id"]] = "EXCLUDED: not confirmed by its author by 2026-11-21 (DEC-038)"
             continue
         email = heldout_v3.ACCOUNTS.get(str(item["test_account"]).strip())
         if email is None:
@@ -315,7 +320,9 @@ def _password_roles(items: Sequence[Mapping[str, Any]]) -> dict[str, str]:
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("gate")
+    sub.add_parser("gate").add_argument(
+        "--no-pending", action="store_true", help="refuse while an item is PENDING (DEC-038)"
+    )
     runner = sub.add_parser("run")
     reranker_check.add_arguments(runner)
     runner.add_argument("--manifest", type=Path, required=True)
@@ -326,6 +333,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(argv)
     try:
         lock = gate()
+        pending_ids = [i["id"] for i in lock["items"] if i.get("status") == heldout_v3.PENDING]
+        if pending_ids and (args.command == "run" or getattr(args, "no_pending", False)):
+            raise GateRefusedError(
+                f"still {heldout_v3.PENDING}: {', '.join(pending_ids)}; resolve them first "
+                "with heldout_v3.py set-status (DEC-038)"
+            )
         if args.command == "gate":
             print(f"held-out v3.1 frozen: {len(lock['items'])} items, sha256 {lock['sha256']}")
             return 0

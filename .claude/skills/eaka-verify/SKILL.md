@@ -14,13 +14,13 @@ description: Use before reporting any EAKA task as done, and when running or re-
 
 - V2, AUTH-02, stack EAKA gốc.
 - **Không bao giờ `docker compose down -v`** trên các stack này.
-- Trước khi xóa bất kỳ volume/container nào → liệt kê và **hỏi người dùng**.
+- Trước khi xóa bất kỳ volume nào, hay container nào không phải `eaka-verify-*` đã dừng → liệt kê và **hỏi người dùng**.
 
 ## Hạ tầng tạm cho test
 
 - `scripts/test/compose.integration.yaml` dựng pgvector và Redis tạm trên mạng riêng, không publish cổng, dữ liệu nằm trên tmpfs.
 - Đặt tên project có tiền tố riêng (ví dụ `eaka-verify-`) để dọn đúng thứ mình tạo.
-- Sau khi xong: dừng container tạm, liệt kê anonymous volume do mình tạo, **hỏi** rồi mới xóa.
+- Sau khi xong: dừng container tạm rồi xóa luôn container `eaka-verify-*` đã dừng và mạng `eaka-verify-*_testnet`, không cần hỏi (owner, 2026-11-19). Volume thì liệt kê, **hỏi** rồi mới xóa.
 
 ## Quy trình
 
@@ -45,7 +45,7 @@ description: Use before reporting any EAKA task as done, and when running or re-
    | `real-logic` | lỗi logic thật trong code |
    | `host-only-file` | test phụ thuộc file chỉ có trên host, không có trong image |
 
-7. Dọn hạ tầng tạm (hỏi trước khi xóa volume). Chỉ giữ image `eaka-backend:verify-<sha>` của HEAD mới nhất; xóa các image verify cũ hơn (owner, 2026-11-19).
+7. Dọn hạ tầng tạm: xóa container `eaka-verify-*` đã dừng và mạng của chúng không cần hỏi; hỏi trước khi xóa volume; không bao giờ xóa model Ollama. Chỉ giữ image `eaka-backend:verify-<sha>` của HEAD mới nhất; xóa các image verify cũ hơn (owner, 2026-11-19).
 8. **CI của PR** (owner, 2026-11-19): trước khi báo "đã verify" hoặc merge, chạy `gh pr checks <PR>` trên HEAD mới nhất và ghi trạng thái vào báo cáo. eaka-verify xanh mà CI đỏ thì vẫn là **ĐỎ** (CI cài từ `pyproject.toml`, image từ `requirements.lock`). Xem `CONTRIBUTING.md`.
 
 ## Báo cáo

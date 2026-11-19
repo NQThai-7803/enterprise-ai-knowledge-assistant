@@ -58,6 +58,19 @@ def test_pending_items_and_unseeded_accounts_are_not_asked() -> None:
     assert [(i["id"], i["role"]) for i in asked] == [("X-01", "staff"), ("X-02", "staff")]
     assert list(not_run) == ["X-03"]
     assert pending == ["X-04"]
+    asked, not_run, pending = release.plan([{**ITEMS[1], "id": "X-05", "status": "EXCLUDED"}])
+    assert (asked, pending) == ([], []) and not_run["X-05"].startswith("EXCLUDED")
+
+
+def test_a_real_run_refuses_while_an_item_is_pending(tmp_path: Path, monkeypatch) -> None:
+    heldout, lock = _frozen(tmp_path)  # X-04 is PENDING_AUTHOR_REVIEW
+    real_gate = release.gate
+    monkeypatch.setattr(release, "gate", lambda: real_gate(heldout, lock))
+    assert release.main(["gate"]) == 0  # the preflight may still build the stack
+    assert release.main(["gate", "--no-pending"]) == 2
+    out = ["--manifest", str(tmp_path / "m.json"), "--output", str(tmp_path / "o.json")]
+    assert release.main(["run", *out]) == 2
+    assert not (tmp_path / "o.json").exists()
 
 
 def test_grading_needs_an_expected_document_and_the_values() -> None:
@@ -148,4 +161,5 @@ def test_the_workflow_is_gated_and_runs_both_configurations_twice() -> None:
         "Run held-out v3, two runs, both configurations interleaved"
     )
     assert 'ci_batch.sh heldout_v3 "$CONFIGS" 2' in text
+    assert "heldout_v3_release.py gate --no-pending" in text  # DEC-038
     assert job["env"]["CONFIGS"].startswith(release.BASELINE + ";" + release.CANDIDATE + ":")
