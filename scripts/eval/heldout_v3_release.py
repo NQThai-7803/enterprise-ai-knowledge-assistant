@@ -9,9 +9,9 @@ usage (inside that workflow):
 - gate refuses unless docs/eval/heldout-v3.1.yaml matches its lock (DEC-038).
 - run asks the items of one configuration once, through ci_batch.sh, which interleaves the two
   configurations over two runs. An item with status PENDING_AUTHOR_REVIEW is not asked and is
-  listed under excluded_pending; one with status EXCLUDED, or whose test account maps to no seeded
-  user, under not_run. `run`, and `gate --no-pending`, refuse while an item is still
-  PENDING_AUTHOR_REVIEW (DEC-038: no "run first, complete later").
+  listed under excluded_pending; one with status EXCLUDED (or any status but ACTIVE), or whose test
+  account maps to no seeded user, under not_run. `run`, and `gate --no-pending`, refuse while an
+  item is still PENDING_AUTHOR_REVIEW (DEC-038: no "run first, complete later").
 - An item expects a refusal when its expected sources name no document code. Otherwise it expects
   an answer that cites one of those documents and states the values of the expected answer with no
   conflicting one (value-aware grading, DEC-032).
@@ -78,6 +78,9 @@ def plan(
             continue
         if item.get("status") == heldout_v3.EXCLUDED:
             not_run[item["id"]] = "EXCLUDED by the owner (DEC-038)"
+            continue
+        if item.get("status") != heldout_v3.ACTIVE:
+            not_run[item["id"]] = f"status {item.get('status')}, not {heldout_v3.ACTIVE}"
             continue
         email = heldout_v3.ACCOUNTS.get(str(item["test_account"]).strip())
         if email is None:

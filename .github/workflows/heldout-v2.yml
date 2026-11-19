@@ -55,7 +55,24 @@ jobs:
       RAG_ACCEPTANCE_BASE_URL: http://127.0.0.1:18190
       PYTHONIOENCODING: utf-8
     steps:
+      - name: Record the exit code of a failing step (DEC-039 run status)
+        id: trap
+        # Every later bash step sources this file (BASH_ENV); heldout_status.py reads its record.
+        run: |
+          cat > "$RUNNER_TEMP/step-exit.sh" <<'EOF'
+          if [ -z "${STEP_EXIT_TRAP:-}" ]; then
+            export STEP_EXIT_TRAP=1
+            trap 'rc=$?; [ "$rc" = 0 ] || echo "${GITHUB_ACTION:-unknown} $rc" >> "$RUNNER_TEMP/failed-steps.txt"' EXIT
+          fi
+          EOF
+          echo "BASH_ENV=$RUNNER_TEMP/step-exit.sh" >> "$GITHUB_ENV"
+
+      - name: Checkout repository
+        id: checkout
+        uses: actions/checkout@v7
+
       - name: Refuse anything but a confirmed run on main
+        id: refuse
         env:
           CONFIRM: ${{ inputs.confirm }}
         run: |
@@ -63,23 +80,24 @@ jobs:
           [ "$CONFIRM" = "DEC-012 release run approved by the owner" ] \
             || { echo "confirm text does not match"; exit 1; }
 
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
       - name: Setup Python 3.12
-        uses: actions/setup-python@v5
+        id: python
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
           cache-dependency-path: pyproject.toml
 
       - name: Install runner dependencies
+        id: deps
         run: python -m pip install -e ".[dev]"
 
       - name: Gate (frozen questions, approved and locked gold)
+        id: gate
         run: python scripts/eval/heldout_v2_release.py gate
 
       - name: Check where the owner's full results go (DEC-039)
+        id: keycheck
         env:
           RUNNER_KIND: ${{ runner.environment }}
           HELDOUT_AGE_RECIPIENT: ${{ vars.HELDOUT_AGE_RECIPIENT }}
@@ -95,6 +113,7 @@ jobs:
           fi
 
       - name: Generate throwaway credentials
+        id: credentials
         run: |
           for name in SECRET_KEY POSTGRES_PASSWORD UAT_ADMIN_PASSWORD UAT_MANAGER_PASSWORD UAT_STAFF_PASSWORD EVAL_PASSWORD_OPS; do
             value="Ci$(openssl rand -hex 16)!"
@@ -103,6 +122,7 @@ jobs:
           done
 
       - name: Write the app environment file
+        id: envfile
         # Same file as eval.yml; every RAG flag is left at the application default.
         run: |
           cat > .env <<EOF
@@ -152,6 +172,7 @@ jobs:
           echo "EVAL_PASSWORD_STAFF=${UAT_STAFF_PASSWORD}" >> "$GITHUB_ENV"
 
       - name: Install Ollama and pull the model
+        id: ollama
         run: |
           set -euo pipefail
           if ! { curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors \
@@ -178,9 +199,11 @@ jobs:
           { ollama --version; nproc; free -m; } > "$OUT/ollama-config.txt"
 
       - name: Build the backend image
+        id: image
         run: docker build -t "$P3D_BACKEND_IMAGE" --label eaka.commit="${GITHUB_SHA::7}" .
 
       - name: Start the eval stack
+        id: stack
         run: |
           set -euo pipefail
           cat > ci-host.yaml <<'EOF'
@@ -202,6 +225,7 @@ jobs:
           docker inspect "$PROJECT-api-1" --format '{{.State.Health.Status}}' | grep -q healthy
 
       - name: Preflight (sends no held-out question)
+        id: preflight
         # The run's own checks, before the corpus load and the first question: gate, reranker
         # mode, Ollama version and backend (DEC-014), one login per role.
         run: |
@@ -209,12 +233,14 @@ jobs:
           python scripts/eval/heldout_v2_release.py preflight 2>&1 | tee "$OUT/preflight.log"
 
       - name: Load corpus V2
+        id: corpus
         if: ${{ !inputs.preflight_only }}
         run: >
           python scripts/eval/bootstrap_corpus_v2.py . http://127.0.0.1:18190
           "$OUT/runtime-manifest.json"
 
       - name: Run held-out v2 twice
+        id: batch
         if: ${{ !inputs.preflight_only }}
         run: |
           set -euo pipefail
@@ -233,22 +259,40 @@ jobs:
           done
 
       - name: Group by nearness to UAT (e5)
+        id: near_uat
         if: ${{ !inputs.preflight_only }}
         run: python scripts/eval/heldout_v2_release.py near-uat --output "$OUT/near-uat.json"
 
       - name: Write the owner's grading sheet (no labels)
+        id: grade
         if: ${{ !inputs.preflight_only }}
         run: |
           python scripts/eval/heldout_v2_release.py grading "$OUT/run1" "$OUT/run2" "$OUT/grading" \
             --stack-manifest "$OUT/runtime-manifest.json" --near-uat "$OUT/near-uat.json"
 
       - name: Collect logs
+        id: logs
         if: always()
         run: |
           mkdir -p "$OUT"
           docker compose -p "$PROJECT" logs --no-color api worker > "$OUT/stack.log" 2>&1 || true
           cp "$RUNNER_TEMP/ollama.log" "$OUT/" 2>/dev/null || true
           docker compose -p "$PROJECT" down -v || true
+
+      - name: Write the run status (DEC-039)
+        id: status
+        # Heads the public summary.md, also when the job failed: status, failing step, exit code,
+        # questions sent to the API. python3: Python may not have been set up yet.
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+          PREFLIGHT: ${{ inputs.preflight_only }}
+          STEPS_JSON: ${{ toJSON(steps) }}
+        run: >
+          python3 scripts/eval/heldout_status.py --workflow .github/workflows/heldout-v2.yml
+          --job-status "$JOB_STATUS" --preflight "$PREFLIGHT"
+          --failed-steps "$RUNNER_TEMP/failed-steps.txt" --stack-log "$OUT/stack.log"
+          --output "$OUT/status/summary.md"
 
       - name: Keep the full results private (DEC-039)
         id: private
@@ -259,18 +303,19 @@ jobs:
           HELDOUT_PRIVATE_DIR: ${{ vars.HELDOUT_PRIVATE_DIR }}
         run: >
           bash scripts/eval/heldout_publish.sh heldout-v2 "$OUT" "$PUBLIC" "$GITHUB_RUN_ID"
-          docs/eval/heldout-v2-questions.lock docs/eval/heldout-v2-gold.lock
+          docs/eval/heldout-v2-questions.lock docs/eval/heldout-v2-gold.lock "$OUT/status/summary.md"
 
       - name: Scan the public folder for question text (DEC-039)
         id: scan
-        if: always() && steps.private.outcome == 'success'
+        # Also after a failed split: the public folder then holds the text-free files only.
+        if: always()
         run: |
-          python scripts/eval/question_leak.py scan "$PUBLIC"
+          python3 scripts/eval/question_leak.py scan "$PUBLIC"
           if [ -f "$PUBLIC/summary.md" ]; then cat "$PUBLIC/summary.md" >> "$GITHUB_STEP_SUMMARY"; fi
 
       - name: Upload the public folder (ids, counts, verdict, lock, ciphertext only)
-        if: always() && steps.private.outcome == 'success' && steps.scan.outcome == 'success'
-        uses: actions/upload-artifact@v4
+        if: always() && steps.scan.outcome == 'success'
+        uses: actions/upload-artifact@v7
         with:
           name: heldout-v2-${{ github.run_id }}
           path: heldout-v2-public/

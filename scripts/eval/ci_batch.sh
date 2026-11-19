@@ -4,24 +4,22 @@
 # (run 1 of every configuration, then run 2), and each later configuration is compared with
 # the first one.
 #
-#   bash scripts/eval/ci_batch.sh <set> "<configs>" <runs> <out> [case ids...]
+#   bash scripts/eval/ci_batch.sh [--validate-only] <set> "<configs>" <runs> <out> [case ids...]
 #
-# set:     uat | rbac | relevance | false_refusal | false_refusal_v2 | compound | natural
+# --validate-only: resolve the set, parse the configurations, count the questions and check the
+#          eval accounts they need, then stop: no stack, no API, no model. Every run does it first.
+# set:     a name of scripts/eval/batch_sets.py: uat | rbac | relevance | false_refusal |
+#          false_refusal_v2 | compound | natural | heldout_v3 (only from heldout-v3.yml)
 # configs: ";"-separated "name" or "name:EVAL_VAR=value,EVAL_VAR=value", first one is the baseline,
 #          e.g. "base; f303:EVAL_SHORT_ANSWER_QUESTION_TERMS=true". EVAL_* variables are read by
 #          scripts/eval/compose.uat-eval.yaml; EVAL_UAT_UNACCENTED=1 asks UAT without diacritics.
 # Needs: the eval stack started by the workflow (PROJECT, FILES), Ollama with EVAL_OLLAMA_LOG.
 set -uo pipefail
+VALIDATE_ONLY=""; [ "${1:-}" = --validate-only ] && { VALIDATE_ONLY=1; shift; }
 SET="$1"; CONFIGS="$2"; RUNS="$3"; OUT="$4"; shift 4
 # Held-out v3 (DEC-035) runs only from the gated .github/workflows/heldout-v3.yml.
 [ "$SET" != heldout_v3 ] || [ "${HELDOUT_V3_APPROVED:-}" = 1 ]   || { echo "heldout_v3 runs only from heldout-v3.yml after its gate"; exit 2; }
 CASE_IDS=("$@")
-: "${PROJECT:?}" "${EVAL_OLLAMA_LOG:?}"
-read -r -a FILES <<< "${COMPOSE_FILES:?space-separated -f arguments}"
-API=http://127.0.0.1:18190
-mkdir -p "$OUT"
-
-case "$SET" in uat|rbac|relevance|false_refusal|false_refusal_v2|compound|natural) ;; *) echo "unknown set $SET"; exit 2 ;; esac
 [[ "$RUNS" =~ ^[12]$ ]] || { echo "runs must be 1 or 2"; exit 2; }
 
 NAMES=(); ENVS=()
@@ -58,6 +56,18 @@ done
 [ "${#NAMES[@]}" -ge 1 ] || { echo "no configuration"; exit 2; }
 # A second run of the baseline would find the re-ingested corpus.
 [ -n "${ROWS_FROM:-}" ] && [ "$RUNS" != 1 ] && { echo "EVAL_TABLE_ROWS needs runs=1"; exit 2; }
+# The set, its questions and accounts (scripts/eval/batch_sets.py), then the configurations.
+python scripts/eval/batch_sets.py validate "$SET" --configs "${NAMES[*]}"   ${CASE_IDS[@]+"${CASE_IDS[@]}"} || exit 2
+echo "runs: $RUNS"
+for index in "${!NAMES[@]}"; do
+  vars="${ENVS[$index]#,}"; echo "config ${NAMES[$index]}: ${vars:-application defaults}"
+done
+[ -z "$VALIDATE_ONLY" ] || exit 0
+
+: "${PROJECT:?}" "${EVAL_OLLAMA_LOG:?}"
+read -r -a FILES <<< "${COMPOSE_FILES:?space-separated -f arguments}"
+API=http://127.0.0.1:18190
+mkdir -p "$OUT"
 REINGESTED=""
 
 backend() {
@@ -150,12 +160,13 @@ run_one() {  # $1 = config index, $2 = run number
       python scripts/eval/run_answer_relevance_dev.py --set "$frozen" \
         --output "$dir/results.json" > "$dir/runner.log" 2>&1 \
         || echo "runner exit $?" >> "$dir/runner.log" ;;
-    heldout_v3)  # DEC-035: counts only on stdout; answers stay in the artifact
+    heldout_v3)  # DEC-035: counts only on stdout; answers stay private (DEC-039)
       python scripts/eval/heldout_v3_release.py run --manifest "$OUT/runtime-manifest.json"         --output "$dir/results.json" > "$dir/runner.log" 2>&1         || echo "runner exit $?" >> "$dir/runner.log" ;;
     natural)  # owner-written questions over corpus V2, proxy-graded on the locked gold
       python scripts/eval/run_natural_dev.py --manifest "$OUT/runtime-manifest.json" \
         --output "$dir/results.json" > "$dir/runner.log" 2>&1 \
         || echo "runner exit $?" >> "$dir/runner.log" ;;
+    *) echo "no runner for set $SET" > "$dir/runner.log" ;;
   esac
   echo "seconds=$(( $(date +%s) - started ))" > "$dir/timing.txt"
   if [[ ",$vars," == *",EVAL_ABLATION="*simple_trace* || ",$vars," == *",EVAL_ABLATION="*retrieval_oracle* ]]; then

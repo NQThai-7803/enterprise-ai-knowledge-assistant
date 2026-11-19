@@ -1,5 +1,18 @@
 # Project Status
 
+## Held-out v3.1 batch set fixed, preflight validates the run (DEC-038/039) -- 2026-11-19
+
+- **Run 44559765410 failed before its first request:** `ci_batch.sh` said `unknown set heldout_v3`
+  (its whitelist lacked the set). 0 questions asked, not counted; the owner may dispatch again (DEC-038).
+- **Fix:** `scripts/eval/batch_sets.py` is the one set registry. `ci_batch.sh` validates the set,
+  the configurations and the accounts first; `--validate-only` stops there. Held-out v3 asks ACTIVE
+  items only (16); `heldout-v3.yml` validates with the run's own arguments, in preflight too.
+- **Failure status:** the public `summary.md` opens with the run status (failing step, exit code,
+  questions sent to the API), also when the job failed (`heldout_status.py`, DEC-039).
+- **CI:** `actions/checkout`, `setup-python` and `upload-artifact` at v7 (Node 24) in every workflow.
+- **HNSW recall test:** `hnsw.ef_search` pinned to 1, so the strict xfails no longer XPASS at random.
+- **Not dispatched.**
+
 ## Held-out v3.1 final, private results (DEC-038/039) -- 2026-11-19
 
 - **Held-out v3.1:** final. HO3-08 is ACTIVE and HO3-11 is EXCLUDED, so 16 items will be asked.

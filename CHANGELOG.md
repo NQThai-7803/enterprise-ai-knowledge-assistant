@@ -6,6 +6,25 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### Held-out v3.1 batch set, validate-only preflight, failure status -- 2026-11-19
+
+- **Fix:** `ci_batch.sh` refused the set `heldout_v3` (`unknown set`), so held-out v3.1 run
+  44559765410 failed before its first request. The set whitelist is replaced by
+  `scripts/eval/batch_sets.py`, which every batch runs first.
+- **`ci_batch.sh --validate-only`:**
+  - It resolves the set, parses the configurations, counts the questions and checks the eval
+    accounts they need. It calls no API and no model.
+  - `heldout-v3.yml` runs it in preflight and before the real run, with the same arguments
+    (`BATCH_SET`, `CONFIGS`, `BATCH_RUNS`).
+- **Held-out v3.1:** only ACTIVE items are asked; any other status goes to `not_run`.
+- **Failure status (DEC-039):**
+  - The public `summary.md` of `heldout-v2.yml` and `heldout-v3.yml` opens with the run status:
+    status, failing step, exit code, and questions sent to the API.
+  - A failed split still uploads the scanned, text-free public folder.
+- **CI:** `actions/checkout@v7`, `actions/setup-python@v7`, `actions/upload-artifact@v7` (Node 24).
+- **Test:** the HNSW recall xfails pin `hnsw.ef_search = 1` and stay strict.
+- **New unit test:** it checks every `ci_batch.sh` call in the workflows against the registry.
+
 ### Held-out v3.1 final, private results (DEC-038/039) -- 2026-11-19
 
 - **Held-out v3.1:** HO3-08 ACTIVE and HO3-11 EXCLUDED (`set-status`). The lock and the

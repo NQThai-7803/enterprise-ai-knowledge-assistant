@@ -7,7 +7,8 @@
 #     uploaded;
 #   - github-hosted: tar | age -r "$HELDOUT_AGE_RECIPIENT" into <public>/private-results.tar.gz.age;
 #     without a valid recipient the step fails: there is no plaintext fallback.
-# The workflow then runs `question_leak.py scan <public>` and uploads <public> only if both pass.
+# <public> is filled before the private part, so a failed split still leaves the text-free files
+# only. The workflow then runs `question_leak.py scan <public>` and uploads <public> if it passes.
 set -euo pipefail
 name=$1 out=$2 public=$3 run_id=$4
 shift 4
