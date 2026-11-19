@@ -77,7 +77,7 @@ def plan(
             pending.append(item["id"])
             continue
         if item.get("status") == heldout_v3.EXCLUDED:
-            not_run[item["id"]] = "EXCLUDED: not confirmed by its author by 2026-11-21 (DEC-038)"
+            not_run[item["id"]] = "EXCLUDED by the owner (DEC-038)"
             continue
         email = heldout_v3.ACCOUNTS.get(str(item["test_account"]).strip())
         if email is None:
