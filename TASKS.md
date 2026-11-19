@@ -8,6 +8,15 @@
 3. **Embedding fine-tune** (`docs/design/embedding-finetune.md` and DEC-015 on branch `feat/embedding-finetune-infra`): infrastructure only so far; the baseline measurement and training come after FIX 3.
 4. The final held-out v2 measurement, once, after the choices above are made (DEC-012).
 
+## Owner's UAT review applied (DEC-037) -- 2026-11-19
+
+- **DONE:**
+  - Owner verdicts in `docs/review/uat-s3-q35-text-2026-11-18.md`; owner pass rate 63.0-65.5 %.
+  - UAT gold changes (Q018, Q002, Q016, Q017, Q034, Q054), re-locked.
+  - Grader: `accepted_sources`, DRAFT citations fail.
+  - DEC-037; the CI rule and the verify-image rule in `CONTRIBUTING.md` and the eaka-verify skill.
+- **WAITING FOR OWNER:** verdicts for Q041 (A/B, the sources of the two rounds swapped since 17/11), Q044 (A/B) and Q053 (A).
+
 ## Exclude as the data policy, held-out v3 workflow (DEC-036) -- 2026-11-18 (STOPPED for the owner's review)
 
 - **DONE:**
@@ -172,6 +181,10 @@ These are open items. Each one can make a right answer count as wrong, or the re
 - **DONE (tooling):** `scripts/eval/heldout_v2_release.py` and `.github/workflows/heldout-v2.yml`: gate on frozen questions and an owner-approved gold lock, 2 runs at the current defaults, e5 grouping near UAT (>= 0.90) / rest, grading sheet with empty labels, report split by group, DEC-022 stated everywhere. Procedure: `docs/design/heldout-v2-release.md`.
 - **DONE (2026-11-15):** the owner approved the gold (HO2-004, 005, 020 changed; HO2-001, 003, 012, 016, 018 as proposed; the other 12 as they were); `heldout_v2_check.py check` clean; gold locked (`heldout-v2-gold.lock`, approved by owner (NQThai-7803)).
 - **WAITING FOR OWNER:** merge PR #30 and create the `heldout-v2-release` environment. The workflow is not dispatched until the owner says so (DEC-012).
+
+## Feature requests (owner, 2026-11-18)
+
+- [ ] **A concrete date for a relative question.** Put the current date in the prompt so that a question such as "công ty trả lương ngày mấy?" can be answered with the next pay date ("ngày 10 tháng 12"), not only the rule. Source: UAT Q054. Not a grading criterion (DEC-037 policy 5). Priority: after the default is settled (DEC-035).
 
 ## Phase 5 backlog -- table rows (recorded 2026-11-18, owner; rows v2 paused, flag off)
 

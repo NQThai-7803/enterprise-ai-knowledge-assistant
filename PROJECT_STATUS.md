@@ -1,5 +1,19 @@
 # Project Status
 
+## Owner's UAT review applied, grading policy (DEC-037) -- 2026-11-19
+
+- PR #43 merged into main (c92394a, CI green); eaka-verify on main: unit 1904, api-unit 51, api-integration 245, integration 408, llm-provider 3.
+- **DEC-037:**
+  - same value in ND-HR-002/003, either source passes; on a conflict ND-HR-003 wins;
+  - templates never count; stating a rule passes;
+  - a computed date is a feature request.
+  - Registered before held-out v3.1.
+- **UAT:**
+  - Owner verdicts written into the 18/11 list.
+  - Gold changes for Q018, Q002, Q016, Q017, Q034 and Q054, re-locked.
+  - The grader matches the owner on every decided item. Owner pass rate for `s3` + `qwen3.5-text:4b`: 63.0-65.5 %. Q041, Q044 and Q053 are undecided.
+- **Process:** CI must be green (`gh pr checks`) before "verified" or a merge; keep only the newest verify image.
+
 ## Exclude as the data policy, held-out v3 workflow ready (DEC-036) -- 2026-11-18 (STOPPED for the owner's review)
 
 - **DEC-036 (owner):** `RAG_DRAFT_DOCUMENT_POLICY=exclude` is the default for every configuration. A document not yet issued never answers. It overrides DEC-026 for this question, with the measured cost and gain recorded. **No other default changed.**

@@ -665,3 +665,30 @@ Set on 2026-11-18 by the owner. This is a decision about the data, not a measure
   - An item whose test account maps to no seeded user is not asked, and is listed. The same holds for any item set aside by the owner's decisions on the DEC-030 findings.
   - An item expects a refusal when its expected sources name no document code; otherwise it expects an answer that cites one of those documents and states the expected answer's values (DEC-032).
 - **Rule:** unchanged. Leaks must be 0; the lower false answers + wrong wins; on a tie, fewer false refusals; still tied, the current default stays.
+
+## DEC-037 — The owner's grading policy
+
+Set on 2026-11-18 by the owner, after reading the UAT list of 2026-11-17 (`docs/review/uat-s3-q35-2026-11-17.md`, the owner's notes committed as written).
+
+**Registered before held-out v3.1 is dispatched.** It applies to every automatic grade from now on, and to the owner's own grading of held-out v3.1 (grading.csv).
+
+1. **Same value, either source.** When ND-HR-002 and ND-HR-003 state the same value, a citation of either passes.
+2. **On a conflict, ND-HR-003 wins.**
+3. **A template or draft is never a valid source.** A citation of a document with `lifecycle_status=DRAFT` fails the item.
+4. **A question about a rule passes when the rule is stated correctly.** A worked example is not required. Owner grading only; the automatic grader still asks for every value of the reference.
+5. **A computed calendar date** (for example "ngày 10 tháng 12" for "this month") is a feature request, not a grading criterion.
+
+**How it is applied:**
+
+- **UAT gold** (`eval-data/uat/reference-grade.json`, `retrieval-gold.json`, re-locked in `gold.lock`; each change carries "owner review 2026-11-18"):
+  - Q018: NO_ANSWER → ANSWERED from ND-HR-003 p4 (start 08:00-09:00, end 17:00-18:00), accepted source ND-HR-003 only (policy 2). `uat/corpus-v2/manifest.json` records how the Q018 conflict was resolved.
+  - Q016, Q017, Q034: `accepted_sources` ND-HR-002 and ND-HR-003 (policy 1). A script checked that their values are in both documents. Q023, Q024, Q027 and Q031 matched by number only, outside working hours, and are not changed.
+  - Q002: ND-CORP-001 added to the accepted sources.
+  - Q054: the expected answer is "Ngày 10 tháng kế tiếp" (policy 5).
+- **Grader** (`scripts/eval/grade_proxy.py`):
+  - With `accepted_sources`, any non-empty set of cited codes inside the list matches.
+  - A cited DRAFT code, read from the corpus manifest metadata and never named per question, fails the item.
+  - Unit tests: `tests/unit/test_grade_proxy_owner_policy.py`.
+- **Check on the existing 18/11 UAT artifacts** (no new run): the regraded `s3` + `qwen3.5-text:4b` matches the owner on every decided item.
+  - The grader gives 64-21-0-15 (A) and 62-24-0-14 (B).
+  - Owner pass rate: 126/200, with 5 item-rounds undecided (Q041 A/B, Q044 A/B, Q053 A), so 63.0-65.5 %.
