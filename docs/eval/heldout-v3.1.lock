@@ -1,0 +1,9 @@
+{
+ "version": "heldout_v3_1",
+ "file": "docs/eval/heldout-v3.1.yaml",
+ "sha256": "047d0859eccd26a82cd0538b17c518381b7d03db8b1b9bc88cfd0b47fcd5f7b0",
+ "frozen_at": "2026-11-19",
+ "items": 17,
+ "approved_by": "owner's decisions of 2026-11-18 (DEC-038); gold unchanged from v3",
+ "rule": "clearing a PENDING item or any edit needs a commit of its own and a new lock"
+}

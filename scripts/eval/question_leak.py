@@ -35,6 +35,8 @@ LOCK_V2 = ROOT / "docs" / "eval" / "heldout-v2-questions.lock"
 HELDOUT_V2 = ROOT / "docs" / "eval" / "heldout-v2-questions.yaml"
 LOCK_V3 = ROOT / "docs" / "eval" / "heldout-v3.lock"
 HELDOUT_V3 = ROOT / "docs" / "eval" / "heldout-v3.yaml"
+LOCK_V31 = ROOT / "docs" / "eval" / "heldout-v3.1.lock"
+HELDOUT_V31 = ROOT / "docs" / "eval" / "heldout-v3.1.yaml"
 RBAC_SOURCE = ROOT / "tests" / "acceptance" / "rbac_dev_v1.yaml"
 RELEVANCE_SOURCE = ROOT / "tests" / "acceptance" / "answer_relevance_dev_v1.yaml"
 FALSE_REFUSAL_SOURCE = ROOT / "tests" / "acceptance" / "false_refusal_dev_v1.yaml"
@@ -58,6 +60,7 @@ EXPECTED_COUNTS = {
     "compound_partial": 12,
     "natural_dev": 20,
     "heldout_v3": 20,
+    "heldout_v3_1": 17,
 }
 OVERLAP_LIMIT = 0.60
 ESCAPE = re.compile(r"\\u([0-9a-fA-F]{4})")
@@ -103,6 +106,8 @@ def build_payload(
     natural_dev: Iterable[tuple[str, str]] = (),
     heldout_v3: Iterable[tuple[str, str]] = (),
     lock_v3_sha256: str = "",
+    heldout_v3_1: Iterable[tuple[str, str]] = (),
+    lock_v3_1_sha256: str = "",
 ) -> dict[str, Any]:
     dev_items = {case_id: fingerprint(question) for case_id, question in dev}
     heldout_items = {case_id: fingerprint(question) for case_id, question in heldout}
@@ -114,6 +119,7 @@ def build_payload(
     compound_items = {case_id: fingerprint(question) for case_id, question in compound_partial}
     natural_items = {case_id: fingerprint(question) for case_id, question in natural_dev}
     v3_items = {case_id: fingerprint(question) for case_id, question in heldout_v3}
+    v31_items = {case_id: fingerprint(question) for case_id, question in heldout_v3_1}
     return {
         "version": 1,
         "gram_size": GRAM_SIZE,
@@ -140,6 +146,11 @@ def build_payload(
                 "lock_sha256": lock_v3_sha256,
                 "items": v3_items,
             },
+            "heldout_v3_1": {
+                "count": len(v31_items),
+                "lock_sha256": lock_v3_1_sha256,
+                "items": v31_items,
+            },
         },
     }
 
@@ -150,6 +161,7 @@ def load_fingerprints(
     expected: Mapping[str, int] = EXPECTED_COUNTS,
     lock_v2: Path = LOCK_V2,
     lock_v3: Path = LOCK_V3,
+    lock_v3_1: Path = LOCK_V31,
 ) -> dict[str, Any]:
     """Return the fingerprints, or refuse when they cannot stand for the question sets."""
     if not path.is_file():
@@ -181,6 +193,12 @@ def load_fingerprints(
         != sources["heldout_v3"]["lock_sha256"]
     ):
         raise QuestionSourceError("fingerprints do not match the held-out v3 lock; rebuild")
+    if "heldout_v3_1" in expected and (
+        not lock_v3_1.is_file()
+        or json.loads(lock_v3_1.read_text(encoding="utf-8"))["sha256"]
+        != sources["heldout_v3_1"]["lock_sha256"]
+    ):
+        raise QuestionSourceError("fingerprints do not match the held-out v3.1 lock; rebuild")
     return payload
 
 
@@ -338,6 +356,13 @@ def _build(output: Path) -> int:
         raise QuestionSourceError("held-out v3 does not match its lock")
     v3_items = yaml.safe_load(HELDOUT_V3.read_text(encoding="utf-8"))["items"]
     v3 = [(item["id"], item["question"]) for item in v3_items]
+    if not HELDOUT_V31.is_file() or not LOCK_V31.is_file():
+        raise QuestionSourceError("build needs the frozen held-out v3.1")
+    lock_v31_sha = json.loads(LOCK_V31.read_text(encoding="utf-8"))["sha256"]
+    if hashlib.sha256(HELDOUT_V31.read_bytes()).hexdigest() != lock_v31_sha:
+        raise QuestionSourceError("held-out v3.1 does not match its lock")
+    v31_items = yaml.safe_load(HELDOUT_V31.read_text(encoding="utf-8"))["items"]
+    v31 = [(item["id"], item["question"]) for item in v31_items]
     payload = build_payload(
         dev,
         heldout,
@@ -352,13 +377,16 @@ def _build(output: Path) -> int:
         natural,
         v3,
         lock_v3_sha,
+        v31,
+        lock_v31_sha,
     )
     output.write_text(json.dumps(payload, indent=0, sort_keys=True) + "\n", encoding="utf-8")
     print(
         f"dev: {len(dev)}; held-out: {len(heldout)}; rbac dev: {len(rbac)}; "
         f"relevance dev: {len(relevance)}; held-out v2: {len(v2)}; "
         f"false-refusal dev: {len(false_refusal)}; false-refusal dev v2: {len(false_refusal_v2)}; "
-        f"compound dev: {len(compound)}; natural dev: {len(natural)}; held-out v3: {len(v3)}"
+        f"compound dev: {len(compound)}; natural dev: {len(natural)}; held-out v3: {len(v3)}; "
+        f"held-out v3.1: {len(v31)}"
     )
     return 0
 

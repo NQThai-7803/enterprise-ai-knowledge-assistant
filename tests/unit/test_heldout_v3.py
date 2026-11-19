@@ -108,3 +108,27 @@ def test_item_check_flags_missing_document_and_account() -> None:
     assert found["account"] is None
     assert found["answer_numbers_not_in_cited_documents"] == ["3"]
     assert [r["found"] for r in found["references"]] == ["phrase", "no document"]
+
+
+def test_v31_drops_three_items_flags_weak_values_and_keeps_the_gold() -> None:
+    from scripts.eval.heldout_v3 import NEAR_DUPLICATE, PENDING, derive_v31
+
+    def item(n: int, answer: str, sources: str = "DOC-AA-001") -> dict:
+        return {"id": f"HO3-{n:02d}", "group": "G", "question": f"Câu {n}?",
+                "test_account": "Bất kỳ", "expected_answer": answer,
+                "expected_sources": sources, "number": n}  # fmt: skip
+
+    items = [item(2, "x"), item(3, "Mất 3 ngày."), item(8, "Phí 50.000 đồng trong 2 ngày."),
+             item(9, "y"), item(11, "z"), item(16, "Không có số.")]  # fmt: skip
+    docs = {"DOC-AA-001": "Phí làm thẻ 50.000 đồng. Thời hạn 3 ngày."}
+    v31, checks = derive_v31(items, docs)
+    by_id = {i["id"]: i for i in v31}
+    assert "HO3-09" not in by_id and len(v31) == 5
+    assert checks["HO3-03"] == {"in_corpus": True, "found": 1, "total": 1}
+    assert by_id["HO3-03"]["status"] == "ACTIVE"
+    assert checks["HO3-08"]["found"] == 1 and by_id["HO3-08"]["status"] == PENDING
+    assert checks["HO3-11"]["total"] == 0 and by_id["HO3-11"]["status"] == PENDING  # default
+    assert by_id["HO3-16"]["status"] == "ACTIVE"  # no value to check
+    assert by_id["HO3-02"]["near_duplicate"] == NEAR_DUPLICATE["HO3-02"]
+    for new, old in zip(v31, [i for i in items if i["id"] != "HO3-09"], strict=True):
+        assert {k: v for k, v in new.items() if k not in ("status", "near_duplicate")} == old
