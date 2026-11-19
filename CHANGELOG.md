@@ -6,6 +6,15 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### Owner's UAT review, grading policy (DEC-037) -- 2026-11-19
+
+- **Grader:** `accepted_sources` in the UAT reference; a cited DRAFT document fails, read from the corpus manifest metadata.
+- **UAT gold:** Q018 answered from ND-HR-003; accepted sources for Q002, Q016, Q017, Q034; the Q054 text. Re-locked.
+- **Docs:**
+  - owner verdicts in the 18/11 UAT list;
+  - the CI rule and the verify-image rule (`CONTRIBUTING.md`, eaka-verify skill);
+  - DEC-037.
+
 ### Exclude by default, held-out v3 workflow (DEC-036) -- 2026-11-18
 
 - **RAG:** `RAG_DRAFT_DOCUMENT_POLICY` defaults to `exclude` (DEC-036, the owner's data policy); `off` is the rollback.

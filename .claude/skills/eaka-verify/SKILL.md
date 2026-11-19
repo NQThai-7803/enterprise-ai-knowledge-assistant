@@ -45,11 +45,13 @@ description: Use before reporting any EAKA task as done, and when running or re-
    | `real-logic` | lỗi logic thật trong code |
    | `host-only-file` | test phụ thuộc file chỉ có trên host, không có trong image |
 
-7. Dọn hạ tầng tạm (hỏi trước khi xóa volume).
+7. Dọn hạ tầng tạm (hỏi trước khi xóa volume). Chỉ giữ image `eaka-backend:verify-<sha>` của HEAD mới nhất; xóa các image verify cũ hơn (owner, 2026-11-19).
+8. **CI của PR** (owner, 2026-11-19): trước khi báo "đã verify" hoặc merge, chạy `gh pr checks <PR>` trên HEAD mới nhất và ghi trạng thái vào báo cáo. eaka-verify xanh mà CI đỏ thì vẫn là **ĐỎ** (CI cài từ `pyproject.toml`, image từ `requirements.lock`). Xem `CONTRIBUTING.md`.
 
 ## Báo cáo
 
 - Bảng pass/fail/xfail theo file (từ `junit_summary.py`).
 - Khác biệt so với lần trước (từ `compare_junit.py`).
 - Danh sách fail kèm nhóm phân loại và bằng chứng (evidence) ngắn.
+- Trạng thái `gh pr checks <PR>` trên HEAD mới nhất.
 - Phần nào chạy ngoài image chuẩn hoặc chưa kiểm chứng → mục **NOT_VERIFIED**.
