@@ -4,6 +4,7 @@ usage (repo root, project venv):
   python scripts/eval/question_leak.py build    # needs artifacts/ and docs/eval/; prints counts
   python scripts/eval/question_leak.py check [--base HEAD | --staged] [--path app]
   python scripts/eval/question_leak.py overlap
+  python scripts/eval/question_leak.py scan <folder>   # an artifact about to be uploaded (DEC-039)
 
 `build` reads only the question of each dev and held-out item and writes
 scripts/eval/question_fingerprints.json: salted hashes, never question or gold text. `check` and
@@ -406,6 +407,34 @@ def _check(args: argparse.Namespace) -> int:
     return 1
 
 
+def scan_files(
+    payload: Mapping[str, Any], root: Path
+) -> tuple[int, list[tuple[str, int, str, str]]]:
+    """find_hits over every line of every file under root, binary files included (DEC-039)."""
+    files = sorted(p for p in root.rglob("*") if p.is_file())
+    lines = [
+        (path.relative_to(root).as_posix(), number, text)
+        for path in files
+        for number, text in enumerate(path.read_bytes().decode("utf-8", "replace").splitlines(), 1)
+    ]
+    return len(files), find_hits(payload, lines)
+
+
+def _scan(root: Path) -> int:
+    """Exit 1 when a file about to be uploaded shares a 4-gram with any question set; ids only."""
+    if not root.is_dir():
+        print(f"[error] {root} is not a folder", file=sys.stderr)
+        return 2
+    count, hits = scan_files(load_fingerprints(), root)
+    if not hits:
+        print(f"OK: no question 4-gram in {count} file(s) under {root}")
+        return 0
+    print(f"LEAK: {len(hits)} line(s) under {root} share a question 4-gram; nothing is uploaded")
+    for file, number, source, case_id in hits:
+        print(f"  {file}:{number}: {source} {case_id}")
+    return 1
+
+
 def _overlap() -> int:
     payload = load_fingerprints()
     value, dev_id, heldout_id = max_overlap(payload)
@@ -441,10 +470,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     check.add_argument("--staged", action="store_true")
     check.add_argument("--path", default="app")
     sub.add_parser("overlap")
+    sub.add_parser("scan", help="an artifact folder about to be uploaded").add_argument(
+        "folder", type=Path
+    )
     args = parser.parse_args(argv)
     try:
         if args.mode == "build":
             return _build(args.output)
+        if args.mode == "scan":
+            return _scan(args.folder)
         return _check(args) if args.mode == "check" else _overlap()
     except QuestionSourceError as exc:
         print(f"[error] {exc}", file=sys.stderr)
