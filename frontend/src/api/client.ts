@@ -15,6 +15,7 @@ import type {
   DataResponse,
   Department,
   DocumentAccessScope,
+  DocumentLifecycleStatus,
   DocumentItem,
   DocumentPermission,
   DocumentPermissionLevel,
@@ -163,6 +164,13 @@ export const apiClient = {
       description?: string | null;
       access_scope: DocumentAccessScope;
       department_id?: string | null;
+      /** BR-1 optional form fields (API_SPEC §7). */
+      document_code?: string | null;
+      document_version?: string | null;
+      effective_from?: string | null;
+      effective_to?: string | null;
+      lifecycle_status?: DocumentLifecycleStatus | null;
+      supersedes_document_id?: string | null;
     }) {
       const formData = new FormData();
       formData.append("file", payload.file);
@@ -173,6 +181,19 @@ export const apiClient = {
       }
       if (payload.department_id) {
         formData.append("department_id", payload.department_id);
+      }
+      for (const field of [
+        "document_code",
+        "document_version",
+        "effective_from",
+        "effective_to",
+        "lifecycle_status",
+        "supersedes_document_id",
+      ] as const) {
+        const value = payload[field];
+        if (value) {
+          formData.append(field, value);
+        }
       }
       return request<DataResponse<DocumentItem>>("/documents/upload", {
         method: "POST",
