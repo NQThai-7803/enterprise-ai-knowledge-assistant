@@ -38,6 +38,13 @@ from tests.integration.retrieval_helpers import (
 
 pytestmark = pytest.mark.integration
 CONFIDENTIAL_MARKER = "CONFIDENTIAL_GROUNDED_CHAT_MARKER"
+SIMPLE_S1_TO_S3 = (
+    "rag_simple_absence_sentences_enabled",
+    "rag_simple_short_prompt_enabled",
+    "rag_simple_relaxed_rules_enabled",
+    "rag_simple_claim_relevance_enabled",
+    "rag_simple_question_list_segments_enabled",
+)
 
 
 def run_async(coro: Coroutine[Any, Any, None]) -> None:
@@ -59,6 +66,7 @@ def make_settings(**overrides: object) -> Settings:
         "hybrid_candidate_multiplier": 4,
         "hybrid_semantic_min_relevance_score": 0.0,
         "keyword_min_rank": 0.0,
+        "rag_answer_mode": "legacy",  # legacy JSON fake LLM (DEC-040 rollback)
     }
     defaults.update(overrides)
     # Keep reranker sizing inside this test's hybrid cap; Settings rejects
@@ -312,14 +320,18 @@ def make_real_hybrid_service(
     )
 
 
+# simple: the default since DEC-040; hybrid: the DEC-041 option (route first, else simple)
+@pytest.mark.parametrize("mode", ["legacy", "simple", "hybrid"])
 def test_grounded_answer_uses_authorized_chunks_only(
-    async_session_factory_for_tests: async_sessionmaker[AsyncSession],
+    async_session_factory_for_tests: async_sessionmaker[AsyncSession], mode: str
 ) -> None:
     async def scenario() -> None:
         settings = make_settings(
             chat_retrieval_top_k=2,
             chat_context_max_tokens=1000,
             citation_max_sources_per_answer=2,
+            rag_answer_mode=mode,
+            **({} if mode == "legacy" else dict.fromkeys(SIMPLE_S1_TO_S3, True)),
         )
         async with async_session_factory_for_tests() as session:
             department_a = await create_department(session, "grounded-a")
@@ -376,13 +388,16 @@ def test_grounded_answer_uses_authorized_chunks_only(
             token_counter=FakeCounter(),
         )
 
-        await service.answer_question(
+        result = await service.answer_question(
             current_user=staff_a,
             session_id=chat.id,
             question="groundedkeyword",
         )
 
-        assert llm.calls == 1
+        # simple mode retries an answer it cannot validate; no prompt may hold the hidden chunk
+        assert llm.calls == 1 if mode == "legacy" else llm.calls >= 1
         assert all(CONFIDENTIAL_MARKER not in message.content for message in llm.messages)
+        assert CONFIDENTIAL_MARKER not in result.assistant_message.content
+        assert all(c.document_id != hidden_doc.id for c in result.assistant_citations)
 
     run_async(scenario())

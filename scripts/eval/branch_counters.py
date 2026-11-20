@@ -53,6 +53,46 @@ def read(base_url: str, timeout: float = 30.0) -> dict[str, int] | None:
         return None
 
 
+# The per-question fields a runner records and a grader copies (DEC-041).
+ROUTE_FIELDS = ("answer_route", "retrieved", "no_answer_reasons")
+_ROUTE = "answer_route_"
+_NO_ANSWER = "no_answer_"
+
+
+def answer_route(change: Mapping[str, int] | None) -> str | None:
+    """The route of one answer from the counter change around it: the API's own label
+    (det_<route>, repair_<route>, llm_legacy, llm_simple, refusal_gate), or on an older API
+    deterministic / llm; None when unknown or when more than one answer moved the counters."""
+    if change is None:
+        return None
+    routes = {k.removeprefix(_ROUTE): v for k, v in change.items() if k.startswith(_ROUTE) and v}
+    if routes:
+        return next(iter(routes)) if list(routes.values()) == [1] else None
+    pair = (change.get("route_deterministic", 0), change.get("route_llm", 0))
+    return {(1, 0): "deterministic", (0, 1): "llm"}.get(pair)
+
+
+def coarse_route(route: str | None) -> str | None:
+    """deterministic (a server-built answer) or llm (anything else) for a route label."""
+    if route is None:
+        return None
+    return "deterministic" if route.startswith(("deterministic", "det_", "repair_")) else "llm"
+
+
+def route_fields(
+    before: Mapping[str, int] | None, after: Mapping[str, int] | None
+) -> dict[str, object]:
+    """answer_route and every no-answer reason the API counted while answering one question
+    (intermediate attempts included); None when the counters are unknown."""
+    change = delta(before, after)
+    reasons = None
+    if change is not None:
+        reasons = sorted(
+            k.removeprefix(_NO_ANSWER) for k, v in change.items() if v and k.startswith(_NO_ANSWER)
+        )
+    return {"answer_route": answer_route(change), "no_answer_reasons": reasons}
+
+
 # shortcut: a restart before the first count reads as 0; eval metadata records resumed runs.
 def delta(start: Mapping[str, int] | None, end: Mapping[str, int] | None) -> dict[str, int] | None:
     if start is None or end is None or any(end.get(key, 0) < start[key] for key in start):

@@ -21,6 +21,14 @@ class DocumentLifecycleStatus(StrEnum):
     ACTIVE = "ACTIVE"
     SUPERSEDED = "SUPERSEDED"
     ARCHIVED = "ARCHIVED"
+    DRAFT = "DRAFT"  # not an issued document (template, draft); DEC-033
+
+
+class DocumentChunkKind(StrEnum):
+    """TEXT: page text as chunked; TABLE_ROW: one data-table row, extra to it (DEC-034)."""
+
+    TEXT = "TEXT"
+    TABLE_ROW = "TABLE_ROW"
 
 
 class DocumentAccessScope(StrEnum):

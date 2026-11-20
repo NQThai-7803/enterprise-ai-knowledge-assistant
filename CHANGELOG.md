@@ -6,6 +6,174 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### Backend requests of the UI session (BR-1, 3, 4, 2, 8, 9) -- 2026-11-20
+
+- **Added:** `chat_messages.grounding_status` (migration `20261120_0013`), returned as
+  `grounding_status` on every chat message (null for user messages and older rows) (BR-3).
+- **Added:** `department_name` on the `user` of login / refresh and on `GET /auth/me` (BR-4).
+- **Added:** `GET /documents/{document_id}/preview`, inline, with the download's access rules and
+  audit event (BR-2).
+- **Docs:** `API_SPEC.md` upload fields and Manager rules (BR-1), unverified-part sentences (BR-3),
+  Admin monitoring examples (BR-8), audit event types (BR-9); answers in
+  `docs/ui/backend-requests.md`.
+
+### DEC-041 decided: keep s3t; UAT is a regression suite -- 2026-11-20
+
+- **Decided:** the owner keeps s3t as the default; `RAG_ANSWER_MODE=hybrid` stays behind its flag,
+  off, not recommended. UAT is a regression suite, not a selection criterion (DEC-026 updated).
+
+### Hybrid answer mode (off) and per-answer route labels (DEC-041 proposal) -- 2026-11-20
+
+- **Added:** `RAG_ANSWER_MODE=hybrid`, off by default: legacy's deterministic route under its
+  existing conditions, else the simple path. No default changed.
+- **Added:** every persisted answer counts `answer_route_<route>` (`det_<builder>`,
+  `repair_<builder>`, `llm_legacy`, `llm_simple`, `refusal_gate`) and every no-answer diagnostic
+  `no_answer_<reason>`; `/metrics` lists them once recorded.
+- **Eval:** every dev runner records `answer_route`, `no_answer_reasons` and `retrieved` per
+  question (UAT reports still split deterministic / llm); `scripts/eval/route_matrix.py`;
+  `scripts/eval/gpu_latency_replay.py` (the simple path's retry text is now
+  `SIMPLE_RETRY_INSTRUCTIONS`, unchanged).
+- **Measured:** the 7 dev sets with legacy, s3t and hybrid (`docs/eval/runs/dec041-hybrid-dev.md`).
+
+### Default simple s1-s3 + qwen3.5-text:4b, held-out v3.1 closed (DEC-040) -- 2026-11-20
+
+- **Changed (DEC-040):** `RAG_ANSWER_MODE` defaults to `simple`, and the s1-s3 flags
+  (`RAG_SIMPLE_ABSENCE_SENTENCES_ENABLED`, `RAG_SIMPLE_SHORT_PROMPT_ENABLED`,
+  `RAG_SIMPLE_RELAXED_RULES_ENABLED`, `RAG_SIMPLE_CLAIM_RELEVANCE_ENABLED`,
+  `RAG_SIMPLE_QUESTION_LIST_SEGMENTS_ENABLED`) default to on. `.env.example` sets
+  `LLM_OLLAMA_MODEL=qwen3.5-text:4b` and `LLM_TIMEOUT_SECONDS=90`. Rollback:
+  `RAG_ANSWER_MODE=legacy` + `LLM_OLLAMA_MODEL=qwen2.5:3b`. ADR 0005 replaces ADR 0003.
+- **Eval:** `compose.uat-eval.yaml`, `eval.yml` and `heldout-v2.yml` measure the new default when a
+  configuration sets nothing; `eval.yml`'s LLM timeout defaults to 600 s. `EVAL_SIMPLE_LEVEL=n` now
+  also turns the flags after n off.
+- **Held-out v3.1:** spent; `heldout-v3.yml` refuses every dispatch. The owner's labels are in
+  `docs/eval/heldout-v3.1-owner-grading.md` (ids, labels, reason codes).
+- **Fix:** `ci_batch.sh` saves each API container's log (and the worker's since the run began)
+  before recreating it; `heldout_status.py` counts every saved log (run 44575927833 reported
+  `api_requests=35`, the last container only). The held-out summary lists the items removed before
+  v3.1 and the reason of every item not asked.
+- **Added:** `scripts/eval/heldout_v3_diag.py` (`table`, `access`): a text-free table per
+  configuration, run and item for the owner, and the gold documents' access per account.
+- **Measured:** dev baselines of the rollback against the new default (DEC-040): `natural_dev_v1`
+  correct 3 / 7 of 20; UAT `value_match` 96 / 71 of 100 (monitoring only, no deterministic route
+  in simple mode).
+
+### Held-out v3.1 batch set, validate-only preflight, failure status -- 2026-11-19
+
+- **Fix:** `ci_batch.sh` refused the set `heldout_v3` (`unknown set`), so held-out v3.1 run
+  44559765410 failed before its first request. The set whitelist is replaced by
+  `scripts/eval/batch_sets.py`, which every batch runs first.
+- **`ci_batch.sh --validate-only`:**
+  - It resolves the set, parses the configurations, counts the questions and checks the eval
+    accounts they need. It calls no API and no model.
+  - `heldout-v3.yml` runs it in preflight and before the real run, with the same arguments
+    (`BATCH_SET`, `CONFIGS`, `BATCH_RUNS`).
+- **Held-out v3.1:** only ACTIVE items are asked; any other status goes to `not_run`.
+- **Failure status (DEC-039):**
+  - The public `summary.md` of `heldout-v2.yml` and `heldout-v3.yml` opens with the run status:
+    status, failing step, exit code, and questions sent to the API.
+  - A failed split still uploads the scanned, text-free public folder.
+- **CI:** `actions/checkout@v7`, `actions/setup-python@v7`, `actions/upload-artifact@v7` (Node 24).
+- **Test:** the HNSW recall xfails pin `hnsw.ef_search = 1` and stay strict.
+- **New unit test:** it checks every `ci_batch.sh` call in the workflows against the registry.
+
+### Held-out v3.1 final, private results (DEC-038/039) -- 2026-11-19
+
+- **Held-out v3.1:** HO3-08 ACTIVE and HO3-11 EXCLUDED (`set-status`). The lock and the
+  fingerprints were rebuilt; 16 items will be asked.
+- **Private results (DEC-039):**
+  - New `scripts/eval/heldout_publish.sh` splits the public part from the private part. The private part is
+    age-encrypted on a GitHub-hosted runner, or kept outside the repository on a self-hosted one.
+  - New `question_leak.py scan <folder>`.
+  - `heldout-v2.yml` and `heldout-v3.yml` upload only the scanned public folder.
+  - Held-out v2 no longer copies its grading sheet into the job summary.
+- **UAT review:** Q044 A/B and Q053 A KHÔNG ĐẠT; final owner pass rate 127/200.
+- **Repository settings:** the three held-out v2 artifacts are deleted, and `heldout-v2-release` deploys from `main` only.
+
+### Owner follow-ups (DEC-038 deadline, Q041) -- 2026-11-19
+
+- **Held-out tooling:**
+  - `heldout_v3.py set-status ACTIVE|EXCLUDED <ids>` resolves PENDING items and rewrites the lock and the fingerprints.
+  - `heldout_v3_release.py`: an EXCLUDED item goes to `not_run`. `run` and `gate --no-pending` refuse while an item is PENDING. The workflow's gate uses `--no-pending` unless `preflight_only` is set.
+- **Docs:**
+  - DEC-038: deadline 2026-11-21 for HO3-08 and HO3-11.
+  - UAT review: Q041 decided; pass rates updated.
+  - CONTRIBUTING and eaka-verify: stopped verify containers and networks are removed without asking.
+
+### Held-out v3.1 (DEC-038) -- 2026-11-19
+
+- **Data:** `docs/eval/heldout-v3.1.yaml` + lock, derived by `heldout_v3.py derive-v3.1` (ids and counts only).
+  - `status` PENDING_AUTHOR_REVIEW and `near_duplicate` fields; the gold is unchanged.
+  - Fingerprints rebuilt with `heldout_v3_1`.
+- **Grader and workflow:**
+  - `heldout_v3_release.py` and the workflow read v3.1;
+  - pending items are excluded (`excluded_pending`);
+  - counts are split near_duplicate / other;
+  - a same-value-other-source flag in the owner's tables.
+
+### Owner's UAT review, grading policy (DEC-037) -- 2026-11-19
+
+- **Grader:** `accepted_sources` in the UAT reference; a cited DRAFT document fails, read from the corpus manifest metadata.
+- **UAT gold:** Q018 answered from ND-HR-003; accepted sources for Q002, Q016, Q017, Q034; the Q054 text. Re-locked.
+- **Docs:**
+  - owner verdicts in the 18/11 UAT list;
+  - the CI rule and the verify-image rule (`CONTRIBUTING.md`, eaka-verify skill);
+  - DEC-037.
+
+### Exclude by default, held-out v3 workflow (DEC-036) -- 2026-11-18
+
+- **RAG:** `RAG_DRAFT_DOCUMENT_POLICY` defaults to `exclude` (DEC-036, the owner's data policy); `off` is the rollback.
+- **Eval:**
+  - `.github/workflows/heldout-v3.yml`, gated as held-out v2;
+  - `scripts/eval/heldout_v3_release.py` (gate, run, grading with the DEC-035 verdict);
+  - `ci_batch.sh` set `heldout_v3`, allowed only with the workflow's approval.
+  - Not dispatched.
+
+### Draft documents, table rows v2 (DEC-033/034/035) -- 2026-11-18
+
+- **RAG:** `DRAFT` lifecycle and `RAG_DRAFT_DOCUMENT_POLICY` (`off` default, `exclude`) in every answer retrieval path.
+- **Ingestion:** table rows v2 behind `DOCUMENT_TABLE_ROW_CHUNKING_ENABLED`:
+  - extra `TABLE_ROW` chunks with a parent and keyword text of their cells only;
+  - one hit per group in fusion;
+  - tables of 3 or more columns only.
+  - The extraction router now keeps the rows.
+- **DB:** migration `20261118_0012`, adding the enum value plus `chunk_kind`, `parent_chunk_id`, `search_text` and a GIN index.
+- **Eval:**
+  - ablation `retrieval_oracle`, and `build_oracle --set natural`;
+  - `EVAL_DRAFT_POLICY`, and the `EVAL_S3T` alias;
+  - the UAT gold lock;
+  - owner-approved gold edits (Q044, ND-001, ND-004, ND-012, ND-019).
+- **Measured** (DEC-034 results): rows fail the retrieval gate, exclude is not adopted. Defaults unchanged.
+
+### Held-out v3, table rows, value-aware grading -- 2026-11-18
+
+- **Held-out v3 (DEC-030):** 20 questions with gold from a team member, frozen with a lock and in the question fingerprints (`scripts/eval/heldout_v3.py`).
+- **Ingestion:** one text unit per table row behind `DOCUMENT_TABLE_ROW_CHUNKING_ENABLED` (default off). Measured in DEC-031 and not adopted.
+- **Eval:**
+  - `ollama_cache_ram` defaults to 2048 MiB, and `heldout-v2.yml` sets the same.
+  - `ci_batch.sh` reloads the corpus for `EVAL_TABLE_ROWS` configurations.
+- **Grading (DEC-032):** `scripts/eval/value_grading.py`.
+  - UAT `value_match`; the dev-set runners add the conflict check; RBAC controls get a digit boundary.
+  - `value_grading.py regrade` regrades stored runs.
+  - `summarize_ablation.categories`, `metrics.py` and `compare_flag_runs.py` use `value_match`.
+- **Deployment:** GPU target `qwen3.5-text:4b` built with `scripts/deploy/ollama_text_model.py --num-gpu 99`. Prompt cache cap documented for every Ollama setup.
+- **Design, no code:**
+  - row-chunking adjustment (`docs/design/table-chunking.md`);
+  - template and draft documents (`docs/design/document-authority.md`).
+
+### Candidate `s3` + `qwen3.5:4b` (DEC-029) -- 2026-11-17
+
+- **DEC-029:** the conditions before the default can change to `s3` + `qwen3.5:4b`: three-job variation, the owner's reading of the UAT errors, and the target hardware. Written before measuring.
+- **Eval (`eval.yml`):**
+  - A model named `<name>-text:<tag>` is built from `<name>:<tag>` without its vision projector.
+  - New input `ollama_cache_ram` caps llama-server's prompt cache through `LLAMA_ARG_CACHE_RAM`; `default` keeps Ollama's 8192 MiB.
+- **Measured:**
+  - round c on `natural_dev_v1` and the 5 dev sets;
+  - UAT in two rounds;
+  - local GPU placement and latency.
+  - (a) holds. The text-only copy gives the same answers with 0.5-0.7 GB less. (b) waits for the owner's reading of `docs/review/uat-s3-q35-2026-11-17.md`. (c) CPU is not met with Ollama's default prompt cache. The default is unchanged (`docs/design/s3-q35-candidate.md`).
+- **Table chunking diagnosis and a row-per-unit proposal, no code:** `docs/design/table-chunking.md`.
+
 ### Model comparison (DEC-028) -- 2026-11-17
 
 - DEC-028: candidate models and selection rule, fixed before measuring (`qwen2.5:7b`, `qwen3.5:4b`, `sailor2:8b`; Apache 2.0, ≤ 8B, Vietnamese, 16 GB CPU).

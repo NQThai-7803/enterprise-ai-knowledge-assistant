@@ -93,6 +93,7 @@ Storage variable rules:
 PDF_MAX_PAGES=500
 PDF_MIN_USABLE_CHARACTERS=20
 PDF_TEXT_SORT=true
+DOCUMENT_TABLE_ROW_CHUNKING_ENABLED=false
 ```
 
 PDF extraction variable rules:
@@ -100,6 +101,12 @@ PDF extraction variable rules:
 - `PDF_MAX_PAGES` is an integer greater than `0`.
 - `PDF_MIN_USABLE_CHARACTERS` is an integer greater than or equal to `0`.
 - `PDF_TEXT_SORT` is a boolean.
+- `DOCUMENT_TABLE_ROW_CHUNKING_ENABLED` (boolean, default `false`; added 2026-11-18 by DEC-031, version 2 by DEC-034): adds one `TABLE_ROW` chunk per body row of each data table, `<table title> | <column>: <cell>; ...`.
+  - The page text and its chunks stay exactly as with the flag off.
+  - A row chunk's parent is the page's text chunk that holds its table. Hybrid retrieval keeps one hit per text chunk and its rows. A row's keyword text is its cells only.
+  - A data table has at least 3 columns and 3 rows.
+  - It is read by the worker at ingestion, so it changes a corpus only when documents are processed again through the pipeline.
+  - Design and measurement: `docs/design/table-chunking.md`.
 - These values are not secrets.
 - No PDF password environment variable is supported in MVP.
 
@@ -223,6 +230,7 @@ HYBRID_KEYWORD_WEIGHT=1.0
 HYBRID_SEMANTIC_MIN_RELEVANCE_SCORE=0.30
 RAG_SEMANTIC_EXACT_PERMITTED_KNN_ENABLED=true
 RAG_DETERMINISTIC_ROUTE_MODE=strict
+RAG_DRAFT_DOCUMENT_POLICY=exclude
 RAG_REPAIR_AFTER_LLM_REFUSAL_ENABLED=false
 RAG_ANSWER_UNIT_GUARD_ENABLED=true
 RAG_RESELECT_REQUIRES_STRONG_SUPPORT_ENABLED=false
@@ -239,13 +247,13 @@ RAG_RESPONSIVENESS_BLOCK_TERMINAL_ENABLED=true
 RAG_CONTENT_BLOCKS_TERMINAL_ENABLED=false
 RAG_EXCERPT_FALLBACK_ENABLED=true
 RAG_COMPOUND_PARTIAL_ANSWER_ENABLED=false
-RAG_ANSWER_MODE=legacy
-RAG_SIMPLE_ABSENCE_SENTENCES_ENABLED=false
-RAG_SIMPLE_SHORT_PROMPT_ENABLED=false
-RAG_SIMPLE_RELAXED_RULES_ENABLED=false
-RAG_SIMPLE_CLAIM_RELEVANCE_ENABLED=false
+RAG_ANSWER_MODE=simple
+RAG_SIMPLE_ABSENCE_SENTENCES_ENABLED=true
+RAG_SIMPLE_SHORT_PROMPT_ENABLED=true
+RAG_SIMPLE_RELAXED_RULES_ENABLED=true
+RAG_SIMPLE_CLAIM_RELEVANCE_ENABLED=true
 RAG_SIMPLE_CLAIM_RELEVANCE_MIN_SIMILARITY=0.78
-RAG_SIMPLE_QUESTION_LIST_SEGMENTS_ENABLED=false
+RAG_SIMPLE_QUESTION_LIST_SEGMENTS_ENABLED=true
 RAG_SIMPLE_SUBJECT_BINDING_ENABLED=false
 RAG_SIMPLE_CLAIM_CROSS_ENCODER_ENABLED=false
 RAG_SIMPLE_CLAIM_CROSS_ENCODER_MODEL=cross-encoder/mmarco-mMiniLMv2-L12-H384-v1
@@ -278,6 +286,11 @@ Retrieval variable rules:
 - `HYBRID_SEMANTIC_WEIGHT` and `HYBRID_KEYWORD_WEIGHT` are finite numbers greater than or equal to `0.0`; they cannot both be `0.0`.
 - `HYBRID_SEMANTIC_MIN_RELEVANCE_SCORE` is a finite number in `[0.0, 1.0]`.
 - `RAG_SEMANTIC_EXACT_PERMITTED_KNN_ENABLED` (boolean, default `true` since PROMPT 3f, added in PROMPT 3e): semantic retrieval ranks every chunk the user may read exactly. Set `false` only to roll back to the statement the planner can serve through the HNSW index; that path applies permission and visibility after `hnsw.ef_search` candidates and can lose permitted chunks. See `docs/design/hnsw-permission-recall.md`, including the latency budget and the cells that are not verified yet.
+- `RAG_DRAFT_DOCUMENT_POLICY` (`off` or `exclude`; default `exclude` since DEC-036, the owner's data policy; added 2026-11-18, DEC-033): what answers do with documents whose `lifecycle_status` is `DRAFT` (templates and drafts, set by the uploader or an admin).
+  - `exclude`: none of their chunks enters retrieval, the retrieval supplements or the citation lookup. It acts only on documents marked `DRAFT`. A document uploaded before DEC-033 stays `ACTIVE` until an admin marks it.
+  - `off`: they rank and answer like `ACTIVE` documents. This is the rollback.
+  - Document management and permissions are the same either way.
+  - Design: `docs/design/document-authority.md`.
 - `RAG_DETERMINISTIC_ROUTE_MODE` (`legacy`, `strict` or `off`; default `strict` since FIX 1, DEC-010; set `legacy` to roll back): the condition copier `_structured_condition_value_answer`, before and after the LLM. `strict` matches cues as whole words on text that keeps its diacritics and requires the chosen source span to share the question's topic. `off` removes this branch. The other deterministic branches are not affected.
 - `RAG_REPAIR_AFTER_LLM_REFUSAL_ENABLED` (boolean, default `false` since DEC-011; FIX 2 group 1): `true` restores the old behaviour. `false` stops the deterministic repair once the LLM has refused in the request. A repair after the validator rejects an LLM answer still runs.
 - `RAG_ANSWER_UNIT_GUARD_ENABLED` (boolean, default `true` since DEC-011; FIX 2 group 2): `false` restores the old behaviour. With `true`, "đồng ý" no longer makes a question a money question, and an answer to "bao nhiêu <unit>" must hold a number with that unit, on every route. An answer saying the documents do not specify the value is exempt.
@@ -292,8 +305,8 @@ Retrieval variable rules:
 - `RAG_RESPONSIVENESS_BLOCK_TERMINAL_ENABLED` (boolean, default `true` since 2026-11-15; variant (a)) and `RAG_CONTENT_BLOCKS_TERMINAL_ENABLED` (boolean, default `false`; variant (b)): a block on an answer the LLM wrote ends at NO_ANSWER instead of a regeneration or a server-built repair. (a) covers the responsiveness block only; (b) covers every content block: responsiveness, a claim not SUPPORTED (single or compound), a missing requested unit, completeness. Format errors (unparseable output, wrong citation markers, placeholders) are still retried, and a blocked server-built candidate never ends the answer. `terminal_block` on `enterprise_ai_rag_answer_branch_total` counts the stops. The inventory of retry sites is in `docs/design/pipeline-loss-fix-plan.md`.
 - `RAG_EXCERPT_FALLBACK_ENABLED` (boolean, default `true` since the (iii) batch of 2026-11-14: one fewer false answer on the compound set, every other set identical; FIX 4 (iii)): the prompt keeps the query-focused excerpt of each chunk (`query_focused_excerpt`), but a source is given whole when its excerpt holds no content word of the question, or, for a compound question, has no evidence block for one of the claims. The validator sees the same text as the LLM. Each fallback is counted as `excerpt_fallback`.
 - `RAG_COMPOUND_PARTIAL_ANSWER_ENABLED` (boolean, default `false`; FIX 4 (iv), DEC-021): when some claims of a compound question are validated and the others still fail after repair, the answer gives the validated parts and, for each other part, the fixed sentence "Chưa xác minh được từ tài liệu bạn được phép truy cập: <part>.", instead of refusing the whole question. Citations come only from the validated parts. With `RAG_CONTENT_BLOCKS_TERMINAL_ENABLED`, a part rejected for its content is not regenerated but goes into that sentence. Counted as `compound_partial_answer`. With `RAG_RESPONSIVENESS_CHECK_ENABLED` also on, every kept claim the LLM wrote must pass the responsiveness check against its own part (threshold `RAG_RESPONSIVENESS_MIN_SIMILARITY`); a claim that fails goes into the unverified sentence (`claim_unresponsive`), and when no claim passes the answer ends at NO_ANSWER without a retry.
-- `RAG_ANSWER_MODE` (`legacy` or `simple`; default `legacy`): `legacy` is the full pipeline. `simple` takes the hybrid retrieval (permission-filtered in SQL), the first 5 chunks with at most 2 per document, whole chunks in one prompt (plain text with inline `[SOURCE_n]` markers, "chưa xác minh được…" for missing parts (DEC-021), the question's language), then only citation validation and claim validation with normalized numbers; a failure is retried once with its reason, then NO_ANSWER. It skips the deterministic route, the low-alignment filter, the completeness and responsiveness checks and every repair after the LLM. Counters: `simple_retry`, `simple_no_answer_<reason>` (`docs/design/simple-answer-mode.md`).
-- Simple-mode fixes s1-s3 (owner decision 2026-11-16; read only when `RAG_ANSWER_MODE=simple`; all off by default; `docs/design/simple-answer-mode.md`):
+- `RAG_ANSWER_MODE` (`legacy`, `simple` or `hybrid`; default `simple` since DEC-040, 2026-11-20, before that `legacy`; `legacy` with `LLM_OLLAMA_MODEL=qwen2.5:3b` is the rollback, `DEPLOYMENT.md` 3.3): `legacy` is the full pipeline. `simple` takes the hybrid retrieval (permission-filtered in SQL), the first 5 chunks with at most 2 per document, whole chunks in one prompt (plain text with inline `[SOURCE_n]` markers, "chưa xác minh được…" for missing parts (DEC-021), the question's language), then only citation validation and claim validation with normalized numbers; a failure is retried once with its reason, then NO_ANSWER. It skips the deterministic route, the low-alignment filter, the completeness and responsiveness checks and every repair after the LLM. Counters: `simple_retry`, `simple_no_answer_<reason>` (`docs/design/simple-answer-mode.md`). `hybrid` (kept behind the flag, **not recommended**, DEC-041: the route's false matches outside UAT give wrong values with citations): the legacy pipeline up to its deterministic route, under the same conditions; a question the route does not answer (no source, missing reason evidence, no route, or a route draft that is not ANSWERED) goes to the simple path, with the s1-s3 flags and the configured model. Every persisted answer also counts `answer_route_<route>` (`det_<builder>` before any LLM call, `repair_<builder>` after it, `llm_legacy`, `llm_simple`, `refusal_gate`), and with `RAG_DIAGNOSTICS_ENABLED` every no-answer diagnostic counts `no_answer_<reason>`; the eval runners read both per question.
+- Simple-mode fixes s1-s3 (owner decision 2026-11-16; read by the simple path: `RAG_ANSWER_MODE=simple`, or `hybrid` when no route answers; all on by default since DEC-040, off before; `docs/design/simple-answer-mode.md`):
   - `RAG_SIMPLE_ABSENCE_SENTENCES_ENABLED` (boolean, s1): a sentence that names an unverified part ("chưa xác minh được", "không xác minh được", "could not be verified") is never a claim, with or without a marker; its marker is removed, and an answer made only of such sentences is NO_ANSWER. A marker written after a full stop belongs to that sentence. A sentence holding a number the question does not hold stays a claim.
   - `RAG_SIMPLE_SHORT_PROMPT_ENABLED` (boolean, s1): the prompt asks for one short sentence per point asked, each with its marker before the full stop in the first draft, and the unverified part named without a marker.
   - `RAG_SIMPLE_RELAXED_RULES_ENABLED` (boolean, s2): claim validation skips `_explicit_value_answer_is_subject_aligned` and the attendance, annual-leave and bereavement rules; the number/unit, polarity and evidence checks stay.
@@ -437,6 +450,8 @@ LLM_OLLAMA_BASE_URL=http://host.docker.internal:11434
 LLM_OLLAMA_MODEL=<local-model>
 ```
 
+The default model is `qwen3.5-text:4b` on an NVIDIA GPU with at least 4 GB VRAM, with `LLM_TIMEOUT_SECONDS=90` (600 on a CPU-only host); `qwen2.5:3b` with `RAG_ANSWER_MODE=legacy` is the rollback (DEC-040, `DEPLOYMENT.md` 3.3).
+
 Local LM Studio:
 
 ```text
@@ -469,6 +484,7 @@ Validation rules:
 - `LLM_PROMPT_TRUNCATION_GUARD_ENABLED` (boolean, default `false`, added in PROMPT 3g, extended in PROMPT 4 item 0b): when `true`, the guard ends the answer with the fixed no-answer and no citations (1) **before sending**, when the estimated prompt plus `LLM_MAX_OUTPUT_TOKENS` exceeds `LLM_CONTEXT_WINDOW` (logged as `LLM_PROMPT_BUDGET_EXCEEDED`; the request is not sent), and (2) after a response with usage at or above `LLM_CONTEXT_WINDOW - LLM_MAX_OUTPUT_TOKENS` or without usage. With the flag off, both cases are logged only. In addition, a response whose `usage.prompt_tokens` is below 0.7 x the estimate logs `LLM_PROMPT_POSSIBLY_TRUNCATED` with `reason=USAGE_BELOW_ESTIMATE`. This is log-only even with the flag on. It is the signature of Ollama 0.40.13 cutting a prompt to about half its context and reporting the shortened count (2050 at 4096, 4098 at 8192), which the usage threshold alone cannot see. All guard logs carry counts only, never prompt or answer text.
 - `LLM_TOKEN_ESTIMATE_RATIO` (float, 0 < x <= 4, default `0.99`, added in PROMPT 4 item 0b): estimated provider prompt tokens = ceil(ratio x the sum of the `TOKENIZER_ENCODING_NAME` (tiktoken `cl100k_base`) counts of the message contents). Calibrated on the 36 LLM calls of a UAT Q001-Q100 run against Ollama 0.40.13 `qwen2.5:3b`; all 36 had the same case order and `prompt_tokens` as the PROMPT 3g measurement. Ollama/tiktoken was 0.779 to 0.985 (median 0.897, mean 0.898, stdev 0.053). The default 0.99 is the maximum rounded up, so no measured call is under-estimated. With it the estimate is 0.5% to 27.1% above the real count (mean 10.7%, at most 805 tokens), and the lowest real/estimate share is 0.787, above the 0.7 truncation signal. Recalibrate when the model or tokenizer changes (`scripts/eval/ollama_usage_proxy.py --tiktoken-encoding`).
 - `LLM_OLLAMA_NUM_CTX` and `LLM_OLLAMA_KEEP_ALIVE` are sent with every Ollama request. Ollama's `/v1` endpoint ignores `options`, so `num_ctx` has **no effect**. **Server-side requirement:** set `OLLAMA_CONTEXT_LENGTH` on the Ollama server, at least `LLM_CONTEXT_WINDOW`, and restart Ollama (`DEPLOYMENT.md` section 3.1). Without it the server default (4096 on Ollama 0.40.13) applies, and longer prompts lose their beginning, including the system instructions, without any error.
+- **Also on the Ollama server:** `LLAMA_ARG_CACHE_RAM=2048` caps llama-server's prompt cache, which otherwise grows to 8 GiB of host RAM (DEC-029, `DEPLOYMENT.md` section 3.2). It is not read by the app.
 - Chat SSE uses `LLM_STREAM_HEARTBEAT_SECONDS` for empty heartbeat events and `LLM_STREAM_MAX_DURATION_SECONDS` as the total bounded stream duration. Heartbeats do not extend the maximum duration.
 - The app does not call an LLM at import, migration, startup, liveness, or readiness by default.
 - The app does not add an Ollama, LM Studio, or other LLM container to Compose in TASK-026.

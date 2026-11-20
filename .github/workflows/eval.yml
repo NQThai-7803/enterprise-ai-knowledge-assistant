@@ -12,6 +12,8 @@ name: Eval
 # (compound_partial_dev_v1, half-answerable two-part questions) and `natural` (natural_dev_v1, the
 # owner's questions over corpus V2, proxy-graded on the locked gold). Never runs held-out v2 (DEC-012). Held-out v1 only through
 # `trace_heldout_v1`, a layer-by-layer diagnostic trace that is not scored (DEC-008).
+# DEC-040: a configuration with no setting (e.g. `base`) is the default, simple + s1-s3 +
+# qwen3.5-text:4b; `legacy:EVAL_ANSWER_MODE=legacy,EVAL_LLM_MODEL=qwen2.5:3b` is the rollback.
 on:
   workflow_dispatch:
     inputs:
@@ -42,10 +44,15 @@ on:
         type: string
         default: ""
       llm_timeout:
-        description: "LLM timeout per call, seconds, for every configuration (600 for 7-8B models on CPU, DEC-028)"
+        description: "LLM timeout per call, seconds, for every configuration (600: qwen3.5-text:4b and 7-8B models on CPU, DEC-028/040)"
         type: choice
         options: ["180", "600"]
-        default: "180"
+        default: "600"
+      ollama_cache_ram:
+        description: "llama-server prompt cache cap in MiB (LLAMA_ARG_CACHE_RAM), 2048 as deployed; 'default' is Ollama's own 8192 (DEC-029)"
+        type: choice
+        options: ["2048", "default", "0", "4096"]
+        default: "2048"
 
 permissions:
   contents: read
@@ -75,10 +82,10 @@ jobs:
       PYTHONIOENCODING: utf-8
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup Python 3.12
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: "3.12"
           cache: pip
@@ -129,7 +136,7 @@ jobs:
           CHUNK_OVERLAP_TOKENS=100
           LLM_ENABLED=true
           LLM_PROVIDER=ollama
-          LLM_OLLAMA_MODEL=qwen2.5:3b
+          LLM_OLLAMA_MODEL=qwen3.5-text:4b
           LLM_OLLAMA_NUM_CTX=8192
           LLM_OLLAMA_KEEP_ALIVE=10m
           LLM_MAX_OUTPUT_TOKENS=512
@@ -166,14 +173,32 @@ jobs:
           sudo systemctl stop ollama || true
           echo "EVAL_OLLAMA_LOG=$RUNNER_TEMP/ollama.log" >> "$GITHUB_ENV"
           # One model in memory at a time: a configuration with another model evicts the last one.
-          OLLAMA_HOST=0.0.0.0:11434 OLLAMA_CONTEXT_LENGTH=8192 OLLAMA_NUM_PARALLEL=1 OLLAMA_MAX_LOADED_MODELS=1 \
+          # DEC-029: llama-server keeps a prompt cache in host RAM (8192 MiB unless capped); Ollama passes
+          # LLAMA_ARG_CACHE_RAM through to it.
+          cache_ram=()
+          [ "${{ inputs.ollama_cache_ram }}" = default ] || cache_ram=("LLAMA_ARG_CACHE_RAM=${{ inputs.ollama_cache_ram }}")
+          env ${cache_ram[@]+"${cache_ram[@]}"} \
+            OLLAMA_HOST=0.0.0.0:11434 OLLAMA_CONTEXT_LENGTH=8192 OLLAMA_NUM_PARALLEL=1 OLLAMA_MAX_LOADED_MODELS=1 \
             nohup ollama serve > "$RUNNER_TEMP/ollama.log" 2>&1 &
           for _ in $(seq 1 30); do curl -sf http://127.0.0.1:11434/api/version && break; sleep 2; done
-          for attempt in 1 2 3; do ollama pull qwen2.5:3b && break; sleep 15; done
-          ollama list | grep -q '^qwen2.5:3b'
-          # Other models named by a configuration (EVAL_LLM_MODEL=...), for model comparisons.
-          for model in $(grep -oE 'EVAL_LLM_MODEL=[^,;]+' <<< "$CONFIGS" | cut -d= -f2 | sort -u); do
-            for attempt in 1 2 3; do ollama pull "$model" && break; sleep 15; done
+          # The eval stack's default model (DEC-040, scripts/eval/compose.uat-eval.yaml) and every
+          # model a configuration names (EVAL_LLM_MODEL=..., e.g. qwen2.5:3b for the rollback).
+          for model in $( { echo qwen3.5-text:4b; grep -oE 'EVAL_LLM_MODEL=[^,;]+' <<< "$CONFIGS" | cut -d= -f2; } | sort -u); do
+            if [[ "$model" == *-text:* ]]; then
+              # DEC-029: <name>-text:<tag> is <name>:<tag> without its vision projector layer
+              # (same weights, template, renderer, parser and parameters); the library has none.
+              base="${model/-text:/:}"
+              for attempt in 1 2 3; do ollama pull "$base" && break; sleep 15; done
+              manifest="$HOME/.ollama/models/manifests/registry.ollama.ai/library/${base%%:*}/${base#*:}"
+              proj=$(python -c "import json, sys; print(''.join(l['digest'].replace(':', '-') for l in json.load(open(sys.argv[1]))['layers'] if l['mediaType'].endswith('.projector')))" "$manifest")
+              [ -n "$proj" ] || { echo "$base has no projector layer"; exit 1; }
+              ollama show --modelfile "$base" | grep -v "$proj" > "$RUNNER_TEMP/text.Modelfile"
+              [ "$(grep -c '^FROM ' "$RUNNER_TEMP/text.Modelfile")" = 1 ]
+              ollama create "$model" -f "$RUNNER_TEMP/text.Modelfile"
+              ollama show "$model" | grep -qE '^[[:space:]]+vision[[:space:]]*$' && { echo "$model still has vision"; exit 1; }
+            else
+              for attempt in 1 2 3; do ollama pull "$model" && break; sleep 15; done
+            fi
             ollama list | grep -q "^$model"
           done
           mkdir -p "$OUT"
@@ -300,7 +325,7 @@ jobs:
 
       - name: Upload results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: eval-${{ inputs.set }}-${{ github.run_id }}
           path: eval-out/

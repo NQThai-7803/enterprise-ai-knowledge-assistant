@@ -18,7 +18,7 @@ from app.core.config import get_settings
 from app.core.security import create_access_token, hash_password, hash_refresh_token, utc_now
 from app.db.session import get_db_session
 from app.main import app
-from app.models import RefreshToken, User, UserRole
+from app.models import Department, RefreshToken, User, UserRole
 from tests.api.rate_limit_isolation import isolated_client_address
 
 pytestmark = pytest.mark.integration
@@ -48,6 +48,7 @@ async def create_user(
     email: str | None = None,
     password: str = "valid auth password",
     is_active: bool = True,
+    department_id: uuid.UUID | None = None,
 ) -> User:
     async with session_factory() as session:
         user = User(
@@ -56,6 +57,7 @@ async def create_user(
             hashed_password=hash_password(password),
             role=UserRole.STAFF,
             is_active=is_active,
+            department_id=department_id,
         )
         session.add(user)
         await session.commit()
@@ -587,3 +589,39 @@ def test_login_over_limit_within_window_is_rejected_by_real_redis(
     # Another client address has its own counter, so tests never share a limit.
     with TestClient(app, client=isolated_client_address()) as other_client:
         login(other_client, email=user.email)
+
+
+async def create_department(
+    session_factory: async_sessionmaker[AsyncSession], name: str
+) -> uuid.UUID:
+    async with session_factory() as session:
+        department = Department(name=name, code=f"BR4-{uuid.uuid4().hex[:8]}")
+        session.add(department)
+        await session.commit()
+        return department.id
+
+
+def test_login_and_me_return_the_users_own_department_name(
+    api_client: TestClient,
+    async_session_factory_for_tests: async_sessionmaker[AsyncSession],
+) -> None:
+    """BR-4: the profile shows its own Department by name; null without a Department."""
+    name = f"Nhan su {uuid.uuid4().hex[:6]}"
+    department_id = asyncio.run(create_department(async_session_factory_for_tests, name))
+    create_test_user(
+        async_session_factory_for_tests, email="api-br4@example.com", department_id=department_id
+    )
+    create_test_user(async_session_factory_for_tests, email="api-br4-none@example.com")
+
+    data = login(api_client, email="api-br4@example.com")
+    me = api_client.get("/api/v1/auth/me", headers=auth_headers(str(data["access_token"])))
+    refreshed = api_client.post(
+        "/api/v1/auth/refresh", json={"refresh_token": data["refresh_token"]}
+    ).json()["data"]
+    without = login(api_client, email="api-br4-none@example.com")
+
+    assert data["user"]["department_id"] == str(department_id)
+    assert data["user"]["department_name"] == name
+    assert me.json()["data"]["department_name"] == name
+    assert refreshed["user"]["department_name"] == name
+    assert without["user"]["department_name"] is None

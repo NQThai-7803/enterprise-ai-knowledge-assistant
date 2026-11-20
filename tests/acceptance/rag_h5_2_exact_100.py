@@ -122,23 +122,14 @@ def _ask_case(
 
 
 def answer_route(before: dict[str, int] | None, after: dict[str, int] | None) -> str | None:
-    """`deterministic` or `llm` from the route counters around one question; None if unknown."""
-    delta = branch_counters.delta(before, after)
-    if delta is None:
-        return None
-    deterministic = delta.get("route_deterministic", 0)
-    llm = delta.get("route_llm", 0)
-    if (deterministic, llm) == (1, 0):
-        return "deterministic"
-    if (deterministic, llm) == (0, 1):
-        return "llm"
-    return None
+    """The route label from the counters around one question (branch_counters.answer_route)."""
+    return branch_counters.answer_route(branch_counters.delta(before, after))
 
 
 def _record_counters(
     result: dict[str, Any], before: dict[str, int] | None, after: dict[str, int] | None
 ) -> None:
-    result["answer_route"] = answer_route(before, after)
+    result.update(branch_counters.route_fields(before, after))
     # FIX 4 (ii) calibration: every question/evidence cosine the check computed on an LLM
     # draft of this question, intermediate drafts included.
     result["evidence_similarities"] = branch_counters.similarities(

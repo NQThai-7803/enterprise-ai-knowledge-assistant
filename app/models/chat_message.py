@@ -4,7 +4,18 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import CheckConstraint, DateTime, Enum, ForeignKey, Index, Integer, Text, Uuid, func
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    Uuid,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -34,6 +45,10 @@ class ChatMessage(Base):
             "completion_tokens IS NULL OR completion_tokens >= 0",
             name="ck_chat_messages_completion_tokens_non_negative",
         ),
+        CheckConstraint(
+            "grounding_status IS NULL OR grounding_status IN ('ANSWERED', 'NO_ANSWER')",
+            name="ck_chat_messages_grounding_status_known",
+        ),
         Index("ix_chat_messages_session_created", "session_id", "created_at", "id"),
     )
 
@@ -56,6 +71,9 @@ class ChatMessage(Base):
     response_time_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     prompt_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
     completion_tokens: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # BR-3: ANSWERED or NO_ANSWER on assistant messages; NULL on user messages and on messages
+    # stored before revision 20261120_0013.
+    grounding_status: Mapped[str | None] = mapped_column(String(16), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

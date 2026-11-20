@@ -202,6 +202,13 @@ LLM_OLLAMA_BASE_URL=http://host.docker.internal:11434
 LLM_OLLAMA_MODEL=<local-model>
 ```
 
+On the Ollama side, set two user environment variables and restart the Ollama tray app:
+
+- `OLLAMA_CONTEXT_LENGTH=8192`;
+- `LLAMA_ARG_CACHE_RAM=2048`, which caps the prompt cache that otherwise grows to 8 GiB of RAM.
+
+Details: `DEPLOYMENT.md` sections 3.1 and 3.2.
+
 LM Studio on the Windows host:
 
 ```text
@@ -1310,7 +1317,7 @@ Current recommended local path on Docker Desktop:
 ollama pull qwen3:4b
 ```
 
-If the machine cannot run that model comfortably, choose a smaller multilingual instruct model such as `qwen2.5:3b`. Do not download a multi-GB model without operator approval.
+The default answer path since DEC-040 is simple mode with `qwen3.5-text:4b` on an NVIDIA GPU with at least 4 GB VRAM (`DEPLOYMENT.md` 3.3, with the rollback to `RAG_ANSWER_MODE=legacy` + `qwen2.5:3b`). If the machine cannot run that model comfortably, choose a smaller multilingual instruct model such as `qwen2.5:3b`. Do not download a multi-GB model without operator approval.
 
 3. Configure `.env` with actual settings names read by `app.core.config.Settings`:
 

@@ -1,0 +1,334 @@
+name: Held-out v3.1 run
+
+# DEC-035 (updated by DEC-036): held-out v3 decides between `legacy` + qwen2.5:3b and
+# `s3` + qwen3.5-text:4b, both with RAG_DRAFT_DOCUMENT_POLICY=exclude (the default), and measures
+# them. Prepared 2026-11-18 and NOT run during development.
+#
+# Refuses to start unless: it runs on main; `confirm` is typed exactly; the job is approved in the
+# `heldout-v3-release` environment (add the owner as a required reviewer in the repository
+# settings); and scripts/eval/heldout_v3_release.py `gate` passes (heldout-v3.1.yaml matches its
+# lock). The owner decides the open DEC-030 findings before dispatching.
+#
+# One job, two runs, the configurations interleaved (legacy, s3, legacy, s3) by ci_batch.sh. Writes
+# the counts, the DEC-035 verdict and the owner's tables (grading.md / grading.csv, labels empty).
+# The job summary and logs carry ids and counts only, never question, answer or source text.
+# DEC-039: the artifact holds only the lock, summary.md, verdict.json and, on a GitHub-hosted
+# runner, the age ciphertext of everything else (repository variable HELDOUT_AGE_RECIPIENT; the job
+# fails without it). On a self-hosted runner the full results go to HELDOUT_PRIVATE_DIR/<run id>
+# (default C:/dev/eaka-private/heldout-v3.1) and are not uploaded. The folder is scanned with the
+# question fingerprints before the upload. summary.md opens with the run status (also on failure:
+# failing step, exit code, questions sent to the API).
+# Preflight and run both validate the batch first (`ci_batch.sh --validate-only`, same arguments):
+# run 44559765410 failed on "unknown set heldout_v3", which the old preflight never reached.
+# DEC-040 (2026-11-20): held-out v3.1 is SPENT after run 44575927833; the refuse step stops every
+# dispatch. `legacy` in CONFIGS meant the application defaults before DEC-040. The next independent
+# measurement needs held-out v4.
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "Type exactly: DEC-035 held-out v3.1 run approved by the owner"
+        type: string
+        required: true
+      preflight_only:
+        description: "Only validate the batch, build the stack and load the corpus; send no held-out question"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: heldout-v3-release
+  cancel-in-progress: false
+
+jobs:
+  heldout-v3:
+    name: Held-out v3 (2 runs, 2 configurations)
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    environment: heldout-v3-release
+    env:
+      PROJECT: eaka-heldout-v3
+      OUT: heldout-v3-out
+      PUBLIC: heldout-v3-public
+      P3D_BACKEND_IMAGE: eaka-backend:ci-heldout-v3
+      EVAL_BACKEND_IMAGE: eaka-backend:ci-heldout-v3
+      EVAL_EXPECTED_RERANKER_MODE: lexical_fallback
+      COMPOSE_FILES: "-f compose.yaml -f compose.uat-corpus-v2.yaml -f scripts/eval/compose.uat-eval.yaml -f ci-host.yaml"
+      OLLAMA_VERSION: 0.40.15
+      EVAL_OLLAMA_EXPECTED_VERSION: 0.40.15
+      EVAL_OLLAMA_EXPECTED_BACKEND: CPU
+      EVAL_OLLAMA_BASE_URL: http://host.docker.internal:11434
+      RAG_ACCEPTANCE_BASE_URL: http://127.0.0.1:18190
+      PYTHONIOENCODING: utf-8
+      # The two configurations of DEC-035; exclude is the default of both (DEC-036).
+      CONFIGS: "legacy;s3t:EVAL_SIMPLE_LEVEL=3,EVAL_LLM_MODEL=qwen3.5-text:4b"
+      # The validate step and the run step pass ci_batch.sh these same arguments.
+      BATCH_SET: heldout_v3
+      BATCH_RUNS: "2"
+      LLM_TIMEOUT: "600"
+    steps:
+      - name: Record the exit code of a failing step (DEC-039 run status)
+        id: trap
+        # Every later bash step sources this file (BASH_ENV); heldout_status.py reads its record.
+        run: |
+          cat > "$RUNNER_TEMP/step-exit.sh" <<'EOF'
+          if [ -z "${STEP_EXIT_TRAP:-}" ]; then
+            export STEP_EXIT_TRAP=1
+            trap 'rc=$?; [ "$rc" = 0 ] || echo "${GITHUB_ACTION:-unknown} $rc" >> "$RUNNER_TEMP/failed-steps.txt"' EXIT
+          fi
+          EOF
+          echo "BASH_ENV=$RUNNER_TEMP/step-exit.sh" >> "$GITHUB_ENV"
+
+      - name: Checkout repository
+        id: checkout
+        uses: actions/checkout@v7
+
+      - name: Refuse anything but a confirmed run on main
+        id: refuse
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+        run: |
+          echo "held-out v3.1 is spent (DEC-040, run 44575927833): measure on held-out v4"; exit 1
+          [ "$GITHUB_REF" = refs/heads/main ] || { echo "held-out v3 runs only on main"; exit 1; }
+          [ "$CONFIRM" = "DEC-035 held-out v3.1 run approved by the owner" ] \
+            || { echo "confirm text does not match"; exit 1; }
+
+      - name: Setup Python 3.12
+        id: python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install runner dependencies
+        id: deps
+        run: python -m pip install -e ".[dev]"
+
+      - name: Gate (held-out v3.1 matches its lock)
+        id: gate
+        # DEC-038: a real run refuses while an item is still PENDING_AUTHOR_REVIEW.
+        env:
+          PREFLIGHT: ${{ inputs.preflight_only }}
+        run: |
+          if [ "$PREFLIGHT" = true ]; then
+            python scripts/eval/heldout_v3_release.py gate
+          else
+            python scripts/eval/heldout_v3_release.py gate --no-pending
+          fi
+
+      - name: Check where the owner's full results go (DEC-039)
+        id: keycheck
+        env:
+          RUNNER_KIND: ${{ runner.environment }}
+          HELDOUT_AGE_RECIPIENT: ${{ vars.HELDOUT_AGE_RECIPIENT }}
+        run: |
+          echo "runner: $RUNNER_KIND"
+          if [ "$RUNNER_KIND" = github-hosted ]; then
+            [[ "$HELDOUT_AGE_RECIPIENT" =~ ^age1[0-9a-z]{58}$ ]] || {
+              echo "set the repository variable HELDOUT_AGE_RECIPIENT to the owner's age public key"
+              exit 1
+            }
+            sudo apt-get update -qq && sudo apt-get install -y -qq age > /dev/null
+            age --version
+          fi
+
+      - name: Generate throwaway credentials
+        id: credentials
+        run: |
+          for name in SECRET_KEY POSTGRES_PASSWORD UAT_ADMIN_PASSWORD UAT_MANAGER_PASSWORD UAT_STAFF_PASSWORD EVAL_PASSWORD_OPS; do
+            value="Ci$(openssl rand -hex 16)!"
+            echo "::add-mask::$value"
+            echo "$name=$value" >> "$GITHUB_ENV"
+          done
+
+      - name: Write the app environment file
+        id: envfile
+        # As eval.yml; the RAG flags stay at the application defaults unless a configuration sets them.
+        run: |
+          cat > .env <<EOF
+          APP_ENV=development
+          APP_DEBUG=false
+          API_V1_PREFIX=/api/v1
+          SECRET_KEY=${SECRET_KEY}
+          JWT_ALGORITHM=HS256
+          JWT_ISSUER=enterprise-ai-knowledge-assistant
+          JWT_AUDIENCE=enterprise-ai-api
+          ACCESS_TOKEN_EXPIRE_MINUTES=15
+          REFRESH_TOKEN_EXPIRE_DAYS=7
+          POSTGRES_DB=enterprise_ai
+          POSTGRES_USER=app_user
+          POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+          STORAGE_BACKEND=local
+          MAX_UPLOAD_SIZE_MB=25
+          EMBEDDING_PROVIDER=sentence_transformers
+          EMBEDDING_MODEL_NAME=intfloat/multilingual-e5-small
+          EMBEDDING_DIMENSIONS=384
+          EMBEDDING_DEVICE=cpu
+          EMBEDDING_BATCH_SIZE=16
+          EMBEDDING_NORMALIZE=true
+          EMBEDDING_QUERY_PREFIX="query: "
+          EMBEDDING_PASSAGE_PREFIX="passage: "
+          EMBEDDING_LOCAL_FILES_ONLY=false
+          RETRIEVAL_TOP_K=10
+          RERANKER_TOP_K=6
+          MIN_RELEVANCE_SCORE=0.50
+          CHUNK_SIZE_TOKENS=700
+          CHUNK_OVERLAP_TOKENS=100
+          LLM_ENABLED=true
+          LLM_PROVIDER=ollama
+          LLM_OLLAMA_MODEL=qwen2.5:3b
+          LLM_OLLAMA_NUM_CTX=8192
+          LLM_OLLAMA_KEEP_ALIVE=10m
+          LLM_MAX_OUTPUT_TOKENS=512
+          LLM_OLLAMA_REASONING_EFFORT=none
+          LLM_TIMEOUT_SECONDS=${LLM_TIMEOUT}
+          LOG_LEVEL=INFO
+          LOG_FORMAT=json
+          RAG_DIAGNOSTICS_ENABLED=true
+          EOF
+          sed -i 's/^          //' .env
+          echo "EVAL_PASSWORD_ADMIN=${UAT_ADMIN_PASSWORD}" >> "$GITHUB_ENV"
+          echo "EVAL_PASSWORD_MANAGER=${UAT_MANAGER_PASSWORD}" >> "$GITHUB_ENV"
+          echo "EVAL_PASSWORD_STAFF=${UAT_STAFF_PASSWORD}" >> "$GITHUB_ENV"
+          echo "EVAL_HTTP_TIMEOUT_SECONDS=$(( LLM_TIMEOUT * 4 ))" >> "$GITHUB_ENV"
+
+      - name: Validate the batch (same set, configurations and runs as the run step)
+        id: validate
+        # Preflight and real run alike: the set, its ACTIVE questions and their accounts, the
+        # configurations; no API, no model. Prints ids and counts only.
+        env:
+          HELDOUT_V3_APPROVED: "1"
+        run: bash scripts/eval/ci_batch.sh --validate-only "$BATCH_SET" "$CONFIGS" "$BATCH_RUNS" "$OUT"
+
+      - name: Install Ollama, pull qwen2.5:3b, build qwen3.5-text:4b
+        id: ollama
+        run: |
+          set -euo pipefail
+          if ! { curl -fsSL --retry 5 --retry-delay 10 --retry-all-errors \
+                   -o "$RUNNER_TEMP/ollama-install.sh" https://ollama.com/install.sh \
+                 && OLLAMA_VERSION="$OLLAMA_VERSION" sh "$RUNNER_TEMP/ollama-install.sh"; }; then
+            docker create --name ollama-src "ollama/ollama:$OLLAMA_VERSION" >/dev/null
+            sudo docker cp ollama-src:/usr/bin/ollama /usr/local/bin/ollama
+            sudo mkdir -p /usr/local/lib
+            sudo docker cp ollama-src:/usr/lib/ollama /usr/local/lib/ollama
+            docker rm ollama-src >/dev/null
+          fi
+          ollama --version
+          sudo systemctl stop ollama || true
+          echo "EVAL_OLLAMA_LOG=$RUNNER_TEMP/ollama.log" >> "$GITHUB_ENV"
+          # DEC-029: the prompt cache capped as in DEPLOYMENT.md; one model in memory at a time.
+          LLAMA_ARG_CACHE_RAM=2048 OLLAMA_HOST=0.0.0.0:11434 OLLAMA_CONTEXT_LENGTH=8192 \
+          OLLAMA_NUM_PARALLEL=1 OLLAMA_MAX_LOADED_MODELS=1 \
+            nohup ollama serve > "$RUNNER_TEMP/ollama.log" 2>&1 &
+          for _ in $(seq 1 30); do curl -sf http://127.0.0.1:11434/api/version && break; sleep 2; done
+          for attempt in 1 2 3; do ollama pull qwen2.5:3b && break; sleep 15; done
+          ollama list | grep -q '^qwen2.5:3b'
+          # DEC-029: qwen3.5:4b without its vision projector (CPU runner: no num_gpu).
+          python scripts/deploy/ollama_text_model.py qwen3.5:4b qwen3.5-text:4b
+          mkdir -p "$OUT"
+          { ollama --version; nproc; free -m; df -h /; ollama list; } > "$OUT/ollama-config.txt"
+
+      - name: Build the backend image
+        id: image
+        run: docker build -t "$P3D_BACKEND_IMAGE" --label eaka.commit="${GITHUB_SHA::7}" .
+
+      - name: Start the eval stack
+        id: stack
+        run: |
+          set -euo pipefail
+          cat > ci-host.yaml <<'EOF'
+          services:
+            api:
+              extra_hosts: ["host.docker.internal:host-gateway"]
+            worker:
+              extra_hosts: ["host.docker.internal:host-gateway"]
+          EOF
+          read -r -a FILES <<< "$COMPOSE_FILES"
+          docker compose -p "$PROJECT" "${FILES[@]}" up -d --wait --no-build postgres redis
+          docker compose -p "$PROJECT" "${FILES[@]}" run --rm --no-deps migration
+          docker compose -p "$PROJECT" "${FILES[@]}" run --rm --no-deps uat-v2-accounts
+          docker compose -p "$PROJECT" "${FILES[@]}" up -d --no-build --no-deps api worker
+          for _ in $(seq 1 90); do
+            [ "$(docker inspect "$PROJECT-api-1" --format '{{.State.Health.Status}}')" = healthy ] && break
+            sleep 5
+          done
+          docker inspect "$PROJECT-api-1" --format '{{.State.Health.Status}}' | grep -q healthy
+
+      - name: Load corpus V2 (the template marked DRAFT, DEC-033)
+        id: corpus
+        run: >
+          python scripts/eval/bootstrap_corpus_v2.py . http://127.0.0.1:18190
+          "$OUT/runtime-manifest.json"
+
+      - name: Run held-out v3, two runs, both configurations interleaved
+        id: batch
+        if: ${{ !inputs.preflight_only }}
+        env:
+          HELDOUT_V3_APPROVED: "1"
+        run: |
+          set -euo pipefail
+          echo "commit=${GITHUB_SHA}" > "$OUT/commit.txt"
+          ( while true; do free -m | awk 'NR==2 {print strftime("%T"), $3, $7}'; sleep 30; done ) \
+            > "$OUT/memory.log" &
+          bash scripts/eval/ci_batch.sh "$BATCH_SET" "$CONFIGS" "$BATCH_RUNS" "$OUT"
+
+      - name: Grade (counts, DEC-035 verdict, owner's tables)
+        id: grade
+        if: ${{ !inputs.preflight_only }}
+        run: |
+          python scripts/eval/heldout_v3_release.py grading "$OUT" "$OUT/grading"
+
+      - name: Collect logs
+        id: logs
+        if: always()
+        run: |
+          mkdir -p "$OUT"
+          docker compose -p "$PROJECT" logs --no-color api worker > "$OUT/stack.log" 2>&1 || true
+          cp "$RUNNER_TEMP/ollama.log" "$OUT/" 2>/dev/null || true
+          docker compose -p "$PROJECT" down -v || true
+
+      - name: Write the run status (DEC-039)
+        id: status
+        # Heads the public summary.md, also when the job failed: status, failing step, exit code,
+        # questions sent to the API. python3: Python may not have been set up yet.
+        if: always()
+        env:
+          JOB_STATUS: ${{ job.status }}
+          PREFLIGHT: ${{ inputs.preflight_only }}
+          STEPS_JSON: ${{ toJSON(steps) }}
+        run: >
+          python3 scripts/eval/heldout_status.py --workflow .github/workflows/heldout-v3.yml
+          --job-status "$JOB_STATUS" --preflight "$PREFLIGHT"
+          --failed-steps "$RUNNER_TEMP/failed-steps.txt"
+          --stack-log "$OUT"/before-batch/api.log "$OUT"/*/run*/api.log "$OUT/stack.log"
+          --summary "$OUT/grading/summary.md" --output "$OUT/status/summary.md"
+
+      - name: Keep the full results private (DEC-039)
+        id: private
+        if: always()
+        env:
+          RUNNER_KIND: ${{ runner.environment }}
+          HELDOUT_AGE_RECIPIENT: ${{ vars.HELDOUT_AGE_RECIPIENT }}
+          HELDOUT_PRIVATE_DIR: ${{ vars.HELDOUT_PRIVATE_DIR }}
+        run: >
+          bash scripts/eval/heldout_publish.sh heldout-v3.1 "$OUT" "$PUBLIC" "$GITHUB_RUN_ID"
+          docs/eval/heldout-v3.1.lock "$OUT/status/summary.md" "$OUT/grading/verdict.json"
+
+      - name: Scan the public folder for question text (DEC-039)
+        id: scan
+        # Also after a failed split: the public folder then holds the text-free files only.
+        if: always()
+        run: |
+          python3 scripts/eval/question_leak.py scan "$PUBLIC"
+          if [ -f "$PUBLIC/summary.md" ]; then cat "$PUBLIC/summary.md" >> "$GITHUB_STEP_SUMMARY"; fi
+
+      - name: Upload the public folder (ids, counts, verdict, lock, ciphertext only)
+        if: always() && steps.scan.outcome == 'success'
+        uses: actions/upload-artifact@v7
+        with:
+          name: heldout-v3-${{ github.run_id }}
+          path: heldout-v3-public/
+          retention-days: 90

@@ -1,0 +1,10 @@
+{
+ "version": "uat_reference_v3",
+ "files": {
+  "reference-grade.json": "25a7199a53cb7ecbb47f49ce04bb533308ddba9aebd3bfca4a4b40bd127a6a25",
+  "retrieval-gold.json": "f0aba0659e12e08b047882e9c68ec87cf61693d55afe0a71980af4c9184f5559"
+ },
+ "approved_by": "owner (NQThai-7803), review of 2026-11-18 (DEC-037): Q018 answered from ND-HR-003, accepted_sources for Q002/Q016/Q017/Q034, Q054 text; earlier: Q044 (DEC-033)",
+ "locked_at": "2026-11-19T08:19:11+00:00",
+ "rule": "any edit needs the owner's approval, a DECISIONS.md entry and a new lock"
+}

@@ -399,12 +399,34 @@ USING gin (
 - No search-history table, retrieval-cache table, conversation table, citation table, trigger, `unaccent`, `pg_trgm`, or new extension is introduced.
 - The TASK-017 downgrade removes only `ix_document_chunks_text_fts_simple`; it does not drop `document_chunks`, vector columns, the pgvector extension, documents, permissions, or the HNSW vector index.
 
+## 11. Draft documents and table-row chunks (migration `20261118_0012`, DEC-033, DEC-034)
+
+- `document_lifecycle_status` gains `DRAFT`: a template or draft, set by the uploader or an admin.
+  - With `RAG_DRAFT_DOCUMENT_POLICY=exclude`, answers never use it.
+  - Otherwise it ranks like `ACTIVE`.
+- `document_chunks` gains three columns:
+
+| Column | Type | Notes |
+|---|---|---|
+| chunk_kind | varchar(16) | `TEXT` (default) or `TABLE_ROW`, check constraint `ck_document_chunks_chunk_kind` |
+| parent_chunk_id | UUID | Nullable FK to `document_chunks.id ON DELETE CASCADE`: the `TEXT` chunk that holds a row's table |
+| search_text | text | Nullable; a row's cells only. Keyword retrieval reads `COALESCE(search_text, text)` |
+
+- New indexes:
+  - `ix_document_chunks_parent_chunk_id`;
+  - the GIN expression index `ix_document_chunks_search_fts_simple` on `to_tsvector('simple', COALESCE(search_text, text))`.
+- Existing chunks are `TEXT` with no parent and no `search_text`, so retrieval over them is unchanged.
+- Downgrade:
+  - deletes `TABLE_ROW` chunks and drops the three columns and their indexes;
+  - sets `DRAFT` documents to `ACTIVE` and rebuilds the enum without `DRAFT`, because PostgreSQL cannot drop an enum value.
+
 ## TASK-018/TASK-019 Chat tables
 
 Chat persistence uses `chat_sessions` and `chat_messages`.
 
 - ChatSession rows are owned by one User.
 - ChatMessage rows belong to a ChatSession and store role, content, optional retrieval query, provider response time, prompt tokens, and completion tokens.
+- `grounding_status` (`VARCHAR(16)`, nullable, migration `20261120_0013`, BR-3): `ANSWERED` or `NO_ANSWER` on ASSISTANT rows written since that revision; `NULL` on USER rows and on older rows (no backfill). Check constraint `ck_chat_messages_grounding_status_known`. Downgrade drops the constraint and the column.
 - SYSTEM messages are internal and hidden from public Chat history.
 - USER and ASSISTANT answer pairs are persisted atomically after retrieval and LLM generation complete.
 

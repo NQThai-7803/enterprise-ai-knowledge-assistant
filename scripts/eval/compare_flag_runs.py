@@ -49,7 +49,7 @@ def rbac_outcomes(run: Mapping[str, Any]) -> dict[str, Outcome]:
 def uat_outcomes(run: Mapping[str, Any]) -> dict[str, Outcome]:
     outcomes = {}
     for case in run["cases"]:
-        if case["proxy_match"]:
+        if case.get("value_match", case["proxy_match"]):  # DEC-032
             outcomes[case["id"]] = "correct"
         elif case["reference_status"] == "NO_ANSWER" and case["grounding_status"] == "ANSWERED":
             outcomes[case["id"]] = "false_answer"

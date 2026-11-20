@@ -44,6 +44,7 @@ class FakeMessageRepository:
         prompt_tokens,
         completion_tokens,
         created_at,
+        grounding_status=None,
     ):
         self.calls.append(
             {
@@ -55,6 +56,7 @@ class FakeMessageRepository:
                 "prompt_tokens": prompt_tokens,
                 "completion_tokens": completion_tokens,
                 "created_at": created_at,
+                "grounding_status": grounding_status,
             }
         )
         return SimpleNamespace(

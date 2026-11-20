@@ -25,7 +25,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.eval import reranker_check  # noqa: E402
+from scripts.eval import branch_counters, reranker_check  # noqa: E402
 from scripts.eval.eval_client import INFRA_ERROR, OK, EvalClient, EvalInfraError, extract  # noqa: E402
 
 HELDOUT = ROOT / "docs" / "eval" / "heldout-v1.yaml"
@@ -109,6 +109,7 @@ def run(
     frozen: dict[str, Any] | None = None,
     all_items: list[dict[str, Any]] | None = None,
     label: str = "heldout-v1",
+    route_reader=None,  # noqa: ANN001 - () -> branch counters; records each answer's route
 ) -> int:
     """Run the frozen set. Held-out v1 by default; the v2 release run passes its own verified
     lock (frozen) and items (heldout_v2_release.py)."""
@@ -160,7 +161,10 @@ def run(
             if results and delay_seconds > 0:
                 time.sleep(delay_seconds)
             client = clients.setdefault(item["role"], make_client(item["role"]))
+            before = route_reader() if route_reader else None
             result = _ask(client, item, attempts=1, label=label)
+            if route_reader:
+                result.update(branch_counters.route_fields(before, route_reader()))
             if monitor is not None:
                 result["monitor"] = monitor()
             results.append(result)
@@ -176,7 +180,10 @@ def run(
                 continue
             item = by_id[result["id"]]
             client = clients.setdefault(item["role"], make_client(item["role"]))
+            before = route_reader() if route_reader else None
             retry = _ask(client, item, attempts=2, label=label)
+            if route_reader:
+                retry.update(branch_counters.route_fields(before, route_reader()))
             retry["first_attempt_failure_class"] = result.get("failure_class")
             if monitor is not None:
                 retry["monitor"] = monitor()

@@ -30,7 +30,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.eval import branch_counters, reranker_check  # noqa: E402
+from scripts.eval import branch_counters, reranker_check, value_grading  # noqa: E402
 from scripts.eval.eval_client import INFRA_ERROR, EvalClient, EvalInfraError, extract  # noqa: E402
 
 SOURCE = ROOT / "tests" / "acceptance" / "rbac_dev_v1.yaml"
@@ -100,10 +100,13 @@ def leak_reasons(
 def control_passed(
     case: Mapping[str, Any], item: Mapping[str, Any], codes: Mapping[str, str]
 ) -> bool:
+    # DEC-032: the fact with no digit touching it, and no other value in its unit
+    answer = case.get("answer") or ""
     return (
         case.get("status") == "ANSWERED"
         and item["document"] in cited_codes(case, codes)
-        and _fold(item["fact"]) in _fold(case.get("answer") or "")
+        and value_grading.says(item["fact"], answer)
+        and not value_grading.check(answer, item["fact"], item.get("question", ""))["conflicting"]
     )
 
 
@@ -141,6 +144,7 @@ def grade_cases(
             "cited_codes": cited_codes(case, codes),
             "latency_ms": case.get("latency_ms"),
             "answer": case.get("answer"),
+            **{field: case.get(field) for field in branch_counters.ROUTE_FIELDS},
         }
         if case["kind"] == NEGATIVE:
             row["leak_reasons"] = leak_reasons(case, item, documents[item["document"]], codes)
@@ -282,8 +286,13 @@ class _Admin:
                 )
 
 
-def _asker(base_url: str, passwords: Mapping[str, str]) -> Callable[[str, str], dict[str, Any]]:
+def _asker(
+    base_url: str,
+    passwords: Mapping[str, str],
+    route_reader: Callable[[], dict[str, int] | None] | None = None,
+) -> Callable[[str, str], dict[str, Any]]:
     clients: dict[str, EvalClient] = {}
+    read = route_reader or (lambda: branch_counters.read(base_url))
 
     def ask(role: str, question: str) -> dict[str, Any]:
         client = clients.setdefault(
@@ -293,7 +302,9 @@ def _asker(base_url: str, passwords: Mapping[str, str]) -> Callable[[str, str], 
         for _ in range(2):
             try:
                 session_id = client.create_session("RBAC dev")
+                before = read()
                 result = extract(client.ask(session_id, question))
+                result.update(branch_counters.route_fields(before, read()))
             except EvalInfraError:
                 result = {
                     "status": INFRA_ERROR,

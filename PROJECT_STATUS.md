@@ -1,5 +1,186 @@
 # Project Status
 
+## UI backend requests BR-1, 3, 4, 2, 8, 9 answered -- 2026-11-20
+
+- **API additions only** (`/api/v1`, no field removed or renamed): `grounding_status` on chat
+  history messages (new nullable column, migration `20261120_0013`), `department_name` of the
+  caller's own Department on login / refresh / `/auth/me`, `GET /documents/{id}/preview`.
+- **Documented:** document version fields and Manager upload rules (BR-1), the unverified-part
+  sentence contract (BR-3), Admin monitoring JSON examples (BR-8), audit `event_type` values (BR-9).
+- **Owner decisions pending:** search by `document_code`, structured answer segments, other users'
+  names for non-Admin roles. Answering and retrieval are unchanged.
+
+## DEC-041 decided: keep s3t, hybrid not recommended -- 2026-11-20
+
+- **Default unchanged:** s3t (simple s1-s3 + `qwen3.5-text:4b` + `exclude`). `RAG_ANSWER_MODE=hybrid`
+  stays behind its flag, off by default, not recommended (route false matches outside UAT).
+- **UAT is a regression suite only** (DEC-026 updated); configurations are chosen on the dev sets.
+- **Next:** the UI backend requests, then false refusals in the shared layer (22 s3t refusals on
+  UAT, 6 on `natural_dev_v1`, `TASKS.md`).
+
+## Hybrid answer mode measured, DEC-041 proposed -- 2026-11-20 (WAITING FOR THE OWNER)
+
+- **Default unchanged:** s3t (DEC-040). `RAG_ANSWER_MODE=hybrid` exists, off by default.
+- **Dev sets, one job per set, 1 run, legacy / s3t / hybrid** (`docs/eval/runs/dec041-hybrid-dev.md`):
+  - 6 dev sets (137 items): correct 75 / 114 / 112; false answers + wrong values 26 / 16 / 19;
+    leaks 0.
+  - UAT (monitoring only): correct 97 / 68 / 92.
+  - The deterministic route answers 74 of 100 UAT items (73 right) and 14 of 137 other items
+    (10 right); its misfires are ND-006, ND-019, ND-020 and REL-103.
+- **DEC-041:** keep s3t (what DEC-026 picks), switch to hybrid, or return to legacy; the owner
+  chooses. GPU latency not measured (about 640 MB of RAM available on the owner's machine).
+- **Observability:** each answer counts `answer_route_<route>`, each no-answer diagnostic
+  `no_answer_<reason>`; every dev runner records them per question.
+
+## Held-out v3.1 closed, new default simple s1-s3 + qwen3.5-text:4b (DEC-040) -- 2026-11-20
+
+- **Held-out v3.1 run 44575927833:** automatic verdict `s3t`; the owner's labels agree
+  (`docs/eval/heldout-v3.1-owner-grading.md`, ids and codes only). Held-out v3.1 is now spent and
+  `heldout-v3.yml` refuses every dispatch.
+- **Default (DEC-040, ADR 0005):** `RAG_ANSWER_MODE=simple` with s1-s3, `qwen3.5-text:4b`,
+  `RAG_DRAFT_DOCUMENT_POLICY=exclude`; needs an NVIDIA GPU with at least 4 GB VRAM
+  (`DEPLOYMENT.md` 3.3). Rollback: `RAG_ANSWER_MODE=legacy` + `LLM_OLLAMA_MODEL=qwen2.5:3b`.
+- **Eval stack:** a configuration with no setting is the new default; the rollback configuration is
+  `legacy:EVAL_ANSWER_MODE=legacy,EVAL_LLM_MODEL=qwen2.5:3b`.
+- **Run diagnosis:** `api_requests=35` counted the last API container only; `ci_batch.sh` now saves
+  each container's log before the recreate. `heldout_v3_diag.py` gives the owner a text-free table.
+- **Dev baselines, `legacy` (rollback) / `default` (DEC-040)**, 1 run on CPU (DEC-040 lists the ids):
+  - `natural_dev_v1` (run 44669873227): correct 3 / 7 of 20, false answers 1 / 1, refusals 8 / 8,
+    leaks 0.
+  - UAT Q001-Q100 (run 44669869629, monitoring only): `value_match` 96 / 71, false refusals 3 / 21,
+    wrong 1 / 8. Simple mode answers every item on the LLM route; `legacy` built 74 answers on
+    the deterministic route.
+- **Local stacks:** the local `.env` (not in git) still sets `LLM_OLLAMA_MODEL=qwen2.5:3b`; a stack
+  started from it gets simple mode with that model until the owner sets either the new model or
+  `RAG_ANSWER_MODE=legacy`.
+
+## Held-out v3.1 batch set fixed, preflight validates the run (DEC-038/039) -- 2026-11-19
+
+- **Run 44559765410 failed before its first request:** `ci_batch.sh` said `unknown set heldout_v3`
+  (its whitelist lacked the set). 0 questions asked, not counted; the owner may dispatch again (DEC-038).
+- **Fix:** `scripts/eval/batch_sets.py` is the one set registry. `ci_batch.sh` validates the set,
+  the configurations and the accounts first; `--validate-only` stops there. Held-out v3 asks ACTIVE
+  items only (16); `heldout-v3.yml` validates with the run's own arguments, in preflight too.
+- **Failure status:** the public `summary.md` opens with the run status (failing step, exit code,
+  questions sent to the API), also when the job failed (`heldout_status.py`, DEC-039).
+- **CI:** `actions/checkout`, `setup-python` and `upload-artifact` at v7 (Node 24) in every workflow.
+- **HNSW recall test:** `hnsw.ef_search` pinned to 1, so the strict xfails no longer XPASS at random.
+- **Not dispatched.**
+
+## Held-out v3.1 final, private results (DEC-038/039) -- 2026-11-19
+
+- **Held-out v3.1:** final. HO3-08 is ACTIVE and HO3-11 is EXCLUDED, so 16 items will be asked.
+  `gate --no-pending` passes; the lock and the fingerprints were rebuilt.
+- **Artifacts (DEC-039):**
+  - They hold only ids, counts, the verdict, the lock and the age ciphertext.
+  - On a GitHub-hosted runner the job needs `HELDOUT_AGE_RECIPIENT`.
+  - A fingerprint scan runs before the upload.
+- **Leak clean-up:** the three old held-out v2 artifacts are deleted, and the v2 environment is restricted to `main`.
+- **UAT:** final owner pass rate 127/200 (63.5 %).
+- **Not dispatched.** The owner first sets `HELDOUT_AGE_RECIPIENT`.
+
+## Owner follow-ups: deadline, approval gate, Q041 -- 2026-11-19
+
+- **HO3-08 and HO3-11:** the author has until the end of 2026-11-21. After that, they become EXCLUDED and the run uses 15 items.
+  - `heldout_v3.py set-status` changes only the status and rewrites the lock and the fingerprints.
+  - A real run refuses while any item is still pending.
+- **Environment `heldout-v3-release`:** created, with the owner as required reviewer and deployments from `main` only.
+- **UAT Q041:** decided (A KHÔNG ĐẠT, B ĐẠT). Owner pass rate 127/200, with Q044 and Q053 (A) still open.
+- **Cleanup:** stopped `eaka-verify-*` containers and their networks are removed without asking.
+
+## Held-out v3.1 ready (DEC-038) -- 2026-11-19
+
+- v3 → v3.1: 17 items, 15 to be asked.
+  - HO3-09/13/20 removed (source not in corpus V2).
+  - HO3-08 and HO3-11 pending author review.
+  - HO3-02/03/06/19 reported as near_duplicate.
+- Gold unchanged; v3 lock kept. Not dispatched.
+
+## Owner's UAT review applied, grading policy (DEC-037) -- 2026-11-19
+
+- PR #43 merged into main (c92394a, CI green); eaka-verify on main: unit 1904, api-unit 51, api-integration 245, integration 408, llm-provider 3.
+- **DEC-037:**
+  - same value in ND-HR-002/003, either source passes; on a conflict ND-HR-003 wins;
+  - templates never count; stating a rule passes;
+  - a computed date is a feature request.
+  - Registered before held-out v3.1.
+- **UAT:**
+  - Owner verdicts written into the 18/11 list.
+  - Gold changes for Q018, Q002, Q016, Q017, Q034 and Q054, re-locked.
+  - The grader matches the owner on every decided item. Owner pass rate for `s3` + `qwen3.5-text:4b`: 63.0-65.5 %. Q041, Q044 and Q053 are undecided.
+- **Process:** CI must be green (`gh pr checks`) before "verified" or a merge; keep only the newest verify image.
+
+## Exclude as the data policy, held-out v3 workflow ready (DEC-036) -- 2026-11-18 (STOPPED for the owner's review)
+
+- **DEC-036 (owner):** `RAG_DRAFT_DOCUMENT_POLICY=exclude` is the default for every configuration. A document not yet issued never answers. It overrides DEC-026 for this question, with the measured cost and gain recorded. **No other default changed.**
+- **DEC-035 updated:** held-out v3 compares `legacy` + 3B + exclude with `s3` + `qwen3.5-text:4b` + exclude.
+  - `.github/workflows/heldout-v3.yml` and `scripts/eval/heldout_v3_release.py`: main only, confirm text, `heldout-v3-release` environment, lock gate, two interleaved runs, value-aware grading, verdict, owner tables.
+  - **Not dispatched.**
+- **Table rows v2:** paused, flag off. Phase 5 tasks: 2-column tables (ND-HR-004) and a stable order on ties.
+- **Open DEC-030 findings:** listed in TASKS by type and item id, with proposals, for the owner.
+
+## Draft documents, table rows v2, held-out v3 protocol (DEC-033/034/035) -- 2026-11-18 (STOPPED for the owner's review)
+
+- **Owner decisions applied:**
+  - **DRAFT lifecycle** and `RAG_DRAFT_DOCUMENT_POLICY=off|exclude` (default `off`). UAT-LEAVE-AUTHORITY-001 is marked DRAFT in the corpus V2 manifest.
+  - **Gold edits, re-locked:** UAT Q044 → ND-HR-004 p6; natural ND-001 → ND-HR-004 p5; ND-004, ND-012, ND-019 without the template.
+  - **Table rows v2** (all four adjustments, flag still off).
+  - **DEC-035:** held-out v3 protocol, written before any run.
+- **Retrieval gate (no LLM):**
+  - Rows **fail**: UAT 77/98 vs 78/98, which is within one job's variation. Natural and the dev sets are unchanged.
+  - Every table of ND-HR-004 has 2 columns, so the 3-column rule gives them no rows (Q041, Q048, Q049, ND-001).
+  - A router bug that dropped the rows was found by the first gate run and fixed.
+- **LLM measurement** (2 rounds, value-aware):
+  - `s3` + `qwen3.5-text:4b` stays best on the 6 sets.
+  - Exclude is **not adopted**: natural false refusals +2 in both jobs, with the evidence still in context (the model words its answer differently).
+  - On UAT, exclude would be better: 69/65 correct vs 61/59.
+- **UAT list for the owner:** `docs/review/uat-s3-q35-text-2026-11-18.md` (19 items).
+- **Docker cleanup** as approved: 17 networks, 2 containers and 4 old verify images removed. No volume or Ollama model touched.
+- **Defaults unchanged.**
+
+## Held-out v3, table rows, value-aware grading (DEC-030/031/032) -- 2026-11-18 (STOPPED for the owner's review)
+
+- **Held-out v3 (DEC-030):** a team member's 20 questions with gold, frozen in `docs/eval/heldout-v3.yaml` + lock and in the fingerprints. Not opened since. The automatic checks list questions for the owner (`docs/eval/heldout-v3-check.json`).
+- **Target hardware (owner):** NVIDIA GPU ≥ 4 GB with `qwen3.5-text:4b` (`PARAMETER num_gpu 99`, `scripts/deploy/ollama_text_model.py`). 16 GB CPU is supported but slow. Recorded in DEC-029, ADR 0003 and `DEPLOYMENT.md`. Default unchanged.
+- **Prompt cache:** `LLAMA_ARG_CACHE_RAM=2048` for eval and in the deployment docs, current default included.
+  - The third capped UAT job shows the same totals (36-11-0-3) as both uncapped ones.
+  - 4 items change only with the cap: Q063 and Q064 correct → refusal, Q076 and Q090 refusal → correct.
+- **Value-aware grading (DEC-032, `scripts/eval/value_grading.py`):** the UAT proxy did not read values.
+  - An answer must state every value of its reference and no other value in the same unit.
+  - The dev-set runners add the conflict check, and RBAC controls now use a digit boundary.
+  - All runs of D and of the model comparison were regraded without rerunning. The dev sets do not change, so the DEC-026/027 conclusions stand.
+  - UAT `s3` + `qwen3.5-text:4b` falls to 62-23-1-14 / 60-24-1-15 (proxy 69/67 correct).
+- **Table rows (DEC-031)**, flag `DOCUMENT_TABLE_ROW_CHUNKING_ENABLED`, default off, two jobs on natural, the 5 dev sets and UAT:
+  - **Not adopted:** natural false refusals +2 in both jobs; false answers + wrong tied.
+  - Fixes Q041, Q077, ND-003, ND-017. Breaks 11 correct UAT answers into refusals, 8 of them because the evidence left the context.
+  - Fix proposed, not coded: `docs/design/table-chunking.md`.
+- **Template document** UAT-LEAVE-AUTHORITY-001 cited by 4 wrong UAT answers per round (6 with rows): design `docs/design/document-authority.md` (DRAFT lifecycle, flag `off`/`demote`/`exclude`, gold impact). Not coded.
+- **Best configuration:** `s3` + `qwen3.5-text:4b` without rows. UAT list for the owner: `docs/review/uat-s3-q35-text-2026-11-18.md` (16 items).
+- **Cleanup:** `docker builder prune` freed 18 GB.
+
+## Candidate `s3` + `qwen3.5:4b` (DEC-029) -- 2026-11-17 (STOPPED for the owner's review)
+
+- **The owner picked the candidate and set DEC-029:** the default changes only when (a) it still wins over three jobs, (b) the owner accepts its UAT errors, and (c) it runs on the target hardware. **Default unchanged.** Details: `docs/design/s3-q35-candidate.md`.
+- **(a) holds.** Round c added a third job per set (aA / bA / cA, against `legacy` + 3B):
+  - false answers + wrong on the six sets 15 / 10 / 12 against 28 / 27 / 28 (real);
+  - natural false refusals 4 / 9 / 5 against 7 / 7 / 7 (tie);
+  - other five sets 1 / 2 / 1 against 27 / 28 / 27 (real); leaks 0.
+- **`qwen3.5-text:4b`** (built in `eval.yml` without the vision projector; the library has no text-only tag): same answers on 137 of 137 items, runner peak 0.5-0.7 GB lower.
+- **(b) UAT, two rounds:** `s3` + `qwen3.5:4b` 67-23-1-9 / 69-22-1-8 against `legacy` 98-1-0-1 / 99-0-0-1 (proxy).
+  - List for the owner: `docs/review/uat-s3-q35-2026-11-17.md`, 19 items.
+  - Claude's first reading: 9 real errors, the same in both rounds, 6 of them a wrong table row or column. `legacy` gets all 9 right on its deterministic route.
+- **(c) CPU: not met with Ollama's defaults.** llama-server's prompt cache (up to 8192 MiB in host RAM) reached 6.6-8.0 GiB per UAT half.
+  - One job lost its runner, and two halves had 1240 and 1249 MB free.
+  - Capped at 2048 MiB (`LLAMA_ARG_CACHE_RAM`, new `eval.yml` input `ollama_cache_ram`), one half kept 6.8 GB free.
+  - The cache affects any model on Ollama 0.40, the current default included.
+- **(c) GPU (GTX 1650 4 GB):**
+  - Fully on the GPU only when forced (`num_gpu` 99): 3841 MiB, or 2971 MiB for the text copy.
+  - LLM time per question: median 20.7 s on the GPU; 29.4 s (or 24.4 s for the text copy) with Ollama's own placement.
+- **Table chunking diagnosis** (no code): `docs/design/table-chunking.md`.
+  - 77 data tables in corpus V2. 45% of their rows are interleaved in the chunk text, and 29 tables spread over several chunks without their header.
+  - ND-002 and the UAT table errors come from this. A row-per-unit proposal behind a flag, with risks and a measurement plan.
+- **Cleanup:** old `eaka-backend:verify-*` images and dangling images removed (1.25 GB inside Docker). C: free space did not change, because the WSL disk does not shrink.
+
 ## Model comparison (DEC-028) -- 2026-11-17 (STOPPED for the owner's review)
 
 - **DEC-028**, written before measuring, set the candidates and the rule:

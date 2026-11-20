@@ -50,9 +50,22 @@ def fuse_retrieval_hits(
     )
     ordered_hits = tuple(sorted(fused_hits, key=_hybrid_sort_key))
     return FusedRetrievalResult(
-        hits=ordered_hits[:top_k],
+        hits=one_per_group(ordered_hits)[:top_k],
         fused_candidate_count=len(ordered_hits),
     )
+
+
+def one_per_group(hits: Sequence[HybridRetrievalHit]) -> tuple[HybridRetrievalHit, ...]:
+    """DEC-034: a text chunk and its table-row chunks take one slot, the first ranked of them.
+    Without row chunks every hit is its own group and nothing is dropped."""
+    seen: set[object] = set()
+    kept = []
+    for hit in hits:
+        group = hit.group_id or hit.chunk_id
+        if group not in seen:
+            seen.add(group)
+            kept.append(hit)
+    return tuple(kept)
 
 
 def _validate_fusion_configuration(
@@ -147,6 +160,7 @@ def _fuse_chunk(
         keyword_score=keyword_hit.keyword_rank if keyword_hit is not None else None,
         keyword_rank=keyword_rank,
         matched_by=matched_by,
+        group_id=source_hit.group_id,
     )
 
 

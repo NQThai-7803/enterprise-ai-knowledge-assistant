@@ -99,3 +99,16 @@ def test_audit_event_accepts_safe_scalar_metadata() -> None:
         "citation_count": 2,
         "rating": "NOT_HELPFUL",
     }
+
+
+def test_audit_event_types_are_the_ones_api_spec_lists() -> None:
+    """BR-9: API_SPEC section 10 lists these values; a new type needs a line there too."""
+    assert [event.value for event in AuditEventType] == [
+        "AUTH_LOGIN_SUCCEEDED", "AUTH_LOGIN_FAILED", "USER_CREATED", "USER_UPDATED",
+        "USER_STATUS_CHANGED", "USER_DEACTIVATED", "USER_REACTIVATED", "DEPARTMENT_CREATED",
+        "DEPARTMENT_UPDATED", "DEPARTMENT_DELETED", "DOCUMENT_UPLOADED", "DOCUMENT_UPDATED",
+        "DOCUMENT_DOWNLOADED", "DOCUMENT_DELETED", "DOCUMENT_PERMISSION_GRANTED",
+        "DOCUMENT_PERMISSION_UPDATED", "DOCUMENT_PERMISSION_REVOKED", "CHAT_SESSION_CREATED",
+        "CHAT_SESSION_DELETED", "CHAT_QUESTION_SUBMITTED", "CHAT_ANSWER_GENERATED",
+        "CHAT_NO_ANSWER_GENERATED", "FEEDBACK_UPSERTED",
+    ]  # fmt: skip

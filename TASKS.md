@@ -1,12 +1,218 @@
 
 # Implementation Tasks
 
+## UI backend requests answered -- 2026-11-20
+
+- **DONE** (`docs/ui/backend-requests.md`, "Đã nhận từ backend"; `API_SPEC.md`):
+  - BR-1: version fields, Manager upload rules and errors documented (no code change).
+  - BR-3: `grounding_status` stored per assistant message (migration `20261120_0013`) and returned
+    in chat history; contract of the sentences naming an unverified part.
+  - BR-4: `department_name` of the user's own Department in login, refresh and `/auth/me`.
+  - BR-2: `GET /documents/{id}/preview` (inline, same rules as download).
+  - BR-8: JSON examples of the Admin monitoring endpoints.
+  - BR-9: the stable audit `event_type` values.
+- **WAITING FOR OWNER:** BR-1 item 4 (search by `document_code`); BR-3 structured segments; BR-4
+  names on documents and feedback for non-Admin roles (conflicts with the anti-enumeration rule of
+  `RBAC.md`). BR-5, BR-6, BR-7 stay postponed.
+
+## Order of the next work -- 2026-11-20 (DEC-041)
+
+1. **Backend requests of the UI session** (`docs/ui/backend-requests.md`): BR-1, BR-3, BR-4, BR-2,
+   BR-8, BR-9; BR-5, BR-6 and BR-7 are postponed.
+2. **[Priority 1 after the BRs] False refusals in the shared layer** (retrieval / evidence gate /
+   validation of the simple path). Diagnose on the dev sets only, never on a held-out set. Case set:
+   - the 22 s3t false refusals on UAT (run 44694882404): Q001 Q003 Q006 Q007 Q026 Q029 Q030 Q031 Q033 Q037 Q039 Q042 Q048 Q063 Q064 Q071 Q075 Q080 Q086 Q093 Q096 Q097;
+   - the 6 s3t false refusals on `natural_dev_v1` (run 44694886339): ND-003 ND-006 ND-007 ND-008 ND-009 ND-018.
+3. GPU latency of the default on the GTX 1650, once the owner has restarted the machine (DEC-041).
+
 ## Order of the next work -- 2026-11-08
 
 1. **DONE: REL-303 measured under DEC-013 on Actions and on by default** (`docs/eval/runs/fix2d-rel303-actions.md`).
 2. FIX 3: **3a done** (flags measured, all off, `docs/eval/runs/fix3a-false-answers.md`); **3b done** (held-out v1 refusals traced, `false_refusal_dev_v2` approved); **3c next**: F, C, A in that order, one flag each, measured on 5 dev sets (E and M3 wait for the NLU phase).
 3. **Embedding fine-tune** (`docs/design/embedding-finetune.md` and DEC-015 on branch `feat/embedding-finetune-infra`): infrastructure only so far; the baseline measurement and training come after FIX 3.
 4. The final held-out v2 measurement, once, after the choices above are made (DEC-012).
+
+## Hybrid answer mode measured, DEC-041 decided: keep s3t -- 2026-11-20
+
+- **DONE:**
+  - `RAG_ANSWER_MODE=hybrid` (off): legacy's deterministic route first, else the s3t path.
+  - Every answer counts `answer_route_<route>`; every dev runner records `answer_route`,
+    `no_answer_reasons` and `retrieved` per question; `scripts/eval/route_matrix.py`.
+  - The 7 dev sets x legacy / s3t / hybrid, one job per set, 1 run (`docs/eval/runs/dec041-hybrid-dev.md`).
+  - The 11 old `eaka-verify-*` images deleted.
+- **DECIDED (owner, DEC-041):** keep s3t; `hybrid` stays behind its flag, not recommended; UAT is
+  a regression suite only (DEC-026 updated).
+- **WAITING FOR OWNER:** GPU latency on the GTX 1650: not measured, about 640 MB of RAM was
+  available; measured after the owner restarts the machine.
+
+## Held-out v3.1 closed, new default (DEC-040) -- 2026-11-20
+
+- **DONE:**
+  - Held-out v3.1 is spent; the owner's labels are in `docs/eval/heldout-v3.1-owner-grading.md`.
+  - Default: simple s1-s3 + `qwen3.5-text:4b` (DEC-040, ADR 0005); rollback `legacy` + `qwen2.5:3b`.
+  - `ci_batch.sh` saves each API container's log before a recreate; the held-out summary lists the
+    items removed before v3.1.
+  - Dev baselines of the rollback against the new default (DEC-040): `natural_dev_v1` run
+    44669873227, UAT run 44669869629.
+- **NEXT (not started):**
+  - **[High]** False refusals of about 40-50 % on natural questions, in the shared layer (retrieval /
+    evidence gate). Diagnose on `natural_dev_v1` and the dev sets, NOT on a held-out set. Baseline:
+    `natural_dev_v1` refuses 8 of 20 in both modes; UAT has 21 false refusals in the default
+    against 3 in `legacy` (DEC-040).
+  - **[High]** Questions where two documents conflict: the answer names one source only. Tied to
+    rewriting the corpus as v3 (removing the duplicates).
+  - **[Medium]** Grader (`value_grading.py`): derived values (12 + 1 = 13), unit conversion
+    (2 weeks = 14 days), false conflicts when an answer gives another value in the same unit, and
+    a citation out of context whose value matches by chance. Fix and check on the dev sets.
+  - **[Low]** Two runs mean nothing when the runs are deterministic: consider changing DEC-027
+    (another seed, or one run plus a determinism check).
+  - Delete the 11 old `eaka-verify-*` images (approved by the owner).
+
+## Held-out v3.1 batch set fix (DEC-038/039) -- 2026-11-19
+
+- **DONE:**
+  - `ci_batch.sh` accepts `heldout_v3` (registry `batch_sets.py`) and validates every batch first.
+  - The preflight validates with the run's own arguments.
+  - The failure status is written to the public summary.
+  - Actions are at v7.
+  - The HNSW xfails are stable.
+- **NOT COUNTED:** run 44559765410, 0 questions asked (DEC-038). The owner does not decrypt its artifact.
+- **WAITING FOR OWNER:** dispatch the preflight again, then the real run.
+
+## Held-out v3.1 final, private results (DEC-038/039) -- 2026-11-19
+
+- **DONE:**
+  - HO3-08 ACTIVE and HO3-11 EXCLUDED: 16 items will be asked, and `gate --no-pending` passes.
+  - Artifacts are safe to publish (DEC-039).
+  - The old v2 artifacts are deleted, and the v2 environment deploys from `main` only.
+- **WAITING FOR OWNER, before the dispatch:**
+  1. Create an age key pair: `age-keygen -o <private place>/heldout.key`. Keep the key out of the repository.
+  2. Store the public key: `gh variable set HELDOUT_AGE_RECIPIENT --body age1...`.
+  3. Dispatch the preflight, then the real run.
+- **OPEN, the owner's call:**
+  - Delete run 43701804785: its job summary still shows the head of the v2 grading sheet.
+  - Scan `heldout-v2-check.json`, `heldout-v2-e5.json` and `docs/eval/runs/`.
+
+## Held-out v3.1 (DEC-038) -- 2026-11-19
+
+- **DONE:**
+  - v3.1 derived: 3 items removed; HO3-08 and HO3-11 pending; 4 items tagged near_duplicate.
+  - Lock and fingerprints rebuilt.
+  - The workflow reads v3.1 and excludes pending items.
+- **WAITING FOR OWNER:** send **HO3-08** and **HO3-11** to their author (PENDING_AUTHOR_REVIEW: not every gold value was found in the cited documents). **Deadline: end of 2026-11-21.**
+  - Confirmed: `python scripts/eval/heldout_v3.py set-status ACTIVE <id>` in a commit of its own (rewrites the lock and the fingerprints).
+  - Not confirmed by the deadline: `set-status EXCLUDED <id>` in a commit of its own; run with 15 items. No "run first, complete later": a real run refuses while an item is PENDING.
+  - Then dispatch held-out v3.1 (DEC-035). The `heldout-v3-release` environment exists (owner as required reviewer, `main` only).
+
+## Owner's UAT review applied (DEC-037) -- 2026-11-19
+
+- **DONE:**
+  - Owner verdicts in `docs/review/uat-s3-q35-text-2026-11-18.md`; owner pass rate 63.0-65.5 %.
+  - UAT gold changes (Q018, Q002, Q016, Q017, Q034, Q054), re-locked.
+  - Grader: `accepted_sources`, DRAFT citations fail.
+  - DEC-037; the CI rule and the verify-image rule in `CONTRIBUTING.md` and the eaka-verify skill.
+- **DONE (2026-11-19):** Q041 decided by content: A KHÔNG ĐẠT (cites the template), B ĐẠT (states the rule, cites ND-HR-004). Owner rate now 127/200 (63.5-65.0 %).
+- **DONE (2026-11-19):** Q044 A/B and Q053 A KHÔNG ĐẠT (template cited, policy 3). Final owner rate: A 64/100, B 63/100, total 127/200 (63.5 %), nothing undecided.
+- **Grader, low priority:** add a `question_type=rule` flag to the UAT gold so DEC-037 policy 4 (stating the rule correctly passes) is graded automatically; today the grader still asks for every value of the reference answer (Q041 B).
+
+## Exclude as the data policy, held-out v3 workflow (DEC-036) -- 2026-11-18 (STOPPED for the owner's review)
+
+- **DONE:**
+  - DEC-036: exclude by default in the app, `.env.example` and the eval stack, plus the deployment note.
+  - DEC-035 updated.
+  - The held-out v3 workflow and grader, with tests on invented items; not dispatched.
+  - Phase 5 tasks for table rows.
+  - Docker cleanup.
+- **WAITING FOR OWNER: the open DEC-030 findings of held-out v3** (ids only; the items are not read here). Each needs a decision before the run.
+  - [ ] **A source document not in corpus V2:** HO3-09, HO3-13, HO3-20.
+    - Proposal: add that document to the eval corpus if it exists, as a corpus V2.1 used for held-out v3 only.
+    - Otherwise set the three items aside in a v3.1 with a new lock. Asked as they are, they can only be refusals or wrong.
+  - [ ] **A test account with no seeded user:** HO3-09, HO3-13 (one department), HO3-20 (another department).
+    - Proposal: seed two eval-only accounts in those departments (`uat-v2-accounts`), with the grants the items assume, and map them in `heldout_v3.ACCOUNTS`.
+    - Until then the workflow does not ask these items and lists them as not run.
+  - [ ] **Expected source passage not found in the PDF:**
+    - not found as written: HO3-16, HO3-17, HO3-18;
+    - found only as separate words: HO3-03, HO3-05, HO3-07, HO3-10;
+    - answer numbers missing from the cited documents: HO3-08, HO3-11.
+    - Proposal: the author checks these against the PDFs.
+      - Wording or diacritics only: keep the gold; the grader needs only the document code and the answer's values.
+      - A real mismatch: correct it in v3.1 with a new lock, or set the item aside.
+  - [ ] **Near-duplicates of other sets:** HO3-02, HO3-03, HO3-19 (UAT); HO3-06 (RBAC dev).
+    - Proposal: keep them and report them as a separate group, as the "near UAT" group of held-out v2.
+    - Or replace them in v3.1 if the owner wants a cleaner estimate.
+
+## Draft documents, table rows v2 (DEC-033/034/035) -- 2026-11-18 (STOPPED for the owner's review)
+
+- **DONE:**
+  - DEC-033/034/035 written before measuring.
+  - DRAFT policy, rows v2, migration `20261118_0012`.
+  - Gold edits with locks (UAT `eval-data/uat/gold.lock`, natural gold re-locked).
+  - `retrieval_oracle` gate, run twice: the first run was void because of a router bug, fixed.
+  - LLM measurement in 2 rounds.
+  - UAT list for the best configuration.
+  - Docker cleanup.
+- **WAITING FOR OWNER:**
+  - Read `docs/review/uat-s3-q35-text-2026-11-18.md`.
+  - Exclude: adopt it for its UAT gain despite natural's +2 false refusals, or keep it off.
+  - Rows v2: repeat the gate over two jobs or with a load-independent tie-break, and decide whether 2-column tables (all of ND-HR-004) should get rows.
+  - Held-out v3 (DEC-035) after the decisions above; the DEC-030 findings first.
+- **Defaults unchanged.**
+
+## Known limits of the value-aware grader (DEC-032, `scripts/eval/value_grading.py`) -- 2026-11-18
+
+These are open items. Each one can make a right answer count as wrong, or the reverse. Read the owner's lists before trusting a single-item difference.
+
+- [ ] **Values inside a condition are required.** Every value of the reference must be stated, so a condition counts as well as the answer itself.
+  - Q039: the reference "12 ngày … khi đủ 12 tháng" also requires "12 tháng".
+  - A fix needs to tell the answer value from the condition values in the reference: by its unit and the question's unit, or by a `required` list in the gold.
+- [ ] **Numbers written in words** count only for 1-10, and only right before a unit ("ba ngày").
+  - "mười hai ngày", "nửa ngày" and "hai mươi phần trăm" are missed.
+- [ ] **False conflicts.** A second, correct value in a reference unit, about another case, is a conflict.
+  - Q069 with row chunks: "30 %" plus the separate night-overtime rule "20 %".
+  - Only thresholds ("từ X trở lên", "trên X") are exempt today.
+- [ ] **Units** are recognized from a fixed list (`UNITS`). A number followed by any other word has no unit and matches loosely.
+- [ ] **A range with one scale word** ("3 - 15 triệu") is handled. A range written with two different scales is not.
+
+## Held-out v3, table rows, value-aware grading -- 2026-11-18 (STOPPED for the owner's review)
+
+- **DONE:**
+  - A: held-out v3 frozen (DEC-030).
+  - B: target hardware in DEC-029, ADR 0003, DEPLOYMENT/SETUP.
+  - C: cache cap in eval and docs, third capped UAT job.
+  - D: table rows behind a flag, with unit tests, measured in 2 jobs (DEC-031).
+  - E: `docker builder prune`.
+  - Value-aware grading for every set and a regrade of all D and model-comparison runs (DEC-032).
+  - Row-chunking analysis per item.
+  - Template-document design.
+  - UAT list for the best configuration.
+- **WAITING FOR OWNER:**
+  - Read `docs/review/uat-s3-q35-text-2026-11-18.md`.
+  - Decide on the held-out v3 findings (`docs/eval/heldout-v3-check.json`).
+  - Approve or change the row-chunking adjustment (`docs/design/table-chunking.md`, "Proposed adjustment").
+  - Approve the template-document design: `exclude` or `demote`, and the expected citation of Q044 and ND-001 (`docs/design/document-authority.md`).
+  - The default is unchanged.
+
+## Candidate `s3` + `qwen3.5:4b` (DEC-029) -- 2026-11-17 (STOPPED for the owner's review)
+
+- **DONE:**
+  - Docker cleanup: old verify images and dangling images; no volume or Ollama model touched.
+  - DEC-029 written before measuring.
+  - Round c: 6 jobs, with `qwen3.5-text:4b` built in `eval.yml`.
+  - UAT in 2 rounds × 2 halves; uB2 re-run after a lost runner, plus uB2m with the prompt cache capped.
+  - Local GPU placement and latency on the GTX 1650.
+  - Table chunking diagnosis, no code.
+  - Results in `docs/design/s3-q35-candidate.md` and DEC-029.
+- **Result:**
+  - (a) holds.
+  - The text-only copy gives the same answers with less memory.
+  - (c) CPU is not met with Ollama's defaults because of llama-server's prompt cache; it is met on one half with a 2048 MiB cap.
+  - (c) GPU needs `num_gpu` 99.
+  - Default unchanged.
+- **WAITING FOR OWNER:**
+  - Read and accept or reject the UAT list (`docs/review/uat-s3-q35-2026-11-17.md`, 19 items, 9 real errors by Claude's first reading).
+  - Name the target hardware (CPU-only 16 GB, or GPU ≥ 4 GB).
+  - Decide on the prompt cache cap: `LLAMA_ARG_CACHE_RAM` on the Ollama host. It affects the current default too, and the effect on answers needs a capped re-measurement.
+  - Decide whether to implement row-per-unit table chunking (`docs/design/table-chunking.md`, behind `DOCUMENT_TABLE_ROW_CHUNKING_ENABLED`, off).
 
 ## Model comparison (DEC-028) -- 2026-11-17 (STOPPED for the owner's review)
 
@@ -73,6 +279,19 @@
 - **DONE (tooling):** `scripts/eval/heldout_v2_release.py` and `.github/workflows/heldout-v2.yml`: gate on frozen questions and an owner-approved gold lock, 2 runs at the current defaults, e5 grouping near UAT (>= 0.90) / rest, grading sheet with empty labels, report split by group, DEC-022 stated everywhere. Procedure: `docs/design/heldout-v2-release.md`.
 - **DONE (2026-11-15):** the owner approved the gold (HO2-004, 005, 020 changed; HO2-001, 003, 012, 016, 018 as proposed; the other 12 as they were); `heldout_v2_check.py check` clean; gold locked (`heldout-v2-gold.lock`, approved by owner (NQThai-7803)).
 - **WAITING FOR OWNER:** merge PR #30 and create the `heldout-v2-release` environment. The workflow is not dispatched until the owner says so (DEC-012).
+
+## Feature requests (owner, 2026-11-18)
+
+- [ ] **A concrete date for a relative question.** Put the current date in the prompt so that a question such as "công ty trả lương ngày mấy?" can be answered with the next pay date ("ngày 10 tháng 12"), not only the rule. Source: UAT Q054. Not a grading criterion (DEC-037 policy 5). Priority: after the default is settled (DEC-035).
+
+## Phase 5 backlog -- table rows (recorded 2026-11-18, owner; rows v2 paused, flag off)
+
+- [ ] **Rows for 2-column tables.** Every table of ND-HR-004 has 2 columns, so the 3-column rule of DEC-034 gives no rows to the tables behind Q041 (seniority), ND-001 (holidays), Q048 and Q049 (notice periods). Try rows for 2-column tables with a real header, and keep the key-value tables without one as page text.
+- [ ] **A stable order on ties.** Chunks that tie in retrieval are ordered by document id, which every corpus load draws anew. Between two jobs with nothing changed, Q096 flipped. Order ties by `document_code` and `chunk_index` (or another load-independent key), behind a flag, before any one-job gate is read again.
+- [ ] Then repeat the DEC-034 retrieval gate over two jobs, and the LLM round only if it passes.
+- [ ] **PyMuPDF 2.** `pyproject.toml` now caps PyMuPDF below 2 (`requirements.lock` pins 1.28.2).
+  - On 2.1, `find_tables()` returns cell text without spaces ("Basiccare") and splits a 2-column table into 3. Backend CI failed on every commit of PR #44 until the cap.
+  - Upgrading needs the table-row tests and the DEC-034 offline counts redone on 2.x.
 
 ## Phase 5 backlog -- English questions (recorded 2026-11-15)
 

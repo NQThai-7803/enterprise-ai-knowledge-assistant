@@ -4,6 +4,7 @@ usage (repo root, project venv):
   python scripts/eval/question_leak.py build    # needs artifacts/ and docs/eval/; prints counts
   python scripts/eval/question_leak.py check [--base HEAD | --staged] [--path app]
   python scripts/eval/question_leak.py overlap
+  python scripts/eval/question_leak.py scan <folder>   # an artifact about to be uploaded (DEC-039)
 
 `build` reads only the question of each dev and held-out item and writes
 scripts/eval/question_fingerprints.json: salted hashes, never question or gold text. `check` and
@@ -33,6 +34,10 @@ LOCK = ROOT / "docs" / "eval" / "heldout-v1.lock"
 HELDOUT = ROOT / "docs" / "eval" / "heldout-v1.yaml"
 LOCK_V2 = ROOT / "docs" / "eval" / "heldout-v2-questions.lock"
 HELDOUT_V2 = ROOT / "docs" / "eval" / "heldout-v2-questions.yaml"
+LOCK_V3 = ROOT / "docs" / "eval" / "heldout-v3.lock"
+HELDOUT_V3 = ROOT / "docs" / "eval" / "heldout-v3.yaml"
+LOCK_V31 = ROOT / "docs" / "eval" / "heldout-v3.1.lock"
+HELDOUT_V31 = ROOT / "docs" / "eval" / "heldout-v3.1.yaml"
 RBAC_SOURCE = ROOT / "tests" / "acceptance" / "rbac_dev_v1.yaml"
 RELEVANCE_SOURCE = ROOT / "tests" / "acceptance" / "answer_relevance_dev_v1.yaml"
 FALSE_REFUSAL_SOURCE = ROOT / "tests" / "acceptance" / "false_refusal_dev_v1.yaml"
@@ -55,6 +60,8 @@ EXPECTED_COUNTS = {
     "false_refusal_v2": 24,
     "compound_partial": 12,
     "natural_dev": 20,
+    "heldout_v3": 20,
+    "heldout_v3_1": 17,
 }
 OVERLAP_LIMIT = 0.60
 ESCAPE = re.compile(r"\\u([0-9a-fA-F]{4})")
@@ -98,6 +105,10 @@ def build_payload(
     false_refusal_v2: Iterable[tuple[str, str]] = (),
     compound_partial: Iterable[tuple[str, str]] = (),
     natural_dev: Iterable[tuple[str, str]] = (),
+    heldout_v3: Iterable[tuple[str, str]] = (),
+    lock_v3_sha256: str = "",
+    heldout_v3_1: Iterable[tuple[str, str]] = (),
+    lock_v3_1_sha256: str = "",
 ) -> dict[str, Any]:
     dev_items = {case_id: fingerprint(question) for case_id, question in dev}
     heldout_items = {case_id: fingerprint(question) for case_id, question in heldout}
@@ -108,6 +119,8 @@ def build_payload(
     fr_v2_items = {case_id: fingerprint(question) for case_id, question in false_refusal_v2}
     compound_items = {case_id: fingerprint(question) for case_id, question in compound_partial}
     natural_items = {case_id: fingerprint(question) for case_id, question in natural_dev}
+    v3_items = {case_id: fingerprint(question) for case_id, question in heldout_v3}
+    v31_items = {case_id: fingerprint(question) for case_id, question in heldout_v3_1}
     return {
         "version": 1,
         "gram_size": GRAM_SIZE,
@@ -129,6 +142,16 @@ def build_payload(
                 "lock_sha256": lock_v2_sha256,
                 "items": v2_items,
             },
+            "heldout_v3": {
+                "count": len(v3_items),
+                "lock_sha256": lock_v3_sha256,
+                "items": v3_items,
+            },
+            "heldout_v3_1": {
+                "count": len(v31_items),
+                "lock_sha256": lock_v3_1_sha256,
+                "items": v31_items,
+            },
         },
     }
 
@@ -138,6 +161,8 @@ def load_fingerprints(
     lock: Path = LOCK,
     expected: Mapping[str, int] = EXPECTED_COUNTS,
     lock_v2: Path = LOCK_V2,
+    lock_v3: Path = LOCK_V3,
+    lock_v3_1: Path = LOCK_V31,
 ) -> dict[str, Any]:
     """Return the fingerprints, or refuse when they cannot stand for the question sets."""
     if not path.is_file():
@@ -163,6 +188,18 @@ def load_fingerprints(
         != sources["heldout_v2"]["lock_sha256"]
     ):
         raise QuestionSourceError("fingerprints do not match the held-out v2 lock; rebuild")
+    if "heldout_v3" in expected and (
+        not lock_v3.is_file()
+        or json.loads(lock_v3.read_text(encoding="utf-8"))["sha256"]
+        != sources["heldout_v3"]["lock_sha256"]
+    ):
+        raise QuestionSourceError("fingerprints do not match the held-out v3 lock; rebuild")
+    if "heldout_v3_1" in expected and (
+        not lock_v3_1.is_file()
+        or json.loads(lock_v3_1.read_text(encoding="utf-8"))["sha256"]
+        != sources["heldout_v3_1"]["lock_sha256"]
+    ):
+        raise QuestionSourceError("fingerprints do not match the held-out v3.1 lock; rebuild")
     return payload
 
 
@@ -313,6 +350,20 @@ def _build(output: Path) -> int:
         raise QuestionSourceError("natural dev set does not match its lock")
     natural_items = yaml.safe_load(NATURAL_SOURCE.read_text(encoding="utf-8"))["items"]
     natural = [(item["id"], item["question"]) for item in natural_items]
+    if not HELDOUT_V3.is_file() or not LOCK_V3.is_file():
+        raise QuestionSourceError("build needs the frozen held-out v3")
+    lock_v3_sha = json.loads(LOCK_V3.read_text(encoding="utf-8"))["sha256"]
+    if hashlib.sha256(HELDOUT_V3.read_bytes()).hexdigest() != lock_v3_sha:
+        raise QuestionSourceError("held-out v3 does not match its lock")
+    v3_items = yaml.safe_load(HELDOUT_V3.read_text(encoding="utf-8"))["items"]
+    v3 = [(item["id"], item["question"]) for item in v3_items]
+    if not HELDOUT_V31.is_file() or not LOCK_V31.is_file():
+        raise QuestionSourceError("build needs the frozen held-out v3.1")
+    lock_v31_sha = json.loads(LOCK_V31.read_text(encoding="utf-8"))["sha256"]
+    if hashlib.sha256(HELDOUT_V31.read_bytes()).hexdigest() != lock_v31_sha:
+        raise QuestionSourceError("held-out v3.1 does not match its lock")
+    v31_items = yaml.safe_load(HELDOUT_V31.read_text(encoding="utf-8"))["items"]
+    v31 = [(item["id"], item["question"]) for item in v31_items]
     payload = build_payload(
         dev,
         heldout,
@@ -325,13 +376,18 @@ def _build(output: Path) -> int:
         false_refusal_v2,
         compound,
         natural,
+        v3,
+        lock_v3_sha,
+        v31,
+        lock_v31_sha,
     )
     output.write_text(json.dumps(payload, indent=0, sort_keys=True) + "\n", encoding="utf-8")
     print(
         f"dev: {len(dev)}; held-out: {len(heldout)}; rbac dev: {len(rbac)}; "
         f"relevance dev: {len(relevance)}; held-out v2: {len(v2)}; "
         f"false-refusal dev: {len(false_refusal)}; false-refusal dev v2: {len(false_refusal_v2)}; "
-        f"compound dev: {len(compound)}; natural dev: {len(natural)}"
+        f"compound dev: {len(compound)}; natural dev: {len(natural)}; held-out v3: {len(v3)}; "
+        f"held-out v3.1: {len(v31)}"
     )
     return 0
 
@@ -348,6 +404,34 @@ def _check(args: argparse.Namespace) -> int:
     print(f"POSSIBLE LEAK: {len(hits)} line(s)")
     for file, number, source, case_id in hits:
         print(f"  {file}:{number}: shares a 4-gram with {source} {case_id}")
+    return 1
+
+
+def scan_files(
+    payload: Mapping[str, Any], root: Path
+) -> tuple[int, list[tuple[str, int, str, str]]]:
+    """find_hits over every line of every file under root, binary files included (DEC-039)."""
+    files = sorted(p for p in root.rglob("*") if p.is_file())
+    lines = [
+        (path.relative_to(root).as_posix(), number, text)
+        for path in files
+        for number, text in enumerate(path.read_bytes().decode("utf-8", "replace").splitlines(), 1)
+    ]
+    return len(files), find_hits(payload, lines)
+
+
+def _scan(root: Path) -> int:
+    """Exit 1 when a file about to be uploaded shares a 4-gram with any question set; ids only."""
+    if not root.is_dir():
+        print(f"[error] {root} is not a folder", file=sys.stderr)
+        return 2
+    count, hits = scan_files(load_fingerprints(), root)
+    if not hits:
+        print(f"OK: no question 4-gram in {count} file(s) under {root}")
+        return 0
+    print(f"LEAK: {len(hits)} line(s) under {root} share a question 4-gram; nothing is uploaded")
+    for file, number, source, case_id in hits:
+        print(f"  {file}:{number}: {source} {case_id}")
     return 1
 
 
@@ -369,6 +453,9 @@ def _overlap() -> int:
     )
     for other, (found, left, right) in source_overlap(payload, "heldout_v2", others).items():
         print(f"held-out v2/{other} word 4-gram Jaccard: {found:.3f} ({left}, {right})")
+    v3_others = (*others, "heldout_v2", "natural_dev")
+    for other, (found, left, right) in source_overlap(payload, "heldout_v3", v3_others).items():
+        print(f"held-out v3/{other} word 4-gram Jaccard: {found:.3f} ({left}, {right})")
     return 1 if max(value, uat_value) >= OVERLAP_LIMIT else 0
 
 
@@ -383,10 +470,15 @@ def main(argv: Sequence[str] | None = None) -> int:
     check.add_argument("--staged", action="store_true")
     check.add_argument("--path", default="app")
     sub.add_parser("overlap")
+    sub.add_parser("scan", help="an artifact folder about to be uploaded").add_argument(
+        "folder", type=Path
+    )
     args = parser.parse_args(argv)
     try:
         if args.mode == "build":
             return _build(args.output)
+        if args.mode == "scan":
+            return _scan(args.folder)
         return _check(args) if args.mode == "check" else _overlap()
     except QuestionSourceError as exc:
         print(f"[error] {exc}", file=sys.stderr)

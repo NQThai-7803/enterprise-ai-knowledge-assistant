@@ -15,10 +15,14 @@ from __future__ import annotations
 import argparse
 import json
 import statistics
+import sys
 from collections import Counter
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from scripts.eval.branch_counters import coarse_route  # noqa: E402
 
 UAT, RBAC = "uat", "rbac"
 
@@ -32,7 +36,8 @@ def categories(kind: str, results: dict[str, Any]) -> dict[str, str]:
             continue
         answered = (case.get("grounding_status") or case.get("status")) == "ANSWERED"
         if kind == UAT:
-            if case["proxy_match"]:
+            # DEC-032: value-aware when graded so (grade_proxy, value_grading regrade)
+            if case.get("value_match", case["proxy_match"]):
                 category = "correct"
             elif case["reference_status"] == "ANSWERED" and not answered:
                 category = "false_refusal"
@@ -117,7 +122,7 @@ def route_counts(kind: str, results: Any, cats: dict[str, str]) -> dict[str, dic
     if kind != UAT:
         return None
     rows = results if isinstance(results, list) else results.get("cases", [])
-    routes = {row["id"]: row.get("answer_route") for row in rows}
+    routes = {row["id"]: coarse_route(row.get("answer_route")) for row in rows}
     if not any(routes.values()):
         return None
     out: dict[str, Counter[str]] = {}

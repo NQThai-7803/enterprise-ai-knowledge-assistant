@@ -176,4 +176,5 @@ def _row_to_hit(row: RetrievalRow) -> RetrievalHit:
         end_page=row.end_page,
         token_count=row.token_count,
         relevance_score=row.relevance_score,
+        group_id=row.group_id,
     )

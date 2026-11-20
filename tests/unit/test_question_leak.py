@@ -76,6 +76,18 @@ def test_stale_held_out_v2_lock_fails(tmp_path: Path) -> None:
     assert leak.load_fingerprints(path, lock, expected, lock_v2)
 
 
+def test_stale_held_out_v3_lock_fails(tmp_path: Path) -> None:
+    payload = leak.build_payload(DEV, HELDOUT, "abc", heldout_v3=HELDOUT, lock_v3_sha256="v3")
+    path, lock = _files(tmp_path, payload)
+    lock_v3 = tmp_path / "lock_v3.json"
+    lock_v3.write_text(json.dumps({"sha256": "other"}), encoding="utf-8")
+    expected = {**EXPECTED, "heldout_v3": 1}
+    with pytest.raises(QuestionSourceError, match="held-out v3"):
+        leak.load_fingerprints(path, lock, expected, lock_v3=lock_v3)
+    lock_v3.write_text(json.dumps({"sha256": "v3"}), encoding="utf-8")
+    assert leak.load_fingerprints(path, lock, expected, lock_v3=lock_v3)
+
+
 @pytest.mark.parametrize(
     "payload",
     [
@@ -130,6 +142,23 @@ def test_check_exit_codes_for_a_hit_and_clean_diff(
     assert leak.main(["check"]) == 0
 
 
+def test_scan_fails_a_folder_holding_a_question_and_names_only_the_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    monkeypatch.setattr(leak, "load_fingerprints", _payload)
+    (tmp_path / "summary.md").write_text("| legacy | run1 | 3 | 1 |\nT1 near_duplicate\n", "utf-8")
+    (tmp_path / "private-results.tar.gz.age").write_bytes(bytes(range(256)) * 64)
+    assert leak.main(["scan", str(tmp_path)]) == 0
+    (tmp_path / "grading").mkdir()
+    (tmp_path / "grading" / "grading.md").write_text(
+        "**Question**: Alpha beta gamma delta?\n", "utf-8"
+    )
+    assert leak.main(["scan", str(tmp_path)]) == 1
+    out = capsys.readouterr().out
+    assert "grading/grading.md:1: heldout T1" in out and "gamma" not in out
+    assert leak.main(["scan", str(tmp_path / "missing")]) == 2
+
+
 @pytest.mark.skipif(shutil.which("git") is None, reason="git is not installed")
 def test_added_lines_reads_real_diff_line_numbers(tmp_path: Path) -> None:
     def git(*args: str) -> None:
@@ -168,3 +197,15 @@ def test_committed_fingerprints_cover_both_sets_without_plain_text() -> None:
             for hashes in items.values()
             for value in hashes
         )
+
+
+def test_stale_held_out_v3_1_lock_fails(tmp_path: Path) -> None:
+    payload = leak.build_payload(DEV, HELDOUT, "abc", heldout_v3_1=HELDOUT, lock_v3_1_sha256="v31")
+    path, lock = _files(tmp_path, payload)
+    lock_v31 = tmp_path / "lock_v31.json"
+    lock_v31.write_text(json.dumps({"sha256": "other"}), encoding="utf-8")
+    expected = {**EXPECTED, "heldout_v3_1": 1}
+    with pytest.raises(QuestionSourceError, match="held-out v3.1"):
+        leak.load_fingerprints(path, lock, expected, lock_v3_1=lock_v31)
+    lock_v31.write_text(json.dumps({"sha256": "v31"}), encoding="utf-8")
+    assert leak.load_fingerprints(path, lock, expected, lock_v3_1=lock_v31)

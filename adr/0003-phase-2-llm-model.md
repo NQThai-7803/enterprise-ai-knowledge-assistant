@@ -2,9 +2,13 @@
 
 ## Status
 
+Superseded by ADR 0005 (owner, 2026-11-20; DEC-040): mặc định mới là simple s1-s3 + `qwen3.5-text:4b`; `legacy` + `qwen2.5:3b` là đường quay lui.
+
 Accepted (owner, 2026-11-14). Xét lại khi có GPU từ 8 GB VRAM trở lên.
 
 2026-11-17: đã đo lại với 3 model (DEC-028, mục "Đo lại 2026-11-17" bên dưới). Mặc định chưa đổi; quyết định đổi model chờ owner.
+
+2026-11-18: owner chọn ứng viên `s3` + `qwen3.5:4b` (DEC-029) và phần cứng mục tiêu (mục "Phần cứng mục tiêu" bên dưới). Mặc định **vẫn chưa đổi**: còn chờ (b), owner đọc và chấp nhận danh sách lỗi UAT. Khi đổi, một ADR mới thay ADR này.
 
 ## Context
 
@@ -78,6 +82,15 @@ So trực tiếp, `s3` + `qwen3.5:4b` và `s3` + 7B **hòa nhau** ở mọi ch�
 - ND-011 đúng với `s3` + 7B và `s3` + `qwen3.5:4b`. ND-019 đúng với `s3` + `qwen3.5:4b` và `s3` + `sailor2:8b`.
 - Oracle với `qwen3.5:4b` (5 bộ dev, 1 lượt): `s3` + `qwen3.5:4b` đúng 104/117 khi có context gold, còn retrieval thật được 106 / 107. Trên các bộ dev, retrieval thật đã chạm trần. Phần còn lại chủ yếu là trả lời sai ở câu phải từ chối. Trần trên natural_dev_v1 và UAT chưa đo.
 - Run và chi tiết: `docs/design/model-comparison.md`.
+
+### Phần cứng mục tiêu (owner, 2026-11-18)
+
+- **Mục tiêu:** GPU NVIDIA, VRAM từ 4 GB trở lên, model `qwen3.5-text:4b`.
+  - Đó là `qwen3.5:4b` bỏ bộ mã hóa ảnh, dựng từ Modelfile có `PARAMETER num_gpu 99` (`scripts/deploy/ollama_text_model.py`, `DEPLOYMENT.md` mục 3.3).
+  - Đo trên GTX 1650 4 GB: 100% GPU, 2971 MiB VRAM, thời gian LLM trung vị khoảng 21 s mỗi câu.
+  - Câu trả lời giống hệt `qwen3.5:4b` ở cả 137 câu của lượt c.
+- **CPU 16 GB:** hỗ trợ nhưng chậm, khoảng 77 s mỗi câu với `s3` trên UAT (4 vCPU).
+- **Mọi cấu hình Ollama** phải đặt `LLAMA_ARG_CACHE_RAM=2048`, kể cả cấu hình hiện tại (`DEPLOYMENT.md` mục 3.2). Không đặt thì prompt cache của llama-server tăng tới 8 GiB RAM.
 
 ## Decision
 

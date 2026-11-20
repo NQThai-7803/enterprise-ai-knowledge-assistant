@@ -88,6 +88,7 @@ def settings() -> Settings:
         chat_history_max_messages=10,
         chat_history_max_tokens=400,
         citation_max_sources_per_answer=3,
+        rag_answer_mode="legacy",  # legacy JSON fake LLM (DEC-040 rollback)
     )
 
 

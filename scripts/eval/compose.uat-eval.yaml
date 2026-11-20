@@ -17,6 +17,9 @@ services:
     <<: *p3d_image
   worker:
     <<: *p3d_image
+    environment:
+      # Ingestion-time flag: ci_batch.sh rebuilds the corpus for EVAL_TABLE_ROWS configurations.
+      DOCUMENT_TABLE_ROW_CHUNKING_ENABLED: ${EVAL_TABLE_ROWS:-false}
   api:
     <<: *p3d_image
     ports: !override
@@ -41,15 +44,19 @@ services:
       RAG_CONTENT_BLOCKS_TERMINAL_ENABLED: ${EVAL_CONTENT_TERMINAL:-false}
       RAG_EXCERPT_FALLBACK_ENABLED: ${EVAL_EXCERPT_FALLBACK:-true}
       RAG_COMPOUND_PARTIAL_ANSWER_ENABLED: ${EVAL_COMPOUND_PARTIAL:-false}
-      RAG_ANSWER_MODE: ${EVAL_ANSWER_MODE:-legacy}
+      # DEC-040: the defaults are simple + s1-s3 + qwen3.5-text:4b; the rollback configuration is
+      # EVAL_ANSWER_MODE=legacy,EVAL_LLM_MODEL=qwen2.5:3b.
+      RAG_ANSWER_MODE: ${EVAL_ANSWER_MODE:-simple}
+      RAG_DRAFT_DOCUMENT_POLICY: ${EVAL_DRAFT_POLICY:-exclude}  # DEC-036: the data policy
+      DOCUMENT_TABLE_ROW_CHUNKING_ENABLED: ${EVAL_TABLE_ROWS:-false}
       RAG_NUMBER_NORMALIZATION_ENABLED: ${EVAL_NUMBER_NORMALIZATION:-false}
       # One switch per measured configuration (docs/design/simple-answer-mode.md), so the
       # configs input stays under the 400-character concurrency group of eval.yml.
-      RAG_SIMPLE_ABSENCE_SENTENCES_ENABLED: ${EVAL_SIMPLE_S1:-false}
-      RAG_SIMPLE_SHORT_PROMPT_ENABLED: ${EVAL_SIMPLE_S1:-false}
-      RAG_SIMPLE_RELAXED_RULES_ENABLED: ${EVAL_SIMPLE_S2:-false}
-      RAG_SIMPLE_CLAIM_RELEVANCE_ENABLED: ${EVAL_SIMPLE_S2:-false}
-      RAG_SIMPLE_QUESTION_LIST_SEGMENTS_ENABLED: ${EVAL_SIMPLE_S3:-false}
+      RAG_SIMPLE_ABSENCE_SENTENCES_ENABLED: ${EVAL_SIMPLE_S1:-true}
+      RAG_SIMPLE_SHORT_PROMPT_ENABLED: ${EVAL_SIMPLE_S1:-true}
+      RAG_SIMPLE_RELAXED_RULES_ENABLED: ${EVAL_SIMPLE_S2:-true}
+      RAG_SIMPLE_CLAIM_RELEVANCE_ENABLED: ${EVAL_SIMPLE_S2:-true}
+      RAG_SIMPLE_QUESTION_LIST_SEGMENTS_ENABLED: ${EVAL_SIMPLE_S3:-true}
       RAG_SIMPLE_SUBJECT_BINDING_ENABLED: ${EVAL_SIMPLE_S4:-false}
       RAG_SIMPLE_CLAIM_CROSS_ENCODER_ENABLED: ${EVAL_SIMPLE_S5:-false}
       # s5's cross-encoder, downloaded and mounted by eval.yml only when a configuration needs it.
@@ -60,8 +67,8 @@ services:
       # PROMPT 6 ablations (scripts/diagnostics/ablation_patches.py); inert by default.
       PYTHONPATH: /app/scripts/diagnostics/ablation_site:/app
       EVAL_ABLATION: ${EVAL_ABLATION:-}
-      LLM_OLLAMA_MODEL: ${EVAL_LLM_MODEL:-qwen2.5:3b}
-      EVAL_ORACLE_FILE: ${EVAL_ORACLE_FILE:-}
+      LLM_OLLAMA_MODEL: ${EVAL_LLM_MODEL:-qwen3.5-text:4b}
+      EVAL_ORACLE_FILE: ${EVAL_ORACLE_FILE:-/oracle/oracle.json}  # read by the oracle ablations only
       # DEC-025: the app default (heuristic) unless a configuration sets it; no cross-encoder
       # model is downloaded or mounted on Actions.
       RERANKER_PROVIDER: ${EVAL_RERANKER_PROVIDER:-heuristic}

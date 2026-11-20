@@ -33,7 +33,7 @@ ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.eval import branch_counters, reranker_check, run_rbac_dev  # noqa: E402
+from scripts.eval import branch_counters, reranker_check, run_rbac_dev, value_grading  # noqa: E402
 
 SETS = (
     "answer_relevance_dev_v1",
@@ -86,12 +86,18 @@ def grade_case(
     answered = case.get("status") == ANSWERED
     answer = case.get("answer") or ""
     says_unverified = run_rbac_dev._fold(UNVERIFIED_MARKER) in run_rbac_dev._fold(answer)
+    values = None
     if item["expect"] == "refuse":
         passed = case.get("status") == "NO_ANSWER"
     else:
         passed = answered and item["document"] in cited and states_fact(item, answer)
         if item["expect"] == "partial":  # one part stated, the other must be named unverified
             passed = passed and says_unverified
+        # DEC-032: no other value in the unit of a fact ("07 ngày" asked, "10 ngày" also given)
+        values = value_grading.check(
+            answer, value_grading.fact_forms(item), item.get("question", "")
+        )
+        passed = passed and not values["conflicting"]
     return {
         "id": item["id"],
         "group": item["group"],
@@ -102,8 +108,10 @@ def grade_case(
         "latency_ms": case.get("latency_ms"),
         "answer": case.get("answer"),
         "passed": passed,
+        **{field: case.get(field) for field in branch_counters.ROUTE_FIELDS},
         "false_answer": answered
         and (item["expect"] == "refuse" or (item["expect"] == "partial" and not says_unverified)),
+        "values": values,
     }
 
 

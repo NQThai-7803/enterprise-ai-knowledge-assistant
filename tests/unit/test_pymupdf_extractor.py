@@ -300,9 +300,11 @@ def test_factory_uses_settings() -> None:
         pdf_max_pages = 7
         pdf_min_usable_characters = 3
         pdf_text_sort = False
+        document_table_row_chunking_enabled = True
 
     extractor = pymupdf_extractor.create_pdf_text_extractor(SettingsStub())  # type: ignore[arg-type]
 
     assert extractor.max_pages == 7
     assert extractor.min_usable_characters == 3
     assert extractor.sort_text is False
+    assert extractor.table_rows is True

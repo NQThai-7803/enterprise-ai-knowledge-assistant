@@ -1,0 +1,1673 @@
+{
+ "pdf_problems": [],
+ "items": {
+  "HO3-01": {
+   "documents_not_in_corpus": [],
+   "no_document_code": false,
+   "account": "staff.uat@example.test",
+   "references": [
+    {
+     "document": "ND-HR-003",
+     "reference": "§05",
+     "found": "phrase"
+    }
+   ],
+   "answer_numbers": 1,
+   "answer_numbers_not_in_cited_documents": []
+  },
+  "HO3-02": {
+   "documents_not_in_corpus": [],
+   "no_document_code": false,
+   "account": "staff.uat@example.test",
+   "references": [
+    {
+     "document": "ND-HR-004",
+     "reference": "§02",
+     "found": "phrase"
+    }
+   ],
+   "answer_numbers": 4,
+   "answer_numbers_not_in_cited_documents": []
+  },
+  "HO3-03": {
+   "documents_not_in_corpus": [],
+   "no_document_code": false,
+   "account": "staff.uat@example.test",
+   "references": [
+    {
+     "document": "ND-HR-004",
+     "reference": "§04, §07",
+     "found": "words"
+    }
+   ],
+   "answer_numbers": 1,
+   "answer_numbers_not_in_cited_documents": []
+  },
+  "HO3-04": {
+   "documents_not_in_corpus": [],
+   "no_document_code": false,
+   "account": "staff.uat@example.test",
+   "references": [
+    {
+     "document": "ND-HR-002",
+     "reference": "Điều 33",
+     "found": "phrase"
+    }
+   ],
+   "answer_numbers": 1,
+   "answer_numbers_not_in_cited_documents": []
+  },
+  "HO3-05": {
+   "documents_not_in_corpus": [],
+   "no_document_code": false,
+   "account": "staff.uat@example.test",
+   "references": [
+    {
+     "document": "ND-HR-006",
+     "reference": "§06, §08",
+     "found": "words"
+    }
+   ],
+   "answer_numbers": 2,
+   "answer_numbers_not_in_cited_documents": []
+  },
+  "HO3-06": {
+   "documents_not_in_corpus": [],
+   "no_document_code": false,
+   "account": "staff.uat@example.test",
+   "references": [
+    {
+     "document": "ND-CORP-001",
+     "reference": "§06",
+     "found": "phrase"
+    }
+   ],
+   "answer_numbers": 0,
+   "answer_numbers_not_in_cited_documents": []
+  },
+  "HO3-07": {
+   "documents_not_in_corpus": [],
+   "no_document_code": false,
+   "account": "staff.uat@example.test",
+   "references": [
+    {
+     "document": "ND-HR-005",
+     "reference": "§03, §10",
+     "found": "words"
+    }
+   ],
+   "answer_numbers": 3,
+   "answer_numbers_not_in_cited_documents": []
+  },
+  "HO3-08": {
+   "documents_not_in_corpus": [],
+   "no_document_code": false,
+   "account": "staff.uat@example.test",
+   "references": [
+    {
+     "document": "ND-HR-005",
+     "reference": "§07",
+     "found": "phrase"
+    }
+   ],
+   "answer_numbers": 4,
+   "answer_numbers_not_in_cited_documents": [
+    "40",
+    "60"
+   ]
+  },
+  "HO3-09": {
+   "documents_not_in_corpus": [
+    "ND-HR-007"
+   ],
+   "no_document_code": false,
+   "account": null,
+   "references": [
+    {
+     "document": "ND-HR-007",
+     "reference": "§05",
+     "found": "no document"
+    }
+   ],
+   "answer_numbers": 2,
+   "answer_numbers_not_in_cited_documents": [
+    "13,6",
+    "85"
+   ]
+  },
+  "HO3-10": {
+   "documents_not_in_corpus": [],
+   "no_document_code": false,
+   "account": "staff.uat@example.test",
+   "references": [
+    {
+     "document": "ND-HR-006",
+     "reference": "§06, §09",
+     "found": "words"
+    }
+   ],
+   "answer_numbers": 1,
+   "answer_numbers_not_in_cited_documents": []
+  },
+  "HO3-11": {
+   "documents_not_in_corpus": [],
+   "no_document_code": false,
+   "account": "staff.uat@example.test",
+   "references": [
+    {
+     "document": "ND-HR-006",
+     "reference": "§03",
+     "found": "phrase"
+    }
+   ],
+   "answer_numbers": 4,
+   "answer_numbers_not_in_cited_documents": [
+    "3,6"
+   ]
+  },
+  "HO3-12": {
+   "documents_not_in_corpus": [],
+   "no_document_code": false,
+   "account": "staff.uat@example.test",
+   "references": [
+    {
+     "document": "ND-HR-004",
+     "reference": "§04 +",
+     "found": "phrase"
+    },
+    {
+     "document": "ND-HR-006",
+     "reference": "§07",
+     "found": "phrase"
+    }
+   ],
+   "answer_numbers": 2,
+   "answer_numbers_not_in_cited_documents": []
+  },
+  "HO3-13": {
+   "documents_not_in_corpus": [
+    "ND-HR-007"
+   ],
+   "no_document_code": false,
+   "account": null,
+   "references": [
+    {
+     "document": "ND-HR-005",
+     "reference": "§02 +",
+     "found": "phrase"
+    },
+    {
+     "document": "ND-HR-007",
+     "reference": "§05",
+     "found": "no document"
+    }
+   ],
+   "answer_numbers": 5,
+   "answer_numbers_not_in_cited_documents": [
+    "11,4",
+    "78"
+   ]
+  },
+  "HO3-14": {
+   "documents_not_in_corpus": [],
+   "no_document_code": false,
+   "account": "staff.uat@example.test",
+   "references": [
+    {
+     "document": "ND-HR-003",
+     "reference": "§06 +",
+     "found": "phrase"
+    },
+    {
+     "document": "ND-HR-005",
+     "reference": "§05 +",
+     "found": "phrase"
+    },
+    {
+     "document": "ND-HR-004",
+     "reference": "§08",
+     "found": "phrase"
+    }
+   ],
+   "answer_numbers": 3,
+   "answer_numbers_not_in_cited_documents": []
+  },
+  "HO3-15": {
+   "documents_not_in_corpus": [],
+   "no_document_code": false,
+   "account": "staff.uat@example.test",
+   "references": [
+    {
+     "document": "ND-HR-003",
+     "reference": "§07 +",
+     "found": "phrase"
+    },
+    {
+     "document": "ND-HR-005",
+     "reference": "§08 +",
+     "found": "phrase"
+    },
+    {
+     "document": "ND-HR-002",
+     "reference": "Điều 35",
+     "found": "phrase"
+    }
+   ],
+   "answer_numbers": 0,
+   "answer_numbers_not_in_cited_documents": []
+  },
+  "HO3-16": {
+   "documents_not_in_corpus": [],
+   "no_document_code": false,
+   "account": "staff.uat@example.test",
+   "references": [
+    {
+     "document": "ND-HR-003",
+     "reference": "§02 vs",
+     "found": "none"
+    },
+    {
+     "document": "ND-HR-002",
+     "reference": "Điều 5",
+     "found": "phrase"
+    }
+   ],
+   "answer_numbers": 8,
+   "answer_numbers_not_in_cited_documents": []
+  },
+  "HO3-17": {
+   "documents_not_in_corpus": [],
+   "no_document_code": false,
+   "account": "staff.uat@example.test",
+   "references": [
+    {
+     "document": "ND-HR-003",
+     "reference": "§08 vs",
+     "found": "none"
+    },
+    {
+     "document": "ND-HR-005",
+     "reference": "§03",
+     "found": "phrase"
+    }
+   ],
+   "answer_numbers": 8,
+   "answer_numbers_not_in_cited_documents": []
+  },
+  "HO3-18": {
+   "documents_not_in_corpus": [],
+   "no_document_code": false,
+   "account": "staff.uat@example.test",
+   "references": [
+    {
+     "document": "ND-CORP-001",
+     "reference": "§06 vs",
+     "found": "none"
+    },
+    {
+     "document": "ND-HR-002",
+     "reference": "Điều 19",
+     "found": "phrase"
+    }
+   ],
+   "answer_numbers": 3,
+   "answer_numbers_not_in_cited_documents": []
+  },
+  "HO3-19": {
+   "documents_not_in_corpus": [],
+   "no_document_code": false,
+   "account": "staff.uat@example.test",
+   "references": [
+    {
+     "document": "ND-CORP-001",
+     "reference": "§01",
+     "found": "phrase"
+    }
+   ],
+   "answer_numbers": 1,
+   "answer_numbers_not_in_cited_documents": []
+  },
+  "HO3-20": {
+   "documents_not_in_corpus": [
+    "ND-HR-007"
+   ],
+   "no_document_code": false,
+   "account": null,
+   "references": [
+    {
+     "document": "ND-HR-007",
+     "reference": "§02, §10",
+     "found": "no document"
+    }
+   ],
+   "answer_numbers": 3,
+   "answer_numbers_not_in_cited_documents": [
+    "007",
+    "300",
+    "9"
+   ]
+  }
+ },
+ "overlap": {
+  "HO3-01": {
+   "compound_partial": {
+    "word4_max": 0.0,
+    "word4_nearest": "CP1-R03",
+    "trigram_max": 0.22,
+    "trigram_nearest": "CP1-P04",
+    "difflib_max": 0.531,
+    "difflib_nearest": "CP1-R02"
+   },
+   "dev": {
+    "word4_max": 0.0,
+    "word4_nearest": "Q100",
+    "trigram_max": 0.277,
+    "trigram_nearest": "Q046",
+    "difflib_max": 0.525,
+    "difflib_nearest": "Q036"
+   },
+   "false_refusal": {
+    "word4_max": 0.0,
+    "word4_nearest": "FR-N10",
+    "trigram_max": 0.2,
+    "trigram_nearest": "FR-N10",
+    "difflib_max": 0.478,
+    "difflib_nearest": "FR-A01"
+   },
+   "false_refusal_v2": {
+    "word4_max": 0.0,
+    "word4_nearest": "FR2-L06",
+    "trigram_max": 0.239,
+    "trigram_nearest": "FR2-F03",
+    "difflib_max": 0.403,
+    "difflib_nearest": "FR2-L06"
+   },
+   "heldout": {
+    "word4_max": 0.0,
+    "word4_nearest": "HO-040"
+   },
+   "heldout_v2": {
+    "word4_max": 0.0,
+    "word4_nearest": "HO2-020"
+   },
+   "natural_dev": {
+    "word4_max": 0.0,
+    "word4_nearest": "ND-020",
+    "trigram_max": 0.229,
+    "trigram_nearest": "ND-012",
+    "difflib_max": 0.507,
+    "difflib_nearest": "ND-010"
+   },
+   "rbac": {
+    "word4_max": 0.0,
+    "word4_nearest": "RBD-18",
+    "trigram_max": 0.235,
+    "trigram_nearest": "RBD-11",
+    "difflib_max": 0.517,
+    "difflib_nearest": "RBD-14"
+   },
+   "relevance": {
+    "word4_max": 0.0,
+    "word4_nearest": "REL-406",
+    "trigram_max": 0.188,
+    "trigram_nearest": "REL-205",
+    "difflib_max": 0.424,
+    "difflib_nearest": "REL-103"
+   }
+  },
+  "HO3-02": {
+   "compound_partial": {
+    "word4_max": 0.0,
+    "word4_nearest": "CP1-R03",
+    "trigram_max": 0.316,
+    "trigram_nearest": "CP1-P02",
+    "difflib_max": 0.45,
+    "difflib_nearest": "CP1-A03"
+   },
+   "dev": {
+    "word4_max": 0.105,
+    "word4_nearest": "Q039",
+    "trigram_max": 0.383,
+    "trigram_nearest": "Q040",
+    "difflib_max": 0.7,
+    "difflib_nearest": "Q040"
+   },
+   "false_refusal": {
+    "word4_max": 0.083,
+    "word4_nearest": "FR-N03",
+    "trigram_max": 0.289,
+    "trigram_nearest": "FR-N01",
+    "difflib_max": 0.519,
+    "difflib_nearest": "FR-N03"
+   },
+   "false_refusal_v2": {
+    "word4_max": 0.0,
+    "word4_nearest": "FR2-L06",
+    "trigram_max": 0.263,
+    "trigram_nearest": "FR2-C06",
+    "difflib_max": 0.508,
+    "difflib_nearest": "FR2-F02"
+   },
+   "heldout": {
+    "word4_max": 0.043,
+    "word4_nearest": "HO-020"
+   },
+   "heldout_v2": {
+    "word4_max": 0.0,
+    "word4_nearest": "HO2-020"
+   },
+   "natural_dev": {
+    "word4_max": 0.0,
+    "word4_nearest": "ND-020",
+    "trigram_max": 0.273,
+    "trigram_nearest": "ND-001",
+    "difflib_max": 0.525,
+    "difflib_nearest": "ND-001"
+   },
+   "rbac": {
+    "word4_max": 0.0,
+    "word4_nearest": "RBD-18",
+    "trigram_max": 0.272,
+    "trigram_nearest": "RBD-07",
+    "difflib_max": 0.488,
+    "difflib_nearest": "RBD-07"
+   },
+   "relevance": {
+    "word4_max": 0.074,
+    "word4_nearest": "REL-204",
+    "trigram_max": 0.323,
+    "trigram_nearest": "REL-201",
+    "difflib_max": 0.557,
+    "difflib_nearest": "REL-204"
+   }
+  },
+  "HO3-03": {
+   "compound_partial": {
+    "word4_max": 0.0,
+    "word4_nearest": "CP1-R03",
+    "trigram_max": 0.211,
+    "trigram_nearest": "CP1-A03",
+    "difflib_max": 0.5,
+    "difflib_nearest": "CP1-A01"
+   },
+   "dev": {
+    "word4_max": 0.095,
+    "word4_nearest": "Q049",
+    "trigram_max": 0.365,
+    "trigram_nearest": "Q049",
+    "difflib_max": 0.645,
+    "difflib_nearest": "Q049"
+   },
+   "false_refusal": {
+    "word4_max": 0.0,
+    "word4_nearest": "FR-N10",
+    "trigram_max": 0.229,
+    "trigram_nearest": "FR-A01",
+    "difflib_max": 0.507,
+    "difflib_nearest": "FR-N03"
+   },
+   "false_refusal_v2": {
+    "word4_max": 0.0,
+    "word4_nearest": "FR2-L06",
+    "trigram_max": 0.207,
+    "trigram_nearest": "FR2-L05",
+    "difflib_max": 0.529,
+    "difflib_nearest": "FR2-C03"
+   },
+   "heldout": {
+    "word4_max": 0.0,
+    "word4_nearest": "HO-040"
+   },
+   "heldout_v2": {
+    "word4_max": 0.0,
+    "word4_nearest": "HO2-020"
+   },
+   "natural_dev": {
+    "word4_max": 0.0,
+    "word4_nearest": "ND-020",
+    "trigram_max": 0.183,
+    "trigram_nearest": "ND-004",
+    "difflib_max": 0.482,
+    "difflib_nearest": "ND-020"
+   },
+   "rbac": {
+    "word4_max": 0.0,
+    "word4_nearest": "RBD-18",
+    "trigram_max": 0.157,
+    "trigram_nearest": "RBD-15",
+    "difflib_max": 0.527,
+    "difflib_nearest": "RBD-15"
+   },
+   "relevance": {
+    "word4_max": 0.0,
+    "word4_nearest": "REL-406",
+    "trigram_max": 0.204,
+    "trigram_nearest": "REL-201",
+    "difflib_max": 0.397,
+    "difflib_nearest": "REL-102"
+   }
+  },
+  "HO3-04": {
+   "compound_partial": {
+    "word4_max": 0.0,
+    "word4_nearest": "CP1-R03",
+    "trigram_max": 0.189,
+    "trigram_nearest": "CP1-P04",
+    "difflib_max": 0.427,
+    "difflib_nearest": "CP1-R03"
+   },
+   "dev": {
+    "word4_max": 0.0,
+    "word4_nearest": "Q100",
+    "trigram_max": 0.218,
+    "trigram_nearest": "Q045",
+    "difflib_max": 0.519,
+    "difflib_nearest": "Q062"
+   },
+   "false_refusal": {
+    "word4_max": 0.0,
+    "word4_nearest": "FR-N10",
+    "trigram_max": 0.165,
+    "trigram_nearest": "FR-N10",
+    "difflib_max": 0.464,
+    "difflib_nearest": "FR-N09"
+   },
+   "false_refusal_v2": {
+    "word4_max": 0.033,
+    "word4_nearest": "FR2-C04",
+    "trigram_max": 0.239,
+    "trigram_nearest": "FR2-C01",
+    "difflib_max": 0.579,
+    "difflib_nearest": "FR2-L06"
+   },
+   "heldout": {
+    "word4_max": 0.029,
+    "word4_nearest": "HO-031"
+   },
+   "heldout_v2": {
+    "word4_max": 0.0,
+    "word4_nearest": "HO2-020"
+   },
+   "natural_dev": {
+    "word4_max": 0.0,
+    "word4_nearest": "ND-020",
+    "trigram_max": 0.191,
+    "trigram_nearest": "ND-009",
+    "difflib_max": 0.452,
+    "difflib_nearest": "ND-019"
+   },
+   "rbac": {
+    "word4_max": 0.0,
+    "word4_nearest": "RBD-18",
+    "trigram_max": 0.242,
+    "trigram_nearest": "RBD-08",
+    "difflib_max": 0.448,
+    "difflib_nearest": "RBD-13"
+   },
+   "relevance": {
+    "word4_max": 0.0,
+    "word4_nearest": "REL-406",
+    "trigram_max": 0.182,
+    "trigram_nearest": "REL-306",
+    "difflib_max": 0.449,
+    "difflib_nearest": "REL-205"
+   }
+  },
+  "HO3-05": {
+   "compound_partial": {
+    "word4_max": 0.0,
+    "word4_nearest": "CP1-R03",
+    "trigram_max": 0.164,
+    "trigram_nearest": "CP1-R01",
+    "difflib_max": 0.459,
+    "difflib_nearest": "CP1-R01"
+   },
+   "dev": {
+    "word4_max": 0.0,
+    "word4_nearest": "Q100",
+    "trigram_max": 0.239,
+    "trigram_nearest": "Q053",
+    "difflib_max": 0.561,
+    "difflib_nearest": "Q052"
+   },
+   "false_refusal": {
+    "word4_max": 0.0,
+    "word4_nearest": "FR-N10",
+    "trigram_max": 0.198,
+    "trigram_nearest": "FR-N03",
+    "difflib_max": 0.457,
+    "difflib_nearest": "FR-A09"
+   },
+   "false_refusal_v2": {
+    "word4_max": 0.0,
+    "word4_nearest": "FR2-L06",
+    "trigram_max": 0.165,
+    "trigram_nearest": "FR2-F06",
+    "difflib_max": 0.431,
+    "difflib_nearest": "FR2-L03"
+   },
+   "heldout": {
+    "word4_max": 0.273,
+    "word4_nearest": "HO-004"
+   },
+   "heldout_v2": {
+    "word4_max": 0.0,
+    "word4_nearest": "HO2-020"
+   },
+   "natural_dev": {
+    "word4_max": 0.0,
+    "word4_nearest": "ND-020",
+    "trigram_max": 0.263,
+    "trigram_nearest": "ND-004",
+    "difflib_max": 0.489,
+    "difflib_nearest": "ND-006"
+   },
+   "rbac": {
+    "word4_max": 0.0,
+    "word4_nearest": "RBD-18",
+    "trigram_max": 0.126,
+    "trigram_nearest": "RBD-10",
+    "difflib_max": 0.414,
+    "difflib_nearest": "RBD-12"
+   },
+   "relevance": {
+    "word4_max": 0.0,
+    "word4_nearest": "REL-406",
+    "trigram_max": 0.172,
+    "trigram_nearest": "REL-103",
+    "difflib_max": 0.481,
+    "difflib_nearest": "REL-401"
+   }
+  },
+  "HO3-06": {
+   "compound_partial": {
+    "word4_max": 0.0,
+    "word4_nearest": "CP1-R03",
+    "trigram_max": 0.136,
+    "trigram_nearest": "CP1-P05",
+    "difflib_max": 0.442,
+    "difflib_nearest": "CP1-P01"
+   },
+   "dev": {
+    "word4_max": 0.0,
+    "word4_nearest": "Q100",
+    "trigram_max": 0.179,
+    "trigram_nearest": "Q087",
+    "difflib_max": 0.478,
+    "difflib_nearest": "Q022"
+   },
+   "false_refusal": {
+    "word4_max": 0.0,
+    "word4_nearest": "FR-N10",
+    "trigram_max": 0.161,
+    "trigram_nearest": "FR-N05",
+    "difflib_max": 0.446,
+    "difflib_nearest": "FR-N05"
+   },
+   "false_refusal_v2": {
+    "word4_max": 0.0,
+    "word4_nearest": "FR2-L06",
+    "trigram_max": 0.156,
+    "trigram_nearest": "FR2-F04",
+    "difflib_max": 0.437,
+    "difflib_nearest": "FR2-C03"
+   },
+   "heldout": {
+    "word4_max": 0.0,
+    "word4_nearest": "HO-040"
+   },
+   "heldout_v2": {
+    "word4_max": 0.0,
+    "word4_nearest": "HO2-020"
+   },
+   "natural_dev": {
+    "word4_max": 0.0,
+    "word4_nearest": "ND-020",
+    "trigram_max": 0.161,
+    "trigram_nearest": "ND-013",
+    "difflib_max": 0.491,
+    "difflib_nearest": "ND-011"
+   },
+   "rbac": {
+    "word4_max": 0.0,
+    "word4_nearest": "RBD-18",
+    "trigram_max": 0.167,
+    "trigram_nearest": "RBD-13",
+    "difflib_max": 0.606,
+    "difflib_nearest": "RBD-13"
+   },
+   "relevance": {
+    "word4_max": 0.0,
+    "word4_nearest": "REL-406",
+    "trigram_max": 0.182,
+    "trigram_nearest": "REL-304",
+    "difflib_max": 0.472,
+    "difflib_nearest": "REL-206"
+   }
+  },
+  "HO3-07": {
+   "compound_partial": {
+    "word4_max": 0.0,
+    "word4_nearest": "CP1-R03",
+    "trigram_max": 0.26,
+    "trigram_nearest": "CP1-P06",
+    "difflib_max": 0.503,
+    "difflib_nearest": "CP1-P06"
+   },
+   "dev": {
+    "word4_max": 0.0,
+    "word4_nearest": "Q100",
+    "trigram_max": 0.258,
+    "trigram_nearest": "Q087",
+    "difflib_max": 0.458,
+    "difflib_nearest": "Q067"
+   },
+   "false_refusal": {
+    "word4_max": 0.0,
+    "word4_nearest": "FR-N10",
+    "trigram_max": 0.216,
+    "trigram_nearest": "FR-N05",
+    "difflib_max": 0.463,
+    "difflib_nearest": "FR-A01"
+   },
+   "false_refusal_v2": {
+    "word4_max": 0.0,
+    "word4_nearest": "FR2-L06",
+    "trigram_max": 0.212,
+    "trigram_nearest": "FR2-F04",
+    "difflib_max": 0.473,
+    "difflib_nearest": "FR2-L03"
+   },
+   "heldout": {
+    "word4_max": 0.0,
+    "word4_nearest": "HO-040"
+   },
+   "heldout_v2": {
+    "word4_max": 0.0,
+    "word4_nearest": "HO2-020"
+   },
+   "natural_dev": {
+    "word4_max": 0.0,
+    "word4_nearest": "ND-020",
+    "trigram_max": 0.288,
+    "trigram_nearest": "ND-013",
+    "difflib_max": 0.42,
+    "difflib_nearest": "ND-020"
+   },
+   "rbac": {
+    "word4_max": 0.0,
+    "word4_nearest": "RBD-18",
+    "trigram_max": 0.312,
+    "trigram_nearest": "RBD-15",
+    "difflib_max": 0.455,
+    "difflib_nearest": "RBD-15"
+   },
+   "relevance": {
+    "word4_max": 0.0,
+    "word4_nearest": "REL-406",
+    "trigram_max": 0.23,
+    "trigram_nearest": "REL-101",
+    "difflib_max": 0.408,
+    "difflib_nearest": "REL-105"
+   }
+  },
+  "HO3-08": {
+   "compound_partial": {
+    "word4_max": 0.0,
+    "word4_nearest": "CP1-R03",
+    "trigram_max": 0.177,
+    "trigram_nearest": "CP1-P02",
+    "difflib_max": 0.425,
+    "difflib_nearest": "CP1-A03"
+   },
+   "dev": {
+    "word4_max": 0.0,
+    "word4_nearest": "Q100",
+    "trigram_max": 0.303,
+    "trigram_nearest": "Q056",
+    "difflib_max": 0.484,
+    "difflib_nearest": "Q056"
+   },
+   "false_refusal": {
+    "word4_max": 0.0,
+    "word4_nearest": "FR-N10",
+    "trigram_max": 0.157,
+    "trigram_nearest": "FR-N06",
+    "difflib_max": 0.407,
+    "difflib_nearest": "FR-A06"
+   },
+   "false_refusal_v2": {
+    "word4_max": 0.0,
+    "word4_nearest": "FR2-L06",
+    "trigram_max": 0.18,
+    "trigram_nearest": "FR2-F04",
+    "difflib_max": 0.479,
+    "difflib_nearest": "FR2-F04"
+   },
+   "heldout": {
+    "word4_max": 0.0,
+    "word4_nearest": "HO-040"
+   },
+   "heldout_v2": {
+    "word4_max": 0.0,
+    "word4_nearest": "HO2-020"
+   },
+   "natural_dev": {
+    "word4_max": 0.0,
+    "word4_nearest": "ND-020",
+    "trigram_max": 0.187,
+    "trigram_nearest": "ND-016",
+    "difflib_max": 0.422,
+    "difflib_nearest": "ND-013"
+   },
+   "rbac": {
+    "word4_max": 0.0,
+    "word4_nearest": "RBD-18",
+    "trigram_max": 0.142,
+    "trigram_nearest": "RBD-08",
+    "difflib_max": 0.364,
+    "difflib_nearest": "RBD-11"
+   },
+   "relevance": {
+    "word4_max": 0.0,
+    "word4_nearest": "REL-406",
+    "trigram_max": 0.153,
+    "trigram_nearest": "REL-201",
+    "difflib_max": 0.38,
+    "difflib_nearest": "REL-203"
+   }
+  },
+  "HO3-09": {
+   "compound_partial": {
+    "word4_max": 0.0,
+    "word4_nearest": "CP1-R03",
+    "trigram_max": 0.189,
+    "trigram_nearest": "CP1-R01",
+    "difflib_max": 0.476,
+    "difflib_nearest": "CP1-P01"
+   },
+   "dev": {
+    "word4_max": 0.0,
+    "word4_nearest": "Q100",
+    "trigram_max": 0.312,
+    "trigram_nearest": "Q057",
+    "difflib_max": 0.55,
+    "difflib_nearest": "Q057"
+   },
+   "false_refusal": {
+    "word4_max": 0.0,
+    "word4_nearest": "FR-N10",
+    "trigram_max": 0.191,
+    "trigram_nearest": "FR-N03",
+    "difflib_max": 0.431,
+    "difflib_nearest": "FR-N01"
+   },
+   "false_refusal_v2": {
+    "word4_max": 0.0,
+    "word4_nearest": "FR2-L06",
+    "trigram_max": 0.198,
+    "trigram_nearest": "FR2-C03",
+    "difflib_max": 0.47,
+    "difflib_nearest": "FR2-C03"
+   },
+   "heldout": {
+    "word4_max": 0.0,
+    "word4_nearest": "HO-040"
+   },
+   "heldout_v2": {
+    "word4_max": 0.0,
+    "word4_nearest": "HO2-020"
+   },
+   "natural_dev": {
+    "word4_max": 0.0,
+    "word4_nearest": "ND-020",
+    "trigram_max": 0.202,
+    "trigram_nearest": "ND-016",
+    "difflib_max": 0.449,
+    "difflib_nearest": "ND-002"
+   },
+   "rbac": {
+    "word4_max": 0.0,
+    "word4_nearest": "RBD-18",
+    "trigram_max": 0.192,
+    "trigram_nearest": "RBD-13",
+    "difflib_max": 0.466,
+    "difflib_nearest": "RBD-08"
+   },
+   "relevance": {
+    "word4_max": 0.0,
+    "word4_nearest": "REL-406",
+    "trigram_max": 0.184,
+    "trigram_nearest": "REL-207",
+    "difflib_max": 0.458,
+    "difflib_nearest": "REL-203"
+   }
+  },
+  "HO3-10": {
+   "compound_partial": {
+    "word4_max": 0.0,
+    "word4_nearest": "CP1-R03",
+    "trigram_max": 0.241,
+    "trigram_nearest": "CP1-P05",
+    "difflib_max": 0.35,
+    "difflib_nearest": "CP1-P01"
+   },
+   "dev": {
+    "word4_max": 0.0,
+    "word4_nearest": "Q100",
+    "trigram_max": 0.241,
+    "trigram_nearest": "Q080",
+    "difflib_max": 0.513,
+    "difflib_nearest": "Q062"
+   },
+   "false_refusal": {
+    "word4_max": 0.0,
+    "word4_nearest": "FR-N10",
+    "trigram_max": 0.195,
+    "trigram_nearest": "FR-N05",
+    "difflib_max": 0.468,
+    "difflib_nearest": "FR-N10"
+   },
+   "false_refusal_v2": {
+    "word4_max": 0.0,
+    "word4_nearest": "FR2-L06",
+    "trigram_max": 0.267,
+    "trigram_nearest": "FR2-C03",
+    "difflib_max": 0.545,
+    "difflib_nearest": "FR2-F04"
+   },
+   "heldout": {
+    "word4_max": 0.0,
+    "word4_nearest": "HO-040"
+   },
+   "heldout_v2": {
+    "word4_max": 0.0,
+    "word4_nearest": "HO2-020"
+   },
+   "natural_dev": {
+    "word4_max": 0.0,
+    "word4_nearest": "ND-020",
+    "trigram_max": 0.177,
+    "trigram_nearest": "ND-002",
+    "difflib_max": 0.443,
+    "difflib_nearest": "ND-007"
+   },
+   "rbac": {
+    "word4_max": 0.0,
+    "word4_nearest": "RBD-18",
+    "trigram_max": 0.19,
+    "trigram_nearest": "RBD-08",
+    "difflib_max": 0.431,
+    "difflib_nearest": "RBD-05"
+   },
+   "relevance": {
+    "word4_max": 0.0,
+    "word4_nearest": "REL-406",
+    "trigram_max": 0.218,
+    "trigram_nearest": "REL-205",
+    "difflib_max": 0.47,
+    "difflib_nearest": "REL-204"
+   }
+  },
+  "HO3-11": {
+   "compound_partial": {
+    "word4_max": 0.031,
+    "word4_nearest": "CP1-P05",
+    "trigram_max": 0.236,
+    "trigram_nearest": "CP1-A03",
+    "difflib_max": 0.4,
+    "difflib_nearest": "CP1-P05"
+   },
+   "dev": {
+    "word4_max": 0.05,
+    "word4_nearest": "Q079",
+    "trigram_max": 0.486,
+    "trigram_nearest": "Q079",
+    "difflib_max": 0.586,
+    "difflib_nearest": "Q079"
+   },
+   "false_refusal": {
+    "word4_max": 0.0,
+    "word4_nearest": "FR-N10",
+    "trigram_max": 0.217,
+    "trigram_nearest": "FR-N06",
+    "difflib_max": 0.437,
+    "difflib_nearest": "FR-N09"
+   },
+   "false_refusal_v2": {
+    "word4_max": 0.033,
+    "word4_nearest": "FR2-C02",
+    "trigram_max": 0.291,
+    "trigram_nearest": "FR2-F04",
+    "difflib_max": 0.452,
+    "difflib_nearest": "FR2-C02"
+   },
+   "heldout": {
+    "word4_max": 0.04,
+    "word4_nearest": "HO-020"
+   },
+   "heldout_v2": {
+    "word4_max": 0.0,
+    "word4_nearest": "HO2-020"
+   },
+   "natural_dev": {
+    "word4_max": 0.0,
+    "word4_nearest": "ND-020",
+    "trigram_max": 0.208,
+    "trigram_nearest": "ND-001",
+    "difflib_max": 0.411,
+    "difflib_nearest": "ND-019"
+   },
+   "rbac": {
+    "word4_max": 0.0,
+    "word4_nearest": "RBD-18",
+    "trigram_max": 0.245,
+    "trigram_nearest": "RBD-08",
+    "difflib_max": 0.496,
+    "difflib_nearest": "RBD-02"
+   },
+   "relevance": {
+    "word4_max": 0.05,
+    "word4_nearest": "REL-205",
+    "trigram_max": 0.253,
+    "trigram_nearest": "REL-202",
+    "difflib_max": 0.478,
+    "difflib_nearest": "REL-202"
+   }
+  },
+  "HO3-12": {
+   "compound_partial": {
+    "word4_max": 0.0,
+    "word4_nearest": "CP1-R03",
+    "trigram_max": 0.221,
+    "trigram_nearest": "CP1-P04",
+    "difflib_max": 0.529,
+    "difflib_nearest": "CP1-P04"
+   },
+   "dev": {
+    "word4_max": 0.071,
+    "word4_nearest": "Q043",
+    "trigram_max": 0.371,
+    "trigram_nearest": "Q043",
+    "difflib_max": 0.578,
+    "difflib_nearest": "Q043"
+   },
+   "false_refusal": {
+    "word4_max": 0.0,
+    "word4_nearest": "FR-N10",
+    "trigram_max": 0.206,
+    "trigram_nearest": "FR-N04",
+    "difflib_max": 0.431,
+    "difflib_nearest": "FR-N03"
+   },
+   "false_refusal_v2": {
+    "word4_max": 0.0,
+    "word4_nearest": "FR2-L06",
+    "trigram_max": 0.212,
+    "trigram_nearest": "FR2-F06",
+    "difflib_max": 0.484,
+    "difflib_nearest": "FR2-F06"
+   },
+   "heldout": {
+    "word4_max": 0.069,
+    "word4_nearest": "HO-033"
+   },
+   "heldout_v2": {
+    "word4_max": 0.0,
+    "word4_nearest": "HO2-020"
+   },
+   "natural_dev": {
+    "word4_max": 0.0,
+    "word4_nearest": "ND-020",
+    "trigram_max": 0.256,
+    "trigram_nearest": "ND-004",
+    "difflib_max": 0.478,
+    "difflib_nearest": "ND-001"
+   },
+   "rbac": {
+    "word4_max": 0.0,
+    "word4_nearest": "RBD-18",
+    "trigram_max": 0.222,
+    "trigram_nearest": "RBD-11",
+    "difflib_max": 0.533,
+    "difflib_nearest": "RBD-11"
+   },
+   "relevance": {
+    "word4_max": 0.0,
+    "word4_nearest": "REL-406",
+    "trigram_max": 0.2,
+    "trigram_nearest": "REL-105",
+    "difflib_max": 0.534,
+    "difflib_nearest": "REL-105"
+   }
+  },
+  "HO3-13": {
+   "compound_partial": {
+    "word4_max": 0.0,
+    "word4_nearest": "CP1-R03",
+    "trigram_max": 0.102,
+    "trigram_nearest": "CP1-A01",
+    "difflib_max": 0.396,
+    "difflib_nearest": "CP1-P06"
+   },
+   "dev": {
+    "word4_max": 0.0,
+    "word4_nearest": "Q100",
+    "trigram_max": 0.219,
+    "trigram_nearest": "Q059",
+    "difflib_max": 0.447,
+    "difflib_nearest": "Q059"
+   },
+   "false_refusal": {
+    "word4_max": 0.0,
+    "word4_nearest": "FR-N10",
+    "trigram_max": 0.173,
+    "trigram_nearest": "FR-A07",
+    "difflib_max": 0.421,
+    "difflib_nearest": "FR-A07"
+   },
+   "false_refusal_v2": {
+    "word4_max": 0.0,
+    "word4_nearest": "FR2-L06",
+    "trigram_max": 0.103,
+    "trigram_nearest": "FR2-C03",
+    "difflib_max": 0.375,
+    "difflib_nearest": "FR2-E05"
+   },
+   "heldout": {
+    "word4_max": 0.0,
+    "word4_nearest": "HO-040"
+   },
+   "heldout_v2": {
+    "word4_max": 0.0,
+    "word4_nearest": "HO2-020"
+   },
+   "natural_dev": {
+    "word4_max": 0.0,
+    "word4_nearest": "ND-020",
+    "trigram_max": 0.116,
+    "trigram_nearest": "ND-015",
+    "difflib_max": 0.4,
+    "difflib_nearest": "ND-001"
+   },
+   "rbac": {
+    "word4_max": 0.0,
+    "word4_nearest": "RBD-18",
+    "trigram_max": 0.117,
+    "trigram_nearest": "RBD-04",
+    "difflib_max": 0.392,
+    "difflib_nearest": "RBD-06"
+   },
+   "relevance": {
+    "word4_max": 0.0,
+    "word4_nearest": "REL-406",
+    "trigram_max": 0.145,
+    "trigram_nearest": "REL-301",
+    "difflib_max": 0.453,
+    "difflib_nearest": "REL-104"
+   }
+  },
+  "HO3-14": {
+   "compound_partial": {
+    "word4_max": 0.0,
+    "word4_nearest": "CP1-R03",
+    "trigram_max": 0.198,
+    "trigram_nearest": "CP1-P05",
+    "difflib_max": 0.473,
+    "difflib_nearest": "CP1-P05"
+   },
+   "dev": {
+    "word4_max": 0.0,
+    "word4_nearest": "Q100",
+    "trigram_max": 0.234,
+    "trigram_nearest": "Q097",
+    "difflib_max": 0.486,
+    "difflib_nearest": "Q097"
+   },
+   "false_refusal": {
+    "word4_max": 0.0,
+    "word4_nearest": "FR-N10",
+    "trigram_max": 0.18,
+    "trigram_nearest": "FR-A02",
+    "difflib_max": 0.417,
+    "difflib_nearest": "FR-N07"
+   },
+   "false_refusal_v2": {
+    "word4_max": 0.0,
+    "word4_nearest": "FR2-L06",
+    "trigram_max": 0.196,
+    "trigram_nearest": "FR2-C03",
+    "difflib_max": 0.394,
+    "difflib_nearest": "FR2-F06"
+   },
+   "heldout": {
+    "word4_max": 0.0,
+    "word4_nearest": "HO-040"
+   },
+   "heldout_v2": {
+    "word4_max": 0.033,
+    "word4_nearest": "HO2-020"
+   },
+   "natural_dev": {
+    "word4_max": 0.0,
+    "word4_nearest": "ND-020",
+    "trigram_max": 0.126,
+    "trigram_nearest": "ND-010",
+    "difflib_max": 0.463,
+    "difflib_nearest": "ND-002"
+   },
+   "rbac": {
+    "word4_max": 0.0,
+    "word4_nearest": "RBD-18",
+    "trigram_max": 0.127,
+    "trigram_nearest": "RBD-06",
+    "difflib_max": 0.378,
+    "difflib_nearest": "RBD-09"
+   },
+   "relevance": {
+    "word4_max": 0.0,
+    "word4_nearest": "REL-406",
+    "trigram_max": 0.137,
+    "trigram_nearest": "REL-203",
+    "difflib_max": 0.373,
+    "difflib_nearest": "REL-305"
+   }
+  },
+  "HO3-15": {
+   "compound_partial": {
+    "word4_max": 0.0,
+    "word4_nearest": "CP1-R03",
+    "trigram_max": 0.21,
+    "trigram_nearest": "CP1-P04",
+    "difflib_max": 0.475,
+    "difflib_nearest": "CP1-A01"
+   },
+   "dev": {
+    "word4_max": 0.0,
+    "word4_nearest": "Q100",
+    "trigram_max": 0.228,
+    "trigram_nearest": "Q035",
+    "difflib_max": 0.484,
+    "difflib_nearest": "Q055"
+   },
+   "false_refusal": {
+    "word4_max": 0.0,
+    "word4_nearest": "FR-N10",
+    "trigram_max": 0.221,
+    "trigram_nearest": "FR-A10",
+    "difflib_max": 0.484,
+    "difflib_nearest": "FR-N05"
+   },
+   "false_refusal_v2": {
+    "word4_max": 0.0,
+    "word4_nearest": "FR2-L06",
+    "trigram_max": 0.21,
+    "trigram_nearest": "FR2-L06",
+    "difflib_max": 0.493,
+    "difflib_nearest": "FR2-L03"
+   },
+   "heldout": {
+    "word4_max": 0.0,
+    "word4_nearest": "HO-040"
+   },
+   "heldout_v2": {
+    "word4_max": 0.0,
+    "word4_nearest": "HO2-020"
+   },
+   "natural_dev": {
+    "word4_max": 0.0,
+    "word4_nearest": "ND-020",
+    "trigram_max": 0.218,
+    "trigram_nearest": "ND-013",
+    "difflib_max": 0.458,
+    "difflib_nearest": "ND-008"
+   },
+   "rbac": {
+    "word4_max": 0.0,
+    "word4_nearest": "RBD-18",
+    "trigram_max": 0.213,
+    "trigram_nearest": "RBD-08",
+    "difflib_max": 0.432,
+    "difflib_nearest": "RBD-06"
+   },
+   "relevance": {
+    "word4_max": 0.0,
+    "word4_nearest": "REL-406",
+    "trigram_max": 0.171,
+    "trigram_nearest": "REL-201",
+    "difflib_max": 0.465,
+    "difflib_nearest": "REL-204"
+   }
+  },
+  "HO3-16": {
+   "compound_partial": {
+    "word4_max": 0.0,
+    "word4_nearest": "CP1-R03",
+    "trigram_max": 0.135,
+    "trigram_nearest": "CP1-P02",
+    "difflib_max": 0.437,
+    "difflib_nearest": "CP1-A02"
+   },
+   "dev": {
+    "word4_max": 0.0,
+    "word4_nearest": "Q100",
+    "trigram_max": 0.239,
+    "trigram_nearest": "Q021",
+    "difflib_max": 0.558,
+    "difflib_nearest": "Q021"
+   },
+   "false_refusal": {
+    "word4_max": 0.0,
+    "word4_nearest": "FR-N10",
+    "trigram_max": 0.188,
+    "trigram_nearest": "FR-A05",
+    "difflib_max": 0.44,
+    "difflib_nearest": "FR-A06"
+   },
+   "false_refusal_v2": {
+    "word4_max": 0.0,
+    "word4_nearest": "FR2-L06",
+    "trigram_max": 0.181,
+    "trigram_nearest": "FR2-L04",
+    "difflib_max": 0.449,
+    "difflib_nearest": "FR2-L03"
+   },
+   "heldout": {
+    "word4_max": 0.0,
+    "word4_nearest": "HO-040"
+   },
+   "heldout_v2": {
+    "word4_max": 0.045,
+    "word4_nearest": "HO2-001"
+   },
+   "natural_dev": {
+    "word4_max": 0.0,
+    "word4_nearest": "ND-020",
+    "trigram_max": 0.19,
+    "trigram_nearest": "ND-018",
+    "difflib_max": 0.407,
+    "difflib_nearest": "ND-019"
+   },
+   "rbac": {
+    "word4_max": 0.0,
+    "word4_nearest": "RBD-18",
+    "trigram_max": 0.217,
+    "trigram_nearest": "RBD-07",
+    "difflib_max": 0.511,
+    "difflib_nearest": "RBD-09"
+   },
+   "relevance": {
+    "word4_max": 0.0,
+    "word4_nearest": "REL-406",
+    "trigram_max": 0.167,
+    "trigram_nearest": "REL-305",
+    "difflib_max": 0.5,
+    "difflib_nearest": "REL-207"
+   }
+  },
+  "HO3-17": {
+   "compound_partial": {
+    "word4_max": 0.0,
+    "word4_nearest": "CP1-R03",
+    "trigram_max": 0.153,
+    "trigram_nearest": "CP1-P03",
+    "difflib_max": 0.397,
+    "difflib_nearest": "CP1-R01"
+   },
+   "dev": {
+    "word4_max": 0.0,
+    "word4_nearest": "Q100",
+    "trigram_max": 0.263,
+    "trigram_nearest": "Q025",
+    "difflib_max": 0.557,
+    "difflib_nearest": "Q025"
+   },
+   "false_refusal": {
+    "word4_max": 0.0,
+    "word4_nearest": "FR-N10",
+    "trigram_max": 0.209,
+    "trigram_nearest": "FR-A07",
+    "difflib_max": 0.414,
+    "difflib_nearest": "FR-N02"
+   },
+   "false_refusal_v2": {
+    "word4_max": 0.0,
+    "word4_nearest": "FR2-L06",
+    "trigram_max": 0.176,
+    "trigram_nearest": "FR2-F06",
+    "difflib_max": 0.487,
+    "difflib_nearest": "FR2-F01"
+   },
+   "heldout": {
+    "word4_max": 0.0,
+    "word4_nearest": "HO-040"
+   },
+   "heldout_v2": {
+    "word4_max": 0.0,
+    "word4_nearest": "HO2-020"
+   },
+   "natural_dev": {
+    "word4_max": 0.0,
+    "word4_nearest": "ND-020",
+    "trigram_max": 0.16,
+    "trigram_nearest": "ND-001",
+    "difflib_max": 0.432,
+    "difflib_nearest": "ND-005"
+   },
+   "rbac": {
+    "word4_max": 0.0,
+    "word4_nearest": "RBD-18",
+    "trigram_max": 0.18,
+    "trigram_nearest": "RBD-09",
+    "difflib_max": 0.492,
+    "difflib_nearest": "RBD-08"
+   },
+   "relevance": {
+    "word4_max": 0.0,
+    "word4_nearest": "REL-406",
+    "trigram_max": 0.212,
+    "trigram_nearest": "REL-201",
+    "difflib_max": 0.477,
+    "difflib_nearest": "REL-405"
+   }
+  },
+  "HO3-18": {
+   "compound_partial": {
+    "word4_max": 0.0,
+    "word4_nearest": "CP1-R03",
+    "trigram_max": 0.129,
+    "trigram_nearest": "CP1-P02",
+    "difflib_max": 0.435,
+    "difflib_nearest": "CP1-P02"
+   },
+   "dev": {
+    "word4_max": 0.0,
+    "word4_nearest": "Q100",
+    "trigram_max": 0.182,
+    "trigram_nearest": "Q087",
+    "difflib_max": 0.5,
+    "difflib_nearest": "Q043"
+   },
+   "false_refusal": {
+    "word4_max": 0.0,
+    "word4_nearest": "FR-N10",
+    "trigram_max": 0.159,
+    "trigram_nearest": "FR-A04",
+    "difflib_max": 0.482,
+    "difflib_nearest": "FR-A04"
+   },
+   "false_refusal_v2": {
+    "word4_max": 0.0,
+    "word4_nearest": "FR2-L06",
+    "trigram_max": 0.138,
+    "trigram_nearest": "FR2-L04",
+    "difflib_max": 0.439,
+    "difflib_nearest": "FR2-L05"
+   },
+   "heldout": {
+    "word4_max": 0.0,
+    "word4_nearest": "HO-040"
+   },
+   "heldout_v2": {
+    "word4_max": 0.0,
+    "word4_nearest": "HO2-020"
+   },
+   "natural_dev": {
+    "word4_max": 0.0,
+    "word4_nearest": "ND-020",
+    "trigram_max": 0.161,
+    "trigram_nearest": "ND-011",
+    "difflib_max": 0.5,
+    "difflib_nearest": "ND-018"
+   },
+   "rbac": {
+    "word4_max": 0.0,
+    "word4_nearest": "RBD-18",
+    "trigram_max": 0.2,
+    "trigram_nearest": "RBD-01",
+    "difflib_max": 0.518,
+    "difflib_nearest": "RBD-14"
+   },
+   "relevance": {
+    "word4_max": 0.0,
+    "word4_nearest": "REL-406",
+    "trigram_max": 0.19,
+    "trigram_nearest": "REL-207",
+    "difflib_max": 0.512,
+    "difflib_nearest": "REL-203"
+   }
+  },
+  "HO3-19": {
+   "compound_partial": {
+    "word4_max": 0.0,
+    "word4_nearest": "CP1-R03",
+    "trigram_max": 0.245,
+    "trigram_nearest": "CP1-P05",
+    "difflib_max": 0.469,
+    "difflib_nearest": "CP1-P02"
+   },
+   "dev": {
+    "word4_max": 0.154,
+    "word4_nearest": "Q009",
+    "trigram_max": 0.338,
+    "trigram_nearest": "Q009",
+    "difflib_max": 0.63,
+    "difflib_nearest": "Q009"
+   },
+   "false_refusal": {
+    "word4_max": 0.0,
+    "word4_nearest": "FR-N10",
+    "trigram_max": 0.25,
+    "trigram_nearest": "FR-N03",
+    "difflib_max": 0.521,
+    "difflib_nearest": "FR-N09"
+   },
+   "false_refusal_v2": {
+    "word4_max": 0.0,
+    "word4_nearest": "FR2-L06",
+    "trigram_max": 0.318,
+    "trigram_nearest": "FR2-C02",
+    "difflib_max": 0.569,
+    "difflib_nearest": "FR2-C05"
+   },
+   "heldout": {
+    "word4_max": 0.0,
+    "word4_nearest": "HO-040"
+   },
+   "heldout_v2": {
+    "word4_max": 0.0,
+    "word4_nearest": "HO2-020"
+   },
+   "natural_dev": {
+    "word4_max": 0.0,
+    "word4_nearest": "ND-020",
+    "trigram_max": 0.202,
+    "trigram_nearest": "ND-006",
+    "difflib_max": 0.548,
+    "difflib_nearest": "ND-008"
+   },
+   "rbac": {
+    "word4_max": 0.0,
+    "word4_nearest": "RBD-18",
+    "trigram_max": 0.227,
+    "trigram_nearest": "RBD-02",
+    "difflib_max": 0.495,
+    "difflib_nearest": "RBD-18"
+   },
+   "relevance": {
+    "word4_max": 0.0,
+    "word4_nearest": "REL-406",
+    "trigram_max": 0.253,
+    "trigram_nearest": "REL-201",
+    "difflib_max": 0.48,
+    "difflib_nearest": "REL-206"
+   }
+  },
+  "HO3-20": {
+   "compound_partial": {
+    "word4_max": 0.0,
+    "word4_nearest": "CP1-R03",
+    "trigram_max": 0.265,
+    "trigram_nearest": "CP1-A01",
+    "difflib_max": 0.436,
+    "difflib_nearest": "CP1-P01"
+   },
+   "dev": {
+    "word4_max": 0.0,
+    "word4_nearest": "Q100",
+    "trigram_max": 0.225,
+    "trigram_nearest": "Q061",
+    "difflib_max": 0.549,
+    "difflib_nearest": "Q079"
+   },
+   "false_refusal": {
+    "word4_max": 0.0,
+    "word4_nearest": "FR-N10",
+    "trigram_max": 0.233,
+    "trigram_nearest": "FR-N03",
+    "difflib_max": 0.446,
+    "difflib_nearest": "FR-N02"
+   },
+   "false_refusal_v2": {
+    "word4_max": 0.0,
+    "word4_nearest": "FR2-L06",
+    "trigram_max": 0.206,
+    "trigram_nearest": "FR2-C03",
+    "difflib_max": 0.532,
+    "difflib_nearest": "FR2-C05"
+   },
+   "heldout": {
+    "word4_max": 0.0,
+    "word4_nearest": "HO-040"
+   },
+   "heldout_v2": {
+    "word4_max": 0.0,
+    "word4_nearest": "HO2-020"
+   },
+   "natural_dev": {
+    "word4_max": 0.0,
+    "word4_nearest": "ND-020",
+    "trigram_max": 0.22,
+    "trigram_nearest": "ND-008",
+    "difflib_max": 0.432,
+    "difflib_nearest": "ND-003"
+   },
+   "rbac": {
+    "word4_max": 0.0,
+    "word4_nearest": "RBD-18",
+    "trigram_max": 0.237,
+    "trigram_nearest": "RBD-08",
+    "difflib_max": 0.537,
+    "difflib_nearest": "RBD-08"
+   },
+   "relevance": {
+    "word4_max": 0.0,
+    "word4_nearest": "REL-406",
+    "trigram_max": 0.26,
+    "trigram_nearest": "REL-203",
+    "difflib_max": 0.467,
+    "difflib_nearest": "REL-403"
+   }
+  }
+ }
+}

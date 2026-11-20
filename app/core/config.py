@@ -83,6 +83,8 @@ class Settings(BaseSettings):
     pdf_max_pages: int = Field(default=500, gt=0)
     pdf_min_usable_characters: int = Field(default=20, ge=0)
     pdf_text_sort: bool = True
+    # One text unit per table row, with title and column names (docs/design/table-chunking.md).
+    document_table_row_chunking_enabled: bool = False
     ocr_enabled: bool = True
     ocr_languages: Annotated[list[str], NoDecode] = Field(default_factory=lambda: ["vie", "eng"])
     ocr_max_pages: int = Field(default=100, ge=1, le=1000)
@@ -132,6 +134,9 @@ class Settings(BaseSettings):
     rag_semantic_exact_permitted_knn_enabled: bool = True
     # legacy, strict or off for _structured_condition_value_answer (DEC-010).
     rag_deterministic_route_mode: Literal["legacy", "strict", "off"] = "strict"
+    # DEC-033/036: exclude (the owner's data policy, default) keeps DRAFT documents (templates,
+    # drafts) out of every answer path; off answers from them like ACTIVE ones (rollback).
+    rag_draft_document_policy: Literal["off", "exclude"] = "exclude"
     # FIX 2 groups 1 and 2 are on by default (DEC-011); set these to roll back.
     # FIX 2 group 1: false stops the deterministic repair once the LLM has refused.
     rag_repair_after_llm_refusal_enabled: bool = False
@@ -171,23 +176,27 @@ class Settings(BaseSettings):
     rag_compound_partial_answer_enabled: bool = False
     # Simple answer mode (docs/design/simple-answer-mode.md): hybrid retrieval, top 5 chunks
     # (at most 2 per document), one prompt, citation + claim validation, one retry. legacy
-    # keeps the full pipeline.
-    rag_answer_mode: Literal["legacy", "simple"] = "legacy"
-    # Simple-mode fixes s1-s3 (same doc, owner decision 2026-11-16), read only in simple mode.
+    # keeps the full pipeline. DEC-040 (2026-11-20): simple with s1-s3 on is the default (with
+    # qwen3.5-text:4b); RAG_ANSWER_MODE=legacy and LLM_OLLAMA_MODEL=qwen2.5:3b roll it back.
+    # hybrid (DEC-041: kept behind this value, not recommended): the legacy deterministic route
+    # first, under its existing conditions; a question it does not answer goes to the simple path.
+    rag_answer_mode: Literal["legacy", "simple", "hybrid"] = "simple"
+    # Simple-mode fixes s1-s3 (same doc, owner decision 2026-11-16), read by the simple path
+    # (simple mode, and hybrid mode when no deterministic route answers).
     # s1: a sentence naming an unverified part ("chưa/không xác minh được") is never a claim,
     # with or without a marker; a short-answer prompt asks for the marker in the first draft.
-    rag_simple_absence_sentences_enabled: bool = False
-    rag_simple_short_prompt_enabled: bool = False
+    rag_simple_absence_sentences_enabled: bool = True
+    rag_simple_short_prompt_enabled: bool = True
     # s2: claim validation skips the subject-alignment rule and the attendance, annual-leave and
     # bereavement rules; a claim whose cited source sentence is too far (e5 cosine) from the
     # question and from each of its parts is dropped, and none left ends at NO_ANSWER.
-    rag_simple_relaxed_rules_enabled: bool = False
-    rag_simple_claim_relevance_enabled: bool = False
+    rag_simple_relaxed_rules_enabled: bool = True
+    rag_simple_claim_relevance_enabled: bool = True
     # Calibrated 2026-11-16 on the dev-set drafts of the diagnostic run (UAT excluded): the
     # lowest best-claim cosine of a correct answer, floored (109 drafts of 58 items).
     rag_simple_claim_relevance_min_similarity: float = Field(default=0.78, ge=0.0, le=1.0)
     # s3: a whole question-list chunk counts by its answer segments, as a reference one does.
-    rag_simple_question_list_segments_enabled: bool = False
+    rag_simple_question_list_segments_enabled: bool = True
     # s4: a value in a claim must sit in a cited sentence or table row that names the subject
     # the question asks about, when another sentence or row with a value of that kind does.
     rag_simple_subject_binding_enabled: bool = False

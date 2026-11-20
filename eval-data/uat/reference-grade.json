@@ -55,7 +55,13 @@
           "page_number": 2
         }
       ],
-      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Person, organization and product facts checked against cited V2 chunks."
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Person, organization and product facts checked against cited V2 chunks.",
+      "accepted_sources": [
+        "ND-CORP-001",
+        "ND-HR-002",
+        "ND-HR-003"
+      ],
+      "gold_change": "owner review 2026-11-18 (DEC-037): ND-CORP-001 (approval block, Tổng Giám đốc) is an accepted source too."
     },
     {
       "id": "Q003",
@@ -335,7 +341,12 @@
           "page_number": 5
         }
       ],
-      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Schedule, attendance, remote and on-call conditions checked."
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Schedule, attendance, remote and on-call conditions checked.",
+      "accepted_sources": [
+        "ND-HR-002",
+        "ND-HR-003"
+      ],
+      "gold_change": "owner review 2026-11-18 (DEC-037): ND-HR-002 and ND-HR-003 state the same value; either source is accepted (policy 1)."
     },
     {
       "id": "Q017",
@@ -355,21 +366,36 @@
           "page_number": 4
         }
       ],
-      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Schedule, attendance, remote and on-call conditions checked."
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Schedule, attendance, remote and on-call conditions checked.",
+      "accepted_sources": [
+        "ND-HR-002",
+        "ND-HR-003"
+      ],
+      "gold_change": "owner review 2026-11-18 (DEC-037): ND-HR-002 and ND-HR-003 state the same value; either source is accepted (policy 1)."
     },
     {
       "id": "Q018",
       "category": "B",
       "applicability": "INTENTIONALLY_CONFLICTING",
       "question": "Sáng mình được vào làm từ mấy giờ tới mấy giờ?",
-      "answer": "Không tìm thấy đủ thông tin trong các tài liệu bạn được phép truy cập để trả lời câu hỏi này.",
-      "grounding_status": "NO_ANSWER",
+      "answer": "Nhân viên linh hoạt có thể bắt đầu làm việc trong khung 08:00 - 09:00 và kết thúc tương ứng trong khung 17:00 - 18:00. [1]",
+      "grounding_status": "ANSWERED",
       "semantic_result": "SAFE_ABSTENTION",
       "material_citation_result": "NOT_APPLICABLE_ZERO_CITATIONS",
       "claim_evidence_support_result": "NOT_APPLICABLE",
-      "citation_count": 0,
-      "citation_ids": [],
-      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Schedule, attendance, remote and on-call conditions checked."
+      "citation_count": 1,
+      "citation_ids": [
+        {
+          "document_id": "e12f25b7-b962-408a-87db-0d1b7e331839",
+          "chunk_id": null,
+          "page_number": 4
+        }
+      ],
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Schedule, attendance, remote and on-call conditions checked.",
+      "accepted_sources": [
+        "ND-HR-003"
+      ],
+      "gold_change": "owner review 2026-11-18 (DEC-037): NO_ANSWER -> ANSWERED. ND-HR-002 p5 (start 08:00-09:30) and ND-HR-003 p4 (start 08:00-09:00, end 17:00-18:00) conflict; ND-HR-003 wins (policy 2)."
     },
     {
       "id": "Q019",
@@ -689,7 +715,12 @@
           "page_number": 2
         }
       ],
-      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Paraphrased attendance/remote conditions and negations checked."
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Paraphrased attendance/remote conditions and negations checked.",
+      "accepted_sources": [
+        "ND-HR-002",
+        "ND-HR-003"
+      ],
+      "gold_change": "owner review 2026-11-18 (DEC-037): ND-HR-002 and ND-HR-003 state the same value; either source is accepted (policy 1)."
     },
     {
       "id": "Q035",
@@ -884,12 +915,13 @@
       "citation_count": 1,
       "citation_ids": [
         {
-          "document_id": "b983593e-6416-4039-9202-322ea9ee699c",
-          "chunk_id": "382a6c05-54eb-4e78-94ab-81fb9224b141",
-          "page_number": 3
+          "document_id": "0392b990-0522-447e-92b1-23c8927a5908",
+          "chunk_id": null,
+          "page_number": 6
         }
       ],
-      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Leave allocation, notice, approval and incident clauses checked."
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Leave allocation, notice, approval and incident clauses checked.",
+      "gold_change": "DEC-033, owner-approved 2026-11-18: the expected citation moved from UAT-LEAVE-AUTHORITY-001 page 3 (a template, 'chưa phải văn bản ban hành') to ND-HR-004 page 6 ('Con đẻ hoặc con nuôi kết hôn 01 ngày'). The answer is unchanged; no V2 chunk id is recorded for the new page."
     },
     {
       "id": "Q045",
@@ -1076,7 +1108,7 @@
       "category": "E",
       "applicability": "SUPPORTED_BY_V2",
       "question": "Công ty trả lương ngày mấy?",
-      "answer": "Ngày là ngay 10 cua thang ke tiep. [1]",
+      "answer": "Ngày 10 tháng kế tiếp. [1]",
       "grounding_status": "ANSWERED",
       "semantic_result": "PASS",
       "material_citation_result": "PASS",
@@ -1089,7 +1121,8 @@
           "page_number": 5
         }
       ],
-      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Payroll, salary, allowances, OT, review and own-salary rights checked."
+      "review_basis": "Current answer and cited evidence inspected; exact answer and source identities match the frozen, manually reviewed H5.2 capture; restored chunk identities/content hashes match protected V2. Payroll, salary, allowances, OT, review and own-salary rights checked.",
+      "gold_change": "owner review 2026-11-18 (DEC-037): the expected answer is the 10th of the following month; a computed calendar date is a feature request (policy 5), not graded."
     },
     {
       "id": "Q055",
