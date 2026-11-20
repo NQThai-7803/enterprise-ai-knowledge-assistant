@@ -771,3 +771,88 @@ Set on 2026-11-19 by the owner, before the held-out v3.1 dispatch.
 - **Not scanned:**
   - the contents of `docs/eval/heldout-v2-check.json`, `docs/eval/heldout-v2-e5.json` and `docs/eval/runs/`;
   - gold text outside `docs/eval/`, because only the questions have fingerprints.
+
+## DEC-040 — The default after held-out v3.1
+
+Set on 2026-11-20 by the owner, after reading `grading.md` of held-out v3.1 run 44575927833.
+
+**New default:** `s3t` = simple answer mode with s1-s3 (`EVAL_SIMPLE_LEVEL=3`) + `qwen3.5-text:4b` +
+`RAG_DRAFT_DOCUMENT_POLICY=exclude`. **Rollback:** `legacy` + `qwen2.5:3b`
+(`RAG_ANSWER_MODE=legacy`, `LLM_OLLAMA_MODEL=qwen2.5:3b`; `DEPLOYMENT.md` 3.3). ADR 0005 replaces
+ADR 0003.
+
+**Basis:**
+
+- The DEC-035 rule, registered before the run. The automatic verdict is `s3t`: false answers +
+  wrong are lower in every run.
+  - Per run (correct / false refusal / false answer / wrong): `legacy` 0 / 8 / 0 / 8, `s3t`
+    3 / 7 / 0 / 6.
+- The owner's labels lean the same way (`s3t` / `legacy`): PASS 1 / 1, PARTIAL 4 / 1, refusals 6 / 7,
+  wrong 5 / 7. Labels per item, ids and reason codes only:
+  `docs/eval/heldout-v3.1-owner-grading.md`.
+- The owner differs from the automatic grader on two items:
+  - HO3-02 `legacy`: the grader asks for a derived value that the document does not state;
+  - HO3-03 `s3t`: the value matches by chance and the citation does not support it.
+- DEC-029: conditions (a) and (c) held; (b), the owner's reading of the UAT list, was still open
+  when the owner decided.
+
+**Limits, stated with the decision:**
+
+- run1 = run2 for every item (deterministic), so there is one observation, not two.
+- Both configurations gave the same answer on 5 items, so only 11 items tell them apart.
+- Held-out v3.1 both chose the configuration and measured it: its figures are not an unbiased
+  estimate.
+- `s3t` is about 2.5 times slower on CPU (1994 s against 796 s for the 16 items of one run).
+- The held-out questions and gold are in the public repository (DEC-039).
+- **Held-out v3.1 is spent.** It is not used again to measure or to design a fix, and
+  `heldout-v3.yml` refuses every dispatch. The next independent measurement needs held-out v4.
+
+**Held-out v3.1 items not asked:** HO3-09, HO3-13 and HO3-20 were removed from v3 because their
+source documents are not in corpus V2 (DEC-038); HO3-11 was excluded because its gold is wrong.
+
+**What the change touches** (the DEC-029 list):
+
+- Settings: `RAG_ANSWER_MODE=simple` and the five s1-s3 flags on in `app/core/config.py`;
+  `.env.example` (also `LLM_OLLAMA_MODEL=qwen3.5-text:4b`, `LLM_TIMEOUT_SECONDS=90`).
+- `compose.uat-corpus-v2.yaml` (model only). `compose.yaml` and `compose.prod.yaml` set neither
+  the answer mode nor the Ollama model, so the application defaults apply there.
+- Eval: `scripts/eval/compose.uat-eval.yaml` defaults, `eval.yml` (default model, LLM timeout
+  600 s), `heldout-v2.yml` (measures the new default), `ci_batch.sh` (`EVAL_SIMPLE_LEVEL=n` now also
+  turns the flags after n off).
+- Documentation: `DEPLOYMENT.md` 3.3 (GPU, building `qwen3.5-text:4b`, rollback),
+  `ENVIRONMENT_VARIABLES.md`, `README.md`, `SETUP.md`, ADR 0005.
+- The unit tests of the legacy pipeline pin `rag_answer_mode="legacy"` in their settings helper.
+
+**Diagnosis of run 44575927833 (2026-11-20):**
+
+- `api_requests=35` counted only the last API container. `ci_batch.sh` recreates the API for every
+  configuration and run, which drops the container's log. It now saves each container's log before
+  the recreate, and the status step counts them all.
+- The held-out summary now also lists the items removed before v3.1, with the reason.
+- `scripts/eval/heldout_v3_diag.py` prints, for the owner, one text-free row per configuration, run
+  and item.
+
+**Baseline on the dev sets after the switch (2026-11-20):** `eval.yml` from the PR branch, CPU
+runner, one job per set, `legacy` (the rollback,
+`legacy:EVAL_ANSWER_MODE=legacy,EVAL_LLM_MODEL=qwen2.5:3b`) then `default` (DEC-040) on the same
+image and Ollama, 1 run, LLM timeout 600 s. It is the reference for later dev work, not an input to
+this decision.
+
+- UAT Q001-Q100 (run 44669869629; monitoring only, DEC-026), `legacy` / `default`:
+  - `value_match` 96 / 71 (`proxy_match` 96 / 77); false refusals 3 / 21; wrong 1 / 8; false
+    answers 0 / 0; infra errors 0 / 0; time 1429 s / 5071 s.
+  - By route: `legacy` answers 74 items on the deterministic route (73 match) and 26 on the LLM
+    route (23); `default` answers all 100 on the LLM route (71). Simple mode has no deterministic
+    route.
+  - `default` gains no item and loses 25 (22 that `legacy` answered on the deterministic route,
+    3 on the LLM route): 19 become refusals, 6 wrong.
+  - `default` false refusals: Q001, Q003, Q006, Q007, Q026, Q030, Q031, Q036, Q037, Q039, Q041,
+    Q042, Q046, Q048, Q071, Q075, Q080, Q086, Q093, Q096, Q097. Wrong: Q018, Q019, Q020, Q049,
+    Q054, Q066, Q077, Q079.
+  - The saved logs count 100 + 100 chat requests.
+
+- `natural_dev_v1` (run 44669873227, 20 items), `legacy` / `default`:
+  - correct 3 / 7; false answers 1 / 1 (ND-002 in both); refused (`NO_ANSWER`) 8 / 8; leaks 0 / 0;
+    infra errors 0 / 0; time 1020 s / 2688 s.
+  - `default` gains ND-010, ND-011, ND-013, ND-018, ND-020 and loses ND-017.
+  - The saved logs count 20 + 20 chat requests, one per item and configuration.

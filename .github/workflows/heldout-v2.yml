@@ -8,7 +8,8 @@ name: Held-out v2 release run
 # settings); and scripts/eval/heldout_v2_release.py `gate` passes (questions match their lock, gold
 # locked with the owner's approval in docs/eval/heldout-v2-gold.lock).
 #
-# Runs the current defaults twice on corpus V2 (CPU, Ollama 0.40.15, qwen2.5:3b), then writes the
+# Runs the current defaults twice on corpus V2 (CPU, Ollama 0.40.15; since DEC-040 simple + s1-s3 +
+# qwen3.5-text:4b, through scripts/eval/compose.uat-eval.yaml), then writes the
 # owner's grading sheet (grading.md / grading.csv, labels left empty), split into "near UAT"
 # (e5 >= 0.90 to a Q001-Q100 question) and the rest. Every sheet states DEC-022: the owner ran the
 # 20 questions by hand on 2026-11-11, outside DEC-012.
@@ -156,12 +157,12 @@ jobs:
           CHUNK_OVERLAP_TOKENS=100
           LLM_ENABLED=true
           LLM_PROVIDER=ollama
-          LLM_OLLAMA_MODEL=qwen2.5:3b
+          LLM_OLLAMA_MODEL=qwen3.5-text:4b
           LLM_OLLAMA_NUM_CTX=8192
           LLM_OLLAMA_KEEP_ALIVE=10m
           LLM_MAX_OUTPUT_TOKENS=512
           LLM_OLLAMA_REASONING_EFFORT=none
-          LLM_TIMEOUT_SECONDS=180
+          LLM_TIMEOUT_SECONDS=600
           LOG_LEVEL=INFO
           LOG_FORMAT=json
           RAG_DIAGNOSTICS_ENABLED=true
@@ -170,6 +171,8 @@ jobs:
           echo "EVAL_PASSWORD_ADMIN=${UAT_ADMIN_PASSWORD}" >> "$GITHUB_ENV"
           echo "EVAL_PASSWORD_MANAGER=${UAT_MANAGER_PASSWORD}" >> "$GITHUB_ENV"
           echo "EVAL_PASSWORD_STAFF=${UAT_STAFF_PASSWORD}" >> "$GITHUB_ENV"
+          # qwen3.5-text:4b on CPU: an answer, a retry and a repair (DEC-040, as heldout-v3.yml).
+          echo "EVAL_HTTP_TIMEOUT_SECONDS=2400" >> "$GITHUB_ENV"
 
       - name: Install Ollama and pull the model
         id: ollama
@@ -193,8 +196,8 @@ jobs:
           OLLAMA_HOST=0.0.0.0:11434 OLLAMA_CONTEXT_LENGTH=8192 OLLAMA_NUM_PARALLEL=1 \
             nohup ollama serve > "$RUNNER_TEMP/ollama.log" 2>&1 &
           for _ in $(seq 1 30); do curl -sf http://127.0.0.1:11434/api/version && break; sleep 2; done
-          for attempt in 1 2 3; do ollama pull qwen2.5:3b && break; sleep 15; done
-          ollama list | grep -q '^qwen2.5:3b'
+          # DEC-040: qwen3.5:4b without its vision projector (CPU runner: no num_gpu).
+          python scripts/deploy/ollama_text_model.py qwen3.5:4b qwen3.5-text:4b
           mkdir -p "$OUT"
           { ollama --version; nproc; free -m; } > "$OUT/ollama-config.txt"
 
@@ -252,7 +255,7 @@ jobs:
           for run in 1 2; do
             mkdir -p "$OUT/run$run"
             python scripts/eval/ollama_warmup.py "$OUT/run$run/warmup.json" \
-              --base-url http://127.0.0.1:11434 --model qwen2.5:3b --num-ctx 8192 \
+              --base-url http://127.0.0.1:11434 --model qwen3.5-text:4b --num-ctx 8192 \
               --keep-alive 10m --seed 20261031 >/dev/null
             python scripts/eval/heldout_v2_release.py run \
               --output "$OUT/run$run/runtime_results.json" 2>&1 | tee "$OUT/run$run/runner.log"

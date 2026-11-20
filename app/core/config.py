@@ -176,23 +176,24 @@ class Settings(BaseSettings):
     rag_compound_partial_answer_enabled: bool = False
     # Simple answer mode (docs/design/simple-answer-mode.md): hybrid retrieval, top 5 chunks
     # (at most 2 per document), one prompt, citation + claim validation, one retry. legacy
-    # keeps the full pipeline.
-    rag_answer_mode: Literal["legacy", "simple"] = "legacy"
+    # keeps the full pipeline. DEC-040 (2026-11-20): simple with s1-s3 on is the default (with
+    # qwen3.5-text:4b); RAG_ANSWER_MODE=legacy and LLM_OLLAMA_MODEL=qwen2.5:3b roll it back.
+    rag_answer_mode: Literal["legacy", "simple"] = "simple"
     # Simple-mode fixes s1-s3 (same doc, owner decision 2026-11-16), read only in simple mode.
     # s1: a sentence naming an unverified part ("chưa/không xác minh được") is never a claim,
     # with or without a marker; a short-answer prompt asks for the marker in the first draft.
-    rag_simple_absence_sentences_enabled: bool = False
-    rag_simple_short_prompt_enabled: bool = False
+    rag_simple_absence_sentences_enabled: bool = True
+    rag_simple_short_prompt_enabled: bool = True
     # s2: claim validation skips the subject-alignment rule and the attendance, annual-leave and
     # bereavement rules; a claim whose cited source sentence is too far (e5 cosine) from the
     # question and from each of its parts is dropped, and none left ends at NO_ANSWER.
-    rag_simple_relaxed_rules_enabled: bool = False
-    rag_simple_claim_relevance_enabled: bool = False
+    rag_simple_relaxed_rules_enabled: bool = True
+    rag_simple_claim_relevance_enabled: bool = True
     # Calibrated 2026-11-16 on the dev-set drafts of the diagnostic run (UAT excluded): the
     # lowest best-claim cosine of a correct answer, floored (109 drafts of 58 items).
     rag_simple_claim_relevance_min_similarity: float = Field(default=0.78, ge=0.0, le=1.0)
     # s3: a whole question-list chunk counts by its answer segments, as a reference one does.
-    rag_simple_question_list_segments_enabled: bool = False
+    rag_simple_question_list_segments_enabled: bool = True
     # s4: a value in a claim must sit in a cited sentence or table row that names the subject
     # the question asks about, when another sentence or row with a value of that kind does.
     rag_simple_subject_binding_enabled: bool = False

@@ -161,6 +161,24 @@ def test_an_unknown_set_or_an_unapproved_held_out_run_is_refused(tmp_path: Path)
     ]  # fmt: skip
 
 
+@needs_bash
+def test_a_simple_level_turns_the_later_flags_off_whatever_the_stack_defaults(
+    tmp_path: Path,
+) -> None:
+    done = _validate("rbac", "base;s1:EVAL_SIMPLE_LEVEL=1", "1", tmp_path)
+    assert done.returncode == 0, done.stderr
+    line = next(x for x in done.stdout.splitlines() if x.startswith("config s1:"))
+    assert "EVAL_SIMPLE_S1=true,EVAL_SIMPLE_S2=false,EVAL_SIMPLE_S3=false" in line  # DEC-040
+
+
+def test_ci_batch_saves_the_api_log_before_a_recreate_removes_it() -> None:
+    text = (ROOT / CI_BATCH).read_text(encoding="utf-8")
+    run_one = text[text.index("run_one() {") :]
+    save = run_one.index("\n  save_logs\n")
+    assert save < run_one.index("reingest_table_rows ||") and save < run_one.index("start_api")
+    assert 'docker logs "$PROJECT-api-1" > "$LOG_DIR/api.log"' in text  # run 44575927833
+
+
 def test_every_registered_set_has_a_runner_branch_in_ci_batch() -> None:
     text = (ROOT / CI_BATCH).read_text(encoding="utf-8")
     groups = re.findall(r"^ {4}([a-z0-9_|]+)\)", text, re.M)  # the runner case labels

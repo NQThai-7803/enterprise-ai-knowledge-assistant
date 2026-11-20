@@ -247,13 +247,13 @@ RAG_RESPONSIVENESS_BLOCK_TERMINAL_ENABLED=true
 RAG_CONTENT_BLOCKS_TERMINAL_ENABLED=false
 RAG_EXCERPT_FALLBACK_ENABLED=true
 RAG_COMPOUND_PARTIAL_ANSWER_ENABLED=false
-RAG_ANSWER_MODE=legacy
-RAG_SIMPLE_ABSENCE_SENTENCES_ENABLED=false
-RAG_SIMPLE_SHORT_PROMPT_ENABLED=false
-RAG_SIMPLE_RELAXED_RULES_ENABLED=false
-RAG_SIMPLE_CLAIM_RELEVANCE_ENABLED=false
+RAG_ANSWER_MODE=simple
+RAG_SIMPLE_ABSENCE_SENTENCES_ENABLED=true
+RAG_SIMPLE_SHORT_PROMPT_ENABLED=true
+RAG_SIMPLE_RELAXED_RULES_ENABLED=true
+RAG_SIMPLE_CLAIM_RELEVANCE_ENABLED=true
 RAG_SIMPLE_CLAIM_RELEVANCE_MIN_SIMILARITY=0.78
-RAG_SIMPLE_QUESTION_LIST_SEGMENTS_ENABLED=false
+RAG_SIMPLE_QUESTION_LIST_SEGMENTS_ENABLED=true
 RAG_SIMPLE_SUBJECT_BINDING_ENABLED=false
 RAG_SIMPLE_CLAIM_CROSS_ENCODER_ENABLED=false
 RAG_SIMPLE_CLAIM_CROSS_ENCODER_MODEL=cross-encoder/mmarco-mMiniLMv2-L12-H384-v1
@@ -305,8 +305,8 @@ Retrieval variable rules:
 - `RAG_RESPONSIVENESS_BLOCK_TERMINAL_ENABLED` (boolean, default `true` since 2026-11-15; variant (a)) and `RAG_CONTENT_BLOCKS_TERMINAL_ENABLED` (boolean, default `false`; variant (b)): a block on an answer the LLM wrote ends at NO_ANSWER instead of a regeneration or a server-built repair. (a) covers the responsiveness block only; (b) covers every content block: responsiveness, a claim not SUPPORTED (single or compound), a missing requested unit, completeness. Format errors (unparseable output, wrong citation markers, placeholders) are still retried, and a blocked server-built candidate never ends the answer. `terminal_block` on `enterprise_ai_rag_answer_branch_total` counts the stops. The inventory of retry sites is in `docs/design/pipeline-loss-fix-plan.md`.
 - `RAG_EXCERPT_FALLBACK_ENABLED` (boolean, default `true` since the (iii) batch of 2026-11-14: one fewer false answer on the compound set, every other set identical; FIX 4 (iii)): the prompt keeps the query-focused excerpt of each chunk (`query_focused_excerpt`), but a source is given whole when its excerpt holds no content word of the question, or, for a compound question, has no evidence block for one of the claims. The validator sees the same text as the LLM. Each fallback is counted as `excerpt_fallback`.
 - `RAG_COMPOUND_PARTIAL_ANSWER_ENABLED` (boolean, default `false`; FIX 4 (iv), DEC-021): when some claims of a compound question are validated and the others still fail after repair, the answer gives the validated parts and, for each other part, the fixed sentence "Chưa xác minh được từ tài liệu bạn được phép truy cập: <part>.", instead of refusing the whole question. Citations come only from the validated parts. With `RAG_CONTENT_BLOCKS_TERMINAL_ENABLED`, a part rejected for its content is not regenerated but goes into that sentence. Counted as `compound_partial_answer`. With `RAG_RESPONSIVENESS_CHECK_ENABLED` also on, every kept claim the LLM wrote must pass the responsiveness check against its own part (threshold `RAG_RESPONSIVENESS_MIN_SIMILARITY`); a claim that fails goes into the unverified sentence (`claim_unresponsive`), and when no claim passes the answer ends at NO_ANSWER without a retry.
-- `RAG_ANSWER_MODE` (`legacy` or `simple`; default `legacy`): `legacy` is the full pipeline. `simple` takes the hybrid retrieval (permission-filtered in SQL), the first 5 chunks with at most 2 per document, whole chunks in one prompt (plain text with inline `[SOURCE_n]` markers, "chưa xác minh được…" for missing parts (DEC-021), the question's language), then only citation validation and claim validation with normalized numbers; a failure is retried once with its reason, then NO_ANSWER. It skips the deterministic route, the low-alignment filter, the completeness and responsiveness checks and every repair after the LLM. Counters: `simple_retry`, `simple_no_answer_<reason>` (`docs/design/simple-answer-mode.md`).
-- Simple-mode fixes s1-s3 (owner decision 2026-11-16; read only when `RAG_ANSWER_MODE=simple`; all off by default; `docs/design/simple-answer-mode.md`):
+- `RAG_ANSWER_MODE` (`legacy` or `simple`; default `simple` since DEC-040, 2026-11-20, before that `legacy`; `legacy` with `LLM_OLLAMA_MODEL=qwen2.5:3b` is the rollback, `DEPLOYMENT.md` 3.3): `legacy` is the full pipeline. `simple` takes the hybrid retrieval (permission-filtered in SQL), the first 5 chunks with at most 2 per document, whole chunks in one prompt (plain text with inline `[SOURCE_n]` markers, "chưa xác minh được…" for missing parts (DEC-021), the question's language), then only citation validation and claim validation with normalized numbers; a failure is retried once with its reason, then NO_ANSWER. It skips the deterministic route, the low-alignment filter, the completeness and responsiveness checks and every repair after the LLM. Counters: `simple_retry`, `simple_no_answer_<reason>` (`docs/design/simple-answer-mode.md`).
+- Simple-mode fixes s1-s3 (owner decision 2026-11-16; read only when `RAG_ANSWER_MODE=simple`; all on by default since DEC-040, off before; `docs/design/simple-answer-mode.md`):
   - `RAG_SIMPLE_ABSENCE_SENTENCES_ENABLED` (boolean, s1): a sentence that names an unverified part ("chưa xác minh được", "không xác minh được", "could not be verified") is never a claim, with or without a marker; its marker is removed, and an answer made only of such sentences is NO_ANSWER. A marker written after a full stop belongs to that sentence. A sentence holding a number the question does not hold stays a claim.
   - `RAG_SIMPLE_SHORT_PROMPT_ENABLED` (boolean, s1): the prompt asks for one short sentence per point asked, each with its marker before the full stop in the first draft, and the unverified part named without a marker.
   - `RAG_SIMPLE_RELAXED_RULES_ENABLED` (boolean, s2): claim validation skips `_explicit_value_answer_is_subject_aligned` and the attendance, annual-leave and bereavement rules; the number/unit, polarity and evidence checks stay.
@@ -449,6 +449,8 @@ LLM_PROVIDER=ollama
 LLM_OLLAMA_BASE_URL=http://host.docker.internal:11434
 LLM_OLLAMA_MODEL=<local-model>
 ```
+
+The default model is `qwen3.5-text:4b` on an NVIDIA GPU with at least 4 GB VRAM, with `LLM_TIMEOUT_SECONDS=90` (600 on a CPU-only host); `qwen2.5:3b` with `RAG_ANSWER_MODE=legacy` is the rollback (DEC-040, `DEPLOYMENT.md` 3.3).
 
 Local LM Studio:
 

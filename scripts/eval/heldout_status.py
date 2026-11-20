@@ -4,14 +4,16 @@ requests reached the API. Text-free: no question, answer or log line. Standard l
 that it runs even when the job failed before Python was set up.
 
 usage: python3 scripts/eval/heldout_status.py --workflow <yml> --job-status <job.status>
-         --preflight <true|false> --failed-steps <file> --stack-log <file>
+         --preflight <true|false> --failed-steps <file> --stack-log <file>...
          [--summary <grading summary.md>] --output <summary.md>
 
 - --failed-steps: "<step id> <exit code>" lines, written by the job's exit trap (BASH_ENV).
 - STEPS_JSON (environment, optional): toJSON(steps), for a failing `uses:` step the trap misses.
-- Requests are counted from the API's uvicorn access log in the stack log: questions are the POSTs
-  to /chat/sessions/<id>/messages(/stream); health checks are left out of the total. A stack log
-  with no access line at all gives "unknown", never 0.
+- Requests are counted from the API's uvicorn access log in the stack logs: questions are the POSTs
+  to /chat/sessions/<id>/messages(/stream); health checks are left out of the total. ci_batch.sh
+  saves each API container's log before it recreates the container, so a run gives one log per
+  container (run 44575927833 counted only the last one). Logs with no access line at all give
+  "unknown", never 0; a path that does not exist is skipped.
 """
 
 from __future__ import annotations
@@ -39,11 +41,15 @@ def step_names(workflow: Path) -> dict[str, str]:
     return names
 
 
-def requests(stack_log: Path) -> dict[str, int | str]:
-    if not stack_log.is_file():
-        return {"questions_sent_to_api": "unknown", "api_requests": "unknown"}
+def requests(*stack_logs: Path) -> dict[str, int | str]:
+    lines = [
+        line
+        for log in stack_logs
+        if log.is_file()
+        for line in log.read_text(encoding="utf-8", errors="replace").splitlines()
+    ]
     seen = questions = other = 0
-    for line in stack_log.read_text(encoding="utf-8", errors="replace").splitlines():
+    for line in lines:
         if not (match := ACCESS.search(line)):
             continue
         seen += 1
@@ -80,7 +86,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--job-status", required=True)
     parser.add_argument("--preflight", choices=("true", "false"), required=True)
     parser.add_argument("--failed-steps", type=Path, required=True)
-    parser.add_argument("--stack-log", type=Path, required=True)
+    parser.add_argument("--stack-log", type=Path, nargs="+", required=True)
     parser.add_argument("--summary", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
@@ -93,7 +99,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     status = {"failure": "failed"}.get(args.job_status, args.job_status)
     if found["failed_step"] not in ("none", "unknown"):
         status = "failed"
-    fields = {"status": status, "preflight": args.preflight, **found, **requests(args.stack_log)}
+    fields = {"status": status, "preflight": args.preflight, **found, **requests(*args.stack_log)}
     text = ["# Run status (DEC-039)", "", *(f"- {key}={value}" for key, value in fields.items())]
     if args.summary and args.summary.is_file():
         text += ["", args.summary.read_text(encoding="utf-8").rstrip("\n")]

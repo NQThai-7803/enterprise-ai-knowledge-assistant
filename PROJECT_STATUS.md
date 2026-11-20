@@ -1,5 +1,27 @@
 # Project Status
 
+## Held-out v3.1 closed, new default simple s1-s3 + qwen3.5-text:4b (DEC-040) -- 2026-11-20
+
+- **Held-out v3.1 run 44575927833:** automatic verdict `s3t`; the owner's labels agree
+  (`docs/eval/heldout-v3.1-owner-grading.md`, ids and codes only). Held-out v3.1 is now spent and
+  `heldout-v3.yml` refuses every dispatch.
+- **Default (DEC-040, ADR 0005):** `RAG_ANSWER_MODE=simple` with s1-s3, `qwen3.5-text:4b`,
+  `RAG_DRAFT_DOCUMENT_POLICY=exclude`; needs an NVIDIA GPU with at least 4 GB VRAM
+  (`DEPLOYMENT.md` 3.3). Rollback: `RAG_ANSWER_MODE=legacy` + `LLM_OLLAMA_MODEL=qwen2.5:3b`.
+- **Eval stack:** a configuration with no setting is the new default; the rollback configuration is
+  `legacy:EVAL_ANSWER_MODE=legacy,EVAL_LLM_MODEL=qwen2.5:3b`.
+- **Run diagnosis:** `api_requests=35` counted the last API container only; `ci_batch.sh` now saves
+  each container's log before the recreate. `heldout_v3_diag.py` gives the owner a text-free table.
+- **Dev baselines, `legacy` (rollback) / `default` (DEC-040)**, 1 run on CPU (DEC-040 lists the ids):
+  - `natural_dev_v1` (run 44669873227): correct 3 / 7 of 20, false answers 1 / 1, refusals 8 / 8,
+    leaks 0.
+  - UAT Q001-Q100 (run 44669869629, monitoring only): `value_match` 96 / 71, false refusals 3 / 21,
+    wrong 1 / 8. Simple mode answers every item on the LLM route; `legacy` built 74 answers on
+    the deterministic route.
+- **Local stacks:** the local `.env` (not in git) still sets `LLM_OLLAMA_MODEL=qwen2.5:3b`; a stack
+  started from it gets simple mode with that model until the owner sets either the new model or
+  `RAG_ANSWER_MODE=legacy`.
+
 ## Held-out v3.1 batch set fixed, preflight validates the run (DEC-038/039) -- 2026-11-19
 
 - **Run 44559765410 failed before its first request:** `ci_batch.sh` said `unknown set heldout_v3`

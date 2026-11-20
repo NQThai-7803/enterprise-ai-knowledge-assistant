@@ -6,6 +6,29 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### Default simple s1-s3 + qwen3.5-text:4b, held-out v3.1 closed (DEC-040) -- 2026-11-20
+
+- **Changed (DEC-040):** `RAG_ANSWER_MODE` defaults to `simple`, and the s1-s3 flags
+  (`RAG_SIMPLE_ABSENCE_SENTENCES_ENABLED`, `RAG_SIMPLE_SHORT_PROMPT_ENABLED`,
+  `RAG_SIMPLE_RELAXED_RULES_ENABLED`, `RAG_SIMPLE_CLAIM_RELEVANCE_ENABLED`,
+  `RAG_SIMPLE_QUESTION_LIST_SEGMENTS_ENABLED`) default to on. `.env.example` sets
+  `LLM_OLLAMA_MODEL=qwen3.5-text:4b` and `LLM_TIMEOUT_SECONDS=90`. Rollback:
+  `RAG_ANSWER_MODE=legacy` + `LLM_OLLAMA_MODEL=qwen2.5:3b`. ADR 0005 replaces ADR 0003.
+- **Eval:** `compose.uat-eval.yaml`, `eval.yml` and `heldout-v2.yml` measure the new default when a
+  configuration sets nothing; `eval.yml`'s LLM timeout defaults to 600 s. `EVAL_SIMPLE_LEVEL=n` now
+  also turns the flags after n off.
+- **Held-out v3.1:** spent; `heldout-v3.yml` refuses every dispatch. The owner's labels are in
+  `docs/eval/heldout-v3.1-owner-grading.md` (ids, labels, reason codes).
+- **Fix:** `ci_batch.sh` saves each API container's log (and the worker's since the run began)
+  before recreating it; `heldout_status.py` counts every saved log (run 44575927833 reported
+  `api_requests=35`, the last container only). The held-out summary lists the items removed before
+  v3.1 and the reason of every item not asked.
+- **Added:** `scripts/eval/heldout_v3_diag.py` (`table`, `access`): a text-free table per
+  configuration, run and item for the owner, and the gold documents' access per account.
+- **Measured:** dev baselines of the rollback against the new default (DEC-040): `natural_dev_v1`
+  correct 3 / 7 of 20; UAT `value_match` 96 / 71 of 100 (monitoring only, no deterministic route
+  in simple mode).
+
 ### Held-out v3.1 batch set, validate-only preflight, failure status -- 2026-11-19
 
 - **Fix:** `ci_batch.sh` refused the set `heldout_v3` (`unknown set`), so held-out v3.1 run

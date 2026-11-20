@@ -251,8 +251,11 @@ def build(
             "",
             *split,
             "",
-            f"Not asked: {', '.join(not_run) or 'none'}. "
-            f"Excluded, PENDING_AUTHOR_REVIEW: {', '.join(pending) or 'none'}.",
+            "Not asked: "
+            + ("; ".join(f"{i} ({first['not_run'][i]})" for i in not_run) or "none")
+            + f". Excluded, PENDING_AUTHOR_REVIEW: {', '.join(pending) or 'none'}. "
+            f"Removed from v3 before v3.1: {', '.join(sorted(heldout_v3.REMOVED))} "
+            f"({heldout_v3.REMOVED_REASON}).",
             "",
             f"**Verdict:** `{decision['winner']}` ({decision['reason']}).",
         ]

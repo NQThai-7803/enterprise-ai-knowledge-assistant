@@ -68,7 +68,7 @@ server therefore grows to the model's size plus 8 GiB once enough different prom
 - On a 16 GB CI runner the cache reached 6.6-8.0 GiB during a 50-question UAT run with
   `qwen3.5:4b`. One run lost its runner, and the others kept as little as 1.2 GB free (DEC-029).
 
-This applies to the current default (`qwen2.5:3b`) as well:
+This applies to every model, the default `qwen3.5-text:4b` and the rollback `qwen2.5:3b`:
 
 - Set `LLAMA_ARG_CACHE_RAM=2048` (MiB) in the environment of the Ollama server, as for
   `OLLAMA_CONTEXT_LENGTH` above, and restart Ollama. Ollama passes the variable to llama-server.
@@ -80,13 +80,19 @@ This applies to the current default (`qwen2.5:3b`) as well:
 - `0` turns the cache off. Every request then re-reads its whole prompt.
 - The eval workflows use the same 2048 MiB (`eval.yml` input `ollama_cache_ram`, `heldout-v2.yml`).
 
-### 3.3 Candidate model on a GPU (DEC-029; not the default)
+### 3.3 Default answer path and model (DEC-040)
 
-The default stays `legacy` + `qwen2.5:3b` until the conditions of DEC-029 hold. When the owner
-switches, the deployment target is:
+Since DEC-040 (2026-11-20) the default is simple answer mode with the s1-s3 fixes and
+`qwen3.5-text:4b`, with `RAG_DRAFT_DOCUMENT_POLICY=exclude`. Before it was `legacy` + `qwen2.5:3b`,
+which stays available as the rollback below.
 
-- **GPU (target):** NVIDIA, at least 4 GB VRAM, with `qwen3.5-text:4b`. That is `qwen3.5:4b`
-  without its vision encoder, built locally with all layers pinned to the GPU:
+- **Hardware required: an NVIDIA GPU with at least 4 GB VRAM** (DEC-029 (c)).
+  - Measured on a GTX 1650 4 GB: 2971 MiB of VRAM, 18.7-28.6 s of LLM time per question
+    (median 20.7 s), the model 100% on the GPU.
+  - A CPU-only host with 16 GB RAM works but is slow: about 77 s per question end to end (UAT
+    median, 4 vCPU), about 2.5 times `legacy` + `qwen2.5:3b`. Set `LLM_TIMEOUT_SECONDS=600` there.
+- **Build `qwen3.5-text:4b` once on the Ollama host.** It is `qwen3.5:4b` without its vision
+  encoder, with every layer pinned to the GPU:
 
   ```bash
   python scripts/deploy/ollama_text_model.py qwen3.5:4b qwen3.5-text:4b --num-gpu 99
@@ -96,16 +102,26 @@ switches, the deployment target is:
     endpoint ignores options), so the model carries `PARAMETER num_gpu 99` itself.
   - Without it, Ollama keeps a VRAM reserve and leaves 36-52% of the layers on the CPU.
   - Verify after one request: `ollama ps` shows `100% GPU`.
-  - Measured on a GTX 1650 4 GB: 3.0 GB, 2971 MiB of VRAM, about 21 s of LLM time per question.
-- **CPU only, 16 GB RAM: supported but slow.** The answers are the same as on the GPU model, but
-  each takes about 77 s end to end with `s3` (UAT median, 4 vCPU).
-  - `LLM_TIMEOUT_SECONDS` must then be raised well above the current 30 s.
-  - The prompt cache cap of section 3.2 is required.
-- **What the switch changes:**
-  - `LLM_OLLAMA_MODEL=qwen3.5-text:4b`;
-  - `RAG_ANSWER_MODE=simple` with the s1-s3 flags;
-  - `LLM_TIMEOUT_SECONDS`;
-  - the compose files and `.env.example`, listed in DEC-029.
+  - On a CPU-only host, build it without `--num-gpu`.
+- **Settings** (the application defaults, also in `.env.example`):
+  - `RAG_ANSWER_MODE=simple`;
+  - `RAG_SIMPLE_ABSENCE_SENTENCES_ENABLED`, `RAG_SIMPLE_SHORT_PROMPT_ENABLED` (s1),
+    `RAG_SIMPLE_RELAXED_RULES_ENABLED`, `RAG_SIMPLE_CLAIM_RELEVANCE_ENABLED` (s2) and
+    `RAG_SIMPLE_QUESTION_LIST_SEGMENTS_ENABLED` (s3) `=true`;
+  - `LLM_OLLAMA_MODEL=qwen3.5-text:4b`, `LLM_OLLAMA_REASONING_EFFORT=none`;
+  - `LLM_TIMEOUT_SECONDS=90` on the GPU (per call; about 3 times the longest question measured),
+    600 on CPU;
+  - the prompt cache cap of section 3.2.
+- **Rollback to `legacy` + `qwen2.5:3b`** (no migration, no re-ingestion):
+  1. `ollama pull qwen2.5:3b` on the Ollama host.
+  2. Set `RAG_ANSWER_MODE=legacy` and `LLM_OLLAMA_MODEL=qwen2.5:3b`. The `RAG_SIMPLE_*` flags are
+     read only in simple mode, so they can stay as they are.
+  3. Restart the API: `docker compose up -d --force-recreate api` (production: the same with the
+     production compose and env files).
+  - Check: `docker compose exec api env | grep -E 'RAG_ANSWER_MODE|LLM_OLLAMA_MODEL'` shows the
+    two rollback values.
+  - Eval runs name the rollback configuration
+    `legacy:EVAL_ANSWER_MODE=legacy,EVAL_LLM_MODEL=qwen2.5:3b` (`scripts/eval/README.md`).
 
 ## 4. Deployment flow
 

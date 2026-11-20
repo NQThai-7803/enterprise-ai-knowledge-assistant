@@ -147,6 +147,8 @@ def test_the_summary_carries_no_text_and_the_owner_tables_do(tmp_path: Path) -> 
         for field in ("question", "expected_answer"):
             assert item[field] not in summary
     assert ITEMS[0]["question"] in md and "X-03" in summary and "X-04" in summary
+    assert "X-03 (test account maps to no seeded user (DEC-030))" in summary  # with its reason
+    assert "HO3-09, HO3-13, HO3-20 (source document not in corpus V2" in summary
     assert ITEMS[3]["question"] not in md  # a PENDING item is not shown either
     assert {r["id"] for r in rows} == {"X-01", "X-02"} and all(r["label"] == "" for r in rows)
     assert "| legacy | run1 | near_duplicate | 1 | 1 |" in summary
