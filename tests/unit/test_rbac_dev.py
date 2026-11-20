@@ -156,3 +156,37 @@ def test_route_names_the_answering_branch_only_for_the_deterministic_route() -> 
     assert route == {"route": "deterministic", "branch": "_structured_b"}
     llm = rbac_retrieval_check.route_of({"route": "llm", "trace": {"structured_hits": hits}})
     assert llm == {"route": "llm", "branch": None}
+
+
+def test_each_answer_records_its_route_reasons_and_retrieved_count(monkeypatch) -> None:  # noqa: ANN001
+    from scripts.eval.eval_client import OK, AskResult
+
+    body = {
+        "data": {
+            "grounding_status": "NO_ANSWER",
+            "retrieved_chunk_count": 2,
+            "assistant_message": {"content": "no", "citations": []},
+        }
+    }
+
+    class Client:
+        def __init__(self, *_args: object, **_kwargs: object) -> None:
+            pass
+
+        def create_session(self, title: str) -> str:
+            return "s1"
+
+        def ask(self, session_id: str, question: str) -> AskResult:
+            return AskResult(201, body, 3, OK, None)
+
+    monkeypatch.setattr(run_rbac_dev, "EvalClient", Client)
+    reads = iter(
+        [{"answer_route_refusal_gate": 0}, {"answer_route_refusal_gate": 1, "no_answer_x": 1}]
+    )
+    ask = run_rbac_dev._asker("http://x", {"staff": "p"}, route_reader=lambda: next(reads))
+    result = ask("staff", "q")
+    assert (result["answer_route"], result["no_answer_reasons"], result["retrieved"]) == (
+        "refusal_gate",
+        ["x"],
+        2,
+    )

@@ -8,6 +8,21 @@
 3. **Embedding fine-tune** (`docs/design/embedding-finetune.md` and DEC-015 on branch `feat/embedding-finetune-infra`): infrastructure only so far; the baseline measurement and training come after FIX 3.
 4. The final held-out v2 measurement, once, after the choices above are made (DEC-012).
 
+## Hybrid answer mode measured, DEC-041 proposed (owner to choose) -- 2026-11-20
+
+- **DONE:**
+  - `RAG_ANSWER_MODE=hybrid` (off): legacy's deterministic route first, else the s3t path.
+  - Every answer counts `answer_route_<route>`; every dev runner records `answer_route`,
+    `no_answer_reasons` and `retrieved` per question; `scripts/eval/route_matrix.py`.
+  - The 7 dev sets x legacy / s3t / hybrid, one job per set, 1 run (`docs/eval/runs/dec041-hybrid-dev.md`).
+  - The 11 old `eaka-verify-*` images deleted.
+- **WAITING FOR OWNER:**
+  - Choose among the three DEC-041 options (keep s3t / hybrid / legacy).
+  - GPU latency on the GTX 1650 (10 `natural_dev_v1` items, s3t and hybrid): not measured, about
+    640 MB of RAM was available. Command in `docs/eval/runs/dec041-hybrid-dev.md`.
+- **NEXT (not started):** route misfires outside UAT (ND-006, ND-019, ND-020, REL-103), if hybrid
+  is chosen; diagnose on the dev sets only.
+
 ## Held-out v3.1 closed, new default (DEC-040) -- 2026-11-20
 
 - **DONE:**

@@ -108,6 +108,7 @@ def grade_case(
         "latency_ms": case.get("latency_ms"),
         "answer": case.get("answer"),
         "passed": passed,
+        **{field: case.get(field) for field in branch_counters.ROUTE_FIELDS},
         "false_answer": answered
         and (item["expect"] == "refuse" or (item["expect"] == "partial" and not says_unverified)),
         "values": values,

@@ -178,8 +178,11 @@ class Settings(BaseSettings):
     # (at most 2 per document), one prompt, citation + claim validation, one retry. legacy
     # keeps the full pipeline. DEC-040 (2026-11-20): simple with s1-s3 on is the default (with
     # qwen3.5-text:4b); RAG_ANSWER_MODE=legacy and LLM_OLLAMA_MODEL=qwen2.5:3b roll it back.
-    rag_answer_mode: Literal["legacy", "simple"] = "simple"
-    # Simple-mode fixes s1-s3 (same doc, owner decision 2026-11-16), read only in simple mode.
+    # hybrid (DEC-041 proposal, not a default): the legacy deterministic route first, under its
+    # existing conditions; a question it does not answer goes to the simple path.
+    rag_answer_mode: Literal["legacy", "simple", "hybrid"] = "simple"
+    # Simple-mode fixes s1-s3 (same doc, owner decision 2026-11-16), read by the simple path
+    # (simple mode, and hybrid mode when no deterministic route answers).
     # s1: a sentence naming an unverified part ("chưa/không xác minh được") is never a claim,
     # with or without a marker; a short-answer prompt asks for the marker in the first draft.
     rag_simple_absence_sentences_enabled: bool = True

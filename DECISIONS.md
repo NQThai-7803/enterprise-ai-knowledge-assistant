@@ -856,3 +856,83 @@ this decision.
     infra errors 0 / 0; time 1020 s / 2688 s.
   - `default` gains ND-010, ND-011, ND-013, ND-018, ND-020 and loses ND-017.
   - The saved logs count 20 + 20 chat requests, one per item and configuration.
+
+## DEC-041 — Hybrid answer mode: proposal for the owner (2026-11-20, NOT DECIDED)
+
+The owner keeps DEC-040 and asked for a hybrid configuration measured on the dev sets only.
+`RAG_ANSWER_MODE=hybrid` exists, off by default: the legacy pipeline up to its deterministic
+route, under the existing conditions (no new route, no wider match); a question the route does
+not answer (no source, missing reason evidence, no route, or a route draft that is not ANSWERED)
+goes to the s3t path. Permission filtering and the DRAFT exclusion are in retrieval, the same
+for both branches. The default stays s3t until the owner chooses.
+
+**Measurement** (`docs/eval/runs/dec041-hybrid-dev.md`): the 7 dev sets, one job per set with
+`legacy`, `s3t`, `hybrid` in the same job, same image and Ollama, 1 run on CPU. One run because a
+run repeats itself within a job (DEC-040: run1 = run2 for every held-out item); the 7 sets do not
+fit one job (UAT alone takes about 2.6 hours with three configurations, the job limit is
+340 minutes).
+
+| | legacy | s3t | hybrid |
+|---|---:|---:|---:|
+| 6 dev sets, 137 items: correct | 75 | 114 | 112 |
+| false refusals | 36 | 7 | 6 |
+| wrong values | 9 | 6 | 8 |
+| false answers | 17 | 10 | 11 |
+| false answers + wrong values | 26 | 16 | 19 |
+| leaks | 0 | 0 | 0 |
+| time, s | 5008 | 5142 | 4665 |
+| UAT, 100 items (monitoring only, DEC-026): correct | 97 | 68 | 92 |
+| UAT false refusals / wrong values | 2 / 1 | 22 / 10 | 6 / 2 |
+| UAT time, s | 1575 | 5563 | 2198 |
+
+The 6 dev sets: `natural_dev_v1` (20), rbac (36), relevance (25), false_refusal (20),
+false_refusal_v2 (24), compound (12). On `natural_dev_v1`: correct 3 / 8 / 6, false refusals
+8 / 6 / 5.
+
+**Route matrix (the false-match measurement):**
+
+- UAT: the route answers 74 of 100 items, 73 right.
+- The 6 other sets: the route answers 14 of 137 items, 10 right. `natural_dev_v1` 4 (1 right),
+  rbac 3 (3), relevance 2 (1), false_refusal 4 (4), false_refusal_v2 1 (1), compound 0.
+- The 4 misfires: ND-006, ND-019 and ND-020 give a wrong value (s3t refused ND-006 and answered
+  ND-019 and ND-020 right); REL-103 is a false answer in every configuration.
+- legacy and hybrid take the same route decision on every item; no legacy answer came from a
+  repair after the LLM.
+
+**Where hybrid loses:**
+
+- To s3t: ND-019, ND-020 (route misfires) and FR2-L06 (simple path, noise: FR2-L01 went the
+  other way).
+- To legacy: Q007, Q033, Q071, Q096, Q097 (UAT items no route answers, refused by the simple path
+  and answered by legacy's LLM path), ND-017, REL-203, FR2-L05, CP1-R03.
+
+**The three options:**
+
+1. **Keep s3t (DEC-040).** It is what the DEC-026 rule picks: leaks 0 everywhere, and the fewest
+   false answers + wrong values on the dev sets (16 against hybrid's 19). UAT stays at 68.
+2. **Switch to hybrid.** UAT 92 instead of 68 and 2.5 times faster on UAT (the route skips the
+   LLM). On the other dev sets it gives 2 fewer right answers and 3 more false answers + wrong
+   values than s3t; 3 of those are route misfires on `natural_dev_v1`. Under DEC-026 it does
+   not pass against s3t.
+3. **Return to legacy.** UAT 97, but 39 fewer right answers than s3t on the other dev sets,
+   36 false refusals and 26 false answers + wrong values.
+
+**Limits:**
+
+- Dev evidence only. The deterministic routes were written against UAT: they answer 74 % of
+  UAT and 10 % of the other sets, and are right on 99 % of their UAT answers against 71 %
+  elsewhere. Hybrid's UAT figure is therefore no estimate for questions the routes were not
+  written for.
+- An independent measurement needs held-out v4 (v3.1 is spent, DEC-040).
+- One run on CPU runners. Within a job, the s3t path differs on 2 items between s3t and hybrid
+  only because the request order differs; across jobs a configuration moves by a few items
+  (s3t `natural_dev_v1` 7 → 8, UAT 71 → 68). Differences of 1-2 items are noise.
+- The sets are small (`natural_dev_v1` has 20 items).
+- **GPU latency not measured.** The owner's machine had about 640 MB of RAM available; the
+  owner's rule is to stop and not close applications. Ready to run (`docs/eval/runs/dec041-hybrid-dev.md`):
+  on ND-001 to ND-010, s3t makes 13 LLM calls and hybrid 10.
+
+**What changed (no default changed):** `RAG_ANSWER_MODE=hybrid`; each answer counts
+`answer_route_<route>` and each no-answer diagnostic `no_answer_<reason>`; every dev runner
+records `answer_route`, `no_answer_reasons`, `retrieved`; `scripts/eval/route_matrix.py`,
+`scripts/eval/gpu_latency_replay.py`.

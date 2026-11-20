@@ -32,6 +32,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from scripts.eval.branch_counters import coarse_route  # noqa: E402
+
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
@@ -237,7 +240,7 @@ def proxy_records(graded: Mapping[str, Any]) -> list[CaseRecord]:
                 cited_docs=frozenset(row.get("cited_codes", [])),
                 required_docs=reference,
                 allowed_docs=reference,
-                route=row.get("answer_route"),
+                route=coarse_route(row.get("answer_route")),
             )
         )
     return records

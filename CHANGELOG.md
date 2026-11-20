@@ -6,6 +6,19 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### Hybrid answer mode (off) and per-answer route labels (DEC-041 proposal) -- 2026-11-20
+
+- **Added:** `RAG_ANSWER_MODE=hybrid`, off by default: legacy's deterministic route under its
+  existing conditions, else the simple path. No default changed.
+- **Added:** every persisted answer counts `answer_route_<route>` (`det_<builder>`,
+  `repair_<builder>`, `llm_legacy`, `llm_simple`, `refusal_gate`) and every no-answer diagnostic
+  `no_answer_<reason>`; `/metrics` lists them once recorded.
+- **Eval:** every dev runner records `answer_route`, `no_answer_reasons` and `retrieved` per
+  question (UAT reports still split deterministic / llm); `scripts/eval/route_matrix.py`;
+  `scripts/eval/gpu_latency_replay.py` (the simple path's retry text is now
+  `SIMPLE_RETRY_INSTRUCTIONS`, unchanged).
+- **Measured:** the 7 dev sets with legacy, s3t and hybrid (`docs/eval/runs/dec041-hybrid-dev.md`).
+
 ### Default simple s1-s3 + qwen3.5-text:4b, held-out v3.1 closed (DEC-040) -- 2026-11-20
 
 - **Changed (DEC-040):** `RAG_ANSWER_MODE` defaults to `simple`, and the s1-s3 flags
