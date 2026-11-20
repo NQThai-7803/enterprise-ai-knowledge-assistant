@@ -103,3 +103,12 @@ def _department_filter_conditions(search: str | None) -> list[ColumnElement[bool
         return []
     search_term = f"%{search.strip()}%"
     return [or_(Department.name.ilike(search_term), Department.code.ilike(search_term))]
+
+
+async def names_by_id(session: AsyncSession, department_ids: set[UUID]) -> dict[UUID, str]:
+    if not department_ids:
+        return {}
+    rows = await session.execute(
+        select(Department.id, Department.name).where(Department.id.in_(department_ids))
+    )
+    return {key: value for key, value in rows.all()}

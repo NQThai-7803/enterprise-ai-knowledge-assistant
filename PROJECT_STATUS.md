@@ -1,5 +1,11 @@
 # Project Status
 
+## UI backend requests: owner follow-up done -- 2026-11-20
+
+- Search by `document_code` inside the access filter; answer `segments` (verified / unverified,
+  migration `20261120_0014`); names of other users and Departments for Admin callers only, with
+  the keys left out for Manager and Staff, and `uploaded_by_me` for every viewer (`RBAC.md`).
+
 ## UI backend requests BR-1, 3, 4, 2, 8, 9 answered -- 2026-11-20
 
 - **API additions only** (`/api/v1`, no field removed or renamed): `grounding_status` on chat

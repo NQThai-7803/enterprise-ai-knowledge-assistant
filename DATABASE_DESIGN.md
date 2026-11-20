@@ -426,6 +426,7 @@ Chat persistence uses `chat_sessions` and `chat_messages`.
 
 - ChatSession rows are owned by one User.
 - ChatMessage rows belong to a ChatSession and store role, content, optional retrieval query, provider response time, prompt tokens, and completion tokens.
+- `segments` (`JSONB`, nullable, migration `20261120_0014`, BR-3 follow-up): the answer's verified / unverified sentences with their citation numbers, on ANSWERED assistant rows written since that revision; `NULL` otherwise (no backfill). Downgrade drops the column.
 - `grounding_status` (`VARCHAR(16)`, nullable, migration `20261120_0013`, BR-3): `ANSWERED` or `NO_ANSWER` on ASSISTANT rows written since that revision; `NULL` on USER rows and on older rows (no backfill). Check constraint `ck_chat_messages_grounding_status_known`. Downgrade drops the constraint and the column.
 - SYSTEM messages are internal and hidden from public Chat history.
 - USER and ASSISTANT answer pairs are persisted atomically after retrieval and LLM generation complete.

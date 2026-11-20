@@ -1,6 +1,16 @@
 
 # Implementation Tasks
 
+## UI backend requests: owner follow-up -- 2026-11-20
+
+- **DONE:** search by `document_code`; answer `segments` (migration `20261120_0014`); BR-4 option
+  (a): other users' and Departments' names for Admin only (keys left out otherwise),
+  `uploaded_by_me` for every viewer (`RBAC.md`).
+- **NEXT (not started):**
+  - **[Medium]** Recognising unverified segments rests on 3 phrases (a heuristic, shared by s1 and
+    `segments`): consider having the model return structured output instead (which sentence is a
+    claim, which part is unverified). Measure on the dev sets only.
+
 ## UI backend requests answered -- 2026-11-20
 
 - **DONE** (`docs/ui/backend-requests.md`, "Đã nhận từ backend"; `API_SPEC.md`):

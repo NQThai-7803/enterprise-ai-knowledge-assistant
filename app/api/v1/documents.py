@@ -18,7 +18,13 @@ from app.api.dependencies import (
     require_manager_or_admin,
 )
 from app.db.session import get_db_session
-from app.models import DocumentAccessScope, DocumentLifecycleStatus, DocumentStatus, User
+from app.models import (
+    Document,
+    DocumentAccessScope,
+    DocumentLifecycleStatus,
+    DocumentStatus,
+    User,
+)
 from app.schemas.common import (
     DEFAULT_PAGE,
     DEFAULT_PAGE_SIZE,
@@ -27,6 +33,7 @@ from app.schemas.common import (
     ListResponse,
 )
 from app.schemas.document import (
+    AdminDocumentResponse,
     DocumentDetailResponse,
     DocumentListItem,
     DocumentPermissionCreate,
@@ -35,8 +42,10 @@ from app.schemas.document import (
     DocumentStatusResponse,
     DocumentUpdate,
     DocumentUploadResponse,
+    document_view,
 )
 from app.services.audit_service import AuditContext
+from app.services.display_names import DisplayNames, admin_display_names
 from app.services.document_permission_service import DocumentPermissionService
 from app.services.document_service import (
     DocumentDownload,
@@ -49,10 +58,26 @@ from app.storage.factory import get_file_storage
 
 router = APIRouter(prefix="/documents", tags=["Documents"])
 
+# BR-4 option (a): an Admin caller gets AdminDocumentResponse (with names), others the base item.
+DocumentUploadView = DocumentUploadResponse | AdminDocumentResponse
+DocumentListView = DocumentListItem | AdminDocumentResponse
+DocumentDetailView = DocumentDetailResponse | AdminDocumentResponse
+
+
+async def _names(
+    session: AsyncSession, current_user: User, documents: list[Document]
+) -> DisplayNames | None:
+    return await admin_display_names(
+        session,
+        current_user=current_user,
+        user_ids=[document.uploaded_by for document in documents],
+        department_ids=[document.department_id for document in documents],
+    )
+
 
 @router.post(
     "/upload",
-    response_model=DataResponse[DocumentUploadResponse],
+    response_model=DataResponse[DocumentUploadView],
     status_code=status.HTTP_202_ACCEPTED,
 )
 async def upload_document(
@@ -76,7 +101,7 @@ async def upload_document(
     effective_to: Annotated[date | None, Form()] = None,
     lifecycle_status: Annotated[DocumentLifecycleStatus, Form()] = DocumentLifecycleStatus.ACTIVE,
     supersedes_document_id: Annotated[UUID | None, Form()] = None,
-) -> DataResponse[DocumentUploadResponse]:
+) -> DataResponse[DocumentUploadView]:
     await enforce_upload_rate_limit(request, current_user)
     document = await DocumentService(
         session,
@@ -98,13 +123,18 @@ async def upload_document(
         lifecycle_status=lifecycle_status,
         supersedes_document_id=supersedes_document_id,
     )
-    return DataResponse[DocumentUploadResponse](
-        data=DocumentUploadResponse.from_document(document),
+    return DataResponse[DocumentUploadView](
+        data=document_view(
+            DocumentUploadResponse,
+            document,
+            current_user_id=current_user.id,
+            names=await _names(session, current_user, [document]),
+        ),
         meta=None,
     )
 
 
-@router.get("", response_model=ListResponse[DocumentListItem])
+@router.get("", response_model=ListResponse[DocumentListView])
 async def list_documents(
     current_user: Annotated[User, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_db_session)],
@@ -116,7 +146,7 @@ async def list_documents(
     department_id: UUID | None = None,
     sort_by: str = "created_at",
     sort_order: Literal["asc", "desc"] = "desc",
-) -> ListResponse[DocumentListItem]:
+) -> ListResponse[DocumentListView]:
     documents, meta = await DocumentService(session).list_documents(
         current_user=current_user,
         page=page,
@@ -128,8 +158,12 @@ async def list_documents(
         sort_by=sort_by,
         sort_order=sort_order,
     )
-    return ListResponse[DocumentListItem](
-        data=[DocumentListItem.from_document(document) for document in documents],
+    names = await _names(session, current_user, list(documents))
+    return ListResponse[DocumentListView](
+        data=[
+            document_view(DocumentListItem, d, current_user_id=current_user.id, names=names)
+            for d in documents
+        ],
         meta=meta,
     )
 
@@ -291,38 +325,48 @@ async def delete_document_permission(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.get("/{document_id}", response_model=DataResponse[DocumentDetailResponse])
+@router.get("/{document_id}", response_model=DataResponse[DocumentDetailView])
 async def get_document_detail(
     document_id: UUID,
     current_user: Annotated[User, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_db_session)],
-) -> DataResponse[DocumentDetailResponse]:
+) -> DataResponse[DocumentDetailView]:
     document = await DocumentService(session).get_document_detail(
         document_id=document_id,
         current_user=current_user,
     )
-    return DataResponse[DocumentDetailResponse](
-        data=DocumentDetailResponse.from_document(document),
+    return DataResponse[DocumentDetailView](
+        data=document_view(
+            DocumentDetailResponse,
+            document,
+            current_user_id=current_user.id,
+            names=await _names(session, current_user, [document]),
+        ),
         meta=None,
     )
 
 
-@router.patch("/{document_id}", response_model=DataResponse[DocumentDetailResponse])
+@router.patch("/{document_id}", response_model=DataResponse[DocumentDetailView])
 async def update_document(
     document_id: UUID,
     payload: DocumentUpdate,
     current_user: Annotated[User, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_db_session)],
     audit_context: Annotated[AuditContext, Depends(get_audit_context)],
-) -> DataResponse[DocumentDetailResponse]:
+) -> DataResponse[DocumentDetailView]:
     document = await DocumentService(session).update_document(
         document_id=document_id,
         payload=payload,
         current_user=current_user,
         audit_context=audit_context,
     )
-    return DataResponse[DocumentDetailResponse](
-        data=DocumentDetailResponse.from_document(document),
+    return DataResponse[DocumentDetailView](
+        data=document_view(
+            DocumentDetailResponse,
+            document,
+            current_user_id=current_user.id,
+            names=await _names(session, current_user, [document]),
+        ),
         meta=None,
     )
 

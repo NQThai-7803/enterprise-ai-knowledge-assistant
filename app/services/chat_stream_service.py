@@ -176,6 +176,7 @@ def _completed_payload(
         "usage": _usage_payload(result),
         "grounding_status": result.grounding_status.value,
         "retrieved_chunk_count": result.retrieved_chunk_count,
+        "segments": response_data["assistant_message"].get("segments"),
     }
 
 

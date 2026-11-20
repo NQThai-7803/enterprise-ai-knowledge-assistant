@@ -5,7 +5,7 @@ import logging
 import math
 import re
 import unicodedata
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
@@ -3058,6 +3058,17 @@ class GroundedAnswerService:
                     completion_tokens=draft.completion_tokens,
                     created_at=assistant_created_at,
                     grounding_status=draft.grounding_status.value,
+                    segments=(
+                        answer_segments(
+                            draft.content,
+                            question=question,
+                            citation_ids=(
+                                getattr(c, "citation_order", None) for c in draft.citations
+                            ),
+                        )
+                        if draft.grounding_status == GroundingStatus.ANSWERED
+                        else None
+                    ),
                 )
                 flush = getattr(session, "flush", None)
                 if flush is not None:
@@ -5595,7 +5606,6 @@ def _simple_split_absences(text: str, *, question: str) -> tuple[str, tuple[str,
     their markers. Such a sentence is never a claim, marked or not, unless it holds a number
     the question does not: then it may carry a fact and stays a claim."""
     parts = _simple_sentence_parts(text)
-    question_numbers = set(re.findall(r"\d+", question))
     shown: list[str] = []
     claims: list[str] = []
     for index, part in enumerate(parts):
@@ -5603,14 +5613,52 @@ def _simple_split_absences(text: str, *, question: str) -> tuple[str, tuple[str,
             shown.append(part)
             continue
         bare = _SIMPLE_MARKER.sub("", part)
-        if any(phrase in fold_text(bare) for phrase in _SIMPLE_UNVERIFIED_PHRASES) and set(
-            re.findall(r"\d+", bare)
-        ).issubset(question_numbers):
+        if _names_unverified_part(bare, question=question):
             shown.append(bare)
         else:
             shown.append(part)
             claims.append(part)
     return "".join(shown), tuple(claims)
+
+
+def _names_unverified_part(sentence: str, *, question: str) -> bool:
+    """s1 and the BR-3 segments: a sentence naming an unverified part, unless it holds a number
+    the question does not (then it may carry a fact)."""
+    return any(phrase in fold_text(sentence) for phrase in _SIMPLE_UNVERIFIED_PHRASES) and set(
+        re.findall(r"\d+", sentence)
+    ).issubset(re.findall(r"\d+", question))
+
+
+# The displayed answer numbers its citations [1], [2]...; a run of them may follow a full stop.
+_DISPLAY_MARKER = re.compile(r"[ \t]*\[(\d+)\]")
+_DISPLAY_MARKERS_AFTER_STOP = re.compile(r"([.!?])((?:[ \t]*\[\d+\])+)")
+
+
+def answer_segments(
+    content: str, *, question: str, citation_ids: Iterable[int]
+) -> list[dict[str, object]]:
+    """BR-3: the displayed answer cut into sentences as s1 cuts a draft. A sentence naming an
+    unverified part (`_names_unverified_part`) is "unverified", any other "verified"; each keeps
+    the citation numbers it shows (only real ones) as citation_ids, and its text without them."""
+    known = set(citation_ids)
+    moved = _DISPLAY_MARKERS_AFTER_STOP.sub(r"\2\1", content.strip())
+    segments: list[dict[str, object]] = []
+    for index, part in enumerate(_SIMPLE_SPLIT_KEEPING_BREAKS.split(moved)):
+        if index % 2 or not part.strip():
+            continue
+        ids = [int(n) for n in _DISPLAY_MARKER.findall(part) if int(n) in known]
+        text = _DISPLAY_MARKER.sub(
+            lambda m: "" if int(m.group(1)) in known else m.group(0), part
+        ).strip()
+        unverified = _names_unverified_part(text, question=question)
+        segments.append(
+            {
+                "kind": "unverified" if unverified else "verified",
+                "text": text,
+                "citation_ids": list(dict.fromkeys(ids)),
+            }
+        )
+    return segments
 
 
 def _simple_select_hits(

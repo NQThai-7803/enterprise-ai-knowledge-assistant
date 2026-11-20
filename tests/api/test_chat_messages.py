@@ -660,7 +660,7 @@ def test_answered_response_returns_web_citations(
     ]
 
 
-def test_session_history_returns_each_assistant_messages_grounding_status(
+def test_session_history_returns_each_assistant_messages_grounding_status_and_segments(
     api_client: TestClient,
     async_session_factory_for_tests: async_sessionmaker[AsyncSession],
     make_user: Callable[..., User],
@@ -691,3 +691,10 @@ def test_session_history_returns_each_assistant_messages_grounding_status(
         ("USER", None),
         ("ASSISTANT", "NO_ANSWER"),
     ]
+    # BR-3 segments: only on answers stored with them; content stays as it was
+    segments = [m["segments"] for m in history.json()["data"]["messages"]]
+    expected = [{"kind": "verified", "text": "Nhân viên được nghỉ 12 ngày phép năm.",
+                 "citation_ids": [1]}]  # fmt: skip
+    assert segments == [None, None, expected, None, None]
+    assert answered.json()["data"]["assistant_message"]["segments"] == expected
+    assert history.json()["data"]["messages"][2]["content"] == GROUNDED_ANSWER_DISPLAY

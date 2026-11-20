@@ -6,6 +6,15 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### UI backend requests: owner follow-up -- 2026-11-20
+
+- **Changed:** `GET /documents?search=` also matches `document_code` (BR-1).
+- **Added:** `segments` on answered assistant messages, in history, the POST response and SSE
+  `message.completed` (migration `20261120_0014`) (BR-3).
+- **Added:** `uploaded_by_me` on Document responses; `uploaded_by_name` / `department_name` on
+  Document responses and `user_full_name` / `department_name` on the Feedback report, Admin
+  callers only, keys absent otherwise (BR-4 option a, `RBAC.md`).
+
 ### Backend requests of the UI session (BR-1, 3, 4, 2, 8, 9) -- 2026-11-20
 
 - **Added:** `chat_messages.grounding_status` (migration `20261120_0013`), returned as

@@ -118,18 +118,16 @@ commit). Các trường và endpoint dưới đây chỉ dùng được khi PR �
 `/api/v1`: chỉ thêm trường hoặc endpoint, không đổi trường cũ. BR-5, BR-6, BR-7 đang hoãn theo
 quyết định của owner.
 
-**CẦN OWNER QUYẾT (chưa làm):**
+**Các mục từng ghi CẦN OWNER QUYẾT (owner đã quyết ngày 20/11/2026):**
 
-- BR-1 mục 4: có thêm `document_code` vào `GET /documents?search=` không.
-- BR-3: có thêm mảng đoạn có cấu trúc (`segments`) thay cho việc nhận diện câu "Chưa xác minh
-  được…" theo chữ không.
-- BR-4: tên người tải lên và tên phòng ban trên tài liệu, tên người dùng trên feedback, cho vai trò
-  không phải Admin. Việc này trái với quy tắc chống dò tài khoản của `RBAC.md`.
+- BR-1 mục 4: **đã quyết, đã làm**: tìm theo `document_code`.
+- BR-3: **đã quyết, đã làm**: thêm `segments`.
+- BR-4: **đã quyết (phương án a), đã làm**: tên chỉ dành cho Admin; thêm `uploaded_by_me`.
 
 ### TRẢ LỜI CHO PHIÊN UI — BR-1 (thông tin phiên bản tài liệu)
 
-- **Trạng thái:** xong mục 1, 2, 3 (chỉ ghi lại hành vi đã có, không đổi code). Mục 4: **CẦN OWNER
-  QUYẾT**.
+- **Trạng thái:** xong mục 1, 2, 3 (chỉ ghi lại hành vi đã có, không đổi code). Mục 4: xong
+  theo quyết định của owner (bổ sung ngày 20/11/2026, nhánh `feat/ui-br-followup`).
 - **Endpoint:** `POST /api/v1/documents/upload` (multipart form), `GET /api/v1/documents`,
   `GET /api/v1/documents/{document_id}`. Spec: `API_SPEC.md` §7.
 - **Field gửi lên (form):** `document_code` (chuỗi ≤ 128 ký tự), `document_version` (≤ 64),
@@ -155,13 +153,19 @@ quyết định của owner.
   `department_id` của chính mình. Server **không** tự điền hay ép `department_id`: UI phải gửi id
   phòng ban của Manager (lấy từ `GET /auth/me`, BR-4). Các trường hợp bị `403 FORBIDDEN`:
   `ORGANIZATION`, phòng ban khác, hoặc Manager chưa có phòng ban.
-- **Tìm kiếm (mục 4):** `GET /documents?search=` hiện tìm trong `title`, `original_filename` và
-  `description`, **không** tìm `document_code`. Thêm `document_code` vào tìm kiếm là đổi hành vi
-  của danh sách → **CẦN OWNER QUYẾT**. Nếu owner đồng ý, chỉ cần thêm một điều kiện vào truy vấn,
-  quyền xem vẫn lọc trong SQL như cũ. Trong lúc chờ, UI giữ placeholder "Tên hoặc tên tệp".
+- **Tìm kiếm (mục 4, owner đã quyết):** `GET /documents?search=` tìm trong `title`,
+  `original_filename`, `description` **và `document_code`**.
+  - So khớp không phân biệt hoa thường, theo chuỗi con, nên gõ tiền tố của mã cũng tìm được.
+  - Tìm kiếm chạy bên trong bộ lọc quyền như cũ: tài liệu người gọi không được xem thì không bao giờ
+    hiện ra, kể cả khi gõ đúng mã.
+  - Ví dụ: `GET /api/v1/documents?search=nd-hr` trả về tài liệu có mã `ND-HR-007` nếu người gọi xem
+    được tài liệu đó.
+  - UI có thể đổi placeholder thành "Tên hoặc mã tài liệu".
 - **Test:** `tests/api/test_document_upload_api.py`
   (`test_upload_version_fields_are_returned_by_upload_detail_and_list`,
-  `test_upload_effective_to_before_effective_from_returns_422`).
+  `test_upload_effective_to_before_effective_from_returns_422`); `tests/api/test_documents_api.py`
+  (`test_search_by_document_code_stays_inside_the_access_filter`: Staff tìm theo mã của tài liệu
+  ngoài quyền thì không thấy).
 
 ### TRẢ LỜI CHO PHIÊN UI — BR-3 (`grounding_status` trong lịch sử, câu "Chưa xác minh được…")
 
@@ -189,19 +193,45 @@ quyết định của owner.
     số mà câu hỏi không có thì vẫn được coi là khẳng định và giữ marker.
   - UI nên nhận diện theo ba cụm từ trên (gập dấu, không phân biệt hoa thường) thay vì khớp nguyên
     tiền tố. Câu nào không khớp vẫn hiển thị như văn bản thường.
-- **CẦN OWNER QUYẾT:** có muốn server trả thêm mảng đoạn có cấu trúc (ví dụ
-  `segments: [{ "kind": "claim" | "unverified", "text": … }]`) để UI khỏi phải nhận diện theo chữ
-  không. Việc này thêm trường vào response và cần quyết định có lưu vào DB không. Chưa làm.
+- **`segments` (owner đã quyết, đã làm; bổ sung ngày 20/11/2026, migration `20261120_0014`):**
+  - Mỗi tin ASSISTANT có trạng thái `ANSWERED` mang thêm `segments`. Đây là `content` được cắt theo
+    câu bằng **chính bước nhận diện** mà server dùng để quyết định câu nào phải kiểm, nên khớp với
+    cách server đã xử lý câu trả lời.
+  - Dạng mỗi phần tử: `{ "kind": "verified" | "unverified", "text": …, "citation_ids": [...] }`.
+    - `text`: câu, đã bỏ số trích dẫn.
+    - `citation_ids`: các `citation_order` của trích dẫn mà câu đó hiển thị. Chỉ tính số là trích dẫn
+      thật của tin; số trong ngoặc khác vẫn giữ nguyên trong `text`.
+  - `content` giữ nguyên.
+  - `segments` là `null` với: tin USER, tin `NO_ANSWER` (content là câu từ chối cố định), và tin
+    lưu trước migration.
+  - Có ở cả ba chỗ: lịch sử `GET /chat/sessions/{id}`, `assistant_message` của
+    `POST …/messages`, và sự kiện SSE `message.completed` (`segments`).
+  - Ví dụ:
+    ```json
+    { "role": "ASSISTANT", "grounding_status": "ANSWERED",
+      "content": "Nhân viên được nghỉ 12 ngày phép năm. [1] Chưa xác minh được từ tài liệu bạn được phép truy cập: mức phụ cấp.",
+      "segments": [
+        { "kind": "verified", "text": "Nhân viên được nghỉ 12 ngày phép năm.", "citation_ids": [1] },
+        { "kind": "unverified", "text": "Chưa xác minh được từ tài liệu bạn được phép truy cập: mức phụ cấp.", "citation_ids": [] }
+      ] }
+    ```
+  - Cách UI nên dùng: hiển thị theo `segments` khi trường này khác `null`: đoạn `unverified` chữ
+    xám, không có chip; đoạn `verified` có chip theo `citation_ids`. Khi `segments` là `null`, hiển
+    thị `content` như hiện nay.
+  - Giới hạn: việc nhận diện vẫn dựa trên 3 cụm từ (heuristic), đã ghi vào TASKS.
 - **Lỗi:** không có mã lỗi mới.
 - **DB:** cột `chat_messages.grounding_status` (nullable). Đây là thay đổi lưu trữ duy nhất của
   BR-3; cách trả lời và retrieval không đổi.
 - **Test:** `tests/api/test_chat_messages.py`
-  (`test_session_history_returns_each_assistant_messages_grounding_status`).
+  (`test_session_history_returns_each_assistant_messages_grounding_status_and_segments`),
+  `tests/api/test_chat_streaming.py` (`segments` trong `message.completed`),
+  `tests/unit/test_answer_segments.py`: có test cho câu có và câu không có đoạn "Chưa xác minh
+  được…".
 
 ### TRẢ LỜI CHO PHIÊN UI — BR-4 (tên phòng ban và tên người dùng)
 
-- **Trạng thái:** xong phần hồ sơ của chính mình. Tên trên tài liệu và trên feedback: **CẦN OWNER
-  QUYẾT**.
+- **Trạng thái:** xong phần hồ sơ của chính mình. Tên trên tài liệu và trên feedback: owner chọn
+  **phương án (a)**, đã làm (bổ sung ngày 20/11/2026, nhánh `feat/ui-br-followup`).
 - **Đã làm — endpoint:** `GET /api/v1/auth/me`, cùng `user` trong response của
   `POST /auth/login` và `POST /auth/refresh`. Spec: `API_SPEC.md` §4.
 - **Field:** `department_name` (chuỗi | `null`), là tên phòng ban **của chính người gọi**; `null`
@@ -213,22 +243,45 @@ quyết định của owner.
   Như vậy là đủ cho Profile và cho Manager khi upload (id và tên phòng ban của chính mình). UI
   không cần gọi `GET /departments`, vốn chỉ dành cho Admin.
 - **Lỗi:** không có mã lỗi mới.
-- **CẦN OWNER QUYẾT:** `department_name` và `uploaded_by_name` trong `DocumentItem`;
-  `user_full_name` và `department_name` trong `FeedbackReportItem`.
-  - Mâu thuẫn với RBAC: `RBAC.md` (TASK-007) quy định Manager và Staff đọc thông tin người dùng
-    khác thì nhận 404, để chống dò tài khoản. `GET /users` và `GET /departments` chỉ dành cho
+- **Tên trên tài liệu và feedback (phương án a, đã làm):**
+  - Tài liệu: áp dụng cho response 202 của upload, `GET /documents`, `GET /documents/{id}` và
+    `PATCH /documents/{id}`.
+    - `uploaded_by_me` (boolean) có cho **mọi người xem được tài liệu**.
+    - `uploaded_by_name` (họ tên người tải lên) và `department_name` (tên phòng ban của tài liệu,
+      `null` nếu không có) **chỉ có khi người gọi là Admin**.
+  - Feedback (`GET /feedback`): `user_full_name` và `department_name` chỉ có khi người gọi là
     Admin.
-  - Nếu trả tên người tải lên cho mọi người xem được tài liệu, Staff sẽ thấy tên người ở phòng ban
-    khác (với tài liệu `ORGANIZATION` hoặc được cấp quyền trực tiếp). Manager cũng sẽ thấy tên
-    người dùng, điều mà hiện không endpoint nào cho phép.
-  - Các phương án để owner chọn:
-    - (a) chỉ trả tên khi người gọi là Admin, các vai trò khác nhận `null`;
-    - (b) trả tên cho mọi người xem được bản ghi, và sửa `RBAC.md` cho khớp;
-    - (c) giữ nguyên, không thêm tên.
-  - Chưa làm phần này. Trong lúc chờ, UI giữ cách hiện tại: Admin tra tên qua `/departments` và
-    `/users`, các vai trò khác hiện nhãn không kèm tên.
-- **Test:** `tests/api/test_auth_endpoints.py`
-  (`test_login_and_me_return_the_users_own_department_name`).
+  - Với Manager và Staff, các khóa trên **không có trong response**: không phải `null` mà vắng hẳn,
+    để UI không suy ra được là có tồn tại tên.
+  - Ví dụ, người gọi là Admin:
+    ```json
+    { "id": "uuid", "title": "…", "uploaded_by": "uuid", "uploaded_by_me": false,
+      "uploaded_by_name": "Nguyễn Văn A", "department_id": "uuid", "department_name": "Nhân sự" }
+    ```
+    Người gọi là Staff (cùng tài liệu):
+    ```json
+    { "id": "uuid", "title": "…", "uploaded_by": "uuid", "uploaded_by_me": false,
+      "department_id": "uuid" }
+    ```
+  - **Kết luận về tên phòng ban của tài liệu:** đọc `RBAC.md` thì thấy mục TASK-007 quy định danh
+    sách và chi tiết phòng ban chỉ dành cho Admin. Người không phải Admin vẫn có thể xem tài liệu
+    `DEPARTMENT` của phòng ban khác nếu được cấp quyền trực tiếp, và `RBAC.md` không có điều nào
+    cho phép nêu tên phòng ban đó với họ. Đây là trường hợp mơ hồ, nên theo quyết định của owner
+    tên phòng ban **chỉ trả cho Admin**. Lý do đã ghi vào `RBAC.md`, mục "BR-4 names in
+    responses".
+  - Gợi ý cho UI: với tài liệu thuộc phòng ban của chính người dùng (`department_id` của tài liệu
+    trùng `department_id` trong `/auth/me`), UI tự hiện tên lấy từ `/auth/me`
+    (`department_name`), không cần server trả thêm. Với Manager, trang feedback chỉ chứa người
+    trong phòng ban của chính họ, nên tên phòng ban cũng lấy được như vậy.
+- **Test:**
+  - `tests/api/test_auth_endpoints.py`
+    (`test_login_and_me_return_the_users_own_department_name`).
+  - Chống dò tài khoản:
+    - `tests/api/test_documents_api.py`
+      (`test_names_reach_admin_only_and_uploaded_by_me_every_viewer`): Staff và Manager không nhận
+      tên, kể cả khóa, ở danh sách, chi tiết và PATCH; Admin thì nhận.
+    - `tests/api/test_document_upload_api.py` (`test_upload_response_names_go_to_admin_only`).
+    - `tests/api/test_feedback.py` (`test_feedback_report_names_go_to_admin_only`).
 
 ### TRẢ LỜI CHO PHIÊN UI — BR-2 (mở tài liệu tại đúng trang)
 
