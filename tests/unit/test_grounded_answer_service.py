@@ -63,6 +63,15 @@ def run_async(coro: Coroutine[Any, Any, None]) -> None:
     asyncio.run(coro)
 
 
+SIMPLE_FLAGS = (
+    "rag_simple_absence_sentences_enabled",
+    "rag_simple_short_prompt_enabled",
+    "rag_simple_relaxed_rules_enabled",
+    "rag_simple_claim_relevance_enabled",
+    "rag_simple_question_list_segments_enabled",
+)
+
+
 def settings(**overrides: object) -> Settings:
     defaults: dict[str, object] = {
         "llm_enabled": True,
@@ -74,6 +83,10 @@ def settings(**overrides: object) -> Settings:
         "chat_history_max_messages": 2,
         "chat_history_max_tokens": 200,
         "citation_max_sources_per_answer": 2,
+        # These tests cover the legacy pipeline, DEC-040's rollback path; simple mode and its
+        # s1-s3 flags (the default since DEC-040) are turned on by the tests that measure them.
+        "rag_answer_mode": "legacy",
+        **dict.fromkeys(SIMPLE_FLAGS, False),
     }
     defaults.update(overrides)
     return Settings(_env_file=None, **defaults)

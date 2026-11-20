@@ -38,11 +38,14 @@ for entry in "${ENTRIES[@]}"; do
   # EVAL_S3T=1: the DEC-029/034 candidate's answer path, s3 with the simple-mode trace (keeps
   # four configurations under the 400-character concurrency group; name the model explicitly).
   [[ ",$vars," == *",EVAL_S3T=1,"* ]] && vars+=",EVAL_ABLATION=simple_trace,EVAL_SIMPLE_LEVEL=3"
-  # EVAL_SIMPLE_LEVEL=n: simple mode with s1..sn (docs/design/simple-answer-mode.md), so that a
-  # configuration stays short; the configs input is part of a 400-character concurrency group.
+  # EVAL_SIMPLE_LEVEL=n: simple mode with s1..sn on and the later ones off
+  # (docs/design/simple-answer-mode.md; the eval stack's defaults have s1-s3 on since DEC-040), so
+  # that a configuration stays short; the configs input is part of a 400-character concurrency group.
   if [[ ",$vars," =~ ,EVAL_SIMPLE_LEVEL=([1-9]), ]]; then
     vars+=",EVAL_ANSWER_MODE=simple"
-    for n in $(seq 1 "${BASH_REMATCH[1]}"); do vars+=",EVAL_SIMPLE_S$n=true"; done
+    for n in 1 2 3 4 5; do
+      if [ "$n" -le "${BASH_REMATCH[1]}" ]; then vars+=",EVAL_SIMPLE_S$n=true"; else vars+=",EVAL_SIMPLE_S$n=false"; fi
+    done
   fi
   # EVAL_TABLE_ROWS=true acts at ingestion: these configurations run last, on a corpus ingested
   # again with the flag on (reingest_table_rows), so they must follow every other one.
@@ -69,6 +72,13 @@ read -r -a FILES <<< "${COMPOSE_FILES:?space-separated -f arguments}"
 API=http://127.0.0.1:18190
 mkdir -p "$OUT"
 REINGESTED=""
+LOG_DIR="$OUT/before-batch"; LOG_SINCE=""
+
+save_logs() {  # a recreated or removed container takes its log with it (run 44575927833)
+  mkdir -p "$LOG_DIR"
+  docker logs "$PROJECT-api-1" > "$LOG_DIR/api.log" 2>&1 || true
+  docker compose -p "$PROJECT" "${FILES[@]}" logs --no-color ${LOG_SINCE:+--since "$LOG_SINCE"} worker     > "$LOG_DIR/worker.log" 2>&1 || true
+}
 
 backend() {
   python - "$EVAL_OLLAMA_LOG" <<'PY'
@@ -110,6 +120,10 @@ reingest_table_rows() {  # fresh database and redis on this throwaway CI stack, 
 run_one() {  # $1 = config index, $2 = run number
   local name="${NAMES[$1]}" vars="${ENVS[$1]}" dir
   dir="$OUT/$name/run$2"; mkdir -p "$dir"
+  # The live API container's log goes to the run it served (before-batch: the corpus load) before
+  # the recreate below removes it; the last run's container stays for the workflow to collect.
+  save_logs
+  LOG_DIR="$dir"; LOG_SINCE="$(date -u +%FT%TZ)"
   if [ -n "${ROWS_FROM:-}" ] && [ "$1" -ge "$ROWS_FROM" ] && [ -z "$REINGESTED" ]; then
     reingest_table_rows || return 1
     start_api "$vars" || return 1
@@ -133,7 +147,7 @@ run_one() {  # $1 = config index, $2 = run number
   docker inspect "$PROJECT-api-1" --format '{{range .Config.Env}}{{println .}}{{end}}' \
     | grep -E '^(RAG_|RERANKER_|EVAL_ABLATION|EVAL_ORACLE|LLM_OLLAMA_MODEL)' | sort > "$dir/flags.txt"
   python scripts/eval/ollama_warmup.py "$dir/warmup.json" --base-url http://127.0.0.1:11434 \
-    --model "${EVAL_LLM_MODEL:-qwen2.5:3b}" --num-ctx 8192 --keep-alive 10m --seed 20261031 >/dev/null
+    --model "${EVAL_LLM_MODEL:-qwen3.5-text:4b}" --num-ctx 8192 --keep-alive 10m --seed 20261031 >/dev/null
   local started; started=$(date +%s)
   case "$SET" in
     uat)

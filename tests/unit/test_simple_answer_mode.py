@@ -15,6 +15,7 @@ from app.chat.models import GroundingStatus
 from app.chat.prompt_builder import build_simple_grounded_prompt, build_simple_system_prompt
 from app.citations.errors import CitationFailureCode, CitationValidationError
 from app.citations.models import PromptSourceRegistry
+from app.core.config import Settings
 from app.llm.models import LLMGenerationResult
 from app.observability.metrics import GLOBAL_METRICS
 from app.retrieval.subclaims import information_need_queries
@@ -25,6 +26,7 @@ from app.services.grounded_answer_service import (
     _simple_split_absences,
 )
 from tests.unit.test_grounded_answer_service import (
+    SIMPLE_FLAGS,
     FakeCitationValidationService,
     FakeCounter,
     FakeRetrievalService,
@@ -197,8 +199,13 @@ def test_no_retrieved_chunk_refuses_without_calling_the_llm() -> None:
     assert GLOBAL_METRICS.answer_branch_counts()["simple_no_answer_no_sources"] == 1
 
 
-def test_legacy_stays_the_default() -> None:
-    assert settings().rag_answer_mode == "legacy"
+def test_simple_with_s1_to_s3_is_the_default_and_legacy_the_rollback() -> None:
+    defaults = Settings(_env_file=None)  # DEC-040
+    assert defaults.rag_answer_mode == "simple"
+    assert all(getattr(defaults, flag) for flag in SIMPLE_FLAGS)
+    assert not (defaults.rag_simple_subject_binding_enabled
+                or defaults.rag_simple_claim_cross_encoder_enabled)  # fmt: skip
+    assert Settings(_env_file=None, rag_answer_mode="legacy").rag_answer_mode == "legacy"
 
 
 def test_unmarked_absence_sentences_are_not_claims() -> None:
@@ -403,14 +410,9 @@ def test_s3_a_question_list_counts_by_its_non_question_segments() -> None:
         assert _validate_whole_chunk(faq, "Ai ky phieu bao hanh.", "Ai ky phieu?") != supported
 
 
-def test_the_new_flags_are_off_by_default() -> None:
-    s = settings()
-    assert not (
-        s.rag_simple_absence_sentences_enabled or s.rag_simple_short_prompt_enabled
-        or s.rag_simple_relaxed_rules_enabled or s.rag_simple_claim_relevance_enabled
-        or s.rag_simple_question_list_segments_enabled or s.rag_simple_subject_binding_enabled
-        or s.rag_simple_claim_cross_encoder_enabled
-    )  # fmt: skip
+def test_the_test_helper_keeps_the_simple_flags_off() -> None:
+    s = settings()  # the tests below turn each flag on themselves
+    assert s.rag_answer_mode == "legacy" and not any(getattr(s, flag) for flag in SIMPLE_FLAGS)
 
 
 # --- s4, s5 (owner decision 2026-11-16, second round), each behind its flag -------------------
