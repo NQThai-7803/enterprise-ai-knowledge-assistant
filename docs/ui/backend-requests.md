@@ -124,7 +124,7 @@ quyết định của owner.
 - BR-3: có thêm mảng đoạn có cấu trúc (`segments`) thay cho việc nhận diện câu "Chưa xác minh
   được…" theo chữ không.
 - BR-4: tên người tải lên và tên phòng ban trên tài liệu, tên người dùng trên feedback, cho vai trò
-  không phải Admin. Việc này mâu thuẫn với quy tắc chống dò tài khoản trong `RBAC.md`.
+  không phải Admin. Việc này trái với quy tắc chống dò tài khoản của `RBAC.md`.
 
 ### TRẢ LỜI CHO PHIÊN UI — BR-1 (thông tin phiên bản tài liệu)
 
