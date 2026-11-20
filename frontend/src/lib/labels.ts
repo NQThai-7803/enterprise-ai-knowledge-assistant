@@ -1,6 +1,7 @@
 import type {
   AuditLogItem,
   DocumentAccessScope,
+  DocumentLifecycleStatus,
   DocumentPermissionLevel,
   DocumentStatus,
   FeedbackRating,
@@ -21,6 +22,14 @@ export const documentStatusLabels: Record<DocumentStatus, string> = {
   READY: "Sẵn sàng",
   FAILED: "Lỗi",
   ARCHIVED: "Lưu trữ",
+};
+
+// BR-1 lifecycle_status. DRAFT is listed and downloadable but never used to answer (API_SPEC §7).
+export const lifecycleLabels: Record<DocumentLifecycleStatus, string> = {
+  ACTIVE: "Đang hiệu lực",
+  SUPERSEDED: "Đã được thay thế",
+  ARCHIVED: "Lưu trữ",
+  DRAFT: "Bản nháp",
 };
 
 export const accessScopeLabels: Record<DocumentAccessScope, string> = {
