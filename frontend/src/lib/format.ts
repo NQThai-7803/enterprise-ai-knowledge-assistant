@@ -3,7 +3,7 @@ import { vi } from "date-fns/locale";
 
 const UNAVAILABLE = "Không có";
 
-export function formatDateTime(value: string | null | undefined): string {
+export function formatDateTime(value: string | null | undefined, pattern = "dd/MM/yyyy HH:mm"): string {
   if (!value) {
     return UNAVAILABLE;
   }
@@ -11,7 +11,7 @@ export function formatDateTime(value: string | null | undefined): string {
   if (Number.isNaN(date.getTime())) {
     return UNAVAILABLE;
   }
-  return format(date, "dd/MM/yyyy HH:mm");
+  return format(date, pattern);
 }
 
 export function formatRelative(value: string | null | undefined): string {
