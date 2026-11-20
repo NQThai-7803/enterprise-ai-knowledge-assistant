@@ -218,6 +218,7 @@ def _document_filter_conditions(
                 Document.title.ilike(search_term),
                 Document.original_filename.ilike(search_term),
                 Document.description.ilike(search_term),
+                Document.document_code.ilike(search_term),  # BR-1: by code, inside the same filters
             )
         )
     if status is not None:

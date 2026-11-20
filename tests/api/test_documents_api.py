@@ -53,6 +53,7 @@ async def create_document_record(
     department_id: uuid.UUID | None = None,
     storage_key: str | None = None,
     is_deleted: bool = False,
+    document_code: str | None = None,
 ) -> Document:
     async with session_factory() as session:
         document = Document(
@@ -68,6 +69,7 @@ async def create_document_record(
             department_id=department_id,
             uploaded_by=uploader.id,
             is_deleted=is_deleted,
+            document_code=document_code,
         )
         session.add(document)
         await session.commit()
@@ -466,3 +468,32 @@ def test_document_preview_is_inline_with_the_download_access_rules(
     assert gone.status_code == 410
     assert gone.json()["error"]["code"] == "DOCUMENT_FILE_UNAVAILABLE"
     assert api_client.get(url).status_code == 401
+
+
+def test_search_by_document_code_stays_inside_the_access_filter(
+    api_client: TestClient,
+    documents_storage: LocalFileStorage,
+    async_session_factory_for_tests: async_sessionmaker[AsyncSession],
+    make_user: Callable[..., User],
+    make_auth_headers: Callable[[User], dict[str, str]],
+) -> None:
+    """BR-1 item 4: a code matches by prefix or substring, any case; never outside access."""
+    admin = make_user(role=UserRole.ADMIN)
+    staff = make_user(role=UserRole.STAFF)
+    shared = make_document(async_session_factory_for_tests, uploader=admin, title="Shared",
+                           access_scope=DocumentAccessScope.ORGANIZATION,
+                           document_code="ND-HR-007")  # fmt: skip
+    hidden = make_document(async_session_factory_for_tests, uploader=admin, title="Hidden",
+                           document_code="ND-HR-008")  # fmt: skip
+
+    def ids(user: User, search: str) -> list[str]:
+        response = api_client.get(
+            "/api/v1/documents", params={"search": search}, headers=make_auth_headers(user)
+        )
+        assert response.status_code == 200
+        return [item["id"] for item in response.json()["data"]]
+
+    assert ids(staff, "nd-hr") == [str(shared.id)]
+    assert ids(staff, "HR-008") == []
+    assert ids(admin, "hr-008") == [str(hidden.id)]
+    assert set(ids(admin, "ND-HR")) == {str(shared.id), str(hidden.id)}

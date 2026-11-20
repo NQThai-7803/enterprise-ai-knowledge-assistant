@@ -419,7 +419,7 @@ Query parameters:
 
 - `page`, default `1`, must be `>= 1`.
 - `page_size`, default `20`, must be between `1` and `100`.
-- `search`, searches `title`, `original_filename`, and `description` (case-insensitive substring), max 200 characters. It does not search `document_code`.
+- `search`, searches `title`, `original_filename`, `description` and `document_code` (case-insensitive substring, so a prefix of a code matches too), max 200 characters. It applies inside the access filter: a Document the caller cannot view is never found, by code or otherwise.
 - `status`: `UPLOADED`, `PROCESSING`, `READY`, `FAILED`, or `ARCHIVED`.
 - `access_scope`: `PRIVATE`, `DEPARTMENT`, or `ORGANIZATION`.
 - `department_id`: Department UUID filter.

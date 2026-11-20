@@ -120,7 +120,7 @@ quyết định của owner.
 
 **CẦN OWNER QUYẾT (chưa làm):**
 
-- BR-1 mục 4: có thêm `document_code` vào `GET /documents?search=` không.
+- BR-1 mục 4: **đã quyết, đã làm**: tìm theo `document_code`.
 - BR-3: có thêm mảng đoạn có cấu trúc (`segments`) thay cho việc nhận diện câu "Chưa xác minh
   được…" theo chữ không.
 - BR-4: tên người tải lên và tên phòng ban trên tài liệu, tên người dùng trên feedback, cho vai trò
@@ -128,8 +128,8 @@ quyết định của owner.
 
 ### TRẢ LỜI CHO PHIÊN UI — BR-1 (thông tin phiên bản tài liệu)
 
-- **Trạng thái:** xong mục 1, 2, 3 (chỉ ghi lại hành vi đã có, không đổi code). Mục 4: **CẦN OWNER
-  QUYẾT**.
+- **Trạng thái:** xong mục 1, 2, 3 (chỉ ghi lại hành vi đã có, không đổi code). Mục 4: xong
+  theo quyết định của owner (bổ sung ngày 20/11/2026, nhánh `feat/ui-br-followup`).
 - **Endpoint:** `POST /api/v1/documents/upload` (multipart form), `GET /api/v1/documents`,
   `GET /api/v1/documents/{document_id}`. Spec: `API_SPEC.md` §7.
 - **Field gửi lên (form):** `document_code` (chuỗi ≤ 128 ký tự), `document_version` (≤ 64),
@@ -155,13 +155,19 @@ quyết định của owner.
   `department_id` của chính mình. Server **không** tự điền hay ép `department_id`: UI phải gửi id
   phòng ban của Manager (lấy từ `GET /auth/me`, BR-4). Các trường hợp bị `403 FORBIDDEN`:
   `ORGANIZATION`, phòng ban khác, hoặc Manager chưa có phòng ban.
-- **Tìm kiếm (mục 4):** `GET /documents?search=` hiện tìm trong `title`, `original_filename` và
-  `description`, **không** tìm `document_code`. Thêm `document_code` vào tìm kiếm là đổi hành vi
-  của danh sách → **CẦN OWNER QUYẾT**. Nếu owner đồng ý, chỉ cần thêm một điều kiện vào truy vấn,
-  quyền xem vẫn lọc trong SQL như cũ. Trong lúc chờ, UI giữ placeholder "Tên hoặc tên tệp".
+- **Tìm kiếm (mục 4, owner đã quyết):** `GET /documents?search=` tìm trong `title`,
+  `original_filename`, `description` **và `document_code`**.
+  - So khớp không phân biệt hoa thường, theo chuỗi con, nên gõ tiền tố của mã cũng tìm được.
+  - Tìm kiếm chạy bên trong bộ lọc quyền như cũ: tài liệu người gọi không được xem thì không bao giờ
+    hiện ra, kể cả khi gõ đúng mã.
+  - Ví dụ: `GET /api/v1/documents?search=nd-hr` trả về tài liệu có mã `ND-HR-007` nếu người gọi xem
+    được tài liệu đó.
+  - UI có thể đổi placeholder thành "Tên hoặc mã tài liệu".
 - **Test:** `tests/api/test_document_upload_api.py`
   (`test_upload_version_fields_are_returned_by_upload_detail_and_list`,
-  `test_upload_effective_to_before_effective_from_returns_422`).
+  `test_upload_effective_to_before_effective_from_returns_422`); `tests/api/test_documents_api.py`
+  (`test_search_by_document_code_stays_inside_the_access_filter`: Staff tìm theo mã của tài liệu
+  ngoài quyền thì không thấy).
 
 ### TRẢ LỜI CHO PHIÊN UI — BR-3 (`grounding_status` trong lịch sử, câu "Chưa xác minh được…")
 
