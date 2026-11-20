@@ -189,3 +189,35 @@ quyết định của owner.
   BR-3; cách trả lời và retrieval không đổi.
 - **Test:** `tests/api/test_chat_messages.py`
   (`test_session_history_returns_each_assistant_messages_grounding_status`).
+
+### TRẢ LỜI CHO PHIÊN UI — BR-4 (tên phòng ban và tên người dùng)
+
+- **Trạng thái:** xong phần hồ sơ của chính mình. Tên trên tài liệu và trên feedback: **CẦN OWNER
+  QUYẾT**.
+- **Đã làm — endpoint:** `GET /api/v1/auth/me`, cùng `user` trong response của
+  `POST /auth/login` và `POST /auth/refresh`. Spec: `API_SPEC.md` §4.
+- **Field:** `department_name` (chuỗi | `null`), là tên phòng ban **của chính người gọi**; `null`
+  khi người đó chưa có phòng ban. Ví dụ:
+  ```json
+  { "id": "uuid", "email": "manager@example.com", "full_name": "…", "role": "MANAGER",
+    "department_id": "uuid", "department_name": "Nhân sự", "is_active": true }
+  ```
+  Như vậy là đủ cho Profile và cho Manager khi upload (id và tên phòng ban của chính mình). UI
+  không cần gọi `GET /departments`, vốn chỉ dành cho Admin.
+- **Lỗi:** không có mã lỗi mới.
+- **CẦN OWNER QUYẾT:** `department_name` và `uploaded_by_name` trong `DocumentItem`;
+  `user_full_name` và `department_name` trong `FeedbackReportItem`.
+  - Mâu thuẫn với RBAC: `RBAC.md` (TASK-007) quy định Manager và Staff đọc thông tin người dùng
+    khác thì nhận 404, để chống dò tài khoản. `GET /users` và `GET /departments` chỉ dành cho
+    Admin.
+  - Nếu trả tên người tải lên cho mọi người xem được tài liệu, Staff sẽ thấy tên người ở phòng ban
+    khác (với tài liệu `ORGANIZATION` hoặc được cấp quyền trực tiếp). Manager cũng sẽ thấy tên
+    người dùng, điều mà hiện không endpoint nào cho phép.
+  - Các phương án để owner chọn:
+    - (a) chỉ trả tên khi người gọi là Admin, các vai trò khác nhận `null`;
+    - (b) trả tên cho mọi người xem được bản ghi, và sửa `RBAC.md` cho khớp;
+    - (c) giữ nguyên, không thêm tên.
+  - Chưa làm phần này. Trong lúc chờ, UI giữ cách hiện tại: Admin tra tên qua `/departments` và
+    `/users`, các vai trò khác hiện nhãn không kèm tên.
+- **Test:** `tests/api/test_auth_endpoints.py`
+  (`test_login_and_me_return_the_users_own_department_name`).

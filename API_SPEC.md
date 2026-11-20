@@ -77,12 +77,15 @@ Success: `HTTP 200`
       "full_name": "Development Admin",
       "role": "ADMIN",
       "department_id": null,
+      "department_name": null,
       "is_active": true
     }
   },
   "meta": null
 }
 ```
+
+`user.department_name` (BR-4) is the name of the user's own Department, `null` without one; `POST /auth/refresh` returns the same `user` object.
 
 Errors:
 
@@ -172,13 +175,16 @@ Success: `HTTP 200`
     "id": "uuid",
     "email": "admin@example.com",
     "full_name": "Development Admin",
-    "role": "ADMIN",
-    "department_id": null,
+    "role": "MANAGER",
+    "department_id": "uuid",
+    "department_name": "Nhân sự",
     "is_active": true
   },
   "meta": null
 }
 ```
+
+`department_name` (BR-4): the name of the caller's own Department, `null` without one. It is the only name of another record this endpoint returns.
 
 The response never includes `hashed_password` or refresh token hashes. The current user is loaded from the database on each request.
 

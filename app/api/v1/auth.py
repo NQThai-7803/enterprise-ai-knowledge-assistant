@@ -35,12 +35,13 @@ async def login(
     session: Annotated[AsyncSession, Depends(get_db_session)],
     audit_context: Annotated[AuditContext, Depends(get_audit_context)],
 ) -> TokenPairResponse:
-    token_pair = await AuthService(session).login(
+    service = AuthService(session)
+    token_pair = await service.login(
         email=str(request.email),
         password=request.password.get_secret_value(),
         audit_context=audit_context,
     )
-    return _token_pair_response(token_pair)
+    return _token_pair_response(token_pair, await service.department_name(token_pair.user))
 
 
 @router.post("/refresh", response_model=TokenPairResponse)
@@ -49,10 +50,11 @@ async def refresh(
     rate_limit: Annotated[None, Depends(enforce_refresh_rate_limit)],
     session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> TokenPairResponse:
-    token_pair = await AuthService(session).refresh(
+    service = AuthService(session)
+    token_pair = await service.refresh(
         refresh_token=request.refresh_token.get_secret_value(),
     )
-    return _token_pair_response(token_pair)
+    return _token_pair_response(token_pair, await service.department_name(token_pair.user))
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
@@ -71,20 +73,26 @@ async def logout(
 @router.get("/me", response_model=AuthenticatedUserDataResponse)
 async def me(
     current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
 ) -> AuthenticatedUserDataResponse:
+    department_name = await AuthService(session).department_name(current_user)
     return AuthenticatedUserDataResponse(
-        data=AuthenticatedUserResponse.from_user(current_user),
+        data=AuthenticatedUserResponse.from_user(current_user, department_name=department_name),
         meta=None,
     )
 
 
-def _token_pair_response(token_pair: AuthTokenPair) -> TokenPairResponse:
+def _token_pair_response(
+    token_pair: AuthTokenPair, department_name: str | None
+) -> TokenPairResponse:
     return TokenPairResponse(
         data=TokenPairData(
             access_token=token_pair.access_token,
             refresh_token=token_pair.refresh_token,
             expires_in=token_pair.expires_in,
-            user=AuthenticatedUserResponse.from_user(token_pair.user),
+            user=AuthenticatedUserResponse.from_user(
+                token_pair.user, department_name=department_name
+            ),
         ),
         meta=None,
     )
