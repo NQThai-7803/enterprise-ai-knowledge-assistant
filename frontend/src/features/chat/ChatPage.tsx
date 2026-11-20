@@ -567,8 +567,7 @@ export function ChatPage() {
                   content={message.content}
                   citations={message.citations}
                   citationMap={citationView.byMessage.get(message.id)}
-                  // TODO(BR-3): history has no grounding_status; NO_ANSWER always comes with no citations.
-                  noAnswer={message.citations.length === 0}
+                  groundingStatus={message.grounding_status ?? null}
                   createdAt={message.created_at}
                   onCitationClick={focusCitation}
                   onFeedback={(rating) => feedbackMutation.mutate({ messageId: message.id, rating })}
@@ -583,7 +582,7 @@ export function ChatPage() {
                 content={streamState.content}
                 citations={streamState.citations}
                 citationMap={citationView.streamMap}
-                noAnswer={completed.grounding_status === "NO_ANSWER"}
+                groundingStatus={completed.grounding_status}
                 onCitationClick={focusCitation}
                 onFeedback={(rating) => feedbackMutation.mutate({ messageId: completed.message_id, rating })}
               />

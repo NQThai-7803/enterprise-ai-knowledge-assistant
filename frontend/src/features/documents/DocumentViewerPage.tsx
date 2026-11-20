@@ -12,9 +12,8 @@ type FileState =
   | { status: "error"; error: unknown };
 
 /**
- * D-7: opens a document at a page in its own tab. Fetches the file with the Bearer token
- * (a plain link cannot send it), shows it through a blob: URL and revokes the URL on leave.
- * TODO(BR-2): switch to the preview endpoint once API_SPEC has it; this downloads the whole file.
+ * D-7: opens a document at a page in its own tab. Fetches GET /documents/{id}/preview (BR-2) with the
+ * Bearer token (a plain link cannot send it), shows it through a blob: URL and revokes the URL on leave.
  */
 export function DocumentViewerPage() {
   const { documentId = "" } = useParams();
@@ -37,7 +36,7 @@ export function DocumentViewerPage() {
     let cancelled = false;
     let url: string | null = null;
     apiClient.documents
-      .download(documentId)
+      .preview(documentId)
       .then(({ blob, filename }) => {
         if (cancelled) {
           return;

@@ -1,7 +1,7 @@
 import { clsx } from "clsx";
 import { Check, FileText, Info, ThumbsDown, ThumbsUp } from "lucide-react";
 import { Fragment, type ReactNode } from "react";
-import type { Citation, FeedbackRating } from "../../api/types";
+import type { Citation, FeedbackRating, GroundingStatus } from "../../api/types";
 import { formatDateTime } from "../../lib/format";
 import { splitAnswerSegments } from "./answerSegments";
 
@@ -9,7 +9,7 @@ export function AnswerCard({
   content,
   citations,
   citationMap,
-  noAnswer,
+  groundingStatus,
   createdAt,
   animate = false,
   onCitationClick,
@@ -18,13 +18,14 @@ export function AnswerCard({
   content: string;
   citations: Citation[];
   citationMap?: ReadonlyMap<number, number>;
-  noAnswer: boolean;
+  /** BR-3. null: an answer stored before the field existed, shown without a verification label. */
+  groundingStatus: GroundingStatus | null;
   createdAt?: string;
   animate?: boolean;
   onCitationClick: (globalOrder: number) => void;
   onFeedback?: (rating: FeedbackRating) => void;
 }) {
-  if (noAnswer) {
+  if (groundingStatus === "NO_ANSWER") {
     // Neutral, not an error: the backend found nothing it could verify and says so in its own words.
     return (
       <article
@@ -57,14 +58,16 @@ export function AnswerCard({
         animate && "fade-up",
       )}
     >
-      <div className="flex flex-wrap items-center gap-2 text-xs">
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-2.5 py-0.5 font-medium text-success">
-          <Check className="h-3.5 w-3.5" aria-hidden={true} />
-          Đã xác minh nguồn
-          {unverifiedCount > 0 ? ` · ${unverifiedCount} ý chưa xác minh` : null}
-        </span>
-        <span className="text-muted">{citations.length} trích dẫn · chỉ từ tài liệu bạn được phép xem</span>
-      </div>
+      {groundingStatus === "ANSWERED" ? (
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-success/10 px-2.5 py-0.5 font-medium text-success">
+            <Check className="h-3.5 w-3.5" aria-hidden={true} />
+            Đã xác minh nguồn
+            {unverifiedCount > 0 ? ` · ${unverifiedCount} ý chưa xác minh` : null}
+          </span>
+          <span className="text-muted">{citations.length} trích dẫn · chỉ từ tài liệu bạn được phép xem</span>
+        </div>
+      ) : null}
       <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-ink">
         {segments.map((segment, index) =>
           segment.unverified ? (

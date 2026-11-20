@@ -6,6 +6,7 @@ export type DocumentPermissionLevel = "VIEW" | "EDIT" | "MANAGE";
 export type FeedbackRating = "HELPFUL" | "NOT_HELPFUL";
 export type ChatMessageRole = "USER" | "ASSISTANT";
 export type GroundingStatus = "ANSWERED" | "NO_ANSWER";
+export type DocumentLifecycleStatus = "ACTIVE" | "SUPERSEDED" | "ARCHIVED" | "DRAFT";
 
 export interface PaginationMeta {
   page: number;
@@ -41,6 +42,8 @@ export interface AuthenticatedUser {
   full_name: string;
   role: UserRole;
   department_id: string | null;
+  /** BR-4: name of the caller's own Department, null without one. */
+  department_name: string | null;
   is_active: boolean;
 }
 
@@ -75,6 +78,13 @@ export interface DocumentItem {
   id: string;
   title: string;
   description: string | null;
+  /** BR-1 version fields. */
+  document_code: string | null;
+  document_version: string | null;
+  effective_from: string | null;
+  effective_to: string | null;
+  lifecycle_status: DocumentLifecycleStatus;
+  supersedes_document_id: string | null;
   original_filename: string;
   mime_type: string;
   file_size: number;
@@ -123,6 +133,8 @@ export interface ChatMessage {
   response_time_ms: number | null;
   citations: Citation[];
   created_at: string;
+  /** BR-3: ANSWERED / NO_ANSWER on ASSISTANT messages; null on USER and on answers stored before it existed. */
+  grounding_status: GroundingStatus | null;
 }
 
 export interface ChatSessionSummary {

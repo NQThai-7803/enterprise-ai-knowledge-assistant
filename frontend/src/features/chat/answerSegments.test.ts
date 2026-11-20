@@ -5,13 +5,13 @@ const VI = "Chưa xác minh được từ tài liệu bạn được phép truy 
 const EN = "Could not be verified from the documents you can access";
 
 describe("splitAnswerSegments", () => {
-  it("keeps an answer without the fixed sentence as one plain segment", () => {
+  it("keeps an answer without the phrases as one plain segment", () => {
     expect(splitAnswerSegments("Ngân sách là 1.200.000.000 đồng [1].")).toEqual([
       { text: "Ngân sách là 1.200.000.000 đồng [1].", unverified: false },
     ]);
   });
 
-  it("separates a Vietnamese unverified sentence from cited text", () => {
+  it("separates the fixed Vietnamese sentence from cited text", () => {
     expect(splitAnswerSegments(`Được mượn 6 cuốn [1]. ${VI}: tiền đặt cọc.`)).toEqual([
       { text: "Được mượn 6 cuốn [1]. ", unverified: false },
       { text: `${VI}: tiền đặt cọc.`, unverified: true },
@@ -26,25 +26,42 @@ describe("splitAnswerSegments", () => {
     ]);
   });
 
-  it("does not end the sentence at dots inside numbers", () => {
+  it("matches the three contract phrases anywhere in a sentence, any case, with or without accents", () => {
+    for (const sentence of [
+      "Mức phạt khi trả muộn chưa xác minh được từ tài liệu.",
+      "Không xác minh được tiền đặt cọc.",
+      "CHƯA XÁC MINH ĐƯỢC: phụ cấp.",
+      "chua xac minh duoc tu tai lieu ban duoc phep truy cap: phu cap.",
+      "The fee could not be verified.",
+    ]) {
+      expect(splitAnswerSegments(sentence)).toEqual([{ text: sentence, unverified: true }]);
+    }
+  });
+
+  it("does not end a sentence at dots inside numbers", () => {
     const sentence = `${VI}: khoản 1.200.000 đồng.`;
     expect(splitAnswerSegments(sentence)).toEqual([{ text: sentence, unverified: true }]);
   });
 
-  it("leaves a matching sentence with a citation marker as plain text", () => {
-    const cited = `${VI}: [1]`;
+  it("leaves a matching sentence that kept a citation marker as plain text", () => {
+    const cited = `${VI}: hạn mức 5 ngày [1].`;
     expect(splitAnswerSegments(cited)).toEqual([{ text: cited, unverified: false }]);
   });
 
   it("does not match other wording", () => {
-    const other = "Không xác minh được từ tài liệu bạn được phép truy cập: tiền cọc.";
+    const other = "Tài liệu không đề cập tiền cọc.";
     expect(splitAnswerSegments(other)).toEqual([{ text: other, unverified: false }]);
   });
 
   it("finds every unverified sentence and loses no text", () => {
     const content = `Ý một [1]. ${VI}: ý hai. ${VI}: ý ba?`;
     const segments = splitAnswerSegments(content);
-    expect(segments.filter((segment) => segment.unverified)).toHaveLength(2);
+    expect(segments).toEqual([
+      { text: "Ý một [1]. ", unverified: false },
+      { text: `${VI}: ý hai.`, unverified: true },
+      { text: " ", unverified: false },
+      { text: `${VI}: ý ba?`, unverified: true },
+    ]);
     expect(segments.map((segment) => segment.text).join("")).toBe(content);
   });
 

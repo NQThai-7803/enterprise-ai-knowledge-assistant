@@ -8,6 +8,7 @@ const user = (role: AuthenticatedUser["role"]): AuthenticatedUser => ({
   full_name: role,
   role,
   department_id: null,
+  department_name: null,
   is_active: true,
 });
 

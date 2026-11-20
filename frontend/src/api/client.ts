@@ -200,6 +200,10 @@ export const apiClient = {
     download(documentId: string) {
       return download(`/documents/${documentId}/download`);
     },
+    /** BR-2: same bytes and access rules as download, served inline for the viewer. */
+    preview(documentId: string) {
+      return download(`/documents/${documentId}/preview`);
+    },
     permissions(documentId: string) {
       return request<DataResponse<DocumentPermission[]>>(`/documents/${documentId}/permissions`);
     },
