@@ -494,3 +494,31 @@ def test_upload_effective_to_before_effective_from_returns_422(
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "VALIDATION_ERROR"
     assert not list(upload_storage.root_path.rglob("*.pdf"))
+
+
+def test_upload_response_names_go_to_admin_only(
+    api_client: TestClient,
+    upload_storage: LocalFileStorage,
+    make_user: Any,
+    make_auth_headers: Any,
+) -> None:
+    """BR-4 option (a): a Manager's upload response has no name keys; an Admin's has them."""
+    manager = make_user(role=UserRole.MANAGER, full_name="Manager An Danh")
+    admin = make_user(role=UserRole.ADMIN, full_name="Admin Co Ten")
+
+    as_manager = upload_request(api_client, headers=make_auth_headers(manager))
+    as_admin = upload_request(
+        api_client, headers=make_auth_headers(admin), content=PDF_BYTES + b"\n%admin"
+    )
+
+    assert as_manager.status_code == as_admin.status_code == 202
+    managers = as_manager.json()["data"]
+    assert managers["uploaded_by_me"] is True
+    assert "uploaded_by_name" not in managers and "department_name" not in managers
+    assert "Manager An Danh" not in as_manager.text
+    admins = as_admin.json()["data"]
+    assert (admins["uploaded_by_me"], admins["uploaded_by_name"], admins["department_name"]) == (
+        True,
+        "Admin Co Ten",
+        None,
+    )

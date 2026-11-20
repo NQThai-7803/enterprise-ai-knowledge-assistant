@@ -11,8 +11,15 @@ from app.api.dependencies import enforce_feedback_rate_limit, get_audit_context,
 from app.db.session import get_db_session
 from app.models import FeedbackRating, User
 from app.schemas.common import DEFAULT_PAGE, DataResponse, ListResponse
-from app.schemas.feedback import FeedbackRead, FeedbackReportItem, FeedbackUpsertRequest
+from app.schemas.feedback import (
+    AdminFeedbackReportItem,
+    FeedbackRead,
+    FeedbackReportItem,
+    FeedbackUpsertRequest,
+    feedback_report_view,
+)
 from app.services.audit_service import AuditContext
+from app.services.display_names import admin_display_names
 from app.services.feedback_service import FeedbackService
 
 router = APIRouter(tags=["Feedback"])
@@ -42,7 +49,11 @@ async def upsert_message_feedback(
     return DataResponse[FeedbackRead](data=FeedbackRead.from_row(feedback), meta=None)
 
 
-@router.get("/feedback", response_model=ListResponse[FeedbackReportItem])
+# BR-4 option (a): an Admin caller gets the names, a Manager the item without those keys.
+FeedbackReportView = FeedbackReportItem | AdminFeedbackReportItem
+
+
+@router.get("/feedback", response_model=ListResponse[FeedbackReportView])
 async def list_feedback_report(
     current_user: Annotated[User, Depends(get_current_user)],
     session: Annotated[AsyncSession, Depends(get_db_session)],
@@ -53,7 +64,7 @@ async def list_feedback_report(
     date_to: datetime | None = None,
     department_id: UUID | None = None,
     user_id: UUID | None = None,
-) -> ListResponse[FeedbackReportItem]:
+) -> ListResponse[FeedbackReportView]:
     report = await FeedbackService(session).list_feedback_report(
         current_user=current_user,
         page=page,
@@ -64,7 +75,13 @@ async def list_feedback_report(
         department_id=department_id,
         user_id=user_id,
     )
-    return ListResponse[FeedbackReportItem](
-        data=[FeedbackReportItem.from_row(row) for row in report.rows],
+    names = await admin_display_names(
+        session,
+        current_user=current_user,
+        user_ids=[row.user_id for row in report.rows],
+        department_ids=[row.department_id for row in report.rows],
+    )
+    return ListResponse[FeedbackReportView](
+        data=[feedback_report_view(row, names=names) for row in report.rows],
         meta=report.pagination,
     )

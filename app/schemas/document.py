@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
@@ -13,6 +14,9 @@ from app.models import (
     DocumentPermissionLevel,
     DocumentStatus,
 )
+
+if TYPE_CHECKING:
+    from app.services.display_names import DisplayNames
 
 
 class DocumentUploadMetadata(BaseModel):
@@ -85,10 +89,14 @@ class DocumentSafeResponse(BaseModel):
     uploaded_by: UUID
     created_at: datetime
     updated_at: datetime
+    # BR-4: whether the caller uploaded this Document; for every caller who can view it.
+    uploaded_by_me: bool = False
 
     @classmethod
-    def from_document(cls, document: Document):
-        return cls.model_validate(document)
+    def from_document(cls, document: Document, *, current_user_id: UUID | None = None):
+        view = cls.model_validate(document)
+        view.uploaded_by_me = document.uploaded_by == current_user_id
+        return view
 
 
 class DocumentUploadResponse(DocumentSafeResponse):
@@ -209,3 +217,29 @@ class DocumentPermissionResponse(BaseModel):
         document_permission: DocumentPermission,
     ) -> DocumentPermissionResponse:
         return cls.model_validate(document_permission)
+
+
+class AdminDocumentResponse(DocumentSafeResponse):
+    """BR-4 option (a): the names an Admin caller sees. Other roles get DocumentSafeResponse
+    without these keys; both fields are required so a response without them never parses as
+    this model."""
+
+    uploaded_by_name: str | None
+    department_name: str | None
+
+
+def document_view(
+    cls: type[DocumentSafeResponse],
+    document: Document,
+    *,
+    current_user_id: UUID,
+    names: DisplayNames | None,
+) -> DocumentSafeResponse:
+    view = cls.from_document(document, current_user_id=current_user_id)
+    if names is None:
+        return view
+    return AdminDocumentResponse(
+        **view.model_dump(),
+        uploaded_by_name=names.user(document.uploaded_by),
+        department_name=names.department(document.department_id),
+    )

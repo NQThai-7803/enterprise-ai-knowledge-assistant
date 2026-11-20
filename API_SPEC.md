@@ -405,9 +405,15 @@ Document response fields (upload `202`, `GET /documents` items, `GET /documents/
   "department_id": "uuid",
   "uploaded_by": "uuid",
   "created_at": "2026-11-20T08:00:00Z",
-  "updated_at": "2026-11-20T08:00:00Z"
+  "updated_at": "2026-11-20T08:00:00Z",
+  "uploaded_by_me": false
 }
 ```
+
+Names (BR-4, option a; `RBAC.md` "BR-4 names in responses"):
+
+- `uploaded_by_me` (boolean): whether the caller uploaded the Document; for every caller who can view it.
+- `uploaded_by_name` (uploader's full name) and `department_name` (the Document's Department, `null` without one) are returned **only to an Admin caller**. For Manager and Staff the two keys are absent, not `null`, so a response does not reveal that a name exists. This holds for upload `202`, `GET /documents`, `GET /documents/{document_id}` and `PATCH /documents/{document_id}`. Admin example: `"uploaded_by": "uuid", "uploaded_by_me": false, "uploaded_by_name": "Nguyễn Văn A", "department_name": "Nhân sự"`.
 
 Duplicate detection is scoped to the same uploader and checksum where `is_deleted = false`.
 
@@ -419,7 +425,7 @@ Query parameters:
 
 - `page`, default `1`, must be `>= 1`.
 - `page_size`, default `20`, must be between `1` and `100`.
-- `search`, searches `title`, `original_filename`, and `description` (case-insensitive substring), max 200 characters. It does not search `document_code`.
+- `search`, searches `title`, `original_filename`, `description` and `document_code` (case-insensitive substring, so a prefix of a code matches too), max 200 characters. It applies inside the access filter: a Document the caller cannot view is never found, by code or otherwise.
 - `status`: `UPLOADED`, `PROCESSING`, `READY`, `FAILED`, or `ARCHIVED`.
 - `access_scope`: `PRIVATE`, `DEPARTMENT`, or `ORGANIZATION`.
 - `department_id`: Department UUID filter.
@@ -553,6 +559,18 @@ Behavior:
     "citations": [], "created_at": "2026-11-20T08:00:00Z", "grounding_status": "NO_ANSWER" }
   ```
 - **Sentences naming an unverified part (BR-3).** An `ANSWERED` answer may contain sentences that name a part of the question the documents do not confirm. The prompt asks for the fixed form `Chưa xác minh được từ tài liệu bạn được phép truy cập: …` (English question: `Could not be verified from the documents you can access: …`). In the default answer path (simple mode, s1) the model writes these sentences, so the wording after the prefix, and occasionally the prefix itself, may vary. The server recognises a sentence containing `chưa xác minh được`, `không xác minh được` or `could not be verified` (case- and accent-insensitive), never validates it as a claim, and removes its source markers, so it carries no citation number. The exception is a sentence holding a number the question does not: it stays a claim with its marker. The legacy compound path (`RAG_COMPOUND_PARTIAL_ANSWER_ENABLED`, off) builds the Vietnamese sentence itself, `Chưa xác minh được từ tài liệu bạn được phép truy cập: <part>.`. A client may style such a sentence differently, but must still show it.
+- **`segments` (BR-3 follow-up, migration `20261120_0014`).** Every ASSISTANT message stored with an `ANSWERED` status carries `segments`: the displayed `content` cut into sentences by the same step and rule as above, each `{ "kind": "verified" | "unverified", "text": ..., "citation_ids": [...] }`. `text` is the sentence without its citation numbers; `citation_ids` are the `citation_order` values of the citations it shows (only numbers that are real citations of the message; any other bracketed number stays in `text`). `content` is unchanged. `segments` is `null` on USER messages, on `NO_ANSWER` messages (their `content` is the fixed no-answer text) and on answers stored before that migration. `POST .../messages` (`assistant_message.segments`) and the stream's `message.completed` (`segments`) return the same value. Example:
+
+  ```json
+  { "role": "ASSISTANT", "grounding_status": "ANSWERED",
+    "content": "Nhân viên được nghỉ 12 ngày phép năm. [1] Chưa xác minh được từ tài liệu bạn được phép truy cập: mức phụ cấp.",
+    "segments": [
+      { "kind": "verified", "text": "Nhân viên được nghỉ 12 ngày phép năm.", "citation_ids": [1] },
+      { "kind": "unverified", "text": "Chưa xác minh được từ tài liệu bạn được phép truy cập: mức phụ cấp.", "citation_ids": [] }
+    ] }
+  ```
+
+  The recognition is a heuristic on three phrases; it is the same one the server uses to decide which sentences it validates.
 - Historical citation metadata may be omitted if the current User no longer has access to the cited Document.
 - The historical Assistant answer text is not redacted in TASK-020.
 - `retrieval_query`, token usage, prompt, vectors, scores, storage keys, permission metadata, and internal source markers are not returned.
@@ -861,6 +879,8 @@ Response:
 ```
 
 The report does not return Assistant answers, User questions, session titles, Chat history, SYSTEM messages, retrieval query, token usage, prompts, citation excerpts, Document titles, storage keys, or permission metadata.
+
+Names (BR-4, option a): an Admin caller's items also carry `user_full_name` (the submitter) and `department_name` (`null` without a Department). A Manager's items have neither key.
 
 ## 10. Audit logs
 

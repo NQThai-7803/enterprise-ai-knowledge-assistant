@@ -358,6 +358,7 @@ class FakeMessageService:
             completion_tokens=kwargs["completion_tokens"],
             created_at=kwargs["created_at"],
             grounding_status=kwargs.get("grounding_status"),
+            segments=kwargs.get("segments"),
         )
 
 

@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models import FeedbackRating
 from app.repositories.feedback_repository import FeedbackReportRow, FeedbackRow
+
+if TYPE_CHECKING:
+    from app.services.display_names import DisplayNames
 
 
 class FeedbackUpsertRequest(BaseModel):
@@ -66,3 +70,24 @@ class FeedbackReportItem(BaseModel):
             created_at=row.created_at,
             updated_at=row.updated_at,
         )
+
+
+class AdminFeedbackReportItem(FeedbackReportItem):
+    """BR-4 option (a): names for an Admin caller only; required so that a Manager's item
+    (without these keys) never parses as this model."""
+
+    user_full_name: str | None
+    department_name: str | None
+
+
+def feedback_report_view(
+    row: FeedbackReportRow, *, names: DisplayNames | None
+) -> FeedbackReportItem:
+    item = FeedbackReportItem.from_row(row)
+    if names is None:
+        return item
+    return AdminFeedbackReportItem(
+        **item.model_dump(),
+        user_full_name=names.user(row.user_id),
+        department_name=names.department(row.department_id),
+    )

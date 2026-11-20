@@ -53,6 +53,7 @@ async def create_document_record(
     department_id: uuid.UUID | None = None,
     storage_key: str | None = None,
     is_deleted: bool = False,
+    document_code: str | None = None,
 ) -> Document:
     async with session_factory() as session:
         document = Document(
@@ -68,6 +69,7 @@ async def create_document_record(
             department_id=department_id,
             uploaded_by=uploader.id,
             is_deleted=is_deleted,
+            document_code=document_code,
         )
         session.add(document)
         await session.commit()
@@ -466,3 +468,74 @@ def test_document_preview_is_inline_with_the_download_access_rules(
     assert gone.status_code == 410
     assert gone.json()["error"]["code"] == "DOCUMENT_FILE_UNAVAILABLE"
     assert api_client.get(url).status_code == 401
+
+
+def test_search_by_document_code_stays_inside_the_access_filter(
+    api_client: TestClient,
+    documents_storage: LocalFileStorage,
+    async_session_factory_for_tests: async_sessionmaker[AsyncSession],
+    make_user: Callable[..., User],
+    make_auth_headers: Callable[[User], dict[str, str]],
+) -> None:
+    """BR-1 item 4: a code matches by prefix or substring, any case; never outside access."""
+    admin = make_user(role=UserRole.ADMIN)
+    staff = make_user(role=UserRole.STAFF)
+    shared = make_document(async_session_factory_for_tests, uploader=admin, title="Shared",
+                           access_scope=DocumentAccessScope.ORGANIZATION,
+                           document_code="ND-HR-007")  # fmt: skip
+    hidden = make_document(async_session_factory_for_tests, uploader=admin, title="Hidden",
+                           document_code="ND-HR-008")  # fmt: skip
+
+    def ids(user: User, search: str) -> list[str]:
+        response = api_client.get(
+            "/api/v1/documents", params={"search": search}, headers=make_auth_headers(user)
+        )
+        assert response.status_code == 200
+        return [item["id"] for item in response.json()["data"]]
+
+    assert ids(staff, "nd-hr") == [str(shared.id)]
+    assert ids(staff, "HR-008") == []
+    assert ids(admin, "hr-008") == [str(hidden.id)]
+    assert set(ids(admin, "ND-HR")) == {str(shared.id), str(hidden.id)}
+
+
+def test_names_reach_admin_only_and_uploaded_by_me_every_viewer(
+    api_client: TestClient,
+    documents_storage: LocalFileStorage,
+    async_session_factory_for_tests: async_sessionmaker[AsyncSession],
+    make_department: Callable[..., Any],
+    make_user: Callable[..., User],
+    make_auth_headers: Callable[[User], dict[str, str]],
+) -> None:
+    """BR-4 option (a): Staff and Manager never get another user's or a Department's name,
+    not even the key; Admin gets both; uploaded_by_me for every viewer."""
+    department = make_department(name=f"Phong ban an {uuid.uuid4().hex[:6]}")
+    uploader_name = f"Nguoi tai len an {uuid.uuid4().hex[:6]}"
+    manager = make_user(role=UserRole.MANAGER, department_id=department.id, full_name=uploader_name)
+    staff = make_user(role=UserRole.STAFF, department_id=department.id)
+    admin = make_user(role=UserRole.ADMIN)
+    document = make_document(async_session_factory_for_tests, uploader=manager,
+                             access_scope=DocumentAccessScope.DEPARTMENT,
+                             department_id=department.id)  # fmt: skip
+    url = f"/api/v1/documents/{document.id}"
+
+    def bodies(user: User) -> list[tuple[dict[str, Any], str]]:
+        headers = make_auth_headers(user)
+        listed = api_client.get("/api/v1/documents", headers=headers)
+        detail = api_client.get(url, headers=headers)
+        items = [i for i in listed.json()["data"] if i["id"] == str(document.id)]
+        return [(items[0], listed.text), (detail.json()["data"], detail.text)]
+
+    patched = api_client.patch(url, json={"title": "Renamed"}, headers=make_auth_headers(manager))
+    assert patched.status_code == 200
+    non_admin = [(body, text, False) for body, text in bodies(staff)]
+    non_admin += [(body, text, True) for body, text in bodies(manager)]
+    non_admin.append((patched.json()["data"], patched.text, True))
+    for body, text, mine in non_admin:
+        assert "uploaded_by_name" not in body and "department_name" not in body
+        assert uploader_name not in text and department.name not in text
+        assert body["uploaded_by_me"] is mine
+    for body, _ in bodies(admin):
+        assert body["uploaded_by_name"] == uploader_name
+        assert body["department_name"] == department.name
+        assert body["uploaded_by_me"] is False
