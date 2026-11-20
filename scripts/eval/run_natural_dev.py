@@ -150,6 +150,7 @@ def grade_case(
         "answer": case.get("answer"),
         "passed": bool(passed),
         "false_answer": bool(false_answer),
+        **{field: case.get(field) for field in branch_counters.ROUTE_FIELDS},
         "leak_reasons": leak_reasons,
         "proxy": {
             "facts": facts,
@@ -208,6 +209,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         frozen=inputs["frozen"],
         all_items=inputs["items"],
         label="natural-dev-v1",
+        route_reader=lambda: branch_counters.read(base_url),
     )
     raw = {c["id"]: c for c in json.loads(answers.read_text(encoding="utf-8"))["cases"]}
     keys = inputs["keys"]

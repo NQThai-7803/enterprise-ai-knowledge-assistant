@@ -28,6 +28,8 @@ from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from scripts.eval import branch_counters  # noqa: E402
+from scripts.eval.branch_counters import coarse_route  # noqa: E402
 from scripts.eval.value_grading import regrade  # noqa: E402
 
 
@@ -128,7 +130,7 @@ def grade(reference, v2_manifest, run_manifest, run, drafts=frozenset()):
                 "latency_ms": case.get("latency_ms"),
                 "execution_status": case.get("execution_status"),
                 "attempts": case.get("attempts", 1),
-                "answer_route": case.get("answer_route"),
+                **{field: case.get(field) for field in branch_counters.ROUTE_FIELDS},
                 "evidence_similarities": case.get("evidence_similarities"),
             }
         )
@@ -148,11 +150,15 @@ def grade(reference, v2_manifest, run_manifest, run, drafts=frozenset()):
         # Server-built answers vs the LLM path; None = the stack did not report the route.
         "by_route": {
             str(route): {
-                "cases": sum(r["answer_route"] == route for r in scored),
-                "proxy_match": sum(r["proxy_match"] for r in scored if r["answer_route"] == route),
-                "value_match": sum(r["value_match"] for r in scored if r["answer_route"] == route),
+                "cases": sum(coarse_route(r["answer_route"]) == route for r in scored),
+                "proxy_match": sum(
+                    r["proxy_match"] for r in scored if coarse_route(r["answer_route"]) == route
+                ),
+                "value_match": sum(
+                    r["value_match"] for r in scored if coarse_route(r["answer_route"]) == route
+                ),
             }
-            for route in sorted({r["answer_route"] for r in scored}, key=str)
+            for route in sorted({coarse_route(r["answer_route"]) for r in scored}, key=str)
         },
         "note": (
             "proxy vs TASK-035.3B manual grade (status + cited document codes); "

@@ -144,6 +144,7 @@ def grade_cases(
             "cited_codes": cited_codes(case, codes),
             "latency_ms": case.get("latency_ms"),
             "answer": case.get("answer"),
+            **{field: case.get(field) for field in branch_counters.ROUTE_FIELDS},
         }
         if case["kind"] == NEGATIVE:
             row["leak_reasons"] = leak_reasons(case, item, documents[item["document"]], codes)
@@ -285,8 +286,13 @@ class _Admin:
                 )
 
 
-def _asker(base_url: str, passwords: Mapping[str, str]) -> Callable[[str, str], dict[str, Any]]:
+def _asker(
+    base_url: str,
+    passwords: Mapping[str, str],
+    route_reader: Callable[[], dict[str, int] | None] | None = None,
+) -> Callable[[str, str], dict[str, Any]]:
     clients: dict[str, EvalClient] = {}
+    read = route_reader or (lambda: branch_counters.read(base_url))
 
     def ask(role: str, question: str) -> dict[str, Any]:
         client = clients.setdefault(
@@ -296,7 +302,9 @@ def _asker(base_url: str, passwords: Mapping[str, str]) -> Callable[[str, str], 
         for _ in range(2):
             try:
                 session_id = client.create_session("RBAC dev")
+                before = read()
                 result = extract(client.ask(session_id, question))
+                result.update(branch_counters.route_fields(before, read()))
             except EvalInfraError:
                 result = {
                     "status": INFRA_ERROR,

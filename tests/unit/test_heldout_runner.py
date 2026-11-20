@@ -88,3 +88,36 @@ def test_each_item_is_asked_with_its_role(tmp_path: Path, monkeypatch) -> None:
     payload = json.loads(output.read_text(encoding="utf-8"))
     assert [c["role"] for c in payload["cases"]] == ["staff", "manager"]
     assert "password" not in output.read_text(encoding="utf-8").casefold()
+
+
+def test_each_answer_records_its_route_when_a_counter_reader_is_given(
+    tmp_path: Path, monkeypatch
+) -> None:
+    heldout, lock = _write_set(tmp_path)
+    monkeypatch.setattr(run_heldout, "verify_frozen", lambda: {"sha256": "x", "version": "t"})
+    monkeypatch.setattr(run_heldout, "load_items", lambda: run_heldout.yaml_items(heldout))
+    reads = iter(
+        [
+            {"answer_route_det_x": 0},
+            {"answer_route_det_x": 1},
+            {"answer_route_det_x": 1, "no_answer_no_selected_sources": 0},
+            {"answer_route_det_x": 1, "answer_route_refusal_gate": 1,
+             "no_answer_no_selected_sources": 1},
+        ]
+    )  # fmt: skip
+    output = tmp_path / "out.json"
+    run_heldout.run(
+        output=output,
+        selected=set(),
+        resume=False,
+        base_url="http://x",
+        passwords={},
+        delay_seconds=0.0,
+        client_factory=lambda role: RoleClient(role, []),
+        route_reader=lambda: next(reads),
+    )
+    cases = json.loads(output.read_text(encoding="utf-8"))["cases"]
+    assert [(c["answer_route"], c["no_answer_reasons"]) for c in cases] == [
+        ("det_x", []),
+        ("refusal_gate", ["no_selected_sources"]),
+    ]

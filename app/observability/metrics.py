@@ -69,6 +69,9 @@ ANSWER_BRANCHES = (
     BRANCH_SIMPLE_CLAIM_UNBOUND,
     *(f"simple_no_answer_{reason}" for reason in SIMPLE_NO_ANSWER_REASONS),
 )
+# DEC-041: one answer_route_<route> per persisted answer (the route names come from the code),
+# and no_answer_<reason> per no-answer diagnostic; listed once recorded.
+RECORDED_BRANCH_PREFIXES = ("answer_route_", "no_answer_")
 _UUID_SEGMENT_PATTERN = re.compile(
     r"(?<=/)[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-"
     r"[0-9a-fA-F]{4}-[0-9a-fA-F]{12}(?=/|$)"
@@ -140,9 +143,16 @@ class MetricsRegistry:
             return dict(sorted(self._similarity_counts.items()))
 
     def answer_branch_counts(self) -> dict[str, int]:
-        """Every known branch, at 0 when unused, so a missing line means an older stack."""
+        """Every known branch, at 0 when unused, so a missing line means an older stack; then
+        the route and no-answer reason branches recorded so far."""
         with self._lock:
-            return {branch: self._answer_branch_counts[branch] for branch in ANSWER_BRANCHES}
+            known = {branch: self._answer_branch_counts[branch] for branch in ANSWER_BRANCHES}
+            recorded = {
+                branch: count
+                for branch, count in sorted(self._answer_branch_counts.items())
+                if branch.startswith(RECORDED_BRANCH_PREFIXES)
+            }
+            return known | recorded
 
     def http_snapshots(self) -> list[HTTPMetricSnapshot]:
         with self._lock:

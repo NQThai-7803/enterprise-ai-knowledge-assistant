@@ -45,3 +45,41 @@ def test_similarity_buckets_are_read_per_route_with_every_cosine_of_a_case() -> 
     assert branch_counters.similarities(delta) == [0.79, 0.83, 0.83]
     assert branch_counters.similarities(branch_counters.delta(before, before)) == []
     assert branch_counters.similarities(None) is None
+
+
+def test_the_api_route_label_wins_and_an_older_api_falls_back_to_two_routes() -> None:
+    assert branch_counters.answer_route({"answer_route_det_overtime_rate": 1, "route_llm": 0}) == (
+        "det_overtime_rate"
+    )
+    assert branch_counters.answer_route({"answer_route_llm_simple": 1, "route_llm": 1}) == (
+        "llm_simple"
+    )
+    assert branch_counters.answer_route({"route_deterministic": 1, "route_llm": 0}) == (
+        "deterministic"
+    )
+    assert branch_counters.answer_route({"answer_route_llm_simple": 2}) is None  # two answers
+    assert branch_counters.answer_route(None) is None
+
+
+def test_coarse_route_keeps_the_two_routes_the_uat_reports_split_by() -> None:
+    assert [
+        branch_counters.coarse_route(r)
+        for r in ("det_x", "repair_y", "deterministic", "llm_simple", "refusal_gate", "llm", None)
+    ] == ["deterministic", "deterministic", "deterministic", "llm", "llm", "llm", None]
+
+
+def test_route_fields_hold_the_route_and_every_no_answer_reason_of_one_question() -> None:
+    before = {"answer_route_llm_simple": 4, "no_answer_simple_claim_insufficient": 1}
+    after = {
+        "answer_route_llm_simple": 5,
+        "no_answer_simple_claim_insufficient": 2,
+        "no_answer_simple_llm_refused": 1,
+    }
+    assert branch_counters.route_fields(before, after) == {
+        "answer_route": "llm_simple",
+        "no_answer_reasons": ["simple_claim_insufficient", "simple_llm_refused"],
+    }
+    assert branch_counters.route_fields(None, after) == {
+        "answer_route": None,
+        "no_answer_reasons": None,
+    }

@@ -599,6 +599,10 @@ class _AnswerDraft:
     llm_refused: bool = False
     # The answer text came from a server-built (local) generation, not from the LLM.
     deterministic: bool = False
+    # How the answer was produced, counted as answer_route_<route> (DEC-041): det_<builder>
+    # (deterministic route before any LLM), repair_<builder> (deterministic after the LLM),
+    # llm_legacy, llm_simple, or refusal_gate (NO_ANSWER before any LLM call).
+    route: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -767,10 +771,21 @@ class GroundedAnswerService:
         conversation_context: ConversationContext,
     ) -> _AnswerDraft:
         grounding_question = conversation_context.resolved_question.standalone_question
-        if self.settings.rag_answer_mode != "legacy":
+        if self.settings.rag_answer_mode == "simple":
             return await self._simple_answer_draft(
                 current_user=current_user, grounding_question=grounding_question
             )
+        draft = await self._legacy_answer_draft(
+            current_user=current_user, grounding_question=grounding_question
+        )
+        return draft if draft.route else replace(draft, route="llm_legacy")
+
+    async def _legacy_answer_draft(
+        self, *, current_user: User, grounding_question: str
+    ) -> _AnswerDraft:
+        """The legacy pipeline. In hybrid mode (DEC-041, off by default) it stops at the
+        deterministic route: a question no route answers goes to the simple answer path."""
+        hybrid = self.settings.rag_answer_mode == "hybrid"
         information_needs = information_need_queries(grounding_question)
         retrieval_hits = ()
         retrieval_ms = 0
@@ -876,26 +891,45 @@ class GroundedAnswerService:
                 source_registry=source_registry,
                 selected_context_count=selected_context.selected_chunk_count,
             )
+        if hybrid and not source_registry.sources:
+            return await self._simple_answer_draft(
+                current_user=current_user, grounding_question=grounding_question
+            )
         if not source_registry.sources:
             if self.settings.rag_diagnostics_enabled:
                 _log_no_answer_diagnostics(reason="no_selected_sources")
-            return _no_answer_draft(self.settings.chat_no_answer_message)
-        if _reason_evidence_is_missing(
+            return replace(
+                _no_answer_draft(self.settings.chat_no_answer_message), route="refusal_gate"
+            )
+        reason_missing = _reason_evidence_is_missing(
             question=grounding_question,
             source_registry=source_registry,
-        ):
+        )
+        if reason_missing and not hybrid:
             if self.settings.rag_diagnostics_enabled:
                 _log_no_answer_diagnostics(reason="reason_evidence_missing")
-            return _no_answer_draft(
-                self.settings.chat_no_answer_message,
-                selected_chunk_count=len(source_registry.sources),
+            return replace(
+                _no_answer_draft(
+                    self.settings.chat_no_answer_message,
+                    selected_chunk_count=len(source_registry.sources),
+                ),
+                route="refusal_gate",
             )
         structured_value_draft = None
-        if len(information_needs) <= 1 or _leave_incident_time_intent(grounding_question):
+        if not reason_missing and (
+            len(information_needs) <= 1 or _leave_incident_time_intent(grounding_question)
+        ):
             structured_value_draft = await self._structured_value_answer_draft(
                 question=grounding_question,
                 source_registry=source_registry,
                 current_user=current_user,
+            )
+        if hybrid and (
+            structured_value_draft is None
+            or structured_value_draft.grounding_status != GroundingStatus.ANSWERED
+        ):
+            return await self._simple_answer_draft(
+                current_user=current_user, grounding_question=grounding_question
             )
         if structured_value_draft is not None:
             return structured_value_draft
@@ -1561,6 +1595,7 @@ class GroundedAnswerService:
             prompt_tokens=generation.prompt_tokens,
             completion_tokens=generation.completion_tokens,
             citations=validated.citations,
+            route="llm_simple",
         )
 
     async def _simple_claim_similarity(
@@ -1599,8 +1634,11 @@ class GroundedAnswerService:
         GLOBAL_METRICS.record_answer_branch(f"simple_no_answer_{reason}")
         if self.settings.rag_diagnostics_enabled:
             _log_no_answer_diagnostics(reason=f"simple_{reason}")
-        return _no_answer_draft(
-            self.settings.chat_no_answer_message, selected_chunk_count=selected_chunk_count
+        return replace(
+            _no_answer_draft(
+                self.settings.chat_no_answer_message, selected_chunk_count=selected_chunk_count
+            ),
+            route="refusal_gate" if reason == "no_sources" else "llm_simple",
         )
 
     async def _compound_draft_with_claim_repair(
@@ -2008,7 +2046,7 @@ class GroundedAnswerService:
         if generation is None:
             return None
         try:
-            return await self._draft_from_generation(
+            draft = await self._draft_from_generation(
                 generation,
                 source_registry=source_registry,
                 current_user=current_user,
@@ -2016,6 +2054,7 @@ class GroundedAnswerService:
             )
         except CitationValidationFailedApplicationError:
             return None
+        return replace(draft, route=f"det_{_local_route_name(generation)}")
 
     async def _draft_from_generation_or_structured_repair(
         self,
@@ -2962,6 +3001,11 @@ class GroundedAnswerService:
             completion_tokens=generation.completion_tokens,
             citations=validated.citations,
             deterministic=generation.provider == "local",
+            route=(
+                f"repair_{_local_route_name(generation)}"
+                if generation.provider == "local"
+                else None
+            ),
         )
 
     async def _persist_message_pair(
@@ -3043,6 +3087,7 @@ class GroundedAnswerService:
         GLOBAL_METRICS.record_answer_branch(
             BRANCH_ROUTE_DETERMINISTIC if draft.deterministic else BRANCH_ROUTE_LLM
         )
+        GLOBAL_METRICS.record_answer_branch(f"answer_route_{draft.route or 'unknown'}")
         return ChatAnswerResult(
             session_id=session_id,
             user_message=_detach_message(user_message),
@@ -8231,6 +8276,8 @@ def _log_no_answer_diagnostics(
     *,
     reason: str,
 ) -> None:
+    # Counted per reason too, so an eval runner can read it per question (DEC-041).
+    GLOBAL_METRICS.record_answer_branch(f"no_answer_{reason}")
     logger.warning(
         "RAG no-answer diagnostics: reason=%s",
         reason,
@@ -8268,59 +8315,53 @@ def _log_generation_latency_diagnostics(
     )
 
 
+def _local_route_name(generation: LLMGenerationResult) -> str:
+    """The deterministic route named in a local generation's model, e.g. overtime_rate."""
+    return generation.model.partition(":")[2] or generation.model.removeprefix("local-")
+
+
 def _structured_value_repair_generation(
     *,
     question: str,
     source_registry: PromptSourceRegistry,
     condition_route_mode: str = "legacy",
 ) -> LLMGenerationResult | None:
-    structured_answer = _structured_overtime_rate_answer(
-        question=question,
-        source_registry=source_registry,
-    )
+    route = ""
+
+    def attempt(
+        builder: Callable[..., tuple[str, str | tuple[str, ...]] | None], **options: str
+    ) -> tuple[str, str | tuple[str, ...]] | None:
+        # Names the route that answered, for the answer_route counter (DEC-041); same calls.
+        nonlocal route
+        answer = builder(question=question, source_registry=source_registry, **options)
+        if answer is not None:
+            name = getattr(builder, "__name__", "unnamed")
+            route = name.removeprefix("_structured_").removesuffix("_answer")
+        return answer
+
+    structured_answer = attempt(_structured_overtime_rate_answer)
     if structured_answer is None and _is_overtime_rate_question(question):
         # A percentage from a different day-type row is not a fallback answer.
         # Preserve NO_ANSWER when the selected evidence has no matching OT row.
         return None
     if structured_answer is None:
-        structured_answer = _structured_performance_bonus_range_answer(
-            question=question,
-            source_registry=source_registry,
-        )
+        structured_answer = attempt(_structured_performance_bonus_range_answer)
     if structured_answer is None and _is_performance_bonus_range_question(question):
         # A range from a different rating row is not an answer. Do not let the
         # generic value copier collapse a locale-formatted decimal range.
         return None
     if structured_answer is None:
-        structured_answer = _structured_salary_band_answer(
-            question=question,
-            source_registry=source_registry,
-        )
+        structured_answer = attempt(_structured_salary_band_answer)
     if structured_answer is None:
-        structured_answer = _structured_conditional_allowance_answer(
-            question=question,
-            source_registry=source_registry,
-        )
+        structured_answer = attempt(_structured_conditional_allowance_answer)
     if structured_answer is None:
-        structured_answer = _structured_allowance_descriptor_answer(
-            question=question,
-            source_registry=source_registry,
-        )
+        structured_answer = attempt(_structured_allowance_descriptor_answer)
     if structured_answer is None:
-        structured_answer = _structured_named_monetary_benefit_answer(
-            question=question,
-            source_registry=source_registry,
-        )
+        structured_answer = attempt(_structured_named_monetary_benefit_answer)
     if structured_answer is None:
-        structured_answer = _structured_proportional_leave_answer(
-            question=question,
-            source_registry=source_registry,
-        )
+        structured_answer = attempt(_structured_proportional_leave_answer)
     if structured_answer is None and annual_leave_relation_intent(question):
-        structured_answer = _structured_annual_leave_relation_answer(
-            question=question,
-            source_registry=source_registry,
-        )
+        structured_answer = attempt(_structured_annual_leave_relation_answer)
         if structured_answer is None:
             # A neighboring notice, base-allocation, or seniority number is
             # never a fallback for a missing requested leave relation.
@@ -8335,55 +8376,25 @@ def _structured_value_repair_generation(
     ):
         return None
     if structured_answer is None:
-        structured_answer = _structured_role_person_answer(
-            question=question,
-            source_registry=source_registry,
-        )
+        structured_answer = attempt(_structured_role_person_answer)
     if structured_answer is None:
-        structured_answer = _structured_credential_sharing_answer(
-            question=question,
-            source_registry=source_registry,
-        )
+        structured_answer = attempt(_structured_credential_sharing_answer)
     if structured_answer is None:
-        structured_answer = _structured_consultation_session_answer(
-            question=question,
-            source_registry=source_registry,
-        )
+        structured_answer = attempt(_structured_consultation_session_answer)
     if structured_answer is None:
-        structured_answer = _structured_public_ai_input_answer(
-            question=question,
-            source_registry=source_registry,
-        )
+        structured_answer = attempt(_structured_public_ai_input_answer)
     if structured_answer is None:
-        structured_answer = _structured_remote_accident_answer(
-            question=question,
-            source_registry=source_registry,
-        )
+        structured_answer = attempt(_structured_remote_accident_answer)
     if structured_answer is None:
-        structured_answer = _structured_leave_incident_time_answer(
-            question=question,
-            source_registry=source_registry,
-        )
+        structured_answer = attempt(_structured_leave_incident_time_answer)
     if structured_answer is None:
-        structured_answer = _structured_example_expense_amount_answer(
-            question=question,
-            source_registry=source_registry,
-        )
+        structured_answer = attempt(_structured_example_expense_amount_answer)
     if structured_answer is None:
-        structured_answer = _structured_leave_approval_workflow_answer(
-            question=question,
-            source_registry=source_registry,
-        )
+        structured_answer = attempt(_structured_leave_approval_workflow_answer)
     if structured_answer is None:
-        structured_answer = _structured_attendance_policy_answer(
-            question=question,
-            source_registry=source_registry,
-        )
+        structured_answer = attempt(_structured_attendance_policy_answer)
     if structured_answer is None:
-        structured_answer = _structured_named_topic_answer(
-            question=question,
-            source_registry=source_registry,
-        )
+        structured_answer = attempt(_structured_named_topic_answer)
     # Resolve clock fields before the generic condition copier. A schedule row
     # can mention durations and a start window before the requested deadline or
     # corresponding end time, and the wider copier would otherwise win first.
@@ -8391,56 +8402,25 @@ def _structured_value_repair_generation(
         "TIME",
         "TIME_RANGE",
     }:
-        structured_answer = _structured_time_range_answer(
-            question=question,
-            source_registry=source_registry,
-        )
+        structured_answer = attempt(_structured_time_range_answer)
     if structured_answer is None:
-        structured_answer = _structured_leave_duration_answer(
-            question=question,
-            source_registry=source_registry,
-        )
+        structured_answer = attempt(_structured_leave_duration_answer)
     if structured_answer is None:
-        structured_answer = _structured_leave_policy_clause_answer(
-            question=question,
-            source_registry=source_registry,
-        )
+        structured_answer = attempt(_structured_leave_policy_clause_answer)
     if structured_answer is None:
-        structured_answer = _structured_condition_value_answer(
-            question=question,
-            source_registry=source_registry,
-            mode=condition_route_mode,
-        )
+        structured_answer = attempt(_structured_condition_value_answer, mode=condition_route_mode)
     if structured_answer is None:
-        structured_answer = _structured_grouped_duration_answer(
-            question=question,
-            source_registry=source_registry,
-        )
+        structured_answer = attempt(_structured_grouped_duration_answer)
     if structured_answer is None:
-        structured_answer = _structured_first_day_eligibility_answer(
-            question=question,
-            source_registry=source_registry,
-        )
+        structured_answer = attempt(_structured_first_day_eligibility_answer)
     if structured_answer is None:
-        structured_answer = _structured_eligibility_condition_answer(
-            question=question,
-            source_registry=source_registry,
-        )
+        structured_answer = attempt(_structured_eligibility_condition_answer)
     if structured_answer is None:
-        structured_answer = _structured_time_range_answer(
-            question=question,
-            source_registry=source_registry,
-        )
+        structured_answer = attempt(_structured_time_range_answer)
     if structured_answer is None:
-        structured_answer = _structured_unspecified_value_answer(
-            question=question,
-            source_registry=source_registry,
-        )
+        structured_answer = attempt(_structured_unspecified_value_answer)
     if structured_answer is None:
-        structured_answer = _structured_direct_value_answer(
-            question=question,
-            source_registry=source_registry,
-        )
+        structured_answer = attempt(_structured_direct_value_answer)
     if structured_answer is None:
         return None
     answer, source_labels = structured_answer
@@ -8456,7 +8436,7 @@ def _structured_value_repair_generation(
             {"answer": answer, "citations": citations},
             ensure_ascii=False,
         ),
-        model="local-structured-value-repair",
+        model=f"local-structured-value-repair:{route}",
         finish_reason="stop",
         prompt_tokens=0,
         completion_tokens=0,

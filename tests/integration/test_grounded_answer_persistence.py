@@ -320,7 +320,8 @@ def make_real_hybrid_service(
     )
 
 
-@pytest.mark.parametrize("mode", ["legacy", "simple"])  # simple: the default since DEC-040
+# simple: the default since DEC-040; hybrid: the DEC-041 option (route first, else simple)
+@pytest.mark.parametrize("mode", ["legacy", "simple", "hybrid"])
 def test_grounded_answer_uses_authorized_chunks_only(
     async_session_factory_for_tests: async_sessionmaker[AsyncSession], mode: str
 ) -> None:
@@ -387,7 +388,7 @@ def test_grounded_answer_uses_authorized_chunks_only(
             token_counter=FakeCounter(),
         )
 
-        await service.answer_question(
+        result = await service.answer_question(
             current_user=staff_a,
             session_id=chat.id,
             question="groundedkeyword",
@@ -396,5 +397,7 @@ def test_grounded_answer_uses_authorized_chunks_only(
         # simple mode retries an answer it cannot validate; no prompt may hold the hidden chunk
         assert llm.calls == 1 if mode == "legacy" else llm.calls >= 1
         assert all(CONFIDENTIAL_MARKER not in message.content for message in llm.messages)
+        assert CONFIDENTIAL_MARKER not in result.assistant_message.content
+        assert all(c.document_id != hidden_doc.id for c in result.assistant_citations)
 
     run_async(scenario())
