@@ -864,6 +864,30 @@ The report does not return Assistant answers, User questions, session titles, Ch
 
 ## 10. Audit logs
 
+### Audit event types (BR-9)
+
+The stable `event_type` values (`app/audit/events.py`, `AuditEventType`). The filter accepts every value; the server writes all but the two marked reserved.
+
+| `event_type` | Written when | `target_type` |
+|---|---|---|
+| `AUTH_LOGIN_SUCCEEDED` | a login succeeds | `USER` |
+| `AUTH_LOGIN_FAILED` | a login fails (outcome `FAILURE`, `error_code` set) | none |
+| `USER_CREATED` | an Admin creates a User | `USER` |
+| `USER_UPDATED` | a User's profile fields change | `USER` |
+| `USER_STATUS_CHANGED` | a User is deactivated or reactivated (metadata `status_before`, `status_after`) | `USER` |
+| `USER_DEACTIVATED` | reserved, not written (deactivation writes `USER_STATUS_CHANGED`) | — |
+| `USER_REACTIVATED` | reserved, not written (reactivation writes `USER_STATUS_CHANGED`) | — |
+| `DEPARTMENT_CREATED` / `DEPARTMENT_UPDATED` / `DEPARTMENT_DELETED` | Department changes | `DEPARTMENT` |
+| `DOCUMENT_UPLOADED` / `DOCUMENT_UPDATED` / `DOCUMENT_DELETED` | Document changes | `DOCUMENT` |
+| `DOCUMENT_DOWNLOADED` | a download, or a preview (`/documents/{id}/preview`) | `DOCUMENT` |
+| `DOCUMENT_PERMISSION_GRANTED` / `DOCUMENT_PERMISSION_UPDATED` / `DOCUMENT_PERMISSION_REVOKED` | direct grant changes | `DOCUMENT_PERMISSION` |
+| `CHAT_SESSION_CREATED` / `CHAT_SESSION_DELETED` | chat session changes | `CHAT_SESSION` |
+| `CHAT_QUESTION_SUBMITTED` | a question is stored | `CHAT_MESSAGE` |
+| `CHAT_ANSWER_GENERATED` / `CHAT_NO_ANSWER_GENERATED` | an answer is stored, `ANSWERED` / `NO_ANSWER` | `CHAT_MESSAGE` |
+| `FEEDBACK_UPSERTED` | feedback is set or changed | `FEEDBACK` |
+
+Audit items never include the client IP address or raw headers.
+
 ### GET `/audit-logs`
 
 Returns an Admin-only paginated AuditLog report.
@@ -872,7 +896,7 @@ Query parameters:
 
 - `page`, default `1`, must be `>= 1`.
 - `page_size`, default `AUDIT_REPORT_PAGE_SIZE`, maximum `AUDIT_REPORT_MAX_PAGE_SIZE`.
-- `event_type`, optional stable audit event type.
+- `event_type`, optional stable audit event type, one of the values below; any other value returns `422 AUDIT_FILTER_INVALID`.
 - `outcome`, optional `SUCCESS` or `FAILURE`.
 - `actor_user_id`, optional actor UUID.
 - `target_type`, optional safe target type: `USER`, `DEPARTMENT`, `DOCUMENT`, `DOCUMENT_PERMISSION`, `CHAT_SESSION`, `CHAT_MESSAGE`, or `FEEDBACK`.

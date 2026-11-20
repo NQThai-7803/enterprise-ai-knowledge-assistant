@@ -269,3 +269,31 @@ quyết định của owner.
 - **Test:** `tests/api/test_admin_monitoring.py`
   (`test_admin_monitoring_responses_keep_the_documented_example_shape`) kiểm các khóa của response
   khớp với ví dụ trong spec.
+
+### TRẢ LỜI CHO PHIÊN UI — BR-9 (danh sách `event_type`)
+
+- **Trạng thái:** xong, bằng cách ghi danh sách vào spec. Không thêm endpoint.
+- **Endpoint:** `GET /api/v1/audit-logs?event_type=…` (chỉ Admin). Danh sách có ở `API_SPEC.md`
+  §10, mục "Audit event types".
+- **Giá trị (23):**
+  - Xác thực: `AUTH_LOGIN_SUCCEEDED`, `AUTH_LOGIN_FAILED`.
+  - Người dùng: `USER_CREATED`, `USER_UPDATED`, `USER_STATUS_CHANGED`, `USER_DEACTIVATED`,
+    `USER_REACTIVATED`.
+  - Phòng ban: `DEPARTMENT_CREATED`, `DEPARTMENT_UPDATED`, `DEPARTMENT_DELETED`.
+  - Tài liệu: `DOCUMENT_UPLOADED`, `DOCUMENT_UPDATED`, `DOCUMENT_DOWNLOADED`, `DOCUMENT_DELETED`.
+  - Quyền tài liệu: `DOCUMENT_PERMISSION_GRANTED`, `DOCUMENT_PERMISSION_UPDATED`,
+    `DOCUMENT_PERMISSION_REVOKED`.
+  - Chat: `CHAT_SESSION_CREATED`, `CHAT_SESSION_DELETED`, `CHAT_QUESTION_SUBMITTED`,
+    `CHAT_ANSWER_GENERATED`, `CHAT_NO_ANSWER_GENERATED`.
+  - Feedback: `FEEDBACK_UPSERTED`.
+- **Lưu ý cho ô chọn:**
+  - `USER_DEACTIVATED` và `USER_REACTIVATED` được filter chấp nhận nhưng server **không ghi**: khóa
+    hoặc mở lại tài khoản được ghi là `USER_STATUS_CHANGED`. UI có thể ẩn hai giá trị này.
+  - Xem tài liệu qua `/preview` cũng ghi là `DOCUMENT_DOWNLOADED`.
+- **Mã lỗi:** `event_type` ngoài danh sách → `422 AUDIT_FILTER_INVALID`.
+- **Ví dụ:** `GET /api/v1/audit-logs?event_type=CHAT_NO_ANSWER_GENERATED&outcome=SUCCESS`.
+- **Không có địa chỉ IP:** `AuditLogItem` không trả IP. Server có lưu IP, nhưng spec cố ý không
+  trả ra. Giữ như ghi chú của UI.
+- **Test:** `tests/unit/test_audit_events.py`
+  (`test_audit_event_types_are_the_ones_api_spec_lists`). Thêm loại sự kiện mới thì test này đỏ,
+  nhắc cập nhật spec.
