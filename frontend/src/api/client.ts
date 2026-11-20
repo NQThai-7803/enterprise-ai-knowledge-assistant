@@ -7,6 +7,7 @@ import {
   setStoredTokens,
 } from "./tokenStore";
 import type {
+  AdminSystemResponse,
   AuditLogListResponse,
   AuthenticatedUser,
   ChatAnswerResponse,
@@ -317,6 +318,12 @@ export const apiClient = {
       date_to?: string;
     }) {
       return request<AuditLogListResponse>("/audit-logs", { query });
+    },
+  },
+  admin: {
+    /** BR-8: Admin only (Manager and Staff get 403); version, health and providers in one call. */
+    system() {
+      return request<DataResponse<AdminSystemResponse>>("/admin/system");
     },
   },
   health: {

@@ -1,57 +1,217 @@
 import { useQuery } from "@tanstack/react-query";
-import { Activity, Database, Server, Wifi } from "lucide-react";
+import { RefreshCw } from "lucide-react";
+import type { ReactNode } from "react";
 import { apiClient } from "../../api/client";
+import type { AdminCheckStatus, AdminProviderStatus, AdminSystemResponse } from "../../api/types";
 import { PageHeader } from "../../components/layout/PageHeader";
 import { Badge } from "../../components/ui/Badge";
-import { Panel } from "../../components/ui/Panel";
+import { Button } from "../../components/ui/Button";
 import { ErrorState, LoadingState } from "../../components/ui/State";
+import { formatDateTime } from "../../lib/format";
+import { useAuth } from "../auth/AuthProvider";
+
+type Tone = "success" | "warning" | "danger" | "neutral";
+
+const providerStatus: Record<AdminProviderStatus["status"], { label: string; tone: Tone }> = {
+  healthy: { label: "Hoạt động", tone: "success" },
+  disabled: { label: "Tắt", tone: "neutral" },
+  misconfigured: { label: "Cấu hình sai", tone: "danger" },
+  unhealthy: { label: "Lỗi", tone: "danger" },
+};
+
+const checkStatus: Record<AdminCheckStatus, { label: string; tone: Tone }> = {
+  ok: { label: "ok", tone: "success" },
+  degraded: { label: "Suy giảm", tone: "warning" },
+  unavailable: { label: "Không phản hồi", tone: "danger" },
+  disabled: { label: "Tắt", tone: "neutral" },
+  misconfigured: { label: "Cấu hình sai", tone: "danger" },
+  not_configured: { label: "Chưa cấu hình", tone: "neutral" },
+};
+
+const rerankerLabels = {
+  cross_encoder: "cross_encoder",
+  lexical_fallback: "lexical_fallback",
+  disabled: "Tắt",
+} as const;
 
 export function SystemStatusPage() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === "ADMIN";
   const liveQuery = useQuery({ queryKey: ["health", "live"], queryFn: apiClient.health.live, refetchInterval: 30_000 });
-  const readyQuery = useQuery({ queryKey: ["health", "ready"], queryFn: apiClient.health.ready, refetchInterval: 30_000, retry: 1 });
+  const readyQuery = useQuery({
+    queryKey: ["health", "ready"],
+    queryFn: apiClient.health.ready,
+    refetchInterval: 30_000,
+    retry: 1,
+  });
+  const systemQuery = useQuery({
+    queryKey: ["admin", "system"],
+    queryFn: apiClient.admin.system,
+    enabled: isAdmin,
+    retry: false,
+  });
+
+  const checkedAt = Math.max(liveQuery.dataUpdatedAt, readyQuery.dataUpdatedAt, systemQuery.dataUpdatedAt);
+  const recheck = () => {
+    void liveQuery.refetch();
+    void readyQuery.refetch();
+    if (isAdmin) {
+      void systemQuery.refetch();
+    }
+  };
+  const ready = readyQuery.data;
+  const system = systemQuery.data?.data;
 
   return (
     <div>
-      <PageHeader title="System and LLM provider status" description="This page uses only current public backend health APIs and does not call external LLM providers." />
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <StatusPanel icon={<Activity className="h-5 w-5" aria-hidden="true" />} label="API live" status={liveQuery.data?.status ?? (liveQuery.isError ? "unavailable" : "checking")} ok={liveQuery.data?.status === "ok"} />
-        <StatusPanel icon={<Server className="h-5 w-5" aria-hidden="true" />} label="API ready" status={readyQuery.data?.status ?? (readyQuery.isError ? "unavailable" : "checking")} ok={readyQuery.data?.status === "ready"} />
-        <StatusPanel icon={<Database className="h-5 w-5" aria-hidden="true" />} label="PostgreSQL" status={readyQuery.data?.checks.database ?? "unavailable"} ok={readyQuery.data?.checks.database === "ok"} />
-        <StatusPanel icon={<Wifi className="h-5 w-5" aria-hidden="true" />} label="Redis" status={readyQuery.data?.checks.redis ?? "unavailable"} ok={readyQuery.data?.checks.redis === "ok"} />
+      <PageHeader
+        title="Trạng thái hệ thống"
+        description={`Kiểm tra lần cuối: ${checkedAt ? formatDateTime(new Date(checkedAt).toISOString(), "dd/MM/yyyy HH:mm:ss") : "đang kiểm tra"}`}
+        actions={
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={recheck}
+            loading={liveQuery.isFetching || readyQuery.isFetching || systemQuery.isFetching}
+            icon={<RefreshCw className="h-4 w-4" aria-hidden="true" />}
+          >
+            Kiểm tra lại
+          </Button>
+        }
+      />
+
+      <h2 className="mb-3 text-sm font-medium text-muted">Hạ tầng</h2>
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <InfraCard
+          label="API live"
+          source="GET /health/live"
+          state={liveQuery.data ? (liveQuery.data.status === "ok" ? ["Hoạt động", "success"] : [liveQuery.data.status, "warning"]) : liveQuery.isError ? ["Không phản hồi", "danger"] : null}
+        />
+        <InfraCard
+          label="API ready"
+          source="GET /health/ready"
+          state={ready ? (ready.status === "ready" ? ["Sẵn sàng", "success"] : [ready.status, "warning"]) : readyQuery.isError ? ["Không phản hồi", "danger"] : null}
+        />
+        <InfraCard label="PostgreSQL" source="checks.database" state={checkState(ready?.checks.database, readyQuery.isError)} />
+        <InfraCard label="Redis" source="checks.redis" state={checkState(ready?.checks.redis, readyQuery.isError)} />
       </div>
+      {readyQuery.isError ? (
+        <div className="mt-3">
+          <ErrorState title="API chưa sẵn sàng" error={readyQuery.error} onRetry={() => void readyQuery.refetch()} />
+        </div>
+      ) : null}
 
-      {readyQuery.isLoading ? <LoadingState label="Checking readiness" /> : null}
-      {readyQuery.isError ? <div className="mt-4"><ErrorState error={readyQuery.error} onRetry={() => void readyQuery.refetch()} /></div> : null}
+      <h2 className="mb-3 mt-7 text-sm font-medium text-muted">Mô hình ngôn ngữ và truy xuất</h2>
+      <dl className="divide-y divide-border/70 rounded-xl border border-border/70 bg-surface">
+        {isAdmin && system ? <ProviderRows system={system} /> : null}
+        {ready?.reranker_mode ? <Row label="Chế độ xếp hạng" value={rerankerLabels[ready.reranker_mode]} mono /> : null}
+        <Row label="Chiến lược trả lời" value="Chỉ dùng nguồn đã truy xuất, kiểm tra trích dẫn" />
+        <Row label="Truyền câu trả lời (SSE)" value="Gửi sau khi kiểm tra xong" />
+      </dl>
+      {isAdmin && systemQuery.isLoading ? <LoadingState label="Đang tải trạng thái quản trị" rows={2} /> : null}
+      {isAdmin && systemQuery.isError ? (
+        <div className="mt-3">
+          <ErrorState
+            title="Không tải được trạng thái quản trị"
+            error={systemQuery.error}
+            onRetry={() => void systemQuery.refetch()}
+          />
+        </div>
+      ) : null}
+      {!isAdmin ? (
+        <p className="mt-3 text-xs text-muted">Nhà cung cấp, mô hình và phiên bản chỉ hiện cho quản trị viên.</p>
+      ) : null}
 
-      <Panel className="mt-4 p-5">
-        <h3 className="text-sm font-semibold">LLM provider visibility</h3>
-        <dl className="mt-4 grid gap-4 md:grid-cols-2">
-          <StatusLine label="Provider status endpoint" value="Not exposed by current backend API" />
-          <StatusLine label="External provider call" value="Not executed by frontend" />
-          <StatusLine label="SSE capability" value="Chat endpoint supports POST text/event-stream" />
-          <StatusLine label="Grounding strategy" value="buffer_after_validation" />
-        </dl>
-      </Panel>
+      {isAdmin && system ? (
+        <>
+          <h2 className="mb-3 mt-7 text-sm font-medium text-muted">Kiểm tra chi tiết</h2>
+          <ul className="divide-y divide-border/70 rounded-xl border border-border/70 bg-surface">
+            {system.health.checks.map((check) => (
+              <li key={check.name} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
+                <div className="min-w-0">
+                  <p className="font-mono text-sm text-ink">{check.name}</p>
+                  {check.message ? <p className="text-xs text-muted">{check.message}</p> : null}
+                </div>
+                <Badge tone={checkStatus[check.status]?.tone ?? "neutral"}>
+                  {checkStatus[check.status]?.label ?? check.status}
+                </Badge>
+              </li>
+            ))}
+          </ul>
+
+          <h2 className="mb-3 mt-7 text-sm font-medium text-muted">Phiên bản</h2>
+          <dl className="divide-y divide-border/70 rounded-xl border border-border/70 bg-surface">
+            <Row label="Ứng dụng" value={`${system.version.app_name} ${system.version.version}`} />
+            <Row label="Môi trường" value={system.version.environment} mono />
+            <Row
+              label="Migration"
+              value={`${system.version.database_revision ?? "chưa rõ"} / ${system.version.migration_head}`}
+              mono
+            />
+            <Row label="Khởi động lúc" value={formatDateTime(system.version.started_at)} />
+          </dl>
+        </>
+      ) : null}
+
+      <p className="mt-4 text-xs text-muted">
+        Chỉ hiển thị thông tin backend thật sự cung cấp. Khóa API và URL nội bộ không bao giờ hiện ở đây.
+      </p>
     </div>
   );
 }
 
-function StatusPanel({ icon, label, status, ok }: { icon: React.ReactNode; label: string; status: string; ok: boolean }) {
+function ProviderRows({ system }: { system: AdminSystemResponse }) {
+  const { llm, web_search: webSearch } = system.providers;
   return (
-    <Panel className="p-5">
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-3 text-accent">{icon}<span className="font-semibold text-ink">{label}</span></div>
-        <Badge tone={ok ? "success" : status === "checking" ? "warning" : "danger"}>{status}</Badge>
-      </div>
-    </Panel>
+    <>
+      <Row label="Nhà cung cấp LLM" value={<ProviderValue provider={llm} />} />
+      <Row label="Mô hình" value={llm.model ?? "Chưa cấu hình"} mono={Boolean(llm.model)} />
+      <Row label="Tìm kiếm web" value={<ProviderValue provider={webSearch} />} />
+    </>
   );
 }
 
-function StatusLine({ label, value }: { label: string; value: string }) {
+function ProviderValue({ provider }: { provider: AdminProviderStatus }) {
+  const status = providerStatus[provider.status];
   return (
-    <div>
-      <dt className="text-xs font-semibold uppercase text-muted">{label}</dt>
-      <dd className="mt-1 text-sm text-ink">{value}</dd>
+    <span className="inline-flex items-center gap-2">
+      {provider.display_name ?? provider.provider}
+      <Badge tone={status?.tone ?? "neutral"}>{status?.label ?? provider.status}</Badge>
+    </span>
+  );
+}
+
+function checkState(value: string | undefined, failed: boolean): [string, Tone] | null {
+  if (value) {
+    return [value, value === "ok" ? "success" : "danger"];
+  }
+  return failed ? ["Không phản hồi", "danger"] : null;
+}
+
+function InfraCard({ label, source, state }: { label: string; source: string; state: [string, Tone] | null }) {
+  return (
+    <section className="rounded-xl border border-border/70 bg-surface p-4" aria-label={label}>
+      <p className="text-sm font-medium text-ink">{label}</p>
+      <div className="my-2.5">
+        {state ? (
+          <Badge tone={state[1]}>
+            <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
+            {state[0]}
+          </Badge>
+        ) : (
+          <Badge tone="neutral">Đang kiểm tra</Badge>
+        )}
+      </div>
+      <p className="font-mono text-xs text-muted">{source}</p>
+    </section>
+  );
+}
+
+function Row({ label, value, mono = false }: { label: string; value: ReactNode; mono?: boolean }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3.5">
+      <dt className="text-sm text-ink/80">{label}</dt>
+      <dd className={mono ? "font-mono text-sm font-medium text-ink" : "text-sm font-medium text-ink"}>{value}</dd>
     </div>
   );
 }

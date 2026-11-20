@@ -206,6 +206,56 @@ export interface HealthLiveResponse {
 export interface HealthReadyResponse {
   status: string;
   checks: Record<string, string>;
+  /** API_SPEC §11: what ranks retrieval candidates right now. */
+  reranker_mode?: "cross_encoder" | "lexical_fallback" | "disabled";
+}
+
+// BR-8: TASK-032 Admin Monitoring shapes (only the fields the UI reads).
+export type AdminCheckStatus = "ok" | "degraded" | "unavailable" | "disabled" | "misconfigured" | "not_configured";
+
+export interface AdminHealthCheck {
+  name: string;
+  status: AdminCheckStatus;
+  enabled: boolean;
+  message: string | null;
+}
+
+export interface AdminHealthResponse {
+  status: "healthy" | "degraded" | "unhealthy";
+  generated_at: string;
+  checks: AdminHealthCheck[];
+}
+
+export interface AdminProviderStatus {
+  provider_type: "llm" | "web_search";
+  provider: string;
+  status: "healthy" | "disabled" | "misconfigured" | "unhealthy";
+  enabled: boolean;
+  configured: boolean;
+  display_name: string | null;
+  model: string | null;
+  connectivity_checked: boolean;
+  message: string | null;
+}
+
+export interface AdminVersionResponse {
+  app_name: string;
+  version: string;
+  environment: string;
+  python_version: string;
+  api_prefix: string;
+  migration_head: string;
+  database_revision: string | null;
+  started_at: string | null;
+  uptime_seconds: number;
+}
+
+export interface AdminSystemResponse {
+  generated_at: string;
+  version: AdminVersionResponse;
+  uptime_seconds: number;
+  health: AdminHealthResponse;
+  providers: { llm: AdminProviderStatus; web_search: AdminProviderStatus };
 }
 
 export interface StreamStartedPayload {
