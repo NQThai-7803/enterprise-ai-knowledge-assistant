@@ -452,7 +452,7 @@ export function ChatPage() {
           {sessionsQuery.isError ? (
             <ErrorState
               title="Không tải được danh sách"
-              message={safeErrorMessage(sessionsQuery.error)}
+              error={sessionsQuery.error}
               onRetry={() => void sessionsQuery.refetch()}
             />
           ) : null}
@@ -540,7 +540,7 @@ export function ChatPage() {
             {sessionQuery.isError && selectedSessionId && !sessionNotFound ? (
               <ErrorState
                 title="Không tải được cuộc trò chuyện"
-                message={safeErrorMessage(sessionQuery.error)}
+                error={sessionQuery.error}
                 onRetry={() => void sessionQuery.refetch()}
               />
             ) : null}

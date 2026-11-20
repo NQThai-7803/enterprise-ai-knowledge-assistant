@@ -15,7 +15,7 @@ export function ProtectedRoute({
   const location = useLocation();
 
   if (status === "loading") {
-    return <LoadingState label="Loading session" />;
+    return <LoadingState label="Đang tải phiên đăng nhập" />;
   }
 
   if (status !== "authenticated" || !user) {

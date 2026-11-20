@@ -71,7 +71,7 @@ export function DocumentDetailPage() {
     return (
       <ErrorState
         title="Không tải được tài liệu"
-        message={safeErrorMessage(detailQuery.error)}
+        error={detailQuery.error}
         onRetry={() => void detailQuery.refetch()}
       />
     );

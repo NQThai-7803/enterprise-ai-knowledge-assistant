@@ -221,7 +221,7 @@ export function UsersPage() {
       {usersQuery.isError ? (
         <ErrorState
           title="Không tải được danh sách người dùng"
-          message={safeErrorMessage(usersQuery.error)}
+          error={usersQuery.error}
           onRetry={() => void usersQuery.refetch()}
         />
       ) : null}

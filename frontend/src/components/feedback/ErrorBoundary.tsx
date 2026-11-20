@@ -23,10 +23,10 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, ErrorBound
     return (
       <main className="flex min-h-[100dvh] items-center justify-center bg-canvas p-6 text-ink">
         <section className="max-w-md rounded-token border border-border bg-surface p-6 shadow-panel">
-          <h1 className="text-lg font-semibold">Application error</h1>
-          <p className="mt-2 text-sm text-muted">The interface failed to render safely.</p>
+          <h1 className="text-lg font-semibold">Giao diện gặp lỗi</h1>
+          <p className="mt-2 text-sm text-muted">Trang không hiển thị được. Tải lại để thử lần nữa.</p>
           <Button className="mt-4" type="button" onClick={() => window.location.reload()}>
-            Reload
+            Tải lại
           </Button>
         </section>
       </main>

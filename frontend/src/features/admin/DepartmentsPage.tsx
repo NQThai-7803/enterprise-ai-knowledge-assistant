@@ -170,7 +170,7 @@ export function DepartmentsPage() {
           {departmentsQuery.isError ? (
             <ErrorState
               title="Không tải được danh sách phòng ban"
-              message={safeErrorMessage(departmentsQuery.error)}
+              error={departmentsQuery.error}
               onRetry={() => void departmentsQuery.refetch()}
             />
           ) : null}

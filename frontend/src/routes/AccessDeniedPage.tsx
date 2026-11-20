@@ -1,15 +1,17 @@
-import { Link } from "react-router-dom";
-import { AccessDeniedState } from "../components/ui/State";
+import { StatusLink, StatusPage } from "../components/ui/State";
 
 export function AccessDeniedPage() {
+  // Written for every restricted page, since some are open to Managers too, not only Admins.
   return (
-    <main className="min-h-[100dvh] bg-canvas p-6 text-ink">
-      <AccessDeniedState />
-      <div className="mt-4 text-center">
-        <Link className="inline-flex min-h-10 items-center justify-center rounded-token border border-border bg-surface px-3 text-sm font-semibold text-ink hover:bg-elevated" to="/chat">
-          Return to chat
-        </Link>
-      </div>
-    </main>
+    <StatusPage
+      code="403"
+      title="Bạn không có quyền xem trang này"
+      description="Trang này chỉ dành cho vai trò được cấp quyền. Nếu bạn cần truy cập, hãy liên hệ người quản lý hệ thống."
+      action={
+        <StatusLink to="/chat" primary>
+          Về trang Trò chuyện
+        </StatusLink>
+      }
+    />
   );
 }

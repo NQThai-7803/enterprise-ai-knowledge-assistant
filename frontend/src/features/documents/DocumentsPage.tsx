@@ -3,7 +3,6 @@ import { Search, Upload } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { apiClient } from "../../api/client";
-import { safeErrorMessage } from "../../api/errors";
 import type { DocumentAccessScope, DocumentItem, DocumentStatus } from "../../api/types";
 import { DataTable } from "../../components/data/DataTable";
 import { PageHeader } from "../../components/layout/PageHeader";
@@ -121,7 +120,7 @@ export function DocumentsPage() {
       {documentsQuery.isError ? (
         <ErrorState
           title="Không tải được danh sách tài liệu"
-          message={safeErrorMessage(documentsQuery.error)}
+          error={documentsQuery.error}
           onRetry={() => void documentsQuery.refetch()}
         />
       ) : null}

@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query";
 import { clsx } from "clsx";
 import { useMemo, useState } from "react";
 import { apiClient } from "../../api/client";
-import { safeErrorMessage } from "../../api/errors";
 import type { AuthenticatedUser, FeedbackRating, FeedbackReportItem } from "../../api/types";
 import { PageHeader } from "../../components/layout/PageHeader";
 import { Badge } from "../../components/ui/Badge";
@@ -108,7 +107,7 @@ export function FeedbackPage() {
       {feedbackQuery.isError ? (
         <ErrorState
           title="Không tải được phản hồi"
-          message={safeErrorMessage(feedbackQuery.error)}
+          error={feedbackQuery.error}
           onRetry={() => void feedbackQuery.refetch()}
         />
       ) : null}

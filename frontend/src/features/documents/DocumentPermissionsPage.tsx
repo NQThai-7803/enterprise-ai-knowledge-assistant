@@ -304,7 +304,7 @@ export function DocumentPermissionsPage() {
         {permissionsQuery.isError ? (
           <ErrorState
             title="Không tải được danh sách quyền"
-            message={safeErrorMessage(permissionsQuery.error)}
+            error={permissionsQuery.error}
             onRetry={() => void permissionsQuery.refetch()}
           />
         ) : null}

@@ -121,7 +121,7 @@ export function AuditLogsPage() {
       {auditQuery.isError && !filterInvalid ? (
         <ErrorState
           title="Không tải được nhật ký"
-          message={safeErrorMessage(auditQuery.error)}
+          error={auditQuery.error}
           onRetry={() => void auditQuery.refetch()}
         />
       ) : null}

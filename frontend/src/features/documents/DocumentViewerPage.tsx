@@ -106,6 +106,7 @@ export function DocumentViewerPage() {
             <ErrorState
               title="Không mở được tài liệu"
               message={viewerErrorMessage(file.error)}
+              error={file.error}
               onRetry={() => {
                 setFile({ status: "loading" });
                 setAttempt((current) => current + 1);

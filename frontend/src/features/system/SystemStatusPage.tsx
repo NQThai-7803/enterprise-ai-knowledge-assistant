@@ -1,7 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { Activity, Database, Server, Wifi } from "lucide-react";
 import { apiClient } from "../../api/client";
-import { safeErrorMessage } from "../../api/errors";
 import { PageHeader } from "../../components/layout/PageHeader";
 import { Badge } from "../../components/ui/Badge";
 import { Panel } from "../../components/ui/Panel";
@@ -22,7 +21,7 @@ export function SystemStatusPage() {
       </div>
 
       {readyQuery.isLoading ? <LoadingState label="Checking readiness" /> : null}
-      {readyQuery.isError ? <div className="mt-4"><ErrorState message={safeErrorMessage(readyQuery.error)} onRetry={() => void readyQuery.refetch()} /></div> : null}
+      {readyQuery.isError ? <div className="mt-4"><ErrorState error={readyQuery.error} onRetry={() => void readyQuery.refetch()} /></div> : null}
 
       <Panel className="mt-4 p-5">
         <h3 className="text-sm font-semibold">LLM provider visibility</h3>
