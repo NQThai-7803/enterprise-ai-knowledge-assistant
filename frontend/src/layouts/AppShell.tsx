@@ -247,7 +247,10 @@ function SidebarContent({
         </div>
         <div className="min-w-0 flex-1 leading-tight">
           <p className="truncate text-[13px] font-medium">{user?.full_name}</p>
-          <p className="text-xs text-muted">{user ? roleLabel(user.role) : null}</p>
+          {/* BR-4: the caller's own department name, from /auth/me. */}
+          <p className="truncate text-xs text-muted">
+            {user ? [roleLabel(user.role), user.department_name].filter(Boolean).join(" · ") : null}
+          </p>
         </div>
         <button
           type="button"
