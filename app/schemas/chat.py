@@ -128,6 +128,14 @@ class CitationRead(BaseModel):
         )
 
 
+class AnswerSegment(BaseModel):
+    """BR-3: one sentence of an answer; citation_ids are its citations' citation_order."""
+
+    kind: Literal["verified", "unverified"]
+    text: str
+    citation_ids: list[int] = Field(default_factory=list)
+
+
 class ChatMessageRead(BaseModel):
     id: UUID
     role: Literal["USER", "ASSISTANT"]
@@ -138,6 +146,8 @@ class ChatMessageRead(BaseModel):
     # BR-3: ANSWERED or NO_ANSWER on assistant messages; null on user messages and on assistant
     # messages stored before the status was kept.
     grounding_status: GroundingStatus | None = None
+    # BR-3: null on user messages, NO_ANSWER messages and older answers; content is unchanged.
+    segments: list[AnswerSegment] | None = None
 
     @classmethod
     def from_visible_row(
@@ -156,6 +166,7 @@ class ChatMessageRead(BaseModel):
             else [],
             created_at=row.created_at,
             grounding_status=row.grounding_status if row.role.value == "ASSISTANT" else None,
+            segments=row.segments if row.role.value == "ASSISTANT" else None,
         )
 
     @classmethod
@@ -177,6 +188,7 @@ class ChatMessageRead(BaseModel):
             grounding_status=message.grounding_status
             if message.role.value == "ASSISTANT"
             else None,
+            segments=message.segments if message.role.value == "ASSISTANT" else None,
         )
 
 

@@ -121,8 +121,7 @@ quyết định của owner.
 **CẦN OWNER QUYẾT (chưa làm):**
 
 - BR-1 mục 4: **đã quyết, đã làm**: tìm theo `document_code`.
-- BR-3: có thêm mảng đoạn có cấu trúc (`segments`) thay cho việc nhận diện câu "Chưa xác minh
-  được…" theo chữ không.
+- BR-3: **đã quyết, đã làm**: thêm `segments`.
 - BR-4: tên người tải lên và tên phòng ban trên tài liệu, tên người dùng trên feedback, cho vai trò
   không phải Admin. Việc này trái với quy tắc chống dò tài khoản của `RBAC.md`.
 
@@ -195,14 +194,40 @@ quyết định của owner.
     số mà câu hỏi không có thì vẫn được coi là khẳng định và giữ marker.
   - UI nên nhận diện theo ba cụm từ trên (gập dấu, không phân biệt hoa thường) thay vì khớp nguyên
     tiền tố. Câu nào không khớp vẫn hiển thị như văn bản thường.
-- **CẦN OWNER QUYẾT:** có muốn server trả thêm mảng đoạn có cấu trúc (ví dụ
-  `segments: [{ "kind": "claim" | "unverified", "text": … }]`) để UI khỏi phải nhận diện theo chữ
-  không. Việc này thêm trường vào response và cần quyết định có lưu vào DB không. Chưa làm.
+- **`segments` (owner đã quyết, đã làm; bổ sung ngày 20/11/2026, migration `20261120_0014`):**
+  - Mỗi tin ASSISTANT có trạng thái `ANSWERED` mang thêm `segments`. Đây là `content` được cắt theo
+    câu bằng **chính bước nhận diện** mà server dùng để quyết định câu nào phải kiểm, nên khớp với
+    cách server đã xử lý câu trả lời.
+  - Dạng mỗi phần tử: `{ "kind": "verified" | "unverified", "text": …, "citation_ids": [...] }`.
+    - `text`: câu, đã bỏ số trích dẫn.
+    - `citation_ids`: các `citation_order` của trích dẫn mà câu đó hiển thị. Chỉ tính số là trích dẫn
+      thật của tin; số trong ngoặc khác vẫn giữ nguyên trong `text`.
+  - `content` giữ nguyên.
+  - `segments` là `null` với: tin USER, tin `NO_ANSWER` (content là câu từ chối cố định), và tin
+    lưu trước migration.
+  - Có ở cả ba chỗ: lịch sử `GET /chat/sessions/{id}`, `assistant_message` của
+    `POST …/messages`, và sự kiện SSE `message.completed` (`segments`).
+  - Ví dụ:
+    ```json
+    { "role": "ASSISTANT", "grounding_status": "ANSWERED",
+      "content": "Nhân viên được nghỉ 12 ngày phép năm. [1] Chưa xác minh được từ tài liệu bạn được phép truy cập: mức phụ cấp.",
+      "segments": [
+        { "kind": "verified", "text": "Nhân viên được nghỉ 12 ngày phép năm.", "citation_ids": [1] },
+        { "kind": "unverified", "text": "Chưa xác minh được từ tài liệu bạn được phép truy cập: mức phụ cấp.", "citation_ids": [] }
+      ] }
+    ```
+  - Cách UI nên dùng: hiển thị theo `segments` khi trường này khác `null`: đoạn `unverified` chữ
+    xám, không có chip; đoạn `verified` có chip theo `citation_ids`. Khi `segments` là `null`, hiển
+    thị `content` như hiện nay.
+  - Giới hạn: việc nhận diện vẫn dựa trên 3 cụm từ (heuristic), đã ghi vào TASKS.
 - **Lỗi:** không có mã lỗi mới.
 - **DB:** cột `chat_messages.grounding_status` (nullable). Đây là thay đổi lưu trữ duy nhất của
   BR-3; cách trả lời và retrieval không đổi.
 - **Test:** `tests/api/test_chat_messages.py`
-  (`test_session_history_returns_each_assistant_messages_grounding_status`).
+  (`test_session_history_returns_each_assistant_messages_grounding_status_and_segments`),
+  `tests/api/test_chat_streaming.py` (`segments` trong `message.completed`),
+  `tests/unit/test_answer_segments.py`: có test cho câu có và câu không có đoạn "Chưa xác minh
+  được…".
 
 ### TRẢ LỜI CHO PHIÊN UI — BR-4 (tên phòng ban và tên người dùng)
 

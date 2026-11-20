@@ -40,6 +40,7 @@ class ChatMessageService:
         completion_tokens: int | None = None,
         created_at: datetime | None = None,
         grounding_status: str | None = None,
+        segments: list[dict[str, object]] | None = None,
     ) -> ChatMessage:
         if not isinstance(role, ChatMessageRole):
             raise ChatMessageContentInvalidError()
@@ -63,6 +64,7 @@ class ChatMessageService:
             completion_tokens=validated_completion_tokens,
             created_at=created_at,
             grounding_status=grounding_status,
+            segments=segments,
         )
         await self.session_repository.touch_updated_at(chat_session, updated_at=created_at)
         await session.flush()

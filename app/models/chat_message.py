@@ -16,6 +16,7 @@ from sqlalchemy import (
     Uuid,
     func,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -74,6 +75,9 @@ class ChatMessage(Base):
     # BR-3: ANSWERED or NO_ANSWER on assistant messages; NULL on user messages and on messages
     # stored before revision 20261120_0013.
     grounding_status: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    # BR-3: the answer cut into verified / unverified sentences with their citation numbers;
+    # NULL on user messages, NO_ANSWER messages and rows stored before revision 20261120_0014.
+    segments: Mapped[list[dict[str, object]] | None] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,

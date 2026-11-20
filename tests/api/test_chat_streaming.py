@@ -417,6 +417,9 @@ def test_stream_success_persists_assistant_message_once_and_returns_final_payloa
     completed = events[-1][1]
     assert completed["message_id"]
     assert completed["content"] == GROUNDED_ANSWER_DISPLAY
+    assert [(seg["kind"], seg["citation_ids"]) for seg in completed["segments"]] == [
+        ("verified", [1])
+    ]  # BR-3
     assert completed["provider"] == "openai_compatible"
     assert completed["model"] == "fake-model"
     assert completed["usage"] == {

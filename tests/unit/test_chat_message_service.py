@@ -45,6 +45,7 @@ class FakeMessageRepository:
         completion_tokens,
         created_at,
         grounding_status=None,
+        segments=None,
     ):
         self.calls.append(
             {

@@ -553,6 +553,18 @@ Behavior:
     "citations": [], "created_at": "2026-11-20T08:00:00Z", "grounding_status": "NO_ANSWER" }
   ```
 - **Sentences naming an unverified part (BR-3).** An `ANSWERED` answer may contain sentences that name a part of the question the documents do not confirm. The prompt asks for the fixed form `Chưa xác minh được từ tài liệu bạn được phép truy cập: …` (English question: `Could not be verified from the documents you can access: …`). In the default answer path (simple mode, s1) the model writes these sentences, so the wording after the prefix, and occasionally the prefix itself, may vary. The server recognises a sentence containing `chưa xác minh được`, `không xác minh được` or `could not be verified` (case- and accent-insensitive), never validates it as a claim, and removes its source markers, so it carries no citation number. The exception is a sentence holding a number the question does not: it stays a claim with its marker. The legacy compound path (`RAG_COMPOUND_PARTIAL_ANSWER_ENABLED`, off) builds the Vietnamese sentence itself, `Chưa xác minh được từ tài liệu bạn được phép truy cập: <part>.`. A client may style such a sentence differently, but must still show it.
+- **`segments` (BR-3 follow-up, migration `20261120_0014`).** Every ASSISTANT message stored with an `ANSWERED` status carries `segments`: the displayed `content` cut into sentences by the same step and rule as above, each `{ "kind": "verified" | "unverified", "text": ..., "citation_ids": [...] }`. `text` is the sentence without its citation numbers; `citation_ids` are the `citation_order` values of the citations it shows (only numbers that are real citations of the message; any other bracketed number stays in `text`). `content` is unchanged. `segments` is `null` on USER messages, on `NO_ANSWER` messages (their `content` is the fixed no-answer text) and on answers stored before that migration. `POST .../messages` (`assistant_message.segments`) and the stream's `message.completed` (`segments`) return the same value. Example:
+
+  ```json
+  { "role": "ASSISTANT", "grounding_status": "ANSWERED",
+    "content": "Nhân viên được nghỉ 12 ngày phép năm. [1] Chưa xác minh được từ tài liệu bạn được phép truy cập: mức phụ cấp.",
+    "segments": [
+      { "kind": "verified", "text": "Nhân viên được nghỉ 12 ngày phép năm.", "citation_ids": [1] },
+      { "kind": "unverified", "text": "Chưa xác minh được từ tài liệu bạn được phép truy cập: mức phụ cấp.", "citation_ids": [] }
+    ] }
+  ```
+
+  The recognition is a heuristic on three phrases; it is the same one the server uses to decide which sentences it validates.
 - Historical citation metadata may be omitted if the current User no longer has access to the cited Document.
 - The historical Assistant answer text is not redacted in TASK-020.
 - `retrieval_query`, token usage, prompt, vectors, scores, storage keys, permission metadata, and internal source markers are not returned.

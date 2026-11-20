@@ -25,6 +25,7 @@ class VisibleChatMessageRow:
     response_time_ms: int | None
     created_at: datetime
     grounding_status: str | None = None
+    segments: list[dict[str, object]] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,6 +48,7 @@ async def create(
     completion_tokens: int | None,
     created_at: datetime | None = None,
     grounding_status: str | None = None,
+    segments: list[dict[str, object]] | None = None,
 ) -> ChatMessage:
     message = ChatMessage(
         session_id=chat_session.id,
@@ -58,6 +60,7 @@ async def create(
         completion_tokens=completion_tokens,
         created_at=created_at,
         grounding_status=grounding_status,
+        segments=segments,
     )
     session.add(message)
     return message
@@ -78,6 +81,7 @@ async def list_visible_by_session(
             ChatMessage.response_time_ms,
             ChatMessage.created_at,
             ChatMessage.grounding_status,
+            ChatMessage.segments,
         )
         .where(
             ChatMessage.session_id == session_id,
@@ -96,8 +100,17 @@ async def list_visible_by_session(
             response_time_ms=response_time_ms,
             created_at=created_at,
             grounding_status=grounding_status,
+            segments=segments,
         )
-        for message_id, role, content, response_time_ms, created_at, grounding_status in rows
+        for (
+            message_id,
+            role,
+            content,
+            response_time_ms,
+            created_at,
+            grounding_status,
+            segments,
+        ) in rows
     )
 
 
