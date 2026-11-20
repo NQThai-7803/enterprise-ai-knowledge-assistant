@@ -674,3 +674,15 @@ Other s3 answers that are wrong but not of another subject: ND-014 in job a ("2.
 - On `natural_dev_v1` s3 has one more false refusal than legacy (8 against 7, in both jobs) and two fewer wrong answers (8 against 10); 4 against 3 correct by the proxy.
 - s3 gives 4 wrong-subject answers in both jobs (ND-002, ND-003, ND-011, ND-019) and a fifth in one job (ND-014). The wrong-subject risk is not handled.
 - Under DEC-026 (natural first) s3 does not win on `natural_dev_v1`, so by the owner's rule of 2026-11-16 the default stays `legacy`.
+
+## Hybrid mode (DEC-041 proposal, 2026-11-20)
+
+`RAG_ANSWER_MODE=hybrid`, off by default: legacy's retrieval, context selection and refusal gates
+up to its deterministic route (`_structured_value_repair_generation`), under the conditions
+legacy already uses; when the route answers (ANSWERED), that answer is returned without an LLM
+call. Anything else (no source, missing reason evidence, more than one information need, no
+route, a route draft that is not ANSWERED) goes to the simple path above, with the s1-s3 flags
+and the configured model. No route is added and no match is widened. Every answer now counts
+`answer_route_<route>` (`det_<builder>`, `repair_<builder>`, `llm_legacy`, `llm_simple`,
+`refusal_gate`). The dev-set measurement against legacy and s3t and the three options for the
+owner are in DEC-041 and `docs/eval/runs/dec041-hybrid-dev.md`.

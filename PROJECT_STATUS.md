@@ -1,5 +1,19 @@
 # Project Status
 
+## Hybrid answer mode measured, DEC-041 proposed -- 2026-11-20 (WAITING FOR THE OWNER)
+
+- **Default unchanged:** s3t (DEC-040). `RAG_ANSWER_MODE=hybrid` exists, off by default.
+- **Dev sets, one job per set, 1 run, legacy / s3t / hybrid** (`docs/eval/runs/dec041-hybrid-dev.md`):
+  - 6 dev sets (137 items): correct 75 / 114 / 112; false answers + wrong values 26 / 16 / 19;
+    leaks 0.
+  - UAT (monitoring only): correct 97 / 68 / 92.
+  - The deterministic route answers 74 of 100 UAT items (73 right) and 14 of 137 other items
+    (10 right); its misfires are ND-006, ND-019, ND-020 and REL-103.
+- **DEC-041:** keep s3t (what DEC-026 picks), switch to hybrid, or return to legacy; the owner
+  chooses. GPU latency not measured (about 640 MB of RAM available on the owner's machine).
+- **Observability:** each answer counts `answer_route_<route>`, each no-answer diagnostic
+  `no_answer_<reason>`; every dev runner records them per question.
+
 ## Held-out v3.1 closed, new default simple s1-s3 + qwen3.5-text:4b (DEC-040) -- 2026-11-20
 
 - **Held-out v3.1 run 44575927833:** automatic verdict `s3t`; the owner's labels agree
