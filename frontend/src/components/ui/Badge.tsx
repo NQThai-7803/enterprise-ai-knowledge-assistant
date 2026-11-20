@@ -1,7 +1,7 @@
 import { clsx } from "clsx";
 import type { ReactNode } from "react";
 
-type BadgeTone = "neutral" | "success" | "warning" | "danger" | "accent";
+type BadgeTone = "neutral" | "success" | "warning" | "danger" | "accent" | "strong";
 
 const toneClasses: Record<BadgeTone, string> = {
   neutral: "bg-border/40 text-ink/80",
@@ -9,6 +9,7 @@ const toneClasses: Record<BadgeTone, string> = {
   warning: "bg-warning/10 text-warning",
   danger: "bg-danger/10 text-danger",
   accent: "bg-accent/10 text-accent-strong",
+  strong: "bg-ink text-surface",
 };
 
 export function Badge({

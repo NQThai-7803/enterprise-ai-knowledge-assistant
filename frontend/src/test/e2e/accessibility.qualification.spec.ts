@@ -73,8 +73,8 @@ test("login has labeled fields, keyboard order, visible focus, and announced val
 test("confirmation dialog receives focus when opened", async ({ page }) => {
   await mockAdminUsers(page);
   await page.goto("/users");
-  await page.getByRole("button", { name: "Deactivate" }).first().click();
-  const dialog = page.getByRole("dialog", { name: /deactivate/i });
+  await page.getByRole("button", { name: "Vô hiệu hóa" }).first().click();
+  const dialog = page.getByRole("dialog", { name: /vô hiệu hóa/i });
   await expect(dialog).toBeVisible();
   expect(await dialog.evaluate((element) => element.contains(document.activeElement))).toBe(true);
 });
@@ -82,12 +82,12 @@ test("confirmation dialog receives focus when opened", async ({ page }) => {
 test("Escape dismisses confirmation dialog without acting", async ({ page }) => {
   await mockAdminUsers(page);
   await page.goto("/users");
-  await page.getByRole("button", { name: "Deactivate" }).first().click();
-  const dialog = page.getByRole("dialog", { name: /deactivate/i });
+  await page.getByRole("button", { name: "Vô hiệu hóa" }).first().click();
+  const dialog = page.getByRole("dialog", { name: /vô hiệu hóa/i });
   await expect(dialog).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(dialog).toHaveCount(0);
-  await expect(page.getByText("INACTIVE")).toHaveCount(0);
+  await expect(page.getByText("Đã vô hiệu hóa", { exact: true })).toHaveCount(0);
 });
 
 test("mobile reduced-motion login does not overflow or animate", async ({ page }) => {
@@ -106,12 +106,12 @@ test("mobile reduced-motion login does not overflow or animate", async ({ page }
 test("dialog traps both Tab directions, labels its message, and restores focus on cancel/reopen", async ({ page }) => {
   await mockAdminUsers(page);
   await page.goto("/users");
-  const trigger = page.getByRole("button", { name: "Deactivate" }).first();
+  const trigger = page.getByRole("button", { name: "Vô hiệu hóa" }).first();
   await trigger.click();
-  const dialog = page.getByRole("dialog", { name: "Deactivate user" });
+  const dialog = page.getByRole("dialog", { name: "Vô hiệu hóa người dùng?" });
   const cancel = dialog.getByRole("button", { name: "Hủy" });
-  const confirm = dialog.getByRole("button", { name: "Deactivate" });
-  await page.getByRole("button", { name: "Create user" }).focus();
+  const confirm = dialog.getByRole("button", { name: "Vô hiệu hóa" });
+  await page.getByRole("button", { name: "Tạo người dùng" }).focus();
   await expect(cancel).toBeFocused();
   const observed = await page.evaluate(() => ({
     activeTag: document.activeElement?.tagName,
@@ -142,12 +142,12 @@ test("dialog traps both Tab directions, labels its message, and restores focus o
   }));
   expect(observed.modal).toBe("true");
   expect(descriptionId).toBeTruthy();
-  expect(descriptionText).toContain("refresh tokens");
+  expect(descriptionText).toContain("phiên đăng nhập");
   expect(observed.activeText).toBe("Hủy");
   expect(afterShiftTab.insideDialog).toBe(true);
   expect(afterTab.insideDialog).toBe(true);
   expect(afterCancel.activeTag).toBe("BUTTON");
-  expect(afterCancel.activeText).toBe("Deactivate");
+  expect(afterCancel.activeText).toBe("Vô hiệu hóa");
   await expect(dialog).toHaveCount(0);
   await expect(trigger).toBeFocused();
   await trigger.click();
@@ -164,11 +164,11 @@ test("dialog traps both Tab directions, labels its message, and restores focus o
 test("successful confirmation keeps focus on a live control when its trigger is replaced", async ({ page }) => {
   await mockAdminUsers(page);
   await page.goto("/users");
-  await page.getByRole("button", { name: "Deactivate" }).first().click();
-  const dialog = page.getByRole("dialog", { name: "Deactivate user" });
-  await dialog.getByRole("button", { name: "Deactivate" }).click();
+  await page.getByRole("button", { name: "Vô hiệu hóa" }).first().click();
+  const dialog = page.getByRole("dialog", { name: "Vô hiệu hóa người dùng?" });
+  await dialog.getByRole("button", { name: "Vô hiệu hóa" }).click();
   await expect(dialog).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Reactivate" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Kích hoạt lại" })).toBeVisible();
   const focus = await page.evaluate(() => ({
     tag: document.activeElement?.tagName,
     connected: document.activeElement?.isConnected,

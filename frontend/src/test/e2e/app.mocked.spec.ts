@@ -310,27 +310,38 @@ async function mockDepartmentsApi(page: Page) {
 test("admin user management supports conflict, edit, deactivate, and reactivate", async ({ page }) => {
   await authenticatedPage(page, "ADMIN");
   await mockUsersApi(page);
+  await page.route("**/api/v1/departments?**", (route) =>
+    route.fulfill({
+      json: {
+        data: [{ id: "dept-1", name: "Knowledge", code: "KNOWLEDGE", description: null, created_at: "2026-07-30T00:00:00Z" }],
+        meta: { page: 1, page_size: 100, total: 1, total_pages: 1 },
+      },
+    }),
+  );
   await page.goto("/users");
 
-  await page.getByLabel("Email").fill("staff.admin-ui@example.test");
-  await page.getByLabel("Full name").fill("Duplicate Staff");
-  await page.getByLabel("Temporary password").fill("MockPassword123!");
-  await page.locator("#new-role").selectOption("STAFF");
-  await page.getByLabel("Department ID").fill("dept-1");
-  await page.getByRole("button", { name: "Create user" }).click();
-  await expect(page.getByText("Create user failed")).toBeVisible();
+  await page.getByRole("button", { name: "Tạo người dùng" }).click();
+  const createDrawer = page.getByRole("dialog", { name: "Tạo người dùng" });
+  await createDrawer.getByLabel("Email").fill("staff.admin-ui@example.test");
+  await createDrawer.getByLabel("Họ tên").fill("Duplicate Staff");
+  await createDrawer.getByLabel("Mật khẩu tạm").fill("MockPassword123!");
+  await createDrawer.getByLabel("Vai trò").selectOption("STAFF");
+  await createDrawer.getByLabel("Phòng ban").selectOption("dept-1");
+  await createDrawer.getByRole("button", { name: "Tạo người dùng" }).click();
+  await expect(createDrawer.getByRole("alert")).toContainText("Email này đã được dùng.");
+  await createDrawer.getByRole("button", { name: "Đóng" }).click();
 
-  await page.getByRole("button", { name: "Edit" }).first().click();
-  await page.getByLabel("Edit full name").fill("Edited Admin UI Staff");
-  await page.getByRole("button", { name: "Update user" }).click();
+  await page.getByRole("button", { name: "Sửa" }).first().click();
+  const editDrawer = page.getByRole("dialog", { name: "Sửa người dùng" });
+  await editDrawer.getByLabel("Họ tên").fill("Edited Admin UI Staff");
+  await editDrawer.getByRole("button", { name: "Lưu thay đổi" }).click();
   await expect(page.getByText("Edited Admin UI Staff")).toBeVisible();
-  await page.getByRole("button", { name: "Cancel" }).click();
 
-  await page.getByRole("button", { name: "Deactivate" }).first().click();
-  await page.getByRole("button", { name: "Deactivate" }).last().click();
-  await expect(page.getByText("INACTIVE")).toBeVisible();
-  await page.getByRole("button", { name: "Reactivate" }).first().click();
-  await expect(page.getByText("ACTIVE")).toBeVisible();
+  await page.getByRole("button", { name: "Vô hiệu hóa" }).first().click();
+  await page.getByRole("dialog", { name: "Vô hiệu hóa người dùng?" }).getByRole("button", { name: "Vô hiệu hóa" }).click();
+  await expect(page.getByText("Đã vô hiệu hóa", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Kích hoạt lại" }).first().click();
+  await expect(page.getByText("Đang hoạt động", { exact: true })).toBeVisible();
 });
 
 test("admin department management supports conflict, edit, and delete", async ({ page }) => {
