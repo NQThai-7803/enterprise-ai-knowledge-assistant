@@ -222,6 +222,7 @@ def make_settings(**overrides: object) -> Settings:
         "chat_history_max_messages": 2,
         "chat_history_max_tokens": 200,
         "citation_max_sources_per_answer": 2,
+        "rag_answer_mode": "legacy",  # legacy JSON fake LLM (DEC-040 rollback)
     }
     defaults.update(overrides)
     return Settings(_env_file=None, **defaults)
