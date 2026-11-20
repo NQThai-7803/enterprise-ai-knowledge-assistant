@@ -75,30 +75,14 @@ textarea {
   scrollbar-width: thin;
 }
 
-.motion-soft-grid {
-  background:
-    linear-gradient(90deg, rgb(var(--color-border) / 0.35) 1px, transparent 1px),
-    linear-gradient(rgb(var(--color-border) / 0.35) 1px, transparent 1px);
-  background-size: 36px 36px;
-  mask-image: linear-gradient(140deg, black 0%, transparent 70%);
-}
-
-.motion-signal {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.motion-signal::before {
-  content: "";
-  position: absolute;
-  width: 34rem;
-  height: 34rem;
-  top: -12rem;
-  right: -12rem;
-  border-radius: 999px;
-  background: radial-gradient(circle, rgb(var(--color-accent) / 0.18), transparent 65%);
+/* Login side panel: static grid and glow, no motion (the old drifting signal is gone). */
+.login-panel {
+  background-color: rgb(13 18 24);
+  background-image:
+    radial-gradient(circle at 85% 95%, rgb(45 212 191 / 0.14), transparent 45%),
+    linear-gradient(90deg, rgb(255 255 255 / 0.04) 1px, transparent 1px),
+    linear-gradient(rgb(255 255 255 / 0.04) 1px, transparent 1px);
+  background-size: auto, 44px 44px, 44px 44px;
 }
 
 .fade-up {

@@ -61,9 +61,11 @@ test("login has labeled fields, keyboard order, visible focus, and announced val
   expect(focusStyle.style).not.toBe("none");
   expect(Number.parseFloat(focusStyle.width)).toBeGreaterThan(0);
   await page.keyboard.press("Tab");
-  await expect(page.getByLabel("Password")).toBeFocused();
+  await expect(page.getByLabel("Mật khẩu", { exact: true })).toBeFocused();
   await page.keyboard.press("Tab");
-  await expect(page.getByRole("button", { name: "Sign in" })).toBeFocused();
+  await expect(page.getByRole("button", { name: "Hiện mật khẩu" })).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(page.getByRole("button", { name: "Đăng nhập" })).toBeFocused();
   await page.keyboard.press("Enter");
   await expect(page.getByRole("alert")).toHaveCount(2);
 });
@@ -88,17 +90,17 @@ test("Escape dismisses confirmation dialog without acting", async ({ page }) => 
   await expect(page.getByText("INACTIVE")).toHaveCount(0);
 });
 
-test("mobile reduced-motion login does not overflow or animate its signal", async ({ page }) => {
+test("mobile reduced-motion login does not overflow or animate", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ reducedMotion: "reduce" });
   await page.goto("/login");
-  await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Đăng nhập" })).toBeVisible();
   const observed = await page.evaluate(() => ({
     overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
-    animation: getComputedStyle(document.querySelector(".motion-signal")!, "::before").animationName,
+    animations: document.getAnimations().length,
   }));
   expect(observed.overflow).toBe(false);
-  expect(observed.animation).toBe("none");
+  expect(observed.animations).toBe(0);
 });
 
 test("dialog traps both Tab directions, labels its message, and restores focus on cancel/reopen", async ({ page }) => {

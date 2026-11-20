@@ -344,7 +344,7 @@ test("admin department management supports conflict, edit, and delete", async ({
   await page.getByRole("button", { name: "Create department" }).click();
   await expect(page.getByText("Create department failed")).toBeVisible();
   await page.getByRole("button", { name: "Đăng xuất" }).click();
-  await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Đăng nhập" })).toBeVisible();
 
   await authenticatedPage(page, "ADMIN");
   await page.goto("/departments");
