@@ -178,8 +178,8 @@ class Settings(BaseSettings):
     # (at most 2 per document), one prompt, citation + claim validation, one retry. legacy
     # keeps the full pipeline. DEC-040 (2026-11-20): simple with s1-s3 on is the default (with
     # qwen3.5-text:4b); RAG_ANSWER_MODE=legacy and LLM_OLLAMA_MODEL=qwen2.5:3b roll it back.
-    # hybrid (DEC-041 proposal, not a default): the legacy deterministic route first, under its
-    # existing conditions; a question it does not answer goes to the simple path.
+    # hybrid (DEC-041: kept behind this value, not recommended): the legacy deterministic route
+    # first, under its existing conditions; a question it does not answer goes to the simple path.
     rag_answer_mode: Literal["legacy", "simple", "hybrid"] = "simple"
     # Simple-mode fixes s1-s3 (same doc, owner decision 2026-11-16), read by the simple path
     # (simple mode, and hybrid mode when no deterministic route answers).

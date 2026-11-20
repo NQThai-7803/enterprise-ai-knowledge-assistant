@@ -1,5 +1,13 @@
 # Project Status
 
+## DEC-041 decided: keep s3t, hybrid not recommended -- 2026-11-20
+
+- **Default unchanged:** s3t (simple s1-s3 + `qwen3.5-text:4b` + `exclude`). `RAG_ANSWER_MODE=hybrid`
+  stays behind its flag, off by default, not recommended (route false matches outside UAT).
+- **UAT is a regression suite only** (DEC-026 updated); configurations are chosen on the dev sets.
+- **Next:** the UI backend requests, then false refusals in the shared layer (22 s3t refusals on
+  UAT, 6 on `natural_dev_v1`, `TASKS.md`).
+
 ## Hybrid answer mode measured, DEC-041 proposed -- 2026-11-20 (WAITING FOR THE OWNER)
 
 - **Default unchanged:** s3t (DEC-040). `RAG_ANSWER_MODE=hybrid` exists, off by default.

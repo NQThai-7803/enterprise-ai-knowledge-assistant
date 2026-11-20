@@ -6,6 +6,11 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### DEC-041 decided: keep s3t; UAT is a regression suite -- 2026-11-20
+
+- **Decided:** the owner keeps s3t as the default; `RAG_ANSWER_MODE=hybrid` stays behind its flag,
+  off, not recommended. UAT is a regression suite, not a selection criterion (DEC-026 updated).
+
 ### Hybrid answer mode (off) and per-answer route labels (DEC-041 proposal) -- 2026-11-20
 
 - **Added:** `RAG_ANSWER_MODE=hybrid`, off by default: legacy's deterministic route under its

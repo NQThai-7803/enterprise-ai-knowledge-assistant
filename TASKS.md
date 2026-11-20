@@ -1,6 +1,16 @@
 
 # Implementation Tasks
 
+## Order of the next work -- 2026-11-20 (DEC-041)
+
+1. **Backend requests of the UI session** (`docs/ui/backend-requests.md`): BR-1, BR-3, BR-4, BR-2,
+   BR-8, BR-9; BR-5, BR-6 and BR-7 are postponed.
+2. **[Priority 1 after the BRs] False refusals in the shared layer** (retrieval / evidence gate /
+   validation of the simple path). Diagnose on the dev sets only, never on a held-out set. Case set:
+   - the 22 s3t false refusals on UAT (run 44694882404): Q001 Q003 Q006 Q007 Q026 Q029 Q030 Q031 Q033 Q037 Q039 Q042 Q048 Q063 Q064 Q071 Q075 Q080 Q086 Q093 Q096 Q097;
+   - the 6 s3t false refusals on `natural_dev_v1` (run 44694886339): ND-003 ND-006 ND-007 ND-008 ND-009 ND-018.
+3. GPU latency of the default on the GTX 1650, once the owner has restarted the machine (DEC-041).
+
 ## Order of the next work -- 2026-11-08
 
 1. **DONE: REL-303 measured under DEC-013 on Actions and on by default** (`docs/eval/runs/fix2d-rel303-actions.md`).
@@ -8,7 +18,7 @@
 3. **Embedding fine-tune** (`docs/design/embedding-finetune.md` and DEC-015 on branch `feat/embedding-finetune-infra`): infrastructure only so far; the baseline measurement and training come after FIX 3.
 4. The final held-out v2 measurement, once, after the choices above are made (DEC-012).
 
-## Hybrid answer mode measured, DEC-041 proposed (owner to choose) -- 2026-11-20
+## Hybrid answer mode measured, DEC-041 decided: keep s3t -- 2026-11-20
 
 - **DONE:**
   - `RAG_ANSWER_MODE=hybrid` (off): legacy's deterministic route first, else the s3t path.
@@ -16,12 +26,10 @@
     `no_answer_reasons` and `retrieved` per question; `scripts/eval/route_matrix.py`.
   - The 7 dev sets x legacy / s3t / hybrid, one job per set, 1 run (`docs/eval/runs/dec041-hybrid-dev.md`).
   - The 11 old `eaka-verify-*` images deleted.
-- **WAITING FOR OWNER:**
-  - Choose among the three DEC-041 options (keep s3t / hybrid / legacy).
-  - GPU latency on the GTX 1650 (10 `natural_dev_v1` items, s3t and hybrid): not measured, about
-    640 MB of RAM was available. Command in `docs/eval/runs/dec041-hybrid-dev.md`.
-- **NEXT (not started):** route misfires outside UAT (ND-006, ND-019, ND-020, REL-103), if hybrid
-  is chosen; diagnose on the dev sets only.
+- **DECIDED (owner, DEC-041):** keep s3t; `hybrid` stays behind its flag, not recommended; UAT is
+  a regression suite only (DEC-026 updated).
+- **WAITING FOR OWNER:** GPU latency on the GTX 1650: not measured, about 640 MB of RAM was
+  available; measured after the owner restarts the machine.
 
 ## Held-out v3.1 closed, new default (DEC-040) -- 2026-11-20
 

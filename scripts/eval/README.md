@@ -1,6 +1,10 @@
 # UAT Q001-Q100 eval harness
 
 Used in PROMPT 3d/3e to compare the runtime before and after a change on an isolated stack.
+
+**UAT is a regression suite (DEC-041, DEC-026):** it is run to watch for changes and reported by
+route; it is not a criterion for choosing a configuration. Configurations are chosen by the
+DEC-026 rule on the dev sets (`natural_dev_v1` first).
 It never touches the V2, AUTH-02 or main stacks.
 
 | File | Purpose |
