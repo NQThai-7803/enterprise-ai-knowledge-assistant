@@ -28,7 +28,7 @@ from tests.unit.test_grounded_answer_service import (
 )
 from tests.unit.test_simple_answer_mode import GOOD, QUESTION, SOURCE, StrictCitationValidation
 
-ROUTE_ANSWER = "Tai trong toi da cua xe toi la 2.500 kg."
+ROUTE_ANSWER = "Tai trong cua xe toi la 2.500 kg."
 
 
 class RevokedCitationValidation(StrictCitationValidation):
