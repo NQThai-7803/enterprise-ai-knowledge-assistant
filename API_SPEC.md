@@ -77,12 +77,15 @@ Success: `HTTP 200`
       "full_name": "Development Admin",
       "role": "ADMIN",
       "department_id": null,
+      "department_name": null,
       "is_active": true
     }
   },
   "meta": null
 }
 ```
+
+`user.department_name` (BR-4) is the name of the user's own Department, `null` without one; `POST /auth/refresh` returns the same `user` object.
 
 Errors:
 
@@ -172,13 +175,16 @@ Success: `HTTP 200`
     "id": "uuid",
     "email": "admin@example.com",
     "full_name": "Development Admin",
-    "role": "ADMIN",
-    "department_id": null,
+    "role": "MANAGER",
+    "department_id": "uuid",
+    "department_name": "Nhân sự",
     "is_active": true
   },
   "meta": null
 }
 ```
+
+`department_name` (BR-4): the name of the caller's own Department, `null` without one. It is the only name of another record this endpoint returns.
 
 The response never includes `hashed_password` or refresh token hashes. The current user is loaded from the database on each request.
 
@@ -352,9 +358,56 @@ Requires Admin or Manager. Staff receives `403 FORBIDDEN`.
 
 Content type: `multipart/form-data` with file MIME type `application/pdf`, `image/png`, or `image/jpeg`.
 
-Fields: `file`, `title`, `description`, `access_scope`, `department_id`.
+Fields (form):
+
+| Field | Type | Rule |
+|---|---|---|
+| `file` | file | required; PDF, PNG or JPEG |
+| `title` | string | required, at most 255 characters, trimmed, not blank |
+| `description` | string | optional; blank becomes `null` |
+| `access_scope` | `PRIVATE` / `DEPARTMENT` / `ORGANIZATION` | required |
+| `department_id` | UUID | required for `DEPARTMENT`; must be absent for `PRIVATE` and `ORGANIZATION` |
+| `document_code` | string | optional, at most 128 characters, trimmed; blank becomes `null` |
+| `document_version` | string | optional, at most 64 characters, trimmed; blank becomes `null` |
+| `effective_from` | date `YYYY-MM-DD` | optional |
+| `effective_to` | date `YYYY-MM-DD` | optional; not before `effective_from` |
+| `lifecycle_status` | `ACTIVE` / `SUPERSEDED` / `ARCHIVED` / `DRAFT` | optional, default `ACTIVE`. With `RAG_DRAFT_DOCUMENT_POLICY=exclude` (the default, DEC-033/036) a `DRAFT` document is listed and downloadable as usual but never used in an answer. |
+| `supersedes_document_id` | UUID | optional; a Document the caller can view, not the Document itself |
+
+Who may upload what:
+
+- Staff: `403 FORBIDDEN`.
+- Admin: any scope; `DEPARTMENT` with any existing Department.
+- Manager: `PRIVATE`, or `DEPARTMENT` with the Manager's own `department_id`. `department_id` is not filled in or replaced by the server: it must be sent and must equal the Manager's own Department. `ORGANIZATION`, another Department, or a Manager without a Department: `403 FORBIDDEN`.
+
+Errors: `422 VALIDATION_ERROR` for a field outside its rule (too long, blank title, bad date, `effective_to` before `effective_from` with message `effective_to must not precede effective_from.`, `department_id` missing for `DEPARTMENT` or present for another scope); `404 RESOURCE_NOT_FOUND` for an unknown `department_id` or a `supersedes_document_id` the caller cannot view; `409 DUPLICATE_DOCUMENT`; `413`, `415` and `400` for the file itself. Validation runs before the file is stored.
 
 The response is `HTTP 202 Accepted` and never includes `storage_key`, `checksum_sha256`, local paths, `error_message`, or permissions.
+
+Document response fields (upload `202`, `GET /documents` items, `GET /documents/{document_id}`):
+
+```json
+{
+  "id": "uuid",
+  "title": "Quy định nghỉ phép",
+  "description": null,
+  "document_code": "ND-HR-007",
+  "document_version": "1.0",
+  "effective_from": "2026-09-01",
+  "effective_to": null,
+  "lifecycle_status": "ACTIVE",
+  "supersedes_document_id": null,
+  "original_filename": "nghi-phep.pdf",
+  "mime_type": "application/pdf",
+  "file_size": 182340,
+  "status": "UPLOADED",
+  "access_scope": "DEPARTMENT",
+  "department_id": "uuid",
+  "uploaded_by": "uuid",
+  "created_at": "2026-11-20T08:00:00Z",
+  "updated_at": "2026-11-20T08:00:00Z"
+}
+```
 
 Duplicate detection is scoped to the same uploader and checksum where `is_deleted = false`.
 
@@ -366,7 +419,7 @@ Query parameters:
 
 - `page`, default `1`, must be `>= 1`.
 - `page_size`, default `20`, must be between `1` and `100`.
-- `search`, searches `title`, `original_filename`, and `description`, max 200 characters.
+- `search`, searches `title`, `original_filename`, and `description` (case-insensitive substring), max 200 characters. It does not search `document_code`.
 - `status`: `UPLOADED`, `PROCESSING`, `READY`, `FAILED`, or `ARCHIVED`.
 - `access_scope`: `PRIVATE`, `DEPARTMENT`, or `ORGANIZATION`.
 - `department_id`: Department UUID filter.
@@ -397,6 +450,17 @@ Response headers:
 - `Cache-Control: private, no-store`
 
 Storage keys and local paths are never returned. If metadata exists but the local file is missing, the endpoint returns `410 DOCUMENT_FILE_UNAVAILABLE`.
+
+### GET `/documents/{document_id}/preview`
+
+BR-2. The same bytes, view policy, errors and audit event (`DOCUMENT_DOWNLOADED`) as `/download`, for showing the file in the browser:
+
+- `Content-Type`: stored MIME type (`application/pdf`, `image/png`, or `image/jpeg`; uploads accept nothing else)
+- `Content-Disposition: inline; filename="..."`
+- `X-Content-Type-Options: nosniff`
+- `Cache-Control: private, no-store`
+
+It needs the Bearer header like every other endpoint, so a plain link cannot open it: the client fetches it and shows the result through a `blob:` URL. The server ignores a `#page=N` fragment (browsers never send it); the client adds it to the `blob:` URL of a PDF. Errors: `401` without a valid token, `404 RESOURCE_NOT_FOUND` when the caller cannot view the Document (or it does not exist or is deleted), `410 DOCUMENT_FILE_UNAVAILABLE` when the stored file is missing. Signed, time-limited URLs are not implemented.
 
 ### PATCH `/documents/{document_id}`
 
@@ -437,7 +501,6 @@ Not implemented yet:
 - Celery processing task dispatch.
 - Document chunks.
 - Embeddings.
-- Preview endpoint.
 - Signed download URLs.
 
 ## 8. Chat
@@ -483,6 +546,13 @@ Behavior:
 - History returns USER and ASSISTANT messages only, ordered by `created_at ASC, id ASC`.
 - SYSTEM messages are hidden.
 - Assistant messages include `citations` for the current page, loaded in a batch query.
+- Every message has `grounding_status` (BR-3): `ANSWERED` or `NO_ANSWER` on an ASSISTANT message, as returned when it was sent; `null` on USER messages and on ASSISTANT messages stored before migration `20261120_0013`. The `assistant_message` of `POST .../messages` carries the same field; the stream's `message.completed` already has `grounding_status` at the top level. Example:
+
+  ```json
+  { "id": "uuid", "role": "ASSISTANT", "content": "Chưa có câu trả lời…", "response_time_ms": 900,
+    "citations": [], "created_at": "2026-11-20T08:00:00Z", "grounding_status": "NO_ANSWER" }
+  ```
+- **Sentences naming an unverified part (BR-3).** An `ANSWERED` answer may contain sentences that name a part of the question the documents do not confirm. The prompt asks for the fixed form `Chưa xác minh được từ tài liệu bạn được phép truy cập: …` (English question: `Could not be verified from the documents you can access: …`). In the default answer path (simple mode, s1) the model writes these sentences, so the wording after the prefix, and occasionally the prefix itself, may vary. The server recognises a sentence containing `chưa xác minh được`, `không xác minh được` or `could not be verified` (case- and accent-insensitive), never validates it as a claim, and removes its source markers, so it carries no citation number. The exception is a sentence holding a number the question does not: it stays a claim with its marker. The legacy compound path (`RAG_COMPOUND_PARTIAL_ANSWER_ENABLED`, off) builds the Vietnamese sentence itself, `Chưa xác minh được từ tài liệu bạn được phép truy cập: <part>.`. A client may style such a sentence differently, but must still show it.
 - Historical citation metadata may be omitted if the current User no longer has access to the cited Document.
 - The historical Assistant answer text is not redacted in TASK-020.
 - `retrieval_query`, token usage, prompt, vectors, scores, storage keys, permission metadata, and internal source markers are not returned.
@@ -794,6 +864,30 @@ The report does not return Assistant answers, User questions, session titles, Ch
 
 ## 10. Audit logs
 
+### Audit event types (BR-9)
+
+The stable `event_type` values (`app/audit/events.py`, `AuditEventType`). The filter accepts every value; the server writes all but the two marked reserved.
+
+| `event_type` | Written when | `target_type` |
+|---|---|---|
+| `AUTH_LOGIN_SUCCEEDED` | a login succeeds | `USER` |
+| `AUTH_LOGIN_FAILED` | a login fails (outcome `FAILURE`, `error_code` set) | none |
+| `USER_CREATED` | an Admin creates a User | `USER` |
+| `USER_UPDATED` | a User's profile fields change | `USER` |
+| `USER_STATUS_CHANGED` | a User is deactivated or reactivated (metadata `status_before`, `status_after`) | `USER` |
+| `USER_DEACTIVATED` | reserved, not written (deactivation writes `USER_STATUS_CHANGED`) | — |
+| `USER_REACTIVATED` | reserved, not written (reactivation writes `USER_STATUS_CHANGED`) | — |
+| `DEPARTMENT_CREATED` / `DEPARTMENT_UPDATED` / `DEPARTMENT_DELETED` | Department changes | `DEPARTMENT` |
+| `DOCUMENT_UPLOADED` / `DOCUMENT_UPDATED` / `DOCUMENT_DELETED` | Document changes | `DOCUMENT` |
+| `DOCUMENT_DOWNLOADED` | a download, or a preview (`/documents/{id}/preview`) | `DOCUMENT` |
+| `DOCUMENT_PERMISSION_GRANTED` / `DOCUMENT_PERMISSION_UPDATED` / `DOCUMENT_PERMISSION_REVOKED` | direct grant changes | `DOCUMENT_PERMISSION` |
+| `CHAT_SESSION_CREATED` / `CHAT_SESSION_DELETED` | chat session changes | `CHAT_SESSION` |
+| `CHAT_QUESTION_SUBMITTED` | a question is stored | `CHAT_MESSAGE` |
+| `CHAT_ANSWER_GENERATED` / `CHAT_NO_ANSWER_GENERATED` | an answer is stored, `ANSWERED` / `NO_ANSWER` | `CHAT_MESSAGE` |
+| `FEEDBACK_UPSERTED` | feedback is set or changed | `FEEDBACK` |
+
+Audit items never include the client IP address or raw headers.
+
 ### GET `/audit-logs`
 
 Returns an Admin-only paginated AuditLog report.
@@ -802,7 +896,7 @@ Query parameters:
 
 - `page`, default `1`, must be `>= 1`.
 - `page_size`, default `AUDIT_REPORT_PAGE_SIZE`, maximum `AUDIT_REPORT_MAX_PAGE_SIZE`.
-- `event_type`, optional stable audit event type.
+- `event_type`, optional stable audit event type, one of the values below; any other value returns `422 AUDIT_FILTER_INVALID`.
 - `outcome`, optional `SUCCESS` or `FAILURE`.
 - `actor_user_id`, optional actor UUID.
 - `target_type`, optional safe target type: `USER`, `DEPARTMENT`, `DOCUMENT`, `DOCUMENT_PERMISSION`, `CHAT_SESSION`, `CHAT_MESSAGE`, or `FEEDBACK`.
@@ -967,6 +1061,52 @@ All endpoints in this section require an active Admin bearer token. Manager and 
 
 Returns the aggregate backend dashboard payload: version, uptime, health checks, provider status, worker status, queue status, and safe statistics.
 
+Example (BR-8; test stack, shortened lists). `version`, `health`, `providers`, `workers`, `queues` and `statistics` have the shapes of `/admin/version`, `/admin/health`, `/admin/providers`, `/admin/workers`, `/admin/queues` and `/admin/statistics`:
+
+```json
+{
+  "data": {
+    "generated_at": "2026-11-20T11:09:09Z",
+    "version": { "app_name": "Enterprise AI Knowledge Assistant", "version": "0.1.0",
+                 "environment": "production", "python_version": "3.12.16", "api_prefix": "/api/v1",
+                 "migration_head": "20261120_0013", "database_revision": "20261120_0013",
+                 "started_at": "2026-11-20T11:09:05Z", "uptime_seconds": 3 },
+    "uptime_seconds": 3,
+    "health": { "status": "healthy", "generated_at": "2026-11-20T11:09:09Z",
+                "checks": [ { "name": "api", "status": "ok", "enabled": true,
+                              "message": "API process is running.", "details": { "uptime_seconds": 3 } } ] },
+    "providers": { "llm": { "provider_type": "llm", "provider": "ollama", "status": "healthy",
+                            "enabled": true, "configured": true, "display_name": "Ollama",
+                            "model": "qwen3.5-text:4b", "external_allowed": null,
+                            "connectivity_checked": false, "message": "…" },
+                   "web_search": { "provider_type": "web_search", "provider": "mock",
+                                   "status": "disabled", "enabled": false, "configured": false,
+                                   "display_name": "Mock Web Search", "model": null,
+                                   "external_allowed": false, "connectivity_checked": false,
+                                   "message": "Web search is disabled." } },
+    "workers": { "status": "healthy", "active_worker_count": 1,
+                 "workers": [ { "name": "worker@host", "status": "ok",
+                                "queues": ["default", "documents"], "pool": "prefork" } ],
+                 "registered_tasks": ["documents.process_document", "system.worker_ping"],
+                 "message": null },
+    "queues": { "status": "healthy",
+                "queues": [ { "kind": "document", "name": "documents", "status": "ok",
+                              "configured": true, "pending": 2,
+                              "consumer": "documents.process_document",
+                              "message": "Document queue is reachable." } ] },
+    "statistics": { "documents": { "total": 12, "deleted": 0, "by_status": { "READY": 12 } },
+                    "chunks": { "total": 340 }, "embeddings": { "total": 340 },
+                    "users": { "total": 4, "active": 4, "inactive": 0,
+                               "by_role": { "ADMIN": 1, "MANAGER": 1, "STAFF": 2 } },
+                    "departments": { "total": 2 }, "chat_sessions": { "total": 9, "archived": 0 },
+                    "messages": { "total": 36, "by_role": { "USER": 18, "ASSISTANT": 18 } },
+                    "feedback": { "total": 3, "by_rating": { "HELPFUL": 2, "NOT_HELPFUL": 1 } },
+                    "audit_logs": { "total": 120 } }
+  },
+  "meta": null
+}
+```
+
 ### GET `/admin/health`
 
 Returns component health for:
@@ -984,9 +1124,67 @@ Returns component health for:
 
 LLM and Web Search checks are configuration checks only by default and do not call external providers. Embedding health does not load the model.
 
+Example (BR-8; the test stack, LLM disabled). `status` is `healthy`, `degraded` or `unhealthy`; each check's `status` is `ok`, `degraded`, `unavailable`, `disabled`, `misconfigured` or `not_configured`; `details` holds only safe scalars and lists of strings, and its keys differ per check:
+
+```json
+{
+  "data": {
+    "status": "healthy",
+    "generated_at": "2026-11-20T11:09:08Z",
+    "checks": [
+      { "name": "api", "status": "ok", "enabled": true, "message": "API process is running.",
+        "details": { "uptime_seconds": 2 } },
+      { "name": "postgres", "status": "ok", "enabled": true, "message": "PostgreSQL is reachable.", "details": {} },
+      { "name": "redis", "status": "ok", "enabled": true, "message": "Redis is reachable.", "details": {} },
+      { "name": "worker", "status": "ok", "enabled": true,
+        "message": "At least one Celery worker responded.", "details": { "active_worker_count": 1 } },
+      { "name": "ocr", "status": "ok", "enabled": true, "message": "OCR engine is available.",
+        "details": { "engine": "tesseract", "requested_languages": ["vie", "eng"],
+                     "version": "tesseract 5", "available_languages": ["eng", "vie"] } },
+      { "name": "embedding", "status": "ok", "enabled": true,
+        "message": "Embedding provider configuration is valid.",
+        "details": { "provider": "sentence_transformers", "model": "intfloat/multilingual-e5-small",
+                     "dimensions": 384, "model_loading_checked": false } },
+      { "name": "llm", "status": "disabled", "enabled": false, "message": "LLM is disabled.",
+        "details": { "provider": "openai_compatible", "display_name": "OpenAI-compatible",
+                     "model": null, "connectivity_checked": false } },
+      { "name": "web_search", "status": "disabled", "enabled": false, "message": "Web search is disabled.",
+        "details": { "provider": "mock", "display_name": "Mock Web Search",
+                     "external_allowed": false, "connectivity_checked": false } },
+      { "name": "streaming", "status": "ok", "enabled": true, "message": "Streaming subsystem is registered.",
+        "details": { "strategy": "buffer_after_validation", "heartbeat_seconds": 15.0,
+                     "max_duration_seconds": 120.0 } },
+      { "name": "conversation", "status": "ok", "enabled": true, "message": "Conversation memory is enabled.",
+        "details": { "max_messages": 10, "max_tokens": 1200 } }
+    ]
+  },
+  "meta": null
+}
+```
+
+On the default deployment the `llm` check reads `"status": "ok"`, `"enabled": true` with `details.provider` `ollama`, `details.display_name` `Ollama` and `details.model` `qwen3.5-text:4b` when its configuration is valid (a configuration check: the model is not called).
+
 ### GET `/admin/providers`
 
 Returns safe LLM and Web Search provider state: provider name, display name, enabled/disabled, configured flag, healthy/disabled/misconfigured/unhealthy status, selected model where applicable, external-call policy where applicable, and safe message. Provider secrets are never returned.
+
+Example (BR-8; test stack, LLM disabled). On the default deployment `llm` reads `"provider": "ollama"`, `"display_name": "Ollama"`, `"model": "qwen3.5-text:4b"`, `"enabled": true`, `"configured": true`, and `"status": "healthy"` when the configuration is valid. `connectivity_checked` stays `false`: the endpoint does not call the provider.
+
+```json
+{
+  "data": {
+    "llm": { "provider_type": "llm", "provider": "openai_compatible", "status": "disabled",
+             "enabled": false, "configured": false, "display_name": "OpenAI-compatible",
+             "model": null, "external_allowed": null, "connectivity_checked": false,
+             "message": "LLM is disabled." },
+    "web_search": { "provider_type": "web_search", "provider": "mock", "status": "disabled",
+                    "enabled": false, "configured": false, "display_name": "Mock Web Search",
+                    "model": null, "external_allowed": false, "connectivity_checked": false,
+                    "message": "Web search is disabled." }
+  },
+  "meta": null
+}
+```
 
 ### GET `/admin/workers`
 
@@ -1021,6 +1219,27 @@ Returns queue state for the existing architecture:
 ### GET `/admin/version`
 
 Returns app name, package version, environment, Python version, API prefix, source Alembic head, database Alembic revision when readable, startup timestamp, and uptime seconds. It does not return hostnames, connection strings, environment variables, or secrets.
+
+Example (BR-8; `database_revision` and `started_at` may be `null`):
+
+```json
+{
+  "data": {
+    "app_name": "Enterprise AI Knowledge Assistant",
+    "version": "0.1.0",
+    "environment": "production",
+    "python_version": "3.12.16",
+    "api_prefix": "/api/v1",
+    "migration_head": "20261120_0013",
+    "database_revision": "20261120_0013",
+    "started_at": "2026-11-20T11:09:05Z",
+    "uptime_seconds": 3
+  },
+  "meta": null
+}
+```
+
+The answer path itself (simple or legacy mode, retrieval settings) is not exposed by these endpoints.
 
 
 ## TASK-033 Admin Analytics API

@@ -39,6 +39,7 @@ from app.schemas.document import (
 from app.services.audit_service import AuditContext
 from app.services.document_permission_service import DocumentPermissionService
 from app.services.document_service import (
+    DocumentDownload,
     DocumentService,
     DocumentUploadLimits,
     EnqueueDocumentProcessing,
@@ -167,11 +168,37 @@ async def download_document(
         current_user=current_user,
         audit_context=audit_context,
     )
+    return _file_response(download, disposition="attachment")
+
+
+@router.get("/{document_id}/preview")
+async def preview_document(
+    document_id: UUID,
+    current_user: Annotated[User, Depends(get_current_user)],
+    session: Annotated[AsyncSession, Depends(get_db_session)],
+    storage: Annotated[FileStorage, Depends(get_file_storage)],
+    upload_limits: Annotated[DocumentUploadLimits, Depends(get_document_upload_limits)],
+    audit_context: Annotated[AuditContext, Depends(get_audit_context)],
+) -> StreamingResponse:
+    """BR-2: the same bytes, access rules and audit event as download, shown inline."""
+    download = await DocumentService(
+        session,
+        storage=storage,
+        upload_limits=upload_limits,
+    ).get_document_download(
+        document_id=document_id,
+        current_user=current_user,
+        audit_context=audit_context,
+    )
+    return _file_response(download, disposition="inline")
+
+
+def _file_response(download: DocumentDownload, *, disposition: str) -> StreamingResponse:
     return StreamingResponse(
         download.chunks,
         media_type=download.media_type,
         headers={
-            "Content-Disposition": f'attachment; filename="{download.filename}"',
+            "Content-Disposition": f'{disposition}; filename="{download.filename}"',
             "Content-Length": str(download.file_size),
             "X-Content-Type-Options": "nosniff",
             "Cache-Control": "private, no-store",

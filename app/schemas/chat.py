@@ -135,6 +135,9 @@ class ChatMessageRead(BaseModel):
     response_time_ms: int | None
     citations: list[CitationRead] = Field(default_factory=list)
     created_at: datetime
+    # BR-3: ANSWERED or NO_ANSWER on assistant messages; null on user messages and on assistant
+    # messages stored before the status was kept.
+    grounding_status: GroundingStatus | None = None
 
     @classmethod
     def from_visible_row(
@@ -152,6 +155,7 @@ class ChatMessageRead(BaseModel):
             if row.role.value == "ASSISTANT"
             else [],
             created_at=row.created_at,
+            grounding_status=row.grounding_status if row.role.value == "ASSISTANT" else None,
         )
 
     @classmethod
@@ -170,6 +174,9 @@ class ChatMessageRead(BaseModel):
             if message.role.value == "ASSISTANT"
             else [],
             created_at=message.created_at,
+            grounding_status=message.grounding_status
+            if message.role.value == "ASSISTANT"
+            else None,
         )
 
 

@@ -22,7 +22,7 @@ from app.core.security import (
     verify_password,
 )
 from app.models import User
-from app.repositories import refresh_token_repository, user_repository
+from app.repositories import department_repository, refresh_token_repository, user_repository
 from app.services.audit_service import AuditContext, AuditService
 
 
@@ -38,6 +38,13 @@ class AuthService:
     def __init__(self, session: AsyncSession, settings: Settings | None = None) -> None:
         self.session = session
         self.settings = settings or get_settings()
+
+    async def department_name(self, user: User) -> str | None:
+        """BR-4: the name of the user's own Department, shown on the user's own profile."""
+        if user.department_id is None:
+            return None
+        department = await department_repository.get_by_id(self.session, user.department_id)
+        return department.name if department is not None else None
 
     async def login(
         self,

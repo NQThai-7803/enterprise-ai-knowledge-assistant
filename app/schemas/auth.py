@@ -34,11 +34,15 @@ class AuthenticatedUserResponse(BaseModel):
     full_name: str
     role: UserRole
     department_id: UUID | None
+    # BR-4: the name of the user's own Department; null without one.
+    department_name: str | None = None
     is_active: bool
 
     @classmethod
-    def from_user(cls, user: User) -> AuthenticatedUserResponse:
-        return cls.model_validate(user)
+    def from_user(
+        cls, user: User, *, department_name: str | None = None
+    ) -> AuthenticatedUserResponse:
+        return cls.model_validate(user).model_copy(update={"department_name": department_name})
 
 
 class TokenPairData(BaseModel):
