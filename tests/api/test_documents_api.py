@@ -497,3 +497,45 @@ def test_search_by_document_code_stays_inside_the_access_filter(
     assert ids(staff, "HR-008") == []
     assert ids(admin, "hr-008") == [str(hidden.id)]
     assert set(ids(admin, "ND-HR")) == {str(shared.id), str(hidden.id)}
+
+
+def test_names_reach_admin_only_and_uploaded_by_me_every_viewer(
+    api_client: TestClient,
+    documents_storage: LocalFileStorage,
+    async_session_factory_for_tests: async_sessionmaker[AsyncSession],
+    make_department: Callable[..., Any],
+    make_user: Callable[..., User],
+    make_auth_headers: Callable[[User], dict[str, str]],
+) -> None:
+    """BR-4 option (a): Staff and Manager never get another user's or a Department's name,
+    not even the key; Admin gets both; uploaded_by_me for every viewer."""
+    department = make_department(name=f"Phong ban an {uuid.uuid4().hex[:6]}")
+    uploader_name = f"Nguoi tai len an {uuid.uuid4().hex[:6]}"
+    manager = make_user(role=UserRole.MANAGER, department_id=department.id, full_name=uploader_name)
+    staff = make_user(role=UserRole.STAFF, department_id=department.id)
+    admin = make_user(role=UserRole.ADMIN)
+    document = make_document(async_session_factory_for_tests, uploader=manager,
+                             access_scope=DocumentAccessScope.DEPARTMENT,
+                             department_id=department.id)  # fmt: skip
+    url = f"/api/v1/documents/{document.id}"
+
+    def bodies(user: User) -> list[tuple[dict[str, Any], str]]:
+        headers = make_auth_headers(user)
+        listed = api_client.get("/api/v1/documents", headers=headers)
+        detail = api_client.get(url, headers=headers)
+        items = [i for i in listed.json()["data"] if i["id"] == str(document.id)]
+        return [(items[0], listed.text), (detail.json()["data"], detail.text)]
+
+    patched = api_client.patch(url, json={"title": "Renamed"}, headers=make_auth_headers(manager))
+    assert patched.status_code == 200
+    non_admin = [(body, text, False) for body, text in bodies(staff)]
+    non_admin += [(body, text, True) for body, text in bodies(manager)]
+    non_admin.append((patched.json()["data"], patched.text, True))
+    for body, text, mine in non_admin:
+        assert "uploaded_by_name" not in body and "department_name" not in body
+        assert uploader_name not in text and department.name not in text
+        assert body["uploaded_by_me"] is mine
+    for body, _ in bodies(admin):
+        assert body["uploaded_by_name"] == uploader_name
+        assert body["department_name"] == department.name
+        assert body["uploaded_by_me"] is False

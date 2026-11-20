@@ -188,3 +188,16 @@ Audit reporting:
 - Staff cannot access the AuditLog report and receives `403 AUDIT_REPORT_FORBIDDEN`.
 - Audit event creation is internal system behavior, not a role permission exposed to clients.
 - TASK-022 does not add Manager Department-scoped AuditLog reporting or User self-audit access.
+
+## BR-4 names in responses (owner decision, 2026-11-20, option a)
+
+- The full name of another User and the name of a Department appear in Document responses
+  (`uploaded_by_name`, `department_name`) and in the Feedback report (`user_full_name`,
+  `department_name`) **only for an Admin caller**. For Manager and Staff the keys are left out,
+  not set to `null`, so a response does not reveal that a name exists.
+- Reason: User reads by Manager and Staff return `404` to avoid account enumeration, and Department
+  list and detail are Admin-only (TASK-007). A non-Admin can view Documents of another Department
+  through direct grants, and nothing in this file allows naming that Department to them, so the
+  Department name is treated as Admin-only too.
+- Every caller who can view a Document gets `uploaded_by_me`. A User's own Department name is on
+  their own profile (`GET /auth/me`, `department_name`).

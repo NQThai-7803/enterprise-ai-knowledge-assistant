@@ -118,12 +118,11 @@ commit). Các trường và endpoint dưới đây chỉ dùng được khi PR �
 `/api/v1`: chỉ thêm trường hoặc endpoint, không đổi trường cũ. BR-5, BR-6, BR-7 đang hoãn theo
 quyết định của owner.
 
-**CẦN OWNER QUYẾT (chưa làm):**
+**Các mục từng ghi CẦN OWNER QUYẾT (owner đã quyết ngày 20/11/2026):**
 
 - BR-1 mục 4: **đã quyết, đã làm**: tìm theo `document_code`.
 - BR-3: **đã quyết, đã làm**: thêm `segments`.
-- BR-4: tên người tải lên và tên phòng ban trên tài liệu, tên người dùng trên feedback, cho vai trò
-  không phải Admin. Việc này trái với quy tắc chống dò tài khoản của `RBAC.md`.
+- BR-4: **đã quyết (phương án a), đã làm**: tên chỉ dành cho Admin; thêm `uploaded_by_me`.
 
 ### TRẢ LỜI CHO PHIÊN UI — BR-1 (thông tin phiên bản tài liệu)
 
@@ -231,8 +230,8 @@ quyết định của owner.
 
 ### TRẢ LỜI CHO PHIÊN UI — BR-4 (tên phòng ban và tên người dùng)
 
-- **Trạng thái:** xong phần hồ sơ của chính mình. Tên trên tài liệu và trên feedback: **CẦN OWNER
-  QUYẾT**.
+- **Trạng thái:** xong phần hồ sơ của chính mình. Tên trên tài liệu và trên feedback: owner chọn
+  **phương án (a)**, đã làm (bổ sung ngày 20/11/2026, nhánh `feat/ui-br-followup`).
 - **Đã làm — endpoint:** `GET /api/v1/auth/me`, cùng `user` trong response của
   `POST /auth/login` và `POST /auth/refresh`. Spec: `API_SPEC.md` §4.
 - **Field:** `department_name` (chuỗi | `null`), là tên phòng ban **của chính người gọi**; `null`
@@ -244,22 +243,45 @@ quyết định của owner.
   Như vậy là đủ cho Profile và cho Manager khi upload (id và tên phòng ban của chính mình). UI
   không cần gọi `GET /departments`, vốn chỉ dành cho Admin.
 - **Lỗi:** không có mã lỗi mới.
-- **CẦN OWNER QUYẾT:** `department_name` và `uploaded_by_name` trong `DocumentItem`;
-  `user_full_name` và `department_name` trong `FeedbackReportItem`.
-  - Mâu thuẫn với RBAC: `RBAC.md` (TASK-007) quy định Manager và Staff đọc thông tin người dùng
-    khác thì nhận 404, để chống dò tài khoản. `GET /users` và `GET /departments` chỉ dành cho
+- **Tên trên tài liệu và feedback (phương án a, đã làm):**
+  - Tài liệu: áp dụng cho response 202 của upload, `GET /documents`, `GET /documents/{id}` và
+    `PATCH /documents/{id}`.
+    - `uploaded_by_me` (boolean) có cho **mọi người xem được tài liệu**.
+    - `uploaded_by_name` (họ tên người tải lên) và `department_name` (tên phòng ban của tài liệu,
+      `null` nếu không có) **chỉ có khi người gọi là Admin**.
+  - Feedback (`GET /feedback`): `user_full_name` và `department_name` chỉ có khi người gọi là
     Admin.
-  - Nếu trả tên người tải lên cho mọi người xem được tài liệu, Staff sẽ thấy tên người ở phòng ban
-    khác (với tài liệu `ORGANIZATION` hoặc được cấp quyền trực tiếp). Manager cũng sẽ thấy tên
-    người dùng, điều mà hiện không endpoint nào cho phép.
-  - Các phương án để owner chọn:
-    - (a) chỉ trả tên khi người gọi là Admin, các vai trò khác nhận `null`;
-    - (b) trả tên cho mọi người xem được bản ghi, và sửa `RBAC.md` cho khớp;
-    - (c) giữ nguyên, không thêm tên.
-  - Chưa làm phần này. Trong lúc chờ, UI giữ cách hiện tại: Admin tra tên qua `/departments` và
-    `/users`, các vai trò khác hiện nhãn không kèm tên.
-- **Test:** `tests/api/test_auth_endpoints.py`
-  (`test_login_and_me_return_the_users_own_department_name`).
+  - Với Manager và Staff, các khóa trên **không có trong response**: không phải `null` mà vắng hẳn,
+    để UI không suy ra được là có tồn tại tên.
+  - Ví dụ, người gọi là Admin:
+    ```json
+    { "id": "uuid", "title": "…", "uploaded_by": "uuid", "uploaded_by_me": false,
+      "uploaded_by_name": "Nguyễn Văn A", "department_id": "uuid", "department_name": "Nhân sự" }
+    ```
+    Người gọi là Staff (cùng tài liệu):
+    ```json
+    { "id": "uuid", "title": "…", "uploaded_by": "uuid", "uploaded_by_me": false,
+      "department_id": "uuid" }
+    ```
+  - **Kết luận về tên phòng ban của tài liệu:** đọc `RBAC.md` thì thấy mục TASK-007 quy định danh
+    sách và chi tiết phòng ban chỉ dành cho Admin. Người không phải Admin vẫn có thể xem tài liệu
+    `DEPARTMENT` của phòng ban khác nếu được cấp quyền trực tiếp, và `RBAC.md` không có điều nào
+    cho phép nêu tên phòng ban đó với họ. Đây là trường hợp mơ hồ, nên theo quyết định của owner
+    tên phòng ban **chỉ trả cho Admin**. Lý do đã ghi vào `RBAC.md`, mục "BR-4 names in
+    responses".
+  - Gợi ý cho UI: với tài liệu thuộc phòng ban của chính người dùng (`department_id` của tài liệu
+    trùng `department_id` trong `/auth/me`), UI tự hiện tên lấy từ `/auth/me`
+    (`department_name`), không cần server trả thêm. Với Manager, trang feedback chỉ chứa người
+    trong phòng ban của chính họ, nên tên phòng ban cũng lấy được như vậy.
+- **Test:**
+  - `tests/api/test_auth_endpoints.py`
+    (`test_login_and_me_return_the_users_own_department_name`).
+  - Chống dò tài khoản:
+    - `tests/api/test_documents_api.py`
+      (`test_names_reach_admin_only_and_uploaded_by_me_every_viewer`): Staff và Manager không nhận
+      tên, kể cả khóa, ở danh sách, chi tiết và PATCH; Admin thì nhận.
+    - `tests/api/test_document_upload_api.py` (`test_upload_response_names_go_to_admin_only`).
+    - `tests/api/test_feedback.py` (`test_feedback_report_names_go_to_admin_only`).
 
 ### TRẢ LỜI CHO PHIÊN UI — BR-2 (mở tài liệu tại đúng trang)
 

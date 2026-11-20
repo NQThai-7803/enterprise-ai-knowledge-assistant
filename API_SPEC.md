@@ -405,9 +405,15 @@ Document response fields (upload `202`, `GET /documents` items, `GET /documents/
   "department_id": "uuid",
   "uploaded_by": "uuid",
   "created_at": "2026-11-20T08:00:00Z",
-  "updated_at": "2026-11-20T08:00:00Z"
+  "updated_at": "2026-11-20T08:00:00Z",
+  "uploaded_by_me": false
 }
 ```
+
+Names (BR-4, option a; `RBAC.md` "BR-4 names in responses"):
+
+- `uploaded_by_me` (boolean): whether the caller uploaded the Document; for every caller who can view it.
+- `uploaded_by_name` (uploader's full name) and `department_name` (the Document's Department, `null` without one) are returned **only to an Admin caller**. For Manager and Staff the two keys are absent, not `null`, so a response does not reveal that a name exists. This holds for upload `202`, `GET /documents`, `GET /documents/{document_id}` and `PATCH /documents/{document_id}`. Admin example: `"uploaded_by": "uuid", "uploaded_by_me": false, "uploaded_by_name": "Nguyễn Văn A", "department_name": "Nhân sự"`.
 
 Duplicate detection is scoped to the same uploader and checksum where `is_deleted = false`.
 
@@ -873,6 +879,8 @@ Response:
 ```
 
 The report does not return Assistant answers, User questions, session titles, Chat history, SYSTEM messages, retrieval query, token usage, prompts, citation excerpts, Document titles, storage keys, or permission metadata.
+
+Names (BR-4, option a): an Admin caller's items also carry `user_full_name` (the submitter) and `department_name` (`null` without a Department). A Manager's items have neither key.
 
 ## 10. Audit logs
 

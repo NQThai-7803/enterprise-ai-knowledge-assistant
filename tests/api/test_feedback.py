@@ -605,3 +605,32 @@ def test_feedback_report_invalid_rating_returns_feedback_code(
 
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "FEEDBACK_RATING_INVALID"
+
+
+def test_feedback_report_names_go_to_admin_only(
+    api_client: TestClient,
+    async_session_factory_for_tests: async_sessionmaker[AsyncSession],
+    make_department: Callable[..., object],
+    make_user: Callable[..., User],
+    make_auth_headers: Callable[[User], dict[str, str]],
+) -> None:
+    """BR-4 option (a): a Manager's report has neither the submitter's name nor the key."""
+    department = make_department()
+    manager = make_user(role=UserRole.MANAGER, department_id=department.id)
+    staff = make_user(role=UserRole.STAFF, department_id=department.id,
+                      full_name="Nhan vien gop y an")  # fmt: skip
+    admin = make_user(role=UserRole.ADMIN)
+    run_async(create_feedback_record(async_session_factory_for_tests, owner=staff))
+
+    as_manager = api_client.get("/api/v1/feedback", headers=make_auth_headers(manager))
+    as_admin = api_client.get(
+        "/api/v1/feedback", headers=make_auth_headers(admin), params={"user_id": str(staff.id)}
+    )
+
+    assert as_manager.status_code == as_admin.status_code == 200
+    item = as_manager.json()["data"][0]
+    assert "user_full_name" not in item and "department_name" not in item
+    assert "Nhan vien gop y an" not in as_manager.text
+    admin_item = as_admin.json()["data"][0]
+    assert admin_item["user_full_name"] == "Nhan vien gop y an"
+    assert admin_item["department_name"] == department.name

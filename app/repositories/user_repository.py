@@ -142,3 +142,10 @@ def _user_filter_conditions(
     if is_active is not None:
         conditions.append(User.is_active.is_(is_active))
     return conditions
+
+
+async def full_names_by_id(session: AsyncSession, user_ids: set[UUID]) -> dict[UUID, str]:
+    if not user_ids:
+        return {}
+    rows = await session.execute(select(User.id, User.full_name).where(User.id.in_(user_ids)))
+    return {key: value for key, value in rows.all()}
