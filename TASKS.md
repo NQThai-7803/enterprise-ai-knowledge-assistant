@@ -8,6 +8,25 @@
 3. **Embedding fine-tune** (`docs/design/embedding-finetune.md` and DEC-015 on branch `feat/embedding-finetune-infra`): infrastructure only so far; the baseline measurement and training come after FIX 3.
 4. The final held-out v2 measurement, once, after the choices above are made (DEC-012).
 
+## Held-out v3.1 closed, new default (DEC-040) -- 2026-11-20
+
+- **DONE:**
+  - Held-out v3.1 is spent; the owner's labels are in `docs/eval/heldout-v3.1-owner-grading.md`.
+  - Default: simple s1-s3 + `qwen3.5-text:4b` (DEC-040, ADR 0005); rollback `legacy` + `qwen2.5:3b`.
+  - `ci_batch.sh` saves each API container's log before a recreate; the held-out summary lists the
+    items removed before v3.1.
+- **NEXT (not started):**
+  - **[High]** False refusals of about 40-50 % on natural questions, in the shared layer (retrieval /
+    evidence gate). Diagnose on `natural_dev_v1` and the dev sets, NOT on a held-out set.
+  - **[High]** Questions where two documents conflict: the answer names one source only. Tied to
+    rewriting the corpus as v3 (removing the duplicates).
+  - **[Medium]** Grader (`value_grading.py`): derived values (12 + 1 = 13), unit conversion
+    (2 weeks = 14 days), false conflicts when an answer gives another value in the same unit, and
+    a citation out of context whose value matches by chance. Fix and check on the dev sets.
+  - **[Low]** Two runs mean nothing when the runs are deterministic: consider changing DEC-027
+    (another seed, or one run plus a determinism check).
+  - Delete the 11 old `eaka-verify-*` images (approved by the owner).
+
 ## Held-out v3.1 batch set fix (DEC-038/039) -- 2026-11-19
 
 - **DONE:**

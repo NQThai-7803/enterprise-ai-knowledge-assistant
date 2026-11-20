@@ -299,7 +299,7 @@ WEB_SEARCH_ENABLED=false
 WEB_SEARCH_MODE=internal_only
 ```
 
-If `qwen3:4b` is too slow or does not fit memory, use a smaller multilingual instruct model such as `qwen2.5:3b`. Do not download a multi-GB model silently; install/start the local provider and pull the selected model deliberately.
+The default answer path since DEC-040 is simple mode with `qwen3.5-text:4b` on an NVIDIA GPU with at least 4 GB VRAM (`DEPLOYMENT.md` 3.3, which also gives the rollback to `RAG_ANSWER_MODE=legacy` + `qwen2.5:3b`). If `qwen3:4b` is too slow or does not fit memory, use a smaller multilingual instruct model such as `qwen2.5:3b`. Do not download a multi-GB model silently; install/start the local provider and pull the selected model deliberately.
 
 TASK-034.1 acceptance uses new local artifacts under `artifacts/task-034-1/`, which is git-ignored. These documents are not encoded in the fake provider, tests, or source code. Manual acceptance must upload/process them through the real document pipeline, ask the required questions, and record claim-level citation support in `artifacts/task-034-1/real-llm-acceptance-report.json`.
 

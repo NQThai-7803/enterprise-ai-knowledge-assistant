@@ -2,6 +2,8 @@
 
 ## Status
 
+Superseded by ADR 0005 (owner, 2026-11-20; DEC-040): mặc định mới là simple s1-s3 + `qwen3.5-text:4b`; `legacy` + `qwen2.5:3b` là đường quay lui.
+
 Accepted (owner, 2026-11-14). Xét lại khi có GPU từ 8 GB VRAM trở lên.
 
 2026-11-17: đã đo lại với 3 model (DEC-028, mục "Đo lại 2026-11-17" bên dưới). Mặc định chưa đổi; quyết định đổi model chờ owner.

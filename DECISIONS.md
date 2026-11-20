@@ -771,3 +771,63 @@ Set on 2026-11-19 by the owner, before the held-out v3.1 dispatch.
 - **Not scanned:**
   - the contents of `docs/eval/heldout-v2-check.json`, `docs/eval/heldout-v2-e5.json` and `docs/eval/runs/`;
   - gold text outside `docs/eval/`, because only the questions have fingerprints.
+
+## DEC-040 — The default after held-out v3.1
+
+Set on 2026-11-20 by the owner, after reading `grading.md` of held-out v3.1 run 44575927833.
+
+**New default:** `s3t` = simple answer mode with s1-s3 (`EVAL_SIMPLE_LEVEL=3`) + `qwen3.5-text:4b` +
+`RAG_DRAFT_DOCUMENT_POLICY=exclude`. **Rollback:** `legacy` + `qwen2.5:3b`
+(`RAG_ANSWER_MODE=legacy`, `LLM_OLLAMA_MODEL=qwen2.5:3b`; `DEPLOYMENT.md` 3.3). ADR 0005 replaces
+ADR 0003.
+
+**Basis:**
+
+- The DEC-035 rule, registered before the run. The automatic verdict is `s3t`: false answers +
+  wrong are lower in every run.
+  - Per run (correct / false refusal / false answer / wrong): `legacy` 0 / 8 / 0 / 8, `s3t`
+    3 / 7 / 0 / 6.
+- The owner's labels lean the same way (`s3t` / `legacy`): PASS 1 / 1, PARTIAL 4 / 1, refusals 6 / 7,
+  wrong 5 / 7. Labels per item, ids and reason codes only:
+  `docs/eval/heldout-v3.1-owner-grading.md`.
+- The owner differs from the automatic grader on two items:
+  - HO3-02 `legacy`: the grader asks for a derived value that the document does not state;
+  - HO3-03 `s3t`: the value matches by chance and the citation does not support it.
+- DEC-029: conditions (a) and (c) held; (b), the owner's reading of the UAT list, was still open
+  when the owner decided.
+
+**Limits, stated with the decision:**
+
+- run1 = run2 for every item (deterministic), so there is one observation, not two.
+- Both configurations gave the same answer on 5 items, so only 11 items tell them apart.
+- Held-out v3.1 both chose the configuration and measured it: its figures are not an unbiased
+  estimate.
+- `s3t` is about 2.5 times slower on CPU (1994 s against 796 s for the 16 items of one run).
+- The held-out questions and gold are in the public repository (DEC-039).
+- **Held-out v3.1 is spent.** It is not used again to measure or to design a fix, and
+  `heldout-v3.yml` refuses every dispatch. The next independent measurement needs held-out v4.
+
+**Held-out v3.1 items not asked:** HO3-09, HO3-13 and HO3-20 were removed from v3 because their
+source documents are not in corpus V2 (DEC-038); HO3-11 was excluded because its gold is wrong.
+
+**What the change touches** (the DEC-029 list):
+
+- Settings: `RAG_ANSWER_MODE=simple` and the five s1-s3 flags on in `app/core/config.py`;
+  `.env.example` (also `LLM_OLLAMA_MODEL=qwen3.5-text:4b`, `LLM_TIMEOUT_SECONDS=90`).
+- `compose.uat-corpus-v2.yaml` (model only). `compose.yaml` and `compose.prod.yaml` set neither
+  the answer mode nor the Ollama model, so the application defaults apply there.
+- Eval: `scripts/eval/compose.uat-eval.yaml` defaults, `eval.yml` (default model, LLM timeout
+  600 s), `heldout-v2.yml` (measures the new default), `ci_batch.sh` (`EVAL_SIMPLE_LEVEL=n` now also
+  turns the flags after n off).
+- Documentation: `DEPLOYMENT.md` 3.3 (GPU, building `qwen3.5-text:4b`, rollback),
+  `ENVIRONMENT_VARIABLES.md`, `README.md`, `SETUP.md`, ADR 0005.
+- The unit tests of the legacy pipeline pin `rag_answer_mode="legacy"` in their settings helper.
+
+**Diagnosis of run 44575927833 (2026-11-20):**
+
+- `api_requests=35` counted only the last API container. `ci_batch.sh` recreates the API for every
+  configuration and run, which drops the container's log. It now saves each container's log before
+  the recreate, and the status step counts them all.
+- The held-out summary now also lists the items removed before v3.1, with the reason.
+- `scripts/eval/heldout_v3_diag.py` prints, for the owner, one text-free row per configuration, run
+  and item.

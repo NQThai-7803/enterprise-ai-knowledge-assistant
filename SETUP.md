@@ -1317,7 +1317,7 @@ Current recommended local path on Docker Desktop:
 ollama pull qwen3:4b
 ```
 
-If the machine cannot run that model comfortably, choose a smaller multilingual instruct model such as `qwen2.5:3b`. Do not download a multi-GB model without operator approval.
+The default answer path since DEC-040 is simple mode with `qwen3.5-text:4b` on an NVIDIA GPU with at least 4 GB VRAM (`DEPLOYMENT.md` 3.3, with the rollback to `RAG_ANSWER_MODE=legacy` + `qwen2.5:3b`). If the machine cannot run that model comfortably, choose a smaller multilingual instruct model such as `qwen2.5:3b`. Do not download a multi-GB model without operator approval.
 
 3. Configure `.env` with actual settings names read by `app.core.config.Settings`:
 
