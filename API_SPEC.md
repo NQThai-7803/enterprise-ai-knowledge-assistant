@@ -451,6 +451,17 @@ Response headers:
 
 Storage keys and local paths are never returned. If metadata exists but the local file is missing, the endpoint returns `410 DOCUMENT_FILE_UNAVAILABLE`.
 
+### GET `/documents/{document_id}/preview`
+
+BR-2. The same bytes, view policy, errors and audit event (`DOCUMENT_DOWNLOADED`) as `/download`, for showing the file in the browser:
+
+- `Content-Type`: stored MIME type (`application/pdf`, `image/png`, or `image/jpeg`; uploads accept nothing else)
+- `Content-Disposition: inline; filename="..."`
+- `X-Content-Type-Options: nosniff`
+- `Cache-Control: private, no-store`
+
+It needs the Bearer header like every other endpoint, so a plain link cannot open it: the client fetches it and shows the result through a `blob:` URL. The server ignores a `#page=N` fragment (browsers never send it); the client adds it to the `blob:` URL of a PDF. Errors: `401` without a valid token, `404 RESOURCE_NOT_FOUND` when the caller cannot view the Document (or it does not exist or is deleted), `410 DOCUMENT_FILE_UNAVAILABLE` when the stored file is missing. Signed, time-limited URLs are not implemented.
+
 ### PATCH `/documents/{document_id}`
 
 Implemented in TASK-010. Requires edit permission for `title` and `description`; changing `access_scope` or `department_id` requires manage permission.
@@ -490,7 +501,6 @@ Not implemented yet:
 - Celery processing task dispatch.
 - Document chunks.
 - Embeddings.
-- Preview endpoint.
 - Signed download URLs.
 
 ## 8. Chat

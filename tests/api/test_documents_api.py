@@ -431,3 +431,38 @@ def test_permission_update_cannot_change_grantee(
 
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+
+
+def test_document_preview_is_inline_with_the_download_access_rules(
+    api_client: TestClient,
+    documents_storage: LocalFileStorage,
+    async_session_factory_for_tests: async_sessionmaker[AsyncSession],
+    make_user: Callable[..., User],
+    make_auth_headers: Callable[[User], dict[str, str]],
+) -> None:
+    """BR-2: 200 inline for a viewer, 404 for anyone else, 410 when the file is gone."""
+    uploader = make_user(role=UserRole.STAFF)
+    other = make_user(role=UserRole.STAFF)
+    document = create_storage_document(
+        async_session_factory_for_tests, documents_storage, uploader=uploader
+    )
+    missing = make_document(async_session_factory_for_tests, uploader=uploader)
+    url = f"/api/v1/documents/{document.id}/preview"
+
+    response = api_client.get(url, headers=make_auth_headers(uploader))
+    hidden = api_client.get(url, headers=make_auth_headers(other))
+    gone = api_client.get(
+        f"/api/v1/documents/{missing.id}/preview", headers=make_auth_headers(uploader)
+    )
+
+    assert response.status_code == 200
+    assert response.content == PDF_BYTES
+    assert response.headers["content-type"].startswith("application/pdf")
+    assert response.headers["content-disposition"].startswith("inline;")
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["cache-control"] == "private, no-store"
+    assert hidden.status_code == 404
+    assert hidden.json()["error"]["code"] == "RESOURCE_NOT_FOUND"
+    assert gone.status_code == 410
+    assert gone.json()["error"]["code"] == "DOCUMENT_FILE_UNAVAILABLE"
+    assert api_client.get(url).status_code == 401

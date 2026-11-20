@@ -221,3 +221,24 @@ quyết định của owner.
     `/users`, các vai trò khác hiện nhãn không kèm tên.
 - **Test:** `tests/api/test_auth_endpoints.py`
   (`test_login_and_me_return_the_users_own_department_name`).
+
+### TRẢ LỜI CHO PHIÊN UI — BR-2 (mở tài liệu tại đúng trang)
+
+- **Trạng thái:** xong theo đề xuất `GET /documents/{id}/preview`. URL ký tạm thời: **không làm**
+  (BR chỉ nêu như phương án thay thế).
+- **Endpoint:** `GET /api/v1/documents/{document_id}/preview` → `200`, đúng `Content-Type` đã lưu
+  (`application/pdf`, `image/png`, `image/jpeg`), `Content-Disposition: inline; filename="…"`,
+  `X-Content-Type-Options: nosniff`, `Cache-Control: private, no-store`. Spec: `API_SPEC.md` §7.
+- **Quyền và lỗi:** giống hệt `/download`.
+  - `401`: thiếu token hoặc token sai.
+  - `404 RESOURCE_NOT_FOUND`: không có quyền xem, không tồn tại, hoặc đã xóa.
+  - `410 DOCUMENT_FILE_UNAVAILABLE`: mất tệp.
+  - Mỗi lần xem được ghi audit `DOCUMENT_DOWNLOADED`, như tải xuống.
+- **Cách dùng:**
+  - Vẫn cần header `Authorization: Bearer`. Cách UI đang làm vẫn đúng: `fetch` → `blob:` URL →
+    gắn `#page=N` cho PDF. Chỉ cần đổi `/download` thành `/preview`.
+  - Server không đọc `#page`.
+  - Rủi ro dùng chung refresh token giữa hai tab mà BR đã nêu vẫn còn. Muốn gỡ thì cần URL ký tạm
+    thời; nếu owner muốn thì ghi thành BR mới.
+- **Test:** `tests/api/test_documents_api.py`
+  (`test_document_preview_is_inline_with_the_download_access_rules`).
