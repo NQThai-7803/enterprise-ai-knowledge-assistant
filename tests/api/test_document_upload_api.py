@@ -447,3 +447,50 @@ def test_upload_accepts_supported_image_documents(
     saved_files = [path.name for path in upload_storage.root_path.rglob(f"*{extension}")]
     assert saved_files
     assert filename not in saved_files
+
+
+def test_upload_version_fields_are_returned_by_upload_detail_and_list(
+    api_client: TestClient,
+    upload_storage: LocalFileStorage,
+    make_user: Any,
+    make_auth_headers: Any,
+) -> None:
+    """BR-1: the version fields the UI sends and reads (API_SPEC section 7)."""
+    admin = make_user(role=UserRole.ADMIN)
+    headers = make_auth_headers(admin)
+    fields = {"document_code": " ND-HR-007 ", "document_version": "1.0",
+              "effective_from": "2026-09-01"}  # fmt: skip
+
+    response = upload_request(api_client, headers=headers, data=fields)
+
+    assert response.status_code == 202
+    uploaded = response.json()["data"]
+    expected = {"document_code": "ND-HR-007", "document_version": "1.0",
+                "effective_from": "2026-09-01", "effective_to": None,
+                "lifecycle_status": "ACTIVE", "supersedes_document_id": None}  # fmt: skip
+    assert {key: uploaded[key] for key in expected} == expected
+    detail = api_client.get(f"/api/v1/documents/{uploaded['id']}", headers=headers).json()["data"]
+    assert {key: detail[key] for key in expected} == expected
+    listed = api_client.get("/api/v1/documents", headers=headers).json()["data"]
+    assert [{key: d[key] for key in expected} for d in listed if d["id"] == uploaded["id"]] == [
+        expected
+    ]
+
+
+def test_upload_effective_to_before_effective_from_returns_422(
+    api_client: TestClient,
+    upload_storage: LocalFileStorage,
+    make_user: Any,
+    make_auth_headers: Any,
+) -> None:
+    admin = make_user(role=UserRole.ADMIN)
+
+    response = upload_request(
+        api_client,
+        headers=make_auth_headers(admin),
+        data={"effective_from": "2026-09-01", "effective_to": "2026-08-31"},
+    )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+    assert not list(upload_storage.root_path.rglob("*.pdf"))

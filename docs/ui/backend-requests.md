@@ -113,4 +113,44 @@ Tình trạng 17/11/2026: BR-1 → BR-9 đều ở trạng thái CHỜ OWNER CHU
 
 ## Đã nhận từ backend
 
-(Chưa có.)
+Phiên backend trả lời ngày 20/11/2026 trên nhánh `feat/ui-backend-requests` (một PR, mỗi BR một
+commit). Các trường và endpoint dưới đây chỉ dùng được khi PR đó đã merge vào `main`. API vẫn là
+`/api/v1`: chỉ thêm trường hoặc endpoint, không đổi trường cũ. BR-5, BR-6, BR-7 đang hoãn theo
+quyết định của owner.
+
+### TRẢ LỜI CHO PHIÊN UI — BR-1 (thông tin phiên bản tài liệu)
+
+- **Trạng thái:** xong mục 1, 2, 3 (chỉ ghi lại hành vi đã có, không đổi code). Mục 4: **CẦN OWNER
+  QUYẾT**.
+- **Endpoint:** `POST /api/v1/documents/upload` (multipart form), `GET /api/v1/documents`,
+  `GET /api/v1/documents/{document_id}`. Spec: `API_SPEC.md` §7.
+- **Field gửi lên (form):** `document_code` (chuỗi ≤ 128 ký tự), `document_version` (≤ 64),
+  `effective_from`, `effective_to` (ngày `YYYY-MM-DD`). Server cắt khoảng trắng hai đầu; chuỗi rỗng
+  thành `null`. Có thêm `lifecycle_status` (`ACTIVE` mặc định, `SUPERSEDED`, `ARCHIVED`, `DRAFT`) và
+  `supersedes_document_id`. Tài liệu `DRAFT` vẫn hiện trong danh sách và tải được, nhưng không bao
+  giờ được dùng để trả lời, vì mặc định là `RAG_DRAFT_DOCUMENT_POLICY=exclude`.
+- **Field trả về:** cả bốn trường trên, cùng `lifecycle_status` và `supersedes_document_id`, có
+  trong response 202 của upload, trong từng item của `GET /documents` và trong
+  `GET /documents/{id}`. Ví dụ:
+  ```json
+  { "id": "uuid", "title": "Quy định nghỉ phép", "document_code": "ND-HR-007",
+    "document_version": "1.0", "effective_from": "2026-09-01", "effective_to": null,
+    "lifecycle_status": "ACTIVE", "supersedes_document_id": null }
+  ```
+- **Mã lỗi:**
+  - `422 VALIDATION_ERROR`: trường sai quy tắc. Với `effective_to` trước `effective_from`, message
+    là `effective_to must not precede effective_from.`; lỗi này được kiểm trước khi lưu tệp.
+  - `404 RESOURCE_NOT_FOUND`: `department_id` không tồn tại, hoặc `supersedes_document_id` người
+    gọi không xem được.
+  - `403 FORBIDDEN`: sai vai trò hoặc phạm vi (xem quy tắc của Manager bên dưới).
+- **Quy tắc upload của Manager (mục 3):** được chọn `PRIVATE`, hoặc `DEPARTMENT` với đúng
+  `department_id` của chính mình. Server **không** tự điền hay ép `department_id`: UI phải gửi id
+  phòng ban của Manager (lấy từ `GET /auth/me`, BR-4). Các trường hợp bị `403 FORBIDDEN`:
+  `ORGANIZATION`, phòng ban khác, hoặc Manager chưa có phòng ban.
+- **Tìm kiếm (mục 4):** `GET /documents?search=` hiện tìm trong `title`, `original_filename` và
+  `description`, **không** tìm `document_code`. Thêm `document_code` vào tìm kiếm là đổi hành vi
+  của danh sách → **CẦN OWNER QUYẾT**. Nếu owner đồng ý, chỉ cần thêm một điều kiện vào truy vấn,
+  quyền xem vẫn lọc trong SQL như cũ. Trong lúc chờ, UI giữ placeholder "Tên hoặc tên tệp".
+- **Test:** `tests/api/test_document_upload_api.py`
+  (`test_upload_version_fields_are_returned_by_upload_detail_and_list`,
+  `test_upload_effective_to_before_effective_from_returns_422`).

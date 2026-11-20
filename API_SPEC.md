@@ -352,9 +352,56 @@ Requires Admin or Manager. Staff receives `403 FORBIDDEN`.
 
 Content type: `multipart/form-data` with file MIME type `application/pdf`, `image/png`, or `image/jpeg`.
 
-Fields: `file`, `title`, `description`, `access_scope`, `department_id`.
+Fields (form):
+
+| Field | Type | Rule |
+|---|---|---|
+| `file` | file | required; PDF, PNG or JPEG |
+| `title` | string | required, at most 255 characters, trimmed, not blank |
+| `description` | string | optional; blank becomes `null` |
+| `access_scope` | `PRIVATE` / `DEPARTMENT` / `ORGANIZATION` | required |
+| `department_id` | UUID | required for `DEPARTMENT`; must be absent for `PRIVATE` and `ORGANIZATION` |
+| `document_code` | string | optional, at most 128 characters, trimmed; blank becomes `null` |
+| `document_version` | string | optional, at most 64 characters, trimmed; blank becomes `null` |
+| `effective_from` | date `YYYY-MM-DD` | optional |
+| `effective_to` | date `YYYY-MM-DD` | optional; not before `effective_from` |
+| `lifecycle_status` | `ACTIVE` / `SUPERSEDED` / `ARCHIVED` / `DRAFT` | optional, default `ACTIVE`. With `RAG_DRAFT_DOCUMENT_POLICY=exclude` (the default, DEC-033/036) a `DRAFT` document is listed and downloadable as usual but never used in an answer. |
+| `supersedes_document_id` | UUID | optional; a Document the caller can view, not the Document itself |
+
+Who may upload what:
+
+- Staff: `403 FORBIDDEN`.
+- Admin: any scope; `DEPARTMENT` with any existing Department.
+- Manager: `PRIVATE`, or `DEPARTMENT` with the Manager's own `department_id`. `department_id` is not filled in or replaced by the server: it must be sent and must equal the Manager's own Department. `ORGANIZATION`, another Department, or a Manager without a Department: `403 FORBIDDEN`.
+
+Errors: `422 VALIDATION_ERROR` for a field outside its rule (too long, blank title, bad date, `effective_to` before `effective_from` with message `effective_to must not precede effective_from.`, `department_id` missing for `DEPARTMENT` or present for another scope); `404 RESOURCE_NOT_FOUND` for an unknown `department_id` or a `supersedes_document_id` the caller cannot view; `409 DUPLICATE_DOCUMENT`; `413`, `415` and `400` for the file itself. Validation runs before the file is stored.
 
 The response is `HTTP 202 Accepted` and never includes `storage_key`, `checksum_sha256`, local paths, `error_message`, or permissions.
+
+Document response fields (upload `202`, `GET /documents` items, `GET /documents/{document_id}`):
+
+```json
+{
+  "id": "uuid",
+  "title": "Quy định nghỉ phép",
+  "description": null,
+  "document_code": "ND-HR-007",
+  "document_version": "1.0",
+  "effective_from": "2026-09-01",
+  "effective_to": null,
+  "lifecycle_status": "ACTIVE",
+  "supersedes_document_id": null,
+  "original_filename": "nghi-phep.pdf",
+  "mime_type": "application/pdf",
+  "file_size": 182340,
+  "status": "UPLOADED",
+  "access_scope": "DEPARTMENT",
+  "department_id": "uuid",
+  "uploaded_by": "uuid",
+  "created_at": "2026-11-20T08:00:00Z",
+  "updated_at": "2026-11-20T08:00:00Z"
+}
+```
 
 Duplicate detection is scoped to the same uploader and checksum where `is_deleted = false`.
 
@@ -366,7 +413,7 @@ Query parameters:
 
 - `page`, default `1`, must be `>= 1`.
 - `page_size`, default `20`, must be between `1` and `100`.
-- `search`, searches `title`, `original_filename`, and `description`, max 200 characters.
+- `search`, searches `title`, `original_filename`, and `description` (case-insensitive substring), max 200 characters. It does not search `document_code`.
 - `status`: `UPLOADED`, `PROCESSING`, `READY`, `FAILED`, or `ARCHIVED`.
 - `access_scope`: `PRIVATE`, `DEPARTMENT`, or `ORGANIZATION`.
 - `department_id`: Department UUID filter.
