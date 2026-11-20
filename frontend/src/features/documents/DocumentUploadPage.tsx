@@ -262,7 +262,8 @@ export function DocumentUploadPage() {
                 <p className="mt-1 text-xs text-muted">Một tệp PDF mỗi lần tải lên.</p>
               </div>
             )}
-            <TextInput
+            {/* A plain input: TextInput's w-full would override sr-only's 1px width and overflow the page. */}
+            <input
               id="file"
               className="sr-only"
               type="file"
