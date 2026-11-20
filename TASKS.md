@@ -1,6 +1,20 @@
 
 # Implementation Tasks
 
+## UI backend requests answered -- 2026-11-20
+
+- **DONE** (`docs/ui/backend-requests.md`, "Đã nhận từ backend"; `API_SPEC.md`):
+  - BR-1: version fields, Manager upload rules and errors documented (no code change).
+  - BR-3: `grounding_status` stored per assistant message (migration `20261120_0013`) and returned
+    in chat history; contract of the sentences naming an unverified part.
+  - BR-4: `department_name` of the user's own Department in login, refresh and `/auth/me`.
+  - BR-2: `GET /documents/{id}/preview` (inline, same rules as download).
+  - BR-8: JSON examples of the Admin monitoring endpoints.
+  - BR-9: the stable audit `event_type` values.
+- **WAITING FOR OWNER:** BR-1 item 4 (search by `document_code`); BR-3 structured segments; BR-4
+  names on documents and feedback for non-Admin roles (conflicts with the anti-enumeration rule of
+  `RBAC.md`). BR-5, BR-6, BR-7 stay postponed.
+
 ## Order of the next work -- 2026-11-20 (DEC-041)
 
 1. **Backend requests of the UI session** (`docs/ui/backend-requests.md`): BR-1, BR-3, BR-4, BR-2,

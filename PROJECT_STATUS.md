@@ -1,5 +1,15 @@
 # Project Status
 
+## UI backend requests BR-1, 3, 4, 2, 8, 9 answered -- 2026-11-20
+
+- **API additions only** (`/api/v1`, no field removed or renamed): `grounding_status` on chat
+  history messages (new nullable column, migration `20261120_0013`), `department_name` of the
+  caller's own Department on login / refresh / `/auth/me`, `GET /documents/{id}/preview`.
+- **Documented:** document version fields and Manager upload rules (BR-1), the unverified-part
+  sentence contract (BR-3), Admin monitoring JSON examples (BR-8), audit `event_type` values (BR-9).
+- **Owner decisions pending:** search by `document_code`, structured answer segments, other users'
+  names for non-Admin roles. Answering and retrieval are unchanged.
+
 ## DEC-041 decided: keep s3t, hybrid not recommended -- 2026-11-20
 
 - **Default unchanged:** s3t (simple s1-s3 + `qwen3.5-text:4b` + `exclude`). `RAG_ANSWER_MODE=hybrid`

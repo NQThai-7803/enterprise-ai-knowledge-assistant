@@ -118,6 +118,14 @@ commit). Các trường và endpoint dưới đây chỉ dùng được khi PR �
 `/api/v1`: chỉ thêm trường hoặc endpoint, không đổi trường cũ. BR-5, BR-6, BR-7 đang hoãn theo
 quyết định của owner.
 
+**CẦN OWNER QUYẾT (chưa làm):**
+
+- BR-1 mục 4: có thêm `document_code` vào `GET /documents?search=` không.
+- BR-3: có thêm mảng đoạn có cấu trúc (`segments`) thay cho việc nhận diện câu "Chưa xác minh
+  được…" theo chữ không.
+- BR-4: tên người tải lên và tên phòng ban trên tài liệu, tên người dùng trên feedback, cho vai trò
+  không phải Admin. Việc này mâu thuẫn với quy tắc chống dò tài khoản trong `RBAC.md`.
+
 ### TRẢ LỜI CHO PHIÊN UI — BR-1 (thông tin phiên bản tài liệu)
 
 - **Trạng thái:** xong mục 1, 2, 3 (chỉ ghi lại hành vi đã có, không đổi code). Mục 4: **CẦN OWNER

@@ -6,6 +6,17 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### Backend requests of the UI session (BR-1, 3, 4, 2, 8, 9) -- 2026-11-20
+
+- **Added:** `chat_messages.grounding_status` (migration `20261120_0013`), returned as
+  `grounding_status` on every chat message (null for user messages and older rows) (BR-3).
+- **Added:** `department_name` on the `user` of login / refresh and on `GET /auth/me` (BR-4).
+- **Added:** `GET /documents/{document_id}/preview`, inline, with the download's access rules and
+  audit event (BR-2).
+- **Docs:** `API_SPEC.md` upload fields and Manager rules (BR-1), unverified-part sentences (BR-3),
+  Admin monitoring examples (BR-8), audit event types (BR-9); answers in
+  `docs/ui/backend-requests.md`.
+
 ### DEC-041 decided: keep s3t; UAT is a regression suite -- 2026-11-20
 
 - **Decided:** the owner keeps s3t as the default; `RAG_ANSWER_MODE=hybrid` stays behind its flag,
