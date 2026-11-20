@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { apiClient } from "../../api/client";
 import type { AuthenticatedUser } from "../../api/types";
 import { DocumentStatusBadge } from "../../components/ui/StatusBadge";
-import { contractDocument, contractManager } from "../../test/fixtures/contract";
+import { contractDocument, contractDocumentForAdmin, contractManager } from "../../test/fixtures/contract";
 import { DocumentsPage } from "./DocumentsPage";
 
 let currentUser: AuthenticatedUser = contractManager;
@@ -44,6 +44,18 @@ describe("DocumentsPage", () => {
     expect(within(screen.getByRole("table")).getAllByText("Đã tải lên")).toHaveLength(2);
     expect(screen.getByRole("link", { name: "Tải tài liệu lên" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Phân quyền" })).not.toBeInTheDocument();
+  });
+
+  it("searches by name or code and shows the Admin-only department_name", async () => {
+    currentUser = { ...contractManager, role: "ADMIN", department_id: null, department_name: null };
+    vi.mocked(apiClient.documents.list).mockResolvedValue({
+      data: [{ ...contractDocumentForAdmin, department_id: "other" }],
+      meta: { page: 1, page_size: 20, total: 1, total_pages: 1 },
+    });
+    renderPage();
+
+    expect(screen.getByPlaceholderText("Tên hoặc mã tài liệu")).toBeInTheDocument();
+    expect(await within(await screen.findByRole("table")).findByText("Nhân sự")).toBeInTheDocument();
   });
 
   it("names no department the viewer does not belong to", async () => {

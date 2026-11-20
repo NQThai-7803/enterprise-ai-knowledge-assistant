@@ -5,13 +5,15 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { apiClient } from "../../api/client";
 import { ToastProvider } from "../../components/feedback/ToastProvider";
-import { contractDocument, contractManager } from "../../test/fixtures/contract";
+import type { AuthenticatedUser } from "../../api/types";
+import { contractDocument, contractDocumentForAdmin, contractManager } from "../../test/fixtures/contract";
 import { DocumentDetailPage } from "./DocumentDetailPage";
 
 vi.mock("../../api/client", () => ({
   apiClient: { documents: { detail: vi.fn(), status: vi.fn(), download: vi.fn(), delete: vi.fn() } },
 }));
-vi.mock("../auth/AuthProvider", () => ({ useAuth: () => ({ user: contractManager }) }));
+let currentUser: AuthenticatedUser = contractManager;
+vi.mock("../auth/AuthProvider", () => ({ useAuth: () => ({ user: currentUser }) }));
 
 function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -32,6 +34,7 @@ describe("DocumentDetailPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubGlobal("crypto", { randomUUID: () => "toast-id" });
+    currentUser = contractManager;
     vi.mocked(apiClient.documents.detail).mockResolvedValue({ data: contractDocument, meta: null });
     vi.mocked(apiClient.documents.status).mockResolvedValue({
       data: { id: "uuid", status: "PROCESSING", error_message: null, updated_at: "2026-11-20T08:00:00Z" },
@@ -51,6 +54,29 @@ describe("DocumentDetailPage", () => {
     expect(screen.getAllByText("Nhân sự")).not.toHaveLength(0);
     expect(await screen.findByRole("img", { name: "Đang chạy" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Phân quyền" })).not.toBeInTheDocument();
+  });
+
+  it("names the uploader and department only from the Admin response (BR-4 option a)", async () => {
+    currentUser = { ...contractManager, role: "ADMIN", department_id: null, department_name: null };
+    vi.mocked(apiClient.documents.detail).mockResolvedValue({ data: contractDocumentForAdmin, meta: null });
+    renderPage();
+
+    expect(await screen.findByText("Nguyễn Văn A")).toBeInTheDocument();
+    expect(screen.getAllByText("Nhân sự")).not.toHaveLength(0);
+  });
+
+  it("tells a non-Admin only whether they uploaded it", async () => {
+    vi.mocked(apiClient.documents.detail).mockResolvedValue({ data: { ...contractDocument, uploaded_by_me: true }, meta: null });
+    renderPage();
+
+    expect(await screen.findByText("Bạn đã tải lên")).toBeInTheDocument();
+  });
+
+  it("shows no uploader row to a non-Admin who did not upload it", async () => {
+    renderPage();
+
+    await screen.findByRole("heading", { level: 1, name: "Quy định nghỉ phép" });
+    expect(screen.queryByText("Người tải lên")).not.toBeInTheDocument();
   });
 
   it("asks before deleting, in the artboard's words", async () => {

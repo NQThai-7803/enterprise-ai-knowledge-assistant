@@ -164,7 +164,7 @@ export function DocumentDetailPage() {
                 }
               />
             ) : null}
-            {/* TODO(BR-4 followup): uploader name only when the response carries it; uploaded_by_me for others. */}
+            {uploaderText(documentItem) ? <Detail label="Người tải lên" value={uploaderText(documentItem)} /> : null}
             <Detail label="Ngày tạo" value={formatDateTime(documentItem.created_at)} />
             <Detail label="Cập nhật" value={formatDateTime(documentItem.updated_at)} />
             <Detail label="Mã tài liệu (ID)" value={<span className="break-all font-mono text-xs">{documentItem.id}</span>} />
@@ -200,11 +200,22 @@ function departmentText(documentItem: DocumentItem, user: AuthenticatedUser | nu
   if (!documentItem.department_id) {
     return "Không gắn phòng ban";
   }
+  // BR-4 option (a): the key exists only for an Admin caller.
+  if (documentItem.department_name !== undefined) {
+    return documentItem.department_name ?? "Không gắn phòng ban";
+  }
   if (user?.department_id === documentItem.department_id && user.department_name) {
     return user.department_name;
   }
-  // TODO(BR-4 followup): show department_name when the document response carries it.
   return "Phòng ban của tài liệu";
+}
+
+/** Uploader name only when the response carries it (Admin); others learn only whether it was them. */
+function uploaderText(documentItem: DocumentItem): string | null {
+  if (documentItem.uploaded_by_name !== undefined) {
+    return documentItem.uploaded_by_me ? `${documentItem.uploaded_by_name} (bạn)` : documentItem.uploaded_by_name;
+  }
+  return documentItem.uploaded_by_me ? "Bạn đã tải lên" : null;
 }
 
 function effectiveText(documentItem: DocumentItem): string {

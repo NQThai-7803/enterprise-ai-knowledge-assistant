@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { clsx } from "clsx";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { apiClient } from "../../api/client";
 import type { AuthenticatedUser, FeedbackRating, FeedbackReportItem } from "../../api/types";
 import { PageHeader } from "../../components/layout/PageHeader";
@@ -8,7 +8,7 @@ import { Badge } from "../../components/ui/Badge";
 import { FieldWrapper, SelectInput } from "../../components/ui/Field";
 import { Pagination } from "../../components/ui/Pagination";
 import { EmptyState, ErrorState, LoadingState } from "../../components/ui/State";
-import { formatDateTime, truncateMiddle } from "../../lib/format";
+import { formatDateTime } from "../../lib/format";
 import { feedbackRatingLabels } from "../../lib/labels";
 import { useAuth } from "../auth/AuthProvider";
 
@@ -43,10 +43,6 @@ export function FeedbackPage() {
     enabled: isAdmin,
     staleTime: 5 * 60_000,
   });
-  const departmentNames = useMemo(
-    () => new Map((departmentsQuery.data?.data ?? []).map((department) => [department.id, department.name])),
-    [departmentsQuery.data],
-  );
 
   const rows = feedbackQuery.data?.data ?? [];
 
@@ -128,8 +124,8 @@ export function FeedbackPage() {
                   {row.reason ?? "Không có ghi chú."}
                 </p>
                 <p className="mt-3 text-xs text-muted">
-                  {/* TODO(BR-4 followup): user_full_name / department_name when the response carries them. */}
-                  Người dùng {truncateMiddle(row.user_id, 14)} · {departmentText(row, user, departmentNames)}
+                  {/* BR-4 option (a): names only when the response carries them (Admin). */}
+                  {[row.user_full_name, departmentText(row, user)].filter(Boolean).join(" · ")}
                 </p>
               </li>
             ))}
@@ -141,16 +137,16 @@ export function FeedbackPage() {
   );
 }
 
-function departmentText(
-  row: FeedbackReportItem,
-  user: AuthenticatedUser | null,
-  departmentNames: ReadonlyMap<string, string>,
-): string {
+function departmentText(row: FeedbackReportItem, user: AuthenticatedUser | null): string {
   if (!row.department_id) {
     return "Không thuộc phòng ban";
   }
+  if (row.department_name !== undefined) {
+    return row.department_name ?? "Không thuộc phòng ban";
+  }
+  // A Manager's report holds only their own department (BR-4 note), named from /auth/me.
   if (row.department_id === user?.department_id && user.department_name) {
     return user.department_name;
   }
-  return departmentNames.get(row.department_id) ?? "Phòng ban";
+  return "Phòng ban";
 }

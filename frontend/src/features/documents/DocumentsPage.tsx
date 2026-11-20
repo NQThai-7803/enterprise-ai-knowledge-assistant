@@ -69,8 +69,7 @@ export function DocumentsPage() {
             <TextInput
               id="document-search"
               className="pl-9"
-              // TODO(BR-1 mục 4): add "mã tài liệu" once search covers document_code.
-              placeholder="Tên hoặc tên tệp"
+              placeholder="Tên hoặc mã tài liệu"
               maxLength={200}
               value={search}
               onChange={(event) => {
