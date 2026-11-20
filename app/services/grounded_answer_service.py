@@ -613,6 +613,24 @@ class _CitationFailure:
     marker_count: int
 
 
+# Simple mode: the reason given to the one retry, per rejection (claim_* share "claim"); any
+# other rejection is final. The GPU latency replay rebuilds retry prompts from it (DEC-041).
+SIMPLE_RETRY_INSTRUCTIONS = {
+    "citation_missing": (
+        "it has no source marker. End every sentence that uses a source with its "
+        "marker, for example [SOURCE_1]."
+    ),
+    "citation_invalid": (
+        "it uses a marker that is not one of the sources. Use only the markers shown, "
+        "for example [SOURCE_1]."
+    ),
+    "claim": (
+        "the cited sources do not support it as written. State only what the cited "
+        "sources say, with the marker of the source that says it; name what could not "
+        "be verified."
+    ),
+}
+
 # DEC-021: what the system knows about a part it could not validate; never "not mentioned".
 _UNVERIFIED_PART_SENTENCE = "Chưa xác minh được từ tài liệu bạn được phép truy cập: {need}."
 
@@ -1512,10 +1530,7 @@ class GroundedAnswerService:
         if not plain:
             return "refusal_text", None
         if not markers:
-            return "citation_missing", (
-                "it has no source marker. End every sentence that uses a source with its "
-                "marker, for example [SOURCE_1]."
-            )
+            return "citation_missing", SIMPLE_RETRY_INSTRUCTIONS["citation_missing"]
         validation_flags = {
             "relaxed_rules": settings.rag_simple_relaxed_rules_enabled,
             "question_list_segments": settings.rag_simple_question_list_segments_enabled,
@@ -1568,10 +1583,7 @@ class GroundedAnswerService:
         except CitationPermissionRevalidationError:
             return "permission", None
         except CitationValidationError:
-            return "citation_invalid", (
-                "it uses a marker that is not one of the sources. Use only the markers shown, "
-                "for example [SOURCE_1]."
-            )
+            return "citation_invalid", SIMPLE_RETRY_INSTRUCTIONS["citation_invalid"]
         except CitationMappingError as exc:
             raise CitationMappingFailedApplicationError() from exc
         with simple_validation(**validation_flags):
@@ -1582,11 +1594,7 @@ class GroundedAnswerService:
                 cited_source_labels=tuple(marker.strip("[]") for marker in markers),
             )
         if claim.status != ClaimEvidenceStatus.SUPPORTED:
-            return f"claim_{claim.status.value.lower()}", (
-                "the cited sources do not support it as written. State only what the cited "
-                "sources say, with the marker of the source that says it; name what could not "
-                "be verified."
-            )
+            return f"claim_{claim.status.value.lower()}", SIMPLE_RETRY_INSTRUCTIONS["claim"]
         return _AnswerDraft(
             content=_strip_internal_evidence_labels(validated.answer),
             grounding_status=GroundingStatus.ANSWERED,
