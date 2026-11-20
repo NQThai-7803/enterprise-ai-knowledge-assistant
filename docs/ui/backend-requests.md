@@ -358,3 +358,84 @@ quyết định của owner.
 - **Test:** `tests/unit/test_audit_events.py`
   (`test_audit_event_types_are_the_ones_api_spec_lists`). Thêm loại sự kiện mới thì test này đỏ,
   nhắc cập nhật spec.
+
+---
+
+## Tình trạng phía UI (20/11/2026)
+
+- Đã ghép trên `feat/ui-redesign` (PR #42), sau khi merge PR #53 và #54 của backend:
+  - BR-1: form upload đủ trường phiên bản; danh sách và chi tiết hiện mã, phiên bản, hiệu lực, vòng
+    đời; tìm theo mã; luật upload của Manager.
+  - BR-2: trang xem tài liệu dùng `/preview`.
+  - BR-3: `grounding_status`, và hiển thị theo `segments`. UI không còn nhận diện câu theo chữ.
+  - BR-4: `department_name` của chính mình; tên chỉ hiện khi response có khóa (Admin);
+    `uploaded_by_me` cho mọi vai trò.
+  - BR-8: trang Trạng thái hệ thống đọc `/admin/system` (chỉ Admin).
+  - BR-9: ô chọn 23 `event_type`, xử lý `422 AUDIT_FILTER_INVALID`.
+- Hoãn theo owner: BR-5, BR-6, BR-7.
+- Yêu cầu mới: BR-10, BR-11 (bên dưới).
+
+## PROMPT CHO PHIÊN BACKEND
+
+Owner dán nguyên khối này sang phiên backend:
+
+> Phiên UI ghi thêm hai yêu cầu, BR-10 và BR-11, ở cuối `docs/ui/backend-requests.md` trên `main`
+> (đến cùng PR #42). Với mỗi BR:
+> - chỉ thêm trường hoặc ghi lại hành vi đang có, không đổi trường cũ;
+> - cập nhật `API_SPEC.md`;
+> - trả lời bằng khối "TRẢ LỜI CHO PHIÊN UI — BR-n" trong file đó, kèm tên test.
+>
+> BR-10 (Nên có): ghi vào API_SPEC §3 dạng `details` của `422 VALIDATION_ERROR`, đủ để UI gắn lỗi
+> vào đúng trường của form.
+>
+> BR-11 (Tùy chọn): trong `GET /audit-logs` (chỉ Admin) thêm họ tên người thực hiện và nhãn an toàn
+> của đối tượng, theo cùng quy tắc BR-4 (a).
+
+### BR-10: Dạng `details` của lỗi `422 VALIDATION_ERROR` theo từng trường
+- Ưu tiên: **Nên có**
+- Màn hình / file frontend: Upload (`features/documents/DocumentUploadPage.tsx`); về sau mọi form
+  gửi lên (Users, Departments, Permissions).
+- Cần gì từ backend:
+  - Ghi vào `API_SPEC.md` §3 ("Standard error response") dạng `details` của
+    `422 VALIDATION_ERROR`, đủ để UI gắn lỗi vào đúng trường.
+  - Đề xuất: `"details": [{ "field": "effective_to", "message": "effective_to must not precede effective_from." }]`.
+    `field` là tên trường đúng như trong request (form hoặc JSON), không phải đường dẫn nội bộ
+    kiểu `["body", "…"]`.
+  - Nếu server đã trả một dạng ổn định (ví dụ danh sách `loc`/`msg`), chỉ cần ghi đúng dạng đó vào
+    spec và cam kết giữ nguyên.
+- Hiện API_SPEC nói gì:
+  - §3 chỉ có ví dụ `"details": null`.
+  - §7 (upload) liệt kê các trường hợp 422 nhưng không ghi `details`. Chỉ một message được ghi
+    nguyên văn: `effective_to must not precede effective_from.`.
+- Có làm đổi hành vi/API hiện tại không: Không, nếu chỉ ghi lại dạng đang có. Có, nếu phải chuẩn
+  hóa sang dạng mới.
+- UI tạm thời đang xử lý thế nào:
+  - Kiểm tra từng trường phía client trước khi gửi (độ dài, thứ tự ngày, phòng ban, tệp).
+  - 422 có đúng message trong spec thì gắn vào ô "Hiệu lực đến".
+  - Các 422 khác hiện thành lỗi chung của form, kèm message của server.
+  - Có `TODO(BR-10)`.
+- Trạng thái: CHỜ OWNER CHUYỂN
+
+### BR-11: Tên người thực hiện và nhãn đối tượng trong nhật ký (chỉ Admin)
+- Ưu tiên: Tùy chọn
+- Màn hình / file frontend: AuditLogs (`features/audit/AuditLogsPage.tsx`), `api/types.ts` →
+  `AuditLogItem`.
+- Cần gì từ backend:
+  - Trong `GET /audit-logs` (vốn chỉ dành cho Admin) thêm:
+    - `actor_full_name`: họ tên người thực hiện; `null` khi `actor_user_id` là null hoặc không còn
+      tra được;
+    - tùy chọn `target_label`: nhãn an toàn của đối tượng, ví dụ `document_code` hoặc tiêu đề tài
+      liệu, mã phòng ban, email người dùng.
+  - Theo cùng quy tắc với BR-4 (a).
+  - Ví dụ: `{ "actor_user_id": "uuid", "actor_full_name": "Admin UAT", "target_type": "DOCUMENT", "target_id": "uuid", "target_label": "ND-HR-007" }`.
+  - Không thêm IP, header hay nội dung chat.
+- Hiện API_SPEC nói gì:
+  - §10: `AuditLogItem` chỉ có `actor_user_id`, `target_type`, `target_id` (đều là UUID).
+  - Artboard "Nhật ký hệ thống" hiện tên người thực hiện ("Staff Nhân sự") và mã đối tượng
+    ("ND-HR-007").
+- Có làm đổi hành vi/API hiện tại không: Không, chỉ thêm trường cho Admin.
+- UI tạm thời đang xử lý thế nào:
+  - Hiện UUID rút gọn của người thực hiện ("Hệ thống" khi null) và loại đối tượng.
+  - Không gọi thêm `/users` để tra tên.
+  - Có `TODO(BR-11)`.
+- Trạng thái: CHỜ OWNER CHUYỂN

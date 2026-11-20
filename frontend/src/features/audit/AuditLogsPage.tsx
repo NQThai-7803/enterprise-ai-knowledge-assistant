@@ -141,7 +141,7 @@ export function AuditLogsPage() {
                     </td>
                     <td className="px-5 py-3 font-mono text-xs text-ink">{row.event_type}</td>
                     <td className="px-5 py-3 text-ink/80">
-                      {/* TODO(BR-4 followup): actor name when the response carries it. */}
+                      {/* TODO(BR-11): actor name and target label once the Admin response carries them. */}
                       {row.actor_user_id ? truncateMiddle(row.actor_user_id, 14) : "Hệ thống"}
                     </td>
                     <td className="px-5 py-3 text-ink/80">
