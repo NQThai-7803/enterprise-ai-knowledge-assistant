@@ -349,23 +349,23 @@ test("admin department management supports conflict, edit, and delete", async ({
   await mockDepartmentsApi(page);
   await page.goto("/departments");
 
-  await page.getByLabel("Name").fill("Duplicate Knowledge");
-  await page.getByLabel("Code").fill("KNOWLEDGE");
-  await page.getByLabel("Description").fill("Duplicate department.");
-  await page.getByRole("button", { name: "Create department" }).click();
-  await expect(page.getByText("Create department failed")).toBeVisible();
+  await page.getByLabel("Tên", { exact: true }).fill("Duplicate Knowledge");
+  await page.getByLabel("Mã", { exact: true }).fill("KNOWLEDGE");
+  await page.getByLabel("Mô tả (tùy chọn)").fill("Duplicate department.");
+  await page.getByRole("button", { name: "Tạo phòng ban" }).click();
+  await expect(page.getByText("Tạo phòng ban thất bại")).toBeVisible();
   await page.getByRole("button", { name: "Đăng xuất" }).click();
   await expect(page.getByRole("heading", { name: "Đăng nhập" })).toBeVisible();
 
   await authenticatedPage(page, "ADMIN");
   await page.goto("/departments");
-  await page.getByRole("button", { name: "Edit" }).first().click();
-  await page.getByLabel("Edit name").fill("Edited Knowledge Operations");
-  await page.getByLabel("Edit code").fill("KNOWLEDGE-EDIT");
-  await page.getByRole("button", { name: "Update department" }).click();
+  await page.getByRole("button", { name: "Sửa" }).first().click();
+  await page.getByLabel("Tên", { exact: true }).fill("Edited Knowledge Operations");
+  await page.getByLabel("Mã", { exact: true }).fill("KNOWLEDGE-EDIT");
+  await page.getByRole("button", { name: "Lưu thay đổi" }).click();
   await expect(page.getByText("KNOWLEDGE-EDIT")).toBeVisible();
 
-  await page.getByRole("button", { name: "Delete" }).first().click();
-  await page.getByRole("button", { name: "Delete" }).last().click();
-  await expect(page.getByText("Department deleted")).toBeVisible();
+  await page.getByRole("button", { name: "Xóa" }).first().click();
+  await page.getByRole("dialog", { name: "Xóa phòng ban?" }).getByRole("button", { name: "Xóa" }).click();
+  await expect(page.getByText("Đã xóa phòng ban")).toBeVisible();
 });
