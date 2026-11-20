@@ -25,6 +25,9 @@ Format follows a simplified Keep a Changelog style.
   v3.1 and the reason of every item not asked.
 - **Added:** `scripts/eval/heldout_v3_diag.py` (`table`, `access`): a text-free table per
   configuration, run and item for the owner, and the gold documents' access per account.
+- **Measured:** dev baselines of the rollback against the new default (DEC-040): `natural_dev_v1`
+  correct 3 / 7 of 20; UAT `value_match` 96 / 71 of 100 (monitoring only, no deterministic route
+  in simple mode).
 
 ### Held-out v3.1 batch set, validate-only preflight, failure status -- 2026-11-19
 

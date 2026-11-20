@@ -831,3 +831,28 @@ source documents are not in corpus V2 (DEC-038); HO3-11 was excluded because its
 - The held-out summary now also lists the items removed before v3.1, with the reason.
 - `scripts/eval/heldout_v3_diag.py` prints, for the owner, one text-free row per configuration, run
   and item.
+
+**Baseline on the dev sets after the switch (2026-11-20):** `eval.yml` from the PR branch, CPU
+runner, one job per set, `legacy` (the rollback,
+`legacy:EVAL_ANSWER_MODE=legacy,EVAL_LLM_MODEL=qwen2.5:3b`) then `default` (DEC-040) on the same
+image and Ollama, 1 run, LLM timeout 600 s. It is the reference for later dev work, not an input to
+this decision.
+
+- UAT Q001-Q100 (run 44669869629; monitoring only, DEC-026), `legacy` / `default`:
+  - `value_match` 96 / 71 (`proxy_match` 96 / 77); false refusals 3 / 21; wrong 1 / 8; false
+    answers 0 / 0; infra errors 0 / 0; time 1429 s / 5071 s.
+  - By route: `legacy` answers 74 items on the deterministic route (73 match) and 26 on the LLM
+    route (23); `default` answers all 100 on the LLM route (71). Simple mode has no deterministic
+    route.
+  - `default` gains no item and loses 25 (22 that `legacy` answered on the deterministic route,
+    3 on the LLM route): 19 become refusals, 6 wrong.
+  - `default` false refusals: Q001, Q003, Q006, Q007, Q026, Q030, Q031, Q036, Q037, Q039, Q041,
+    Q042, Q046, Q048, Q071, Q075, Q080, Q086, Q093, Q096, Q097. Wrong: Q018, Q019, Q020, Q049,
+    Q054, Q066, Q077, Q079.
+  - The saved logs count 100 + 100 chat requests.
+
+- `natural_dev_v1` (run 44669873227, 20 items), `legacy` / `default`:
+  - correct 3 / 7; false answers 1 / 1 (ND-002 in both); refused (`NO_ANSWER`) 8 / 8; leaks 0 / 0;
+    infra errors 0 / 0; time 1020 s / 2688 s.
+  - `default` gains ND-010, ND-011, ND-013, ND-018, ND-020 and loses ND-017.
+  - The saved logs count 20 + 20 chat requests, one per item and configuration.

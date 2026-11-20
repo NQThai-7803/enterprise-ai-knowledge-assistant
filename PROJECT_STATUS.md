@@ -12,6 +12,12 @@
   `legacy:EVAL_ANSWER_MODE=legacy,EVAL_LLM_MODEL=qwen2.5:3b`.
 - **Run diagnosis:** `api_requests=35` counted the last API container only; `ci_batch.sh` now saves
   each container's log before the recreate. `heldout_v3_diag.py` gives the owner a text-free table.
+- **Dev baselines, `legacy` (rollback) / `default` (DEC-040)**, 1 run on CPU (DEC-040 lists the ids):
+  - `natural_dev_v1` (run 44669873227): correct 3 / 7 of 20, false answers 1 / 1, refusals 8 / 8,
+    leaks 0.
+  - UAT Q001-Q100 (run 44669869629, monitoring only): `value_match` 96 / 71, false refusals 3 / 21,
+    wrong 1 / 8. Simple mode answers every item on the LLM route; `legacy` built 74 answers on
+    the deterministic route.
 - **Local stacks:** the local `.env` (not in git) still sets `LLM_OLLAMA_MODEL=qwen2.5:3b`; a stack
   started from it gets simple mode with that model until the owner sets either the new model or
   `RAG_ANSWER_MODE=legacy`.

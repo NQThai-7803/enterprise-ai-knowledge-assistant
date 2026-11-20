@@ -15,9 +15,13 @@
   - Default: simple s1-s3 + `qwen3.5-text:4b` (DEC-040, ADR 0005); rollback `legacy` + `qwen2.5:3b`.
   - `ci_batch.sh` saves each API container's log before a recreate; the held-out summary lists the
     items removed before v3.1.
+  - Dev baselines of the rollback against the new default (DEC-040): `natural_dev_v1` run
+    44669873227, UAT run 44669869629.
 - **NEXT (not started):**
   - **[High]** False refusals of about 40-50 % on natural questions, in the shared layer (retrieval /
-    evidence gate). Diagnose on `natural_dev_v1` and the dev sets, NOT on a held-out set.
+    evidence gate). Diagnose on `natural_dev_v1` and the dev sets, NOT on a held-out set. Baseline:
+    `natural_dev_v1` refuses 8 of 20 in both modes; UAT has 21 false refusals in the default
+    against 3 in `legacy` (DEC-040).
   - **[High]** Questions where two documents conflict: the answer names one source only. Tied to
     rewriting the corpus as v3 (removing the duplicates).
   - **[Medium]** Grader (`value_grading.py`): derived values (12 + 1 = 13), unit conversion
