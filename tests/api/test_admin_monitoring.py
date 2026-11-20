@@ -254,3 +254,41 @@ def test_admin_health_covers_required_subsystems(
         "streaming",
         "conversation",
     }.issubset(names)
+
+
+# BR-8: the keys of the JSON examples in API_SPEC.md (TASK-032 Admin Monitoring API).
+DOCUMENTED_KEYS = {
+    "health": {"status", "generated_at", "checks"},
+    "providers": {"llm", "web_search"},
+    "version": {"app_name", "version", "environment", "python_version", "api_prefix",
+                "migration_head", "database_revision", "started_at", "uptime_seconds"},
+    "system": {"generated_at", "version", "uptime_seconds", "health", "providers", "workers",
+               "queues", "statistics"},
+}  # fmt: skip
+CHECK_KEYS = {"name", "status", "enabled", "message", "details"}
+PROVIDER_KEYS = {"provider_type", "provider", "status", "enabled", "configured", "display_name",
+                 "model", "external_allowed", "connectivity_checked", "message"}  # fmt: skip
+CHECK_NAMES = ["api", "postgres", "redis", "worker", "ocr", "embedding", "llm", "web_search",
+               "streaming", "conversation"]  # fmt: skip
+
+
+def test_admin_monitoring_responses_keep_the_documented_example_shape(
+    api_client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
+    make_user: Callable[..., User],
+    make_auth_headers: Callable[[User], dict[str, str]],
+) -> None:
+    install_fast_monitoring(monkeypatch)
+    headers = make_auth_headers(make_user(role=UserRole.ADMIN))
+    data = {
+        path: api_client.get(f"/api/v1/admin/{path}", headers=headers).json()["data"]
+        for path in DOCUMENTED_KEYS
+    }
+
+    assert {path: set(body) for path, body in data.items()} == DOCUMENTED_KEYS
+    assert [check["name"] for check in data["health"]["checks"]] == CHECK_NAMES
+    assert all(set(check) == CHECK_KEYS for check in data["health"]["checks"])
+    assert {set(data["providers"][kind]) == PROVIDER_KEYS for kind in ("llm", "web_search")} == {
+        True
+    }
+    assert set(data["system"]["version"]) == DOCUMENTED_KEYS["version"]

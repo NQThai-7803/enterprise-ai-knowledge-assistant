@@ -242,3 +242,30 @@ quyết định của owner.
     thời; nếu owner muốn thì ghi thành BR mới.
 - **Test:** `tests/api/test_documents_api.py`
   (`test_document_preview_is_inline_with_the_download_access_rules`).
+
+### TRẢ LỜI CHO PHIÊN UI — BR-8 (ví dụ JSON cho giám sát Admin)
+
+- **Trạng thái:** xong. Chỉ thêm tài liệu, không đổi response.
+- **Endpoint:** `GET /api/v1/admin/system`, `/admin/health`, `/admin/providers`, `/admin/version`,
+  chỉ dành cho Admin (Manager và Staff nhận `403 FORBIDDEN`). Ví dụ JSON đầy đủ có ở `API_SPEC.md`,
+  mục "TASK-032 Admin Monitoring API".
+- **Field UI cần cho mục "Mô hình ngôn ngữ":** lấy từ `data.llm` của `/admin/providers` (hoặc
+  `data.providers.llm` của `/admin/system`): `provider`, `display_name`, `model`, `status`
+  (`healthy` | `disabled` | `misconfigured` | `unhealthy`), `enabled`, `configured`, `message`.
+  Ở cấu hình mặc định: `"provider": "ollama"`, `"display_name": "Ollama"`,
+  `"model": "qwen3.5-text:4b"`. Ví dụ:
+  ```json
+  { "provider_type": "llm", "provider": "ollama", "status": "healthy", "enabled": true,
+    "configured": true, "display_name": "Ollama", "model": "qwen3.5-text:4b",
+    "external_allowed": null, "connectivity_checked": false, "message": "…" }
+  ```
+  Endpoint chỉ kiểm cấu hình, không gọi tới mô hình (`connectivity_checked: false`).
+- **Phiên bản:** `/admin/version` trả `app_name`, `version`, `environment`, `python_version`,
+  `api_prefix`, `migration_head`, `database_revision`, `started_at`, `uptime_seconds`.
+- **Không có trong các endpoint này:**
+  - Chế độ trả lời (simple hay legacy) và cấu hình reranker như `lexical_fallback`. Reranker chỉ có
+    ở `GET /health/ready` (`reranker_mode`). Nếu UI cần hiện chế độ trả lời thì ghi thành BR mới.
+  - Câu cũ "Not exposed by current backend API" trên trang System đã lỗi thời; nên bỏ.
+- **Test:** `tests/api/test_admin_monitoring.py`
+  (`test_admin_monitoring_responses_keep_the_documented_example_shape`) kiểm các khóa của response
+  khớp với ví dụ trong spec.

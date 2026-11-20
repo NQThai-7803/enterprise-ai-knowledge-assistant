@@ -1037,6 +1037,52 @@ All endpoints in this section require an active Admin bearer token. Manager and 
 
 Returns the aggregate backend dashboard payload: version, uptime, health checks, provider status, worker status, queue status, and safe statistics.
 
+Example (BR-8; test stack, shortened lists). `version`, `health`, `providers`, `workers`, `queues` and `statistics` have the shapes of `/admin/version`, `/admin/health`, `/admin/providers`, `/admin/workers`, `/admin/queues` and `/admin/statistics`:
+
+```json
+{
+  "data": {
+    "generated_at": "2026-11-20T11:09:09Z",
+    "version": { "app_name": "Enterprise AI Knowledge Assistant", "version": "0.1.0",
+                 "environment": "production", "python_version": "3.12.16", "api_prefix": "/api/v1",
+                 "migration_head": "20261120_0013", "database_revision": "20261120_0013",
+                 "started_at": "2026-11-20T11:09:05Z", "uptime_seconds": 3 },
+    "uptime_seconds": 3,
+    "health": { "status": "healthy", "generated_at": "2026-11-20T11:09:09Z",
+                "checks": [ { "name": "api", "status": "ok", "enabled": true,
+                              "message": "API process is running.", "details": { "uptime_seconds": 3 } } ] },
+    "providers": { "llm": { "provider_type": "llm", "provider": "ollama", "status": "healthy",
+                            "enabled": true, "configured": true, "display_name": "Ollama",
+                            "model": "qwen3.5-text:4b", "external_allowed": null,
+                            "connectivity_checked": false, "message": "…" },
+                   "web_search": { "provider_type": "web_search", "provider": "mock",
+                                   "status": "disabled", "enabled": false, "configured": false,
+                                   "display_name": "Mock Web Search", "model": null,
+                                   "external_allowed": false, "connectivity_checked": false,
+                                   "message": "Web search is disabled." } },
+    "workers": { "status": "healthy", "active_worker_count": 1,
+                 "workers": [ { "name": "worker@host", "status": "ok",
+                                "queues": ["default", "documents"], "pool": "prefork" } ],
+                 "registered_tasks": ["documents.process_document", "system.worker_ping"],
+                 "message": null },
+    "queues": { "status": "healthy",
+                "queues": [ { "kind": "document", "name": "documents", "status": "ok",
+                              "configured": true, "pending": 2,
+                              "consumer": "documents.process_document",
+                              "message": "Document queue is reachable." } ] },
+    "statistics": { "documents": { "total": 12, "deleted": 0, "by_status": { "READY": 12 } },
+                    "chunks": { "total": 340 }, "embeddings": { "total": 340 },
+                    "users": { "total": 4, "active": 4, "inactive": 0,
+                               "by_role": { "ADMIN": 1, "MANAGER": 1, "STAFF": 2 } },
+                    "departments": { "total": 2 }, "chat_sessions": { "total": 9, "archived": 0 },
+                    "messages": { "total": 36, "by_role": { "USER": 18, "ASSISTANT": 18 } },
+                    "feedback": { "total": 3, "by_rating": { "HELPFUL": 2, "NOT_HELPFUL": 1 } },
+                    "audit_logs": { "total": 120 } }
+  },
+  "meta": null
+}
+```
+
 ### GET `/admin/health`
 
 Returns component health for:
@@ -1054,9 +1100,67 @@ Returns component health for:
 
 LLM and Web Search checks are configuration checks only by default and do not call external providers. Embedding health does not load the model.
 
+Example (BR-8; the test stack, LLM disabled). `status` is `healthy`, `degraded` or `unhealthy`; each check's `status` is `ok`, `degraded`, `unavailable`, `disabled`, `misconfigured` or `not_configured`; `details` holds only safe scalars and lists of strings, and its keys differ per check:
+
+```json
+{
+  "data": {
+    "status": "healthy",
+    "generated_at": "2026-11-20T11:09:08Z",
+    "checks": [
+      { "name": "api", "status": "ok", "enabled": true, "message": "API process is running.",
+        "details": { "uptime_seconds": 2 } },
+      { "name": "postgres", "status": "ok", "enabled": true, "message": "PostgreSQL is reachable.", "details": {} },
+      { "name": "redis", "status": "ok", "enabled": true, "message": "Redis is reachable.", "details": {} },
+      { "name": "worker", "status": "ok", "enabled": true,
+        "message": "At least one Celery worker responded.", "details": { "active_worker_count": 1 } },
+      { "name": "ocr", "status": "ok", "enabled": true, "message": "OCR engine is available.",
+        "details": { "engine": "tesseract", "requested_languages": ["vie", "eng"],
+                     "version": "tesseract 5", "available_languages": ["eng", "vie"] } },
+      { "name": "embedding", "status": "ok", "enabled": true,
+        "message": "Embedding provider configuration is valid.",
+        "details": { "provider": "sentence_transformers", "model": "intfloat/multilingual-e5-small",
+                     "dimensions": 384, "model_loading_checked": false } },
+      { "name": "llm", "status": "disabled", "enabled": false, "message": "LLM is disabled.",
+        "details": { "provider": "openai_compatible", "display_name": "OpenAI-compatible",
+                     "model": null, "connectivity_checked": false } },
+      { "name": "web_search", "status": "disabled", "enabled": false, "message": "Web search is disabled.",
+        "details": { "provider": "mock", "display_name": "Mock Web Search",
+                     "external_allowed": false, "connectivity_checked": false } },
+      { "name": "streaming", "status": "ok", "enabled": true, "message": "Streaming subsystem is registered.",
+        "details": { "strategy": "buffer_after_validation", "heartbeat_seconds": 15.0,
+                     "max_duration_seconds": 120.0 } },
+      { "name": "conversation", "status": "ok", "enabled": true, "message": "Conversation memory is enabled.",
+        "details": { "max_messages": 10, "max_tokens": 1200 } }
+    ]
+  },
+  "meta": null
+}
+```
+
+On the default deployment the `llm` check reads `"status": "ok"`, `"enabled": true` with `details.provider` `ollama`, `details.display_name` `Ollama` and `details.model` `qwen3.5-text:4b` when its configuration is valid (a configuration check: the model is not called).
+
 ### GET `/admin/providers`
 
 Returns safe LLM and Web Search provider state: provider name, display name, enabled/disabled, configured flag, healthy/disabled/misconfigured/unhealthy status, selected model where applicable, external-call policy where applicable, and safe message. Provider secrets are never returned.
+
+Example (BR-8; test stack, LLM disabled). On the default deployment `llm` reads `"provider": "ollama"`, `"display_name": "Ollama"`, `"model": "qwen3.5-text:4b"`, `"enabled": true`, `"configured": true`, and `"status": "healthy"` when the configuration is valid. `connectivity_checked` stays `false`: the endpoint does not call the provider.
+
+```json
+{
+  "data": {
+    "llm": { "provider_type": "llm", "provider": "openai_compatible", "status": "disabled",
+             "enabled": false, "configured": false, "display_name": "OpenAI-compatible",
+             "model": null, "external_allowed": null, "connectivity_checked": false,
+             "message": "LLM is disabled." },
+    "web_search": { "provider_type": "web_search", "provider": "mock", "status": "disabled",
+                    "enabled": false, "configured": false, "display_name": "Mock Web Search",
+                    "model": null, "external_allowed": false, "connectivity_checked": false,
+                    "message": "Web search is disabled." }
+  },
+  "meta": null
+}
+```
 
 ### GET `/admin/workers`
 
@@ -1091,6 +1195,27 @@ Returns queue state for the existing architecture:
 ### GET `/admin/version`
 
 Returns app name, package version, environment, Python version, API prefix, source Alembic head, database Alembic revision when readable, startup timestamp, and uptime seconds. It does not return hostnames, connection strings, environment variables, or secrets.
+
+Example (BR-8; `database_revision` and `started_at` may be `null`):
+
+```json
+{
+  "data": {
+    "app_name": "Enterprise AI Knowledge Assistant",
+    "version": "0.1.0",
+    "environment": "production",
+    "python_version": "3.12.16",
+    "api_prefix": "/api/v1",
+    "migration_head": "20261120_0013",
+    "database_revision": "20261120_0013",
+    "started_at": "2026-11-20T11:09:05Z",
+    "uptime_seconds": 3
+  },
+  "meta": null
+}
+```
+
+The answer path itself (simple or legacy mode, retrieval settings) is not exposed by these endpoints.
 
 
 ## TASK-033 Admin Analytics API
