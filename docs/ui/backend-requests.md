@@ -1,0 +1,116 @@
+# Yêu cầu backend từ phiên UI
+
+File này chỉ phiên UI ghi. Phiên backend trả lời bằng PR/commit cập nhật `API_SPEC.md`.
+Phiên UI chỉ dùng trường/endpoint mới SAU KHI nó có trên `main` và đã merge `main` vào `feat/ui-redesign`.
+
+Ưu tiên: **Bắt buộc** (chặn một tính năng đã có trong thiết kế), **Nên có** (làm UI đúng thiết kế hơn), **Tùy chọn** (nâng cấp, UI vẫn chạy được nếu không có).
+
+Tình trạng 17/11/2026: BR-1 → BR-9 đều ở trạng thái CHỜ OWNER CHUYỂN.
+
+---
+
+### BR-1: Thông tin phiên bản tài liệu (document_code, document_version, effective_from, effective_to)
+- Ưu tiên: **Bắt buộc**
+- Màn hình / file frontend: Upload (`features/documents/DocumentUploadPage.tsx`, `api/client.ts` → `documents.upload`), Documents/DocumentDetail (`api/types.ts` → `DocumentItem`), Chat (mã tài liệu trên citation, lấy qua detail).
+- Cần gì từ backend:
+  1. Ghi vào `API_SPEC.md` §7 `POST /documents/upload` các field form mà code backend đã nhận: `document_code` (str ≤ 128), `document_version` (str ≤ 64), `effective_from` / `effective_to` (date `YYYY-MM-DD`, bắt buộc `effective_to >= effective_from`). Ghi rõ mã lỗi 422 khi sai (ví dụ `effective_to` trước `effective_from`) để UI hiển thị đúng.
+  2. Ghi vào `API_SPEC.md` các trường tương ứng trong response của `GET /documents`, `GET /documents/{id}` và response 202 của upload (`DocumentSafeResponse` đã có): `document_code`, `document_version`, `effective_from`, `effective_to`. Nếu `lifecycle_status` và `supersedes_document_id` cũng được trả về thì ghi luôn (UI chưa dùng, chỉ cần biết để không hiểu nhầm).
+  3. Xác nhận quy tắc upload của Manager: được chọn phạm vi nào (PATCH chỉ cho `PRIVATE` hoặc `DEPARTMENT` của chính mình; upload thì spec chưa nói) và `department_id` có bị ép về phòng ban của Manager không.
+  4. (Tùy ý) `GET /documents?search=` có tìm theo `document_code` không. Thiết kế đặt placeholder "Tên hoặc mã tài liệu".
+  - Ví dụ response:
+    ```json
+    { "id": "uuid", "title": "…", "document_code": "ND-HR-007", "document_version": "1.0",
+      "effective_from": "2026-09-01", "effective_to": null }
+    ```
+- Hiện API_SPEC nói gì: §7 `POST /documents/upload`: "Fields: `file`, `title`, `description`, `access_scope`, `department_id`." Không có field phiên bản. `GET /documents/{id}` không liệt kê trường nào của phiên bản. Trong code (chỉ đọc): `app/api/v1/documents.py` dòng 72–77 nhận các field trên; `app/schemas/document.py` `DocumentSafeResponse` trả về.
+- Có làm đổi hành vi/API hiện tại không: Không. Chỉ ghi lại hành vi đã có. Riêng mục 3 và 4 có thể đòi thay đổi nếu hiện chưa đúng.
+- UI tạm thời đang xử lý thế nào: Form upload KHÔNG hiện mục "Thông tin phiên bản", không gửi các field này. Ô tìm kiếm ghi "Tên hoặc tên tệp". Có `TODO(BR-1)` trong code.
+- Trạng thái: CHỜ OWNER CHUYỂN
+
+### BR-2: Mở tài liệu tại đúng trang từ citation
+- Ưu tiên: **Nên có** (owner đã duyệt đường tạm phía UI, endpoint preview giúp nhẹ hơn)
+- Màn hình / file frontend: Chat, panel trích dẫn (`features/chat/ChatPage.tsx`, liên kết "Mở tài liệu tại trang N"). Tham chiếu: `docs/review/bao-cao-kiem-thu-2026-10-28.md` mục 6.2.
+- Cần gì từ backend: Một cách để trình duyệt mở PDF ở trang N cho đúng người có quyền xem. Đề xuất `GET /documents/{id}/preview` trả `Content-Disposition: inline`, cùng quy tắc quyền như `/download` (404 `RESOURCE_NOT_FOUND` nếu không được xem, `410 DOCUMENT_FILE_UNAVAILABLE` nếu mất file). Trang N do client gắn `#page=N`, backend không cần xử lý. Nếu backend muốn phương án khác (URL ký tạm thời có hạn), ghi rõ cách dùng vào `API_SPEC.md`. Lý do cần: trình duyệt không gửi được header `Authorization` khi mở link thường, nên không thể mở bằng thẻ `<a>`.
+  - Ví dụ: `GET /api/v1/documents/{document_id}/preview` → `200 application/pdf`, `Content-Disposition: inline`.
+- Hiện API_SPEC nói gì: §7 cuối: "Not implemented yet: … Preview endpoint. Signed download URLs." `/download` trả `Content-Disposition: attachment`. Citation đã có `document_id` và `page_number` (§8A).
+- Có làm đổi hành vi/API hiện tại không: Không, chỉ thêm endpoint.
+- UI tạm thời đang xử lý thế nào: Owner đã duyệt (17/11/2026). Liên kết "Mở tài liệu tại trang N" mở tab mới tới route `/documents/:id/view?page=N` của app. Trang này gọi `GET /documents/{id}/download` (có Bearer), tạo `blob:` URL, nhúng vào khung PDF với `#page=N`. Chỉ tới được trang, không tô được câu; nhược điểm: tải cả tệp mỗi lần. Có `TODO(BR-2)` để đổi sang endpoint preview khi có. Tài liệu PNG/JPEG hiện ảnh, bỏ `#page`.
+  - Ghi nhận khi làm (17/11/2026): token nằm trong `sessionStorage`, nên liên kết dùng `rel="opener"` để tab mới nhận bản sao token (đã kiểm bằng Playwright). Hệ quả: hai tab dùng chung một refresh token; refresh xoay vòng token (API_SPEC §4), nên nếu tab xem tài liệu phải refresh thì tab gốc sẽ bị đăng xuất ở lần refresh sau. Chỉ xảy ra khi access token sắp hết hạn lúc mở tab. Endpoint preview vẫn cần Bearer nên không gỡ được rủi ro này; URL ký tạm thời (phương án thay thế ở trên) thì gỡ được.
+- Trạng thái: CHỜ OWNER CHUYỂN
+
+### BR-3: `grounding_status` trong lịch sử chat và hợp đồng của câu "Chưa xác minh được…" (kèm bản tiếng Anh)
+- Ưu tiên: **Nên có**
+- Màn hình / file frontend: Chat (`features/chat/ChatPage.tsx` → `MessageBubble`, `AssistantStreamBubble`), `api/types.ts` → `ChatMessage`.
+- Cần gì từ backend:
+  1. Thêm `grounding_status` (`"ANSWERED"` | `"NO_ANSWER"`) vào mỗi message `ASSISTANT` trong `GET /chat/sessions/{id}` (nullable với message cũ). Hiện chỉ có ở response gửi tin và SSE `message.completed`, nên sau khi tải lại trang UI không biết tin nào là NO_ANSWER.
+  2. Ghi vào `API_SPEC.md` rằng câu trả lời `ANSWERED` có thể chứa câu cố định bắt đầu bằng "Chưa xác minh được từ tài liệu bạn được phép truy cập: …" (không có số trích dẫn), để UI hiển thị riêng (chữ xám, không chip). Nguồn trong code: `app/services/grounded_answer_service.py` `_UNVERIFIED_PART_SENTENCE`. Prompt (`app/chat/prompt_builder.py` dòng 189-190, 207-208) còn cho phép bản tiếng Anh "Could not be verified from the documents you can access: …"; cần ghi cả hai vào spec. Nếu backend không muốn cố định câu này, đề xuất trả mảng đoạn có cấu trúc thay vì để UI nhận diện theo chữ.
+  - Ví dụ: `{ "id": "uuid", "role": "ASSISTANT", "content": "…", "citations": [], "grounding_status": "NO_ANSWER" }`
+- Hiện API_SPEC nói gì: §8: "`grounding_status` is `NO_ANSWER`." và "Assistant `citations` is `[]`." (chỉ trong response gửi tin). `ChatMessage` ở frontend không có `grounding_status`.
+- Có làm đổi hành vi/API hiện tại không: Không. Chỉ thêm trường.
+- UI tạm thời đang xử lý thế nào: Tin vừa gửi dùng `grounding_status` từ response/SSE. Tin trong lịch sử: coi message ASSISTANT không có citation là "không có nguồn" (suy từ quy tắc NO_ANSWER → `citations = []`), kèm `TODO(BR-3)`. Câu "Chưa xác minh được…" nhận diện theo hai tiền tố đó (Việt và Anh), chỉ ảnh hưởng hiển thị; không khớp thì hiển thị như văn bản thường. Không đổi logic xử lý response.
+- Trạng thái: CHỜ OWNER CHUYỂN
+
+### BR-4: Tên phòng ban và tên người dùng cho vai trò không phải Admin
+- Ưu tiên: **Nên có**
+- Màn hình / file frontend: Profile, DocumentDetail, Upload (Manager), Feedback (`api/types.ts` → `AuthenticatedUser`, `DocumentItem`, `FeedbackReportItem`).
+- Cần gì từ backend: Thêm tên hiển thị để UI không phải hiện UUID:
+  - `GET /auth/me` và `user` trong login: `department_name` (hoặc `department: { id, name, code }`).
+  - `DocumentItem`: `department_name` và `uploaded_by_name`.
+  - `FeedbackReportItem` (Admin/Manager): `user_full_name`, `department_name`. Không thêm nội dung câu hỏi/câu trả lời.
+  - Cho Manager khi upload: phòng ban của chính mình (tên + id) lấy từ `/auth/me` là đủ.
+  - Ví dụ: `"department_id": "uuid", "department_name": "Nhân sự"`.
+- Hiện API_SPEC nói gì: §5 `GET /users`: "Requires Admin." §6 `GET /departments`: "Requires Admin." Các response chỉ có `department_id` / `uploaded_by` / `user_id` (UUID). Thiết kế hiện "Phòng ban: Nhân sự", "Người tải lên: Manager Nhân sự".
+- Có làm đổi hành vi/API hiện tại không: Không. Chỉ thêm trường. Lưu ý quyền riêng tư: chỉ trả tên trong phạm vi người gọi đã được xem sẵn các bản ghi đó.
+- UI tạm thời đang xử lý thế nào: Admin: tra tên qua `GET /departments` và `GET /users` (page_size 100). Vai trò khác: Profile hiện "Đã gán phòng ban" không kèm ID; DocumentDetail hiện "Phòng ban của tài liệu" không kèm tên. Ghi nhận thêm: trang Upload hiện gọi `GET /departments` cho mọi vai trò khi chọn phạm vi Phòng ban, theo spec Manager sẽ nhận 403; UI sẽ xử lý lỗi này nhẹ nhàng cho tới khi có trường mới.
+- Trạng thái: CHỜ OWNER CHUYỂN
+
+### BR-5: Số trang của tài liệu
+- Ưu tiên: Tùy chọn
+- Màn hình / file frontend: Documents, DocumentDetail ("Số trang"), Upload (thẻ tệp đã chọn), `DocumentItem`.
+- Cần gì từ backend: `page_count` (int | null) trong `DocumentItem`; null khi chưa xử lý xong. Ví dụ: `"page_count": 13`.
+- Hiện API_SPEC nói gì: Không có trường số trang trong `DocumentItem`; `DocumentSafeResponse` (chỉ đọc) cũng chưa có.
+- Có làm đổi hành vi/API hiện tại không: Không.
+- UI tạm thời đang xử lý thế nào: Bỏ phần "N trang" ở danh sách, chi tiết và thẻ tệp upload. Chỉ hiện kích thước tệp thật. Không đọc PDF phía trình duyệt để đếm trang.
+- Trạng thái: CHỜ OWNER CHUYỂN
+
+### BR-6: Sự kiện tiến trình khi trả lời (SSE)
+- Ưu tiên: Tùy chọn
+- Màn hình / file frontend: Chat (`api/sse.ts`, `features/chat/streamState.ts`, khối chờ câu trả lời). Tham chiếu: báo cáo kiểm thử 28/10 mục 6.4.
+- Cần gì từ backend: Thêm sự kiện SSE `stage` trong lúc chờ kiểm tra (chiến lược `buffer_after_validation` chưa phát gì đến khi xong), ví dụ `{ "stage": "retrieving" | "generating" | "validating" }`.
+- Hiện API_SPEC nói gì: §8 stream: các sự kiện hiện có là `stream.started`, `heartbeat`, `message.delta`, `citations.ready`, `message.completed`, `stream.error`, `stream.cancelled`. Không có sự kiện tiến trình.
+- Có làm đổi hành vi/API hiện tại không: Không, thêm sự kiện mới; client cũ bỏ qua sự kiện lạ.
+- UI tạm thời đang xử lý thế nào: Một dòng trạng thái "Đang tìm và kiểm tra nguồn…" theo `connecting/started`. Không dựng bộ đếm giờ giả cho 3 bước trong thiết kế, không ghi tên mô hình cố định.
+- Trạng thái: CHỜ OWNER CHUYỂN
+
+### BR-7: Giai đoạn xử lý tài liệu
+- Ưu tiên: Tùy chọn
+- Màn hình / file frontend: DocumentDetail, Documents (`DocumentStatusResponse`, `GET /documents/{id}/status`).
+- Cần gì từ backend: Trường `stage` (ví dụ `extracting` | `chunking` | `embedding`) khi `status = PROCESSING`.
+- Hiện API_SPEC nói gì: §7 `GET /documents/{id}/status`: "Returns `id`, `status`, sanitized `error_message`, and `updated_at`."
+- Có làm đổi hành vi/API hiện tại không: Không.
+- UI tạm thời đang xử lý thế nào: Dòng thời gian 3 bước suy từ `status` (Đã tải lên → Đang xử lý → Sẵn sàng hoặc Lỗi kèm `error_message`), không hiện phần trăm hay tên thư viện như artboard.
+- Trạng thái: CHỜ OWNER CHUYỂN
+
+### BR-8: Ví dụ JSON cho các endpoint giám sát Admin
+- Ưu tiên: Tùy chọn
+- Màn hình / file frontend: SystemStatus (`features/system/SystemStatusPage.tsx`).
+- Cần gì từ backend: Ghi ví dụ JSON response cho `GET /admin/health`, `/admin/providers`, `/admin/version`, `/admin/system` (hiện chỉ có mô tả chữ) để UI định kiểu được và hiện nhà cung cấp LLM, mô hình, phiên bản cho Admin.
+- Hiện API_SPEC nói gì: "TASK-032 Admin Monitoring API" chỉ có mô tả chữ, không có JSON mẫu. Trang System hiện ghi "Not exposed by current backend API" cho provider, đã lỗi thời so với TASK-032.
+- Có làm đổi hành vi/API hiện tại không: Không.
+- UI tạm thời đang xử lý thế nào: Mọi vai trò chỉ thấy `live/ready` + `checks.database` + `checks.redis`. Mục "Mô hình ngôn ngữ" chỉ hiện các dòng hợp đồng đã biết (chiến lược trả lời, SSE). Không hiện Ollama/qwen2.5:3b/lexical_fallback như artboard.
+- Trạng thái: CHỜ OWNER CHUYỂN
+
+### BR-9: Danh sách `event_type` của nhật ký
+- Ưu tiên: Tùy chọn
+- Màn hình / file frontend: AuditLogs (`features/audit/AuditLogsPage.tsx`).
+- Cần gì từ backend: Liệt kê các giá trị `event_type` ổn định vào `API_SPEC.md` §10 (hoặc endpoint trả danh sách) để UI làm ô chọn thay vì ô nhập tự do.
+- Hiện API_SPEC nói gì: §10: "`event_type`, optional stable audit event type." Không có danh sách. Artboard liệt kê 7 giá trị (ví dụ `AUTH_LOGIN_SUCCEEDED`, `CHAT_NO_ANSWER_GENERATED`); chưa đối chiếu được với backend.
+- Có làm đổi hành vi/API hiện tại không: Không.
+- UI tạm thời đang xử lý thế nào: Giữ ô nhập tự do cho loại sự kiện. Không hiện "Địa chỉ IP" của artboard vì `AuditLogItem` không có trường này và spec cố ý không trả header thô.
+- Trạng thái: CHỜ OWNER CHUYỂN
+
+---
+
+## Đã nhận từ backend
+
+(Chưa có.)
