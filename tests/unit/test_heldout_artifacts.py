@@ -55,7 +55,7 @@ def test_the_status_names_the_failing_step_and_counts_the_questions(tmp_path: Pa
     )
     trap = tmp_path / "failed-steps.txt"
     trap.write_text("batch 2\ngrade 1\n", "utf-8")  # the first failing step is the one named
-    log = tmp_path / "stack.log"
+    logs = [tmp_path / "legacy-run1.log", tmp_path / "s3t-run1.log"]  # one per API container
     requests = [
         ("GET", "/health/ready"),
         ("POST", "/api/v1/auth/login"),
@@ -63,12 +63,14 @@ def test_the_status_names_the_failing_step_and_counts_the_questions(tmp_path: Pa
         ("POST", "/api/v1/chat/sessions/abc/messages/stream"),
         ("GET", "/api/v1/chat/sessions/abc/messages"),
     ]
-    log.write_text("\n".join(ACCESS.format(*request) for request in requests), "utf-8")
+    for log, part in zip(logs, (requests[:3], requests[3:]), strict=True):
+        log.write_text("\n".join(ACCESS.format(*request) for request in part), "utf-8")
     grading = tmp_path / "grading.md"
     grading.write_text("| legacy | run1 | 3 |\n", "utf-8")
     out = tmp_path / "out" / "summary.md"
     args = ["--workflow", str(workflow), "--preflight", "false", "--failed-steps", str(trap)]
-    args += ["--stack-log", str(log), "--summary", str(grading), "--output", str(out)]
+    args += ["--stack-log", str(logs[0]), str(tmp_path / "missing.log"), str(logs[1])]
+    args += ["--summary", str(grading), "--output", str(out)]
     assert heldout_status.main([*args, "--job-status", "failure"]) == 0
     lines = out.read_text("utf-8").splitlines()
     assert lines[2:8] == [

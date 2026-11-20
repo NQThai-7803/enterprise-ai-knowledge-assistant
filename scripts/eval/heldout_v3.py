@@ -339,6 +339,7 @@ def check() -> int:
 HELDOUT_V31 = DOCS / "heldout-v3.1.yaml"
 LOCK_V31 = DOCS / "heldout-v3.1.lock"
 REMOVED = {"HO3-09", "HO3-13", "HO3-20"}
+REMOVED_REASON = "source document not in corpus V2 (DEC-038)"
 VALUE_CHECKED = ("HO3-03", "HO3-05", "HO3-07", "HO3-08", "HO3-10", "HO3-11", "HO3-16", "HO3-17",
                  "HO3-18")  # fmt: skip
 PENDING_BY_DEFAULT = {"HO3-08", "HO3-11"}

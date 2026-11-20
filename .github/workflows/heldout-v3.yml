@@ -20,6 +20,9 @@ name: Held-out v3.1 run
 # failing step, exit code, questions sent to the API).
 # Preflight and run both validate the batch first (`ci_batch.sh --validate-only`, same arguments):
 # run 44559765410 failed on "unknown set heldout_v3", which the old preflight never reached.
+# DEC-040 (2026-11-20): held-out v3.1 is SPENT after run 44575927833; the refuse step stops every
+# dispatch. `legacy` in CONFIGS meant the application defaults before DEC-040. The next independent
+# measurement needs held-out v4.
 on:
   workflow_dispatch:
     inputs:
@@ -87,6 +90,7 @@ jobs:
         env:
           CONFIRM: ${{ inputs.confirm }}
         run: |
+          echo "held-out v3.1 is spent (DEC-040, run 44575927833): measure on held-out v4"; exit 1
           [ "$GITHUB_REF" = refs/heads/main ] || { echo "held-out v3 runs only on main"; exit 1; }
           [ "$CONFIRM" = "DEC-035 held-out v3.1 run approved by the owner" ] \
             || { echo "confirm text does not match"; exit 1; }
@@ -298,7 +302,8 @@ jobs:
         run: >
           python3 scripts/eval/heldout_status.py --workflow .github/workflows/heldout-v3.yml
           --job-status "$JOB_STATUS" --preflight "$PREFLIGHT"
-          --failed-steps "$RUNNER_TEMP/failed-steps.txt" --stack-log "$OUT/stack.log"
+          --failed-steps "$RUNNER_TEMP/failed-steps.txt"
+          --stack-log "$OUT"/before-batch/api.log "$OUT"/*/run*/api.log "$OUT/stack.log"
           --summary "$OUT/grading/summary.md" --output "$OUT/status/summary.md"
 
       - name: Keep the full results private (DEC-039)
