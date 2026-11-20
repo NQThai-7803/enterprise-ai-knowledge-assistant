@@ -530,6 +530,13 @@ Behavior:
 - History returns USER and ASSISTANT messages only, ordered by `created_at ASC, id ASC`.
 - SYSTEM messages are hidden.
 - Assistant messages include `citations` for the current page, loaded in a batch query.
+- Every message has `grounding_status` (BR-3): `ANSWERED` or `NO_ANSWER` on an ASSISTANT message, as returned when it was sent; `null` on USER messages and on ASSISTANT messages stored before migration `20261120_0013`. The `assistant_message` of `POST .../messages` carries the same field; the stream's `message.completed` already has `grounding_status` at the top level. Example:
+
+  ```json
+  { "id": "uuid", "role": "ASSISTANT", "content": "Chưa có câu trả lời…", "response_time_ms": 900,
+    "citations": [], "created_at": "2026-11-20T08:00:00Z", "grounding_status": "NO_ANSWER" }
+  ```
+- **Sentences naming an unverified part (BR-3).** An `ANSWERED` answer may contain sentences that name a part of the question the documents do not confirm. The prompt asks for the fixed form `Chưa xác minh được từ tài liệu bạn được phép truy cập: …` (English question: `Could not be verified from the documents you can access: …`). In the default answer path (simple mode, s1) the model writes these sentences, so the wording after the prefix, and occasionally the prefix itself, may vary. The server recognises a sentence containing `chưa xác minh được`, `không xác minh được` or `could not be verified` (case- and accent-insensitive), never validates it as a claim, and removes its source markers, so it carries no citation number. The exception is a sentence holding a number the question does not: it stays a claim with its marker. The legacy compound path (`RAG_COMPOUND_PARTIAL_ANSWER_ENABLED`, off) builds the Vietnamese sentence itself, `Chưa xác minh được từ tài liệu bạn được phép truy cập: <part>.`. A client may style such a sentence differently, but must still show it.
 - Historical citation metadata may be omitted if the current User no longer has access to the cited Document.
 - The historical Assistant answer text is not redacted in TASK-020.
 - `retrieval_query`, token usage, prompt, vectors, scores, storage keys, permission metadata, and internal source markers are not returned.

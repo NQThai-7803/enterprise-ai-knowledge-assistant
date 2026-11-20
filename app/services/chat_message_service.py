@@ -39,6 +39,7 @@ class ChatMessageService:
         prompt_tokens: int | None = None,
         completion_tokens: int | None = None,
         created_at: datetime | None = None,
+        grounding_status: str | None = None,
     ) -> ChatMessage:
         if not isinstance(role, ChatMessageRole):
             raise ChatMessageContentInvalidError()
@@ -61,6 +62,7 @@ class ChatMessageService:
             prompt_tokens=validated_prompt_tokens,
             completion_tokens=validated_completion_tokens,
             created_at=created_at,
+            grounding_status=grounding_status,
         )
         await self.session_repository.touch_updated_at(chat_session, updated_at=created_at)
         await session.flush()

@@ -24,6 +24,7 @@ class VisibleChatMessageRow:
     content: str
     response_time_ms: int | None
     created_at: datetime
+    grounding_status: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -45,6 +46,7 @@ async def create(
     prompt_tokens: int | None,
     completion_tokens: int | None,
     created_at: datetime | None = None,
+    grounding_status: str | None = None,
 ) -> ChatMessage:
     message = ChatMessage(
         session_id=chat_session.id,
@@ -55,6 +57,7 @@ async def create(
         prompt_tokens=prompt_tokens,
         completion_tokens=completion_tokens,
         created_at=created_at,
+        grounding_status=grounding_status,
     )
     session.add(message)
     return message
@@ -74,6 +77,7 @@ async def list_visible_by_session(
             ChatMessage.content,
             ChatMessage.response_time_ms,
             ChatMessage.created_at,
+            ChatMessage.grounding_status,
         )
         .where(
             ChatMessage.session_id == session_id,
@@ -91,8 +95,9 @@ async def list_visible_by_session(
             content=content,
             response_time_ms=response_time_ms,
             created_at=created_at,
+            grounding_status=grounding_status,
         )
-        for message_id, role, content, response_time_ms, created_at in rows
+        for message_id, role, content, response_time_ms, created_at, grounding_status in rows
     )
 
 

@@ -658,3 +658,36 @@ def test_answered_response_returns_web_citations(
             "source_url": "https://platform.openai.com/docs/api-reference/responses",
         }
     ]
+
+
+def test_session_history_returns_each_assistant_messages_grounding_status(
+    api_client: TestClient,
+    async_session_factory_for_tests: async_sessionmaker[AsyncSession],
+    make_user: Callable[..., User],
+    make_auth_headers: Callable[[User], dict[str, str]],
+) -> None:
+    """BR-3: the status survives a reload; user messages and older answers carry null."""
+    owner = make_user(role=UserRole.STAFF)
+    chat = create_session(async_session_factory_for_tests, owner=owner)
+    create_message(async_session_factory_for_tests, chat_session=chat,
+                   role=ChatMessageRole.ASSISTANT, content="older answer", seconds=0)  # fmt: skip
+    install_service(api_client, async_session_factory_for_tests)
+    answered = post_question(api_client, make_auth_headers, owner, chat)
+    install_service(
+        api_client,
+        async_session_factory_for_tests,
+        retrieval=FakeRetrievalService(retrieval_result()),
+    )
+    refused = post_question(api_client, make_auth_headers, owner, chat)
+
+    assert answered.json()["data"]["assistant_message"]["grounding_status"] == "ANSWERED"
+    assert refused.json()["data"]["assistant_message"]["grounding_status"] == "NO_ANSWER"
+    history = api_client.get(f"/api/v1/chat/sessions/{chat.id}", headers=make_auth_headers(owner))
+    assert history.status_code == 200
+    assert [(m["role"], m["grounding_status"]) for m in history.json()["data"]["messages"]] == [
+        ("ASSISTANT", None),
+        ("USER", None),
+        ("ASSISTANT", "ANSWERED"),
+        ("USER", None),
+        ("ASSISTANT", "NO_ANSWER"),
+    ]

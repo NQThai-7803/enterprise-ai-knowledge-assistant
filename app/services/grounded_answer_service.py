@@ -3057,6 +3057,7 @@ class GroundedAnswerService:
                     prompt_tokens=draft.prompt_tokens,
                     completion_tokens=draft.completion_tokens,
                     created_at=assistant_created_at,
+                    grounding_status=draft.grounding_status.value,
                 )
                 flush = getattr(session, "flush", None)
                 if flush is not None:

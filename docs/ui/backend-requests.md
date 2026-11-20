@@ -154,3 +154,38 @@ quyết định của owner.
 - **Test:** `tests/api/test_document_upload_api.py`
   (`test_upload_version_fields_are_returned_by_upload_detail_and_list`,
   `test_upload_effective_to_before_effective_from_returns_422`).
+
+### TRẢ LỜI CHO PHIÊN UI — BR-3 (`grounding_status` trong lịch sử, câu "Chưa xác minh được…")
+
+- **Trạng thái:** xong mục 1; mục 2 đã ghi hợp đồng. Phương án "mảng đoạn có cấu trúc" là
+  **CẦN OWNER QUYẾT**.
+- **Endpoint:** `GET /api/v1/chat/sessions/{session_id}` (lịch sử) và `assistant_message` của
+  `POST /chat/sessions/{id}/messages`. Sự kiện SSE `message.completed` vốn đã có
+  `grounding_status` ở cấp ngoài, không đổi. Spec: `API_SPEC.md` §8.
+- **Field:** `grounding_status` trên mọi message: `"ANSWERED"` | `"NO_ANSWER"` với ASSISTANT;
+  `null` với USER và với ASSISTANT lưu trước migration `20261120_0013` (không backfill). Ví dụ:
+  ```json
+  { "id": "uuid", "role": "ASSISTANT", "content": "…", "citations": [],
+    "created_at": "2026-11-20T08:00:00Z", "response_time_ms": 900, "grounding_status": "NO_ANSWER" }
+  ```
+  Với tin cũ có `grounding_status: null`, UI giữ cách suy hiện tại (không có citation thì coi là
+  không có nguồn).
+- **Câu "Chưa xác minh được…":**
+  - Prompt yêu cầu dạng cố định `Chưa xác minh được từ tài liệu bạn được phép truy cập: …`; với
+    câu hỏi tiếng Anh là `Could not be verified from the documents you can access: …`.
+  - Ở đường trả lời mặc định (simple, s1), câu này do **mô hình viết**, nên phần sau tiền tố, đôi
+    khi cả tiền tố, có thể khác đôi chút.
+  - Server nhận diện câu chứa `chưa xác minh được`, `không xác minh được` hoặc
+    `could not be verified` (không phân biệt hoa thường và dấu). Server không kiểm câu đó như một
+    khẳng định và bỏ marker nguồn của nó, nên câu không có số trích dẫn. Ngoại lệ: câu chứa một con
+    số mà câu hỏi không có thì vẫn được coi là khẳng định và giữ marker.
+  - UI nên nhận diện theo ba cụm từ trên (gập dấu, không phân biệt hoa thường) thay vì khớp nguyên
+    tiền tố. Câu nào không khớp vẫn hiển thị như văn bản thường.
+- **CẦN OWNER QUYẾT:** có muốn server trả thêm mảng đoạn có cấu trúc (ví dụ
+  `segments: [{ "kind": "claim" | "unverified", "text": … }]`) để UI khỏi phải nhận diện theo chữ
+  không. Việc này thêm trường vào response và cần quyết định có lưu vào DB không. Chưa làm.
+- **Lỗi:** không có mã lỗi mới.
+- **DB:** cột `chat_messages.grounding_status` (nullable). Đây là thay đổi lưu trữ duy nhất của
+  BR-3; cách trả lời và retrieval không đổi.
+- **Test:** `tests/api/test_chat_messages.py`
+  (`test_session_history_returns_each_assistant_messages_grounding_status`).
