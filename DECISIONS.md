@@ -218,6 +218,7 @@ Set by the owner on 2026-11-15.
 Set by the owner on 2026-11-15, before the simple answer mode is coded.
 
 - **UAT Q001-Q100 is no longer a hard gate.** It overfits the deterministic route (75-76 of 100 answers are server-built, `docs/design/pipeline-loss-fix-plan.md` section 7). UAT is still run and reported for monitoring, split by route (`by_route`).
+- **Since DEC-041 (2026-11-20), UAT is a regression suite only:** it is run to watch for changes, and is not a criterion for choosing a configuration, not even as a tie-break.
 - **Selection rule for a configuration, in this order:**
   1. permission leaks = 0 on every set;
   2. the **total** of false answers (answered when it must refuse, plus a wrong value) summed over the dev sets does not increase;
@@ -857,7 +858,27 @@ this decision.
   - `default` gains ND-010, ND-011, ND-013, ND-018, ND-020 and loses ND-017.
   - The saved logs count 20 + 20 chat requests, one per item and configuration.
 
-## DEC-041 — Hybrid answer mode: proposal for the owner (2026-11-20, NOT DECIDED)
+## DEC-041 — Keep s3t; hybrid stays behind a flag, not recommended
+
+**Owner decision, 2026-11-20: option 1.** The default stays s3t = simple with s1-s3 +
+`qwen3.5-text:4b` + `RAG_DRAFT_DOCUMENT_POLICY=exclude` (DEC-040). `RAG_ANSWER_MODE=hybrid` stays
+in the code behind its flag, off by default, and is **not recommended**.
+
+**Basis:**
+
+- (a) On the 6 dev sets, s3t and hybrid are tied within the noise (correct 114 / 112, false
+  answers + wrong values 16 / 19), so the choice of the DEC-026 rule stands.
+- (b) The route's false matches are systematic: outside UAT it answered 14 items and got 4 wrong,
+  each a wrong value with a citation (ND-006, ND-019, ND-020, REL-103).
+- (c) The owner puts accuracy before speed.
+- No default changes, so the two-job rule of DEC-027 for a flip does not apply.
+
+**Known limit:** UAT is 68 with s3t, against 92 with hybrid and 97 with legacy, mostly from false
+refusals (22 with s3t). From now on **UAT is a regression suite to watch, not a criterion for
+choosing a configuration** (DEC-026 updated). The 22 s3t false refusals on UAT and the 6 on
+`natural_dev_v1` are the case set for diagnosing refusals in the shared layer (`TASKS.md`).
+
+### The proposal and the measurement it rests on (2026-11-20)
 
 The owner keeps DEC-040 and asked for a hybrid configuration measured on the dev sets only.
 `RAG_ANSWER_MODE=hybrid` exists, off by default: the legacy pipeline up to its deterministic

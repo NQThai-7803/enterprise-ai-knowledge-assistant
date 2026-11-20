@@ -675,7 +675,11 @@ Other s3 answers that are wrong but not of another subject: ND-014 in job a ("2.
 - s3 gives 4 wrong-subject answers in both jobs (ND-002, ND-003, ND-011, ND-019) and a fifth in one job (ND-014). The wrong-subject risk is not handled.
 - Under DEC-026 (natural first) s3 does not win on `natural_dev_v1`, so by the owner's rule of 2026-11-16 the default stays `legacy`.
 
-## Hybrid mode (DEC-041 proposal, 2026-11-20)
+## Hybrid mode (DEC-041, 2026-11-20: kept behind the flag, not recommended)
+
+The owner kept s3t as the default (DEC-041, option 1): on the dev sets s3t and hybrid tie within
+the noise, and outside UAT the route answered 14 items and got 4 wrong, each a wrong value with a
+citation. UAT is a regression suite only from now on.
 
 `RAG_ANSWER_MODE=hybrid`, off by default: legacy's retrieval, context selection and refusal gates
 up to its deterministic route (`_structured_value_repair_generation`), under the conditions
