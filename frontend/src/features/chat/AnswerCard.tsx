@@ -1,15 +1,15 @@
 import { clsx } from "clsx";
 import { Check, FileText, Info, ThumbsDown, ThumbsUp } from "lucide-react";
 import { Fragment, type ReactNode } from "react";
-import type { Citation, FeedbackRating, GroundingStatus } from "../../api/types";
+import type { AnswerSegment, Citation, FeedbackRating, GroundingStatus } from "../../api/types";
 import { formatDateTime } from "../../lib/format";
-import { splitAnswerSegments } from "./answerSegments";
 
 export function AnswerCard({
   content,
   citations,
   citationMap,
   groundingStatus,
+  segments,
   createdAt,
   animate = false,
   onCitationClick,
@@ -20,6 +20,8 @@ export function AnswerCard({
   citationMap?: ReadonlyMap<number, number>;
   /** BR-3. null: an answer stored before the field existed, shown without a verification label. */
   groundingStatus: GroundingStatus | null;
+  /** BR-3 follow-up: the server's own verified / unverified sentences; null shows content as is. */
+  segments?: AnswerSegment[] | null;
   createdAt?: string;
   animate?: boolean;
   onCitationClick: (globalOrder: number) => void;
@@ -47,8 +49,7 @@ export function AnswerCard({
     );
   }
 
-  const segments = splitAnswerSegments(content);
-  const unverifiedCount = segments.filter((segment) => segment.unverified).length;
+  const unverifiedCount = segments?.filter((segment) => segment.kind === "unverified").length ?? 0;
   const sources = sourceButtons(citations, citationMap);
 
   return (
@@ -69,15 +70,26 @@ export function AnswerCard({
         </div>
       ) : null}
       <p className="whitespace-pre-wrap text-[15px] leading-relaxed text-ink">
-        {segments.map((segment, index) =>
-          segment.unverified ? (
-            <span key={index} className="text-muted">
-              {segment.text}
-            </span>
-          ) : (
-            <Fragment key={index}>{withCitationChips(segment.text, citationMap, onCitationClick)}</Fragment>
-          ),
-        )}
+        {segments
+          ? segments.map((segment, index) => (
+              <Fragment key={index}>
+                {index > 0 ? " " : null}
+                {segment.kind === "unverified" ? (
+                  <span className="text-muted">{segment.text}</span>
+                ) : (
+                  <>
+                    {segment.text}
+                    {segment.citation_ids.map((citationId) => {
+                      const globalOrder = citationMap?.get(citationId);
+                      return globalOrder === undefined ? null : (
+                        <CitationChip key={citationId} globalOrder={globalOrder} onClick={onCitationClick} />
+                      );
+                    })}
+                  </>
+                )}
+              </Fragment>
+            ))
+          : withCitationChips(content, citationMap, onCitationClick)}
       </p>
       <AnswerFooter createdAt={createdAt} onFeedback={onFeedback}>
         {sources.map((source) => (
@@ -140,6 +152,21 @@ function FeedbackButton({ label, onClick, children }: { label: string; onClick: 
   );
 }
 
+function CitationChip({ globalOrder, onClick }: { globalOrder: number; onClick: (globalOrder: number) => void }) {
+  return (
+    <button
+      type="button"
+      className="citation-chip"
+      onClick={() => onClick(globalOrder)}
+      aria-label={`Mở trích dẫn ${globalOrder}`}
+      title={`Mở trích dẫn ${globalOrder}`}
+    >
+      {globalOrder}
+    </button>
+  );
+}
+
+/** Content without segments: numbered markers become chips; no sentence is classified by its wording. */
 function withCitationChips(
   text: string,
   citationMap: ReadonlyMap<number, number> | undefined,
@@ -156,18 +183,7 @@ function withCitationChips(
     }
     const globalOrder = citationMap?.get(Number(match[1]));
     if (globalOrder !== undefined) {
-      parts.push(
-        <button
-          key={`${match.index}-${globalOrder}`}
-          type="button"
-          className="citation-chip"
-          onClick={() => onCitationClick(globalOrder)}
-          aria-label={`Mở trích dẫn ${globalOrder}`}
-          title={`Mở trích dẫn ${globalOrder}`}
-        >
-          {globalOrder}
-        </button>,
-      );
+      parts.push(<CitationChip key={`${match.index}-${globalOrder}`} globalOrder={globalOrder} onClick={onCitationClick} />);
     } else {
       parts.push(match[0]);
     }

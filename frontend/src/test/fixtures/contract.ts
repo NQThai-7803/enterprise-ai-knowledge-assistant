@@ -21,6 +21,14 @@ export const contractDocument: DocumentItem = {
   uploaded_by: "uuid",
   created_at: "2026-11-20T08:00:00Z",
   updated_at: "2026-11-20T08:00:00Z",
+  uploaded_by_me: false,
+};
+
+// BR-4 option (a): the same document as an Admin receives it (names only for Admin).
+export const contractDocumentForAdmin: DocumentItem = {
+  ...contractDocument,
+  uploaded_by_name: "Nguyễn Văn A",
+  department_name: "Nhân sự",
 };
 
 export const contractManager: AuthenticatedUser = {

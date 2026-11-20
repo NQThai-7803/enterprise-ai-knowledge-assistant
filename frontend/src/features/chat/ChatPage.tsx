@@ -568,6 +568,7 @@ export function ChatPage() {
                   citations={message.citations}
                   citationMap={citationView.byMessage.get(message.id)}
                   groundingStatus={message.grounding_status ?? null}
+                  segments={message.segments ?? null}
                   createdAt={message.created_at}
                   onCitationClick={focusCitation}
                   onFeedback={(rating) => feedbackMutation.mutate({ messageId: message.id, rating })}
@@ -583,6 +584,7 @@ export function ChatPage() {
                 citations={streamState.citations}
                 citationMap={citationView.streamMap}
                 groundingStatus={completed.grounding_status}
+                segments={completed.segments ?? null}
                 onCitationClick={focusCitation}
                 onFeedback={(rating) => feedbackMutation.mutate({ messageId: completed.message_id, rating })}
               />

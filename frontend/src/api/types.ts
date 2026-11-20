@@ -94,6 +94,11 @@ export interface DocumentItem {
   uploaded_by: string;
   created_at: string;
   updated_at: string;
+  /** BR-4: whether the caller uploaded it; for every viewer. */
+  uploaded_by_me: boolean;
+  /** BR-4 option (a): present only for an Admin caller; the keys are absent otherwise. */
+  uploaded_by_name?: string;
+  department_name?: string | null;
 }
 
 export interface DocumentStatusResponse {
@@ -126,6 +131,15 @@ export interface Citation {
   citation_order: number;
 }
 
+/** BR-3 follow-up: an ANSWERED message cut into sentences by the server's own recognition step. */
+export interface AnswerSegment {
+  kind: "verified" | "unverified";
+  /** The sentence without its citation numbers. */
+  text: string;
+  /** citation_order values of the citations this sentence shows. */
+  citation_ids: number[];
+}
+
 export interface ChatMessage {
   id: string;
   role: ChatMessageRole;
@@ -135,6 +149,8 @@ export interface ChatMessage {
   created_at: string;
   /** BR-3: ANSWERED / NO_ANSWER on ASSISTANT messages; null on USER and on answers stored before it existed. */
   grounding_status: GroundingStatus | null;
+  /** null on USER, NO_ANSWER and answers stored before the segments migration. */
+  segments?: AnswerSegment[] | null;
 }
 
 export interface ChatSessionSummary {
@@ -176,6 +192,9 @@ export interface Feedback {
 export interface FeedbackReportItem extends Feedback {
   user_id: string;
   department_id: string | null;
+  /** BR-4 option (a): present only for an Admin caller. */
+  user_full_name?: string;
+  department_name?: string | null;
 }
 
 export interface AuditLogItem {
@@ -285,6 +304,7 @@ export interface MessageCompletedPayload {
   usage?: Record<string, number> | null;
   grounding_status: GroundingStatus;
   retrieved_chunk_count: number;
+  segments?: AnswerSegment[] | null;
 }
 
 export interface StreamErrorPayload {
