@@ -1003,7 +1003,32 @@ Response:
 }
 ```
 
-The report does not return actor email, actor full name, request/response bodies, raw headers, exceptions, stack traces, Chat question/answer content, prompts, retrieved context, citation excerpts, Feedback reason, Document filename, storage path, storage key, API key, access token, or refresh token.
+The report does not return actor email, request/response bodies, raw headers, exceptions, stack traces, Chat question/answer content, prompts, retrieved context, citation excerpts, Feedback reason, Document filename, storage path, storage key, API key, access token, or refresh token.
+
+**Names and labels (BR-11, Admin only).** Each item an Admin receives also has:
+
+- `actor_full_name`: the actor's full name; `null` when `actor_user_id` is `null` (a system or failed-login event) or the User no longer exists.
+- `target_label`: a safe label of the target, a display name or a code only:
+
+  | `target_type` | `target_label` |
+  |---|---|
+  | `USER` | the User's full name |
+  | `DEPARTMENT` | the Department code |
+  | `DOCUMENT` | `document_code`, else the title (soft-deleted Documents too) |
+  | `DOCUMENT_PERMISSION` | the label of the Document the grant belongs to; `null` once the grant is revoked |
+  | `CHAT_SESSION`, `CHAT_MESSAGE`, `FEEDBACK`, none | `null`: their only text is user content (a session title can be the question) |
+
+  It never contains Document text, a chat question or answer, an email, or metadata.
+
+The endpoint is Admin-only (`403 AUDIT_REPORT_FORBIDDEN` otherwise), and the serializer checks the role again: an item built for any other role has neither key. Example:
+
+```json
+{ "id": "uuid", "event_type": "DOCUMENT_UPLOADED", "outcome": "SUCCESS",
+  "actor_user_id": "uuid", "actor_full_name": "Admin UAT",
+  "target_type": "DOCUMENT", "target_id": "uuid", "target_label": "ND-HR-007",
+  "request_id": null, "error_code": null, "metadata": { "access_scope": "DEPARTMENT" },
+  "created_at": "2026-11-21T08:00:00Z" }
+```
 
 ## 11. Health
 

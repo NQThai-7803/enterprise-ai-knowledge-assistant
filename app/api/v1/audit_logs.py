@@ -11,9 +11,10 @@ from app.api.dependencies import get_current_user
 from app.audit import AuditEventType, AuditOutcome, AuditTargetType
 from app.db.session import get_db_session
 from app.models import User
-from app.schemas.audit import AuditLogListResponse, AuditLogRead
+from app.schemas.audit import AuditLogListResponse, audit_log_view
 from app.schemas.common import DEFAULT_PAGE
 from app.services.audit_service import AuditService
+from app.services.display_names import admin_audit_labels
 
 router = APIRouter(prefix="/audit-logs", tags=["Audit logs"])
 
@@ -48,8 +49,12 @@ async def list_audit_logs(
         request_id=request_id,
         error_code=error_code,
     )
+    labels = await admin_audit_labels(session, current_user=current_user, rows=report.rows)
     return AuditLogListResponse(
-        items=[AuditLogRead.from_audit_log(audit_log) for audit_log in report.rows],
+        items=[
+            audit_log_view(audit_log, current_user=current_user, labels=labels)
+            for audit_log in report.rows
+        ],
         page=report.pagination.page,
         page_size=report.pagination.page_size,
         total=report.pagination.total,

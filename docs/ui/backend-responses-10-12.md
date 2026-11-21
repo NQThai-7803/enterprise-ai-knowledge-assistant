@@ -60,3 +60,43 @@ các khối dưới đây vào file BR sau. Trường mới chỉ có trên `mai
   - `tests/api/test_users_api.py`:
     `test_user_create_and_update_422_details_name_each_json_field` (cũng kiểm mật khẩu và email
     đã gửi không bị lặp lại trong response).
+
+### TRẢ LỜI CHO PHIÊN UI — BR-11 (tên người thực hiện và nhãn đối tượng trong nhật ký)
+
+- **Trạng thái:** xong. Chỉ thêm trường cho Admin.
+- **Endpoint:** `GET /api/v1/audit-logs`. Endpoint này vốn chỉ dành cho Admin: vai trò khác nhận
+  `403 AUDIT_REPORT_FORBIDDEN`. Ngoài ra, serializer kiểm vai trò thêm một lần nữa: item dựng cho
+  vai trò khác không có hai khóa mới. Spec: `API_SPEC.md` §10.
+- **Field mới trên mỗi item:**
+  - `actor_full_name`: họ tên người thực hiện. Là `null` khi `actor_user_id` là `null` (sự kiện
+    hệ thống, đăng nhập thất bại) hoặc người dùng không còn.
+  - `target_label`: nhãn an toàn của đối tượng, **chỉ là tên hiển thị hoặc mã**:
+
+    | `target_type` | `target_label` |
+    |---|---|
+    | `USER` | họ tên người dùng |
+    | `DEPARTMENT` | mã phòng ban |
+    | `DOCUMENT` | `document_code`, nếu không có thì tiêu đề (kể cả tài liệu đã xóa mềm) |
+    | `DOCUMENT_PERMISSION` | nhãn của tài liệu mà quyền đó thuộc về; `null` khi quyền đã bị thu hồi |
+    | `CHAT_SESSION`, `CHAT_MESSAGE`, `FEEDBACK`, không có | `null` |
+
+  - Ba loại cuối luôn là `null`, vì nội dung duy nhất của chúng là chữ người dùng viết; tiêu đề
+    phiên chat có thể chính là câu hỏi.
+  - Không bao giờ có nội dung tài liệu, câu hỏi hay câu trả lời chat, email hoặc metadata. Không
+    thêm IP hay header.
+- **Ví dụ:**
+  ```json
+  { "id": "uuid", "event_type": "DOCUMENT_UPLOADED", "outcome": "SUCCESS",
+    "actor_user_id": "uuid", "actor_full_name": "Admin UAT",
+    "target_type": "DOCUMENT", "target_id": "uuid", "target_label": "ND-HR-007",
+    "request_id": null, "error_code": null, "metadata": { "access_scope": "DEPARTMENT" },
+    "created_at": "2026-11-21T08:00:00Z" }
+  ```
+- **Lỗi:** không có mã lỗi mới.
+- **Test:** `tests/api/test_audit_logs.py`:
+  - `test_admin_report_adds_actor_names_and_safe_target_labels`: đủ mọi loại đối tượng; tiêu đề
+    phiên chat không xuất hiện trong response;
+  - `test_the_serializer_drops_names_for_a_non_admin_even_with_labels`: kiểm vai trò ở
+    serializer;
+  - `test_audit_report_response_is_sanitized`: đã cập nhật, Admin thấy tên người thực hiện, không
+    bao giờ thấy email.

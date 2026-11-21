@@ -228,3 +228,29 @@ def _document_filter_conditions(
     if department_id is not None:
         conditions.append(Document.department_id == department_id)
     return conditions
+
+
+async def labels_by_id(session: AsyncSession, document_ids: set[UUID]) -> dict[UUID, str]:
+    """BR-11: a Document's code, else its title (soft-deleted ones included); never its text."""
+    if not document_ids:
+        return {}
+    rows = await session.execute(
+        select(Document.id, func.coalesce(Document.document_code, Document.title)).where(
+            Document.id.in_(document_ids)
+        )
+    )
+    return {key: value for key, value in rows.all()}
+
+
+async def permission_labels_by_id(
+    session: AsyncSession, permission_ids: set[UUID]
+) -> dict[UUID, str]:
+    """BR-11: the label of the Document a direct grant belongs to; revoked grants have none."""
+    if not permission_ids:
+        return {}
+    rows = await session.execute(
+        select(DocumentPermission.id, func.coalesce(Document.document_code, Document.title))
+        .join(Document, Document.id == DocumentPermission.document_id)
+        .where(DocumentPermission.id.in_(permission_ids))
+    )
+    return {key: value for key, value in rows.all()}
