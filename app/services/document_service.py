@@ -513,18 +513,30 @@ class DocumentService:
 
         if access_scope == DocumentAccessScope.ORGANIZATION:
             if department_id is not None:
-                raise BusinessValidationError("Organization documents must not have a Department.")
+                raise BusinessValidationError(
+                    "Organization documents must not have a Department.",
+                    field="department_id",
+                    code="NOT_ALLOWED",
+                )
             if current_user.role == UserRole.MANAGER:
                 raise PermissionDeniedError()
             return None
 
         if access_scope == DocumentAccessScope.PRIVATE:
             if department_id is not None:
-                raise BusinessValidationError("Private documents must not have a Department.")
+                raise BusinessValidationError(
+                    "Private documents must not have a Department.",
+                    field="department_id",
+                    code="NOT_ALLOWED",
+                )
             return None
 
         if department_id is None:
-            raise BusinessValidationError("Department documents require a Department.")
+            raise BusinessValidationError(
+                "Department documents require a Department.",
+                field="department_id",
+                code="REQUIRED",
+            )
 
         if current_user.role == UserRole.MANAGER:
             if current_user.department_id is None:
@@ -547,7 +559,9 @@ class DocumentService:
         final_scope = document.access_scope
         if "access_scope" in payload.model_fields_set:
             if payload.access_scope is None:
-                raise BusinessValidationError("Access scope must not be null.")
+                raise BusinessValidationError(
+                    "Access scope must not be null.", field="access_scope", code="REQUIRED"
+                )
             final_scope = payload.access_scope
 
         if "department_id" in payload.model_fields_set:
@@ -564,16 +578,28 @@ class DocumentService:
             if current_user.role == UserRole.MANAGER:
                 raise PermissionDeniedError()
             if final_department_id is not None:
-                raise BusinessValidationError("Organization documents must not have a Department.")
+                raise BusinessValidationError(
+                    "Organization documents must not have a Department.",
+                    field="department_id",
+                    code="NOT_ALLOWED",
+                )
             return final_scope, None
 
         if final_scope == DocumentAccessScope.PRIVATE:
             if final_department_id is not None:
-                raise BusinessValidationError("Private documents must not have a Department.")
+                raise BusinessValidationError(
+                    "Private documents must not have a Department.",
+                    field="department_id",
+                    code="NOT_ALLOWED",
+                )
             return final_scope, None
 
         if final_department_id is None:
-            raise BusinessValidationError("Department documents require a Department.")
+            raise BusinessValidationError(
+                "Department documents require a Department.",
+                field="department_id",
+                code="REQUIRED",
+            )
         if current_user.role == UserRole.MANAGER:
             if current_user.department_id is None:
                 raise PermissionDeniedError()
@@ -619,7 +645,9 @@ class DocumentService:
 
     def _reject_null_update_fields(self, payload: DocumentUpdate) -> None:
         if "title" in payload.model_fields_set and payload.title is None:
-            raise BusinessValidationError("Document title must not be null.")
+            raise BusinessValidationError(
+                "Document title must not be null.", field="title", code="REQUIRED"
+            )
 
     async def _validate_authority_metadata(
         self,
@@ -635,11 +663,17 @@ class DocumentService:
             and effective_to is not None
             and effective_to < effective_from
         ):
-            raise BusinessValidationError("effective_to must not precede effective_from.")
+            raise BusinessValidationError(
+                "effective_to must not precede effective_from.",
+                field="effective_to",
+                code="INVALID_RANGE",
+            )
         if supersedes_document_id is None:
             return
         if document_id is not None and supersedes_document_id == document_id:
-            raise BusinessValidationError("A document cannot supersede itself.")
+            raise BusinessValidationError(
+                "A document cannot supersede itself.", field="supersedes_document_id"
+            )
         predecessor = await document_repository.get_accessible_by_id(
             self.session,
             document_id=supersedes_document_id,
@@ -732,9 +766,11 @@ class DocumentService:
 def normalize_title(title: str) -> str:
     normalized = title.strip()
     if not normalized:
-        raise BusinessValidationError("Document title must not be empty.")
+        raise BusinessValidationError(
+            "Document title must not be empty.", field="title", code="REQUIRED"
+        )
     if len(normalized) > MAX_TITLE_LENGTH:
-        raise BusinessValidationError("Document title is too long.")
+        raise BusinessValidationError("Document title is too long.", field="title", code="TOO_LONG")
     return normalized
 
 
@@ -752,7 +788,7 @@ def normalize_search(search: str | None) -> str | None:
     if not normalized:
         return None
     if len(normalized) > MAX_SEARCH_LENGTH:
-        raise BusinessValidationError("Search is too long.")
+        raise BusinessValidationError("Search is too long.", field="search", code="TOO_LONG")
     return normalized
 
 
@@ -833,6 +869,8 @@ def _validate_storage_extension(extension: str) -> str:
 
 def _validate_document_sort(sort_by: str, sort_order: str) -> None:
     if sort_by not in document_repository.DOCUMENT_SORT_FIELDS:
-        raise BusinessValidationError("Invalid sort field.")
+        raise BusinessValidationError("Invalid sort field.", field="sort_by", code="INVALID_CHOICE")
     if sort_order not in {"asc", "desc"}:
-        raise BusinessValidationError("Invalid sort order.")
+        raise BusinessValidationError(
+            "Invalid sort order.", field="sort_order", code="INVALID_CHOICE"
+        )

@@ -160,7 +160,9 @@ class UserService:
             if "email" in payload.model_fields_set:
                 email = str(payload.email).strip().lower() if payload.email is not None else None
                 if email is None:
-                    raise BusinessValidationError("Email must not be null.")
+                    raise BusinessValidationError(
+                        "Email must not be null.", field="email", code="REQUIRED"
+                    )
                 if email != user.email:
                     await self._ensure_email_available(email, excluded_user_id=user.id)
             await self._ensure_last_active_admin_not_removed(
@@ -273,7 +275,11 @@ class UserService:
         department_id: UUID | None,
     ) -> None:
         if role in {UserRole.MANAGER, UserRole.STAFF} and department_id is None:
-            raise BusinessValidationError("Manager and Staff users must belong to a Department.")
+            raise BusinessValidationError(
+                "Manager and Staff users must belong to a Department.",
+                field="department_id",
+                code="REQUIRED",
+            )
         if department_id is None:
             return
         department = await department_repository.get_by_id(self.session, department_id)
@@ -330,29 +336,39 @@ class UserService:
     def _apply_user_update(self, user: User, payload: UserUpdate) -> None:
         if "email" in payload.model_fields_set:
             if payload.email is None:
-                raise BusinessValidationError("Email must not be null.")
+                raise BusinessValidationError(
+                    "Email must not be null.", field="email", code="REQUIRED"
+                )
             user.email = str(payload.email).strip().lower()
         if "full_name" in payload.model_fields_set:
             if payload.full_name is None:
-                raise BusinessValidationError("Full name must not be null.")
+                raise BusinessValidationError(
+                    "Full name must not be null.", field="full_name", code="REQUIRED"
+                )
             user.full_name = payload.full_name.strip()
         if "role" in payload.model_fields_set:
             if payload.role is None:
-                raise BusinessValidationError("Role must not be null.")
+                raise BusinessValidationError(
+                    "Role must not be null.", field="role", code="REQUIRED"
+                )
             user.role = payload.role
         if "department_id" in payload.model_fields_set:
             user.department_id = payload.department_id
         if "is_active" in payload.model_fields_set:
             if payload.is_active is None:
-                raise BusinessValidationError("Active status must not be null.")
+                raise BusinessValidationError(
+                    "Active status must not be null.", field="is_active", code="REQUIRED"
+                )
             user.is_active = payload.is_active
 
 
 def _validate_user_sort(sort_by: str, sort_order: str) -> None:
     if sort_by not in user_repository.USER_SORT_FIELDS:
-        raise BusinessValidationError("Invalid sort field.")
+        raise BusinessValidationError("Invalid sort field.", field="sort_by", code="INVALID_CHOICE")
     if sort_order not in {"asc", "desc"}:
-        raise BusinessValidationError("Invalid sort order.")
+        raise BusinessValidationError(
+            "Invalid sort order.", field="sort_order", code="INVALID_CHOICE"
+        )
 
 
 def _user_audit_snapshot(user: User) -> dict[str, Any]:

@@ -6,6 +6,13 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### UI backend requests BR-10, BR-11, BR-12 -- 2026-11-21
+
+- **Changed:** `422` responses fill `details` (was always `null`) with `[{field, code, message}]`
+  (BR-10).
+- **Added:** `actor_full_name`, `target_label` on `GET /audit-logs` items for Admin callers (BR-11).
+- **Added:** `break_after` on each answer segment (BR-12).
+
 ### UI backend requests: owner follow-up -- 2026-11-20
 
 - **Changed:** `GET /documents?search=` also matches `document_code` (BR-1).

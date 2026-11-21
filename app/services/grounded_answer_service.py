@@ -5639,26 +5639,44 @@ def answer_segments(
 ) -> list[dict[str, object]]:
     """BR-3: the displayed answer cut into sentences as s1 cuts a draft. A sentence naming an
     unverified part (`_names_unverified_part`) is "unverified", any other "verified"; each keeps
-    the citation numbers it shows (only real ones) as citation_ids, and its text without them."""
+    the citation numbers it shows (only real ones) as citation_ids, and its text without them.
+    BR-12: break_after is the whitespace up to the next segment: "none" (same line), "line" (one
+    line break) or "paragraph" (two or more); the last segment's is "none"."""
     known = set(citation_ids)
     moved = _DISPLAY_MARKERS_AFTER_STOP.sub(r"\2\1", content.strip())
     segments: list[dict[str, object]] = []
+    gap = ""
     for index, part in enumerate(_SIMPLE_SPLIT_KEEPING_BREAKS.split(moved)):
         if index % 2 or not part.strip():
+            gap += part
             continue
         ids = [int(n) for n in _DISPLAY_MARKER.findall(part) if int(n) in known]
         text = _DISPLAY_MARKER.sub(
             lambda m: "" if int(m.group(1)) in known else m.group(0), part
         ).strip()
+        if not text and segments:  # citation numbers alone on a line belong to the line before
+            previous_ids = segments[-1]["citation_ids"]
+            segments[-1]["citation_ids"] = list(dict.fromkeys([*previous_ids, *ids]))
+            gap += part
+            continue
+        if segments:
+            segments[-1]["break_after"] = _segment_break(gap)
+        gap = ""
         unverified = _names_unverified_part(text, question=question)
         segments.append(
             {
                 "kind": "unverified" if unverified else "verified",
                 "text": text,
                 "citation_ids": list(dict.fromkeys(ids)),
+                "break_after": "none",
             }
         )
     return segments
+
+
+def _segment_break(gap: str) -> str:
+    newlines = gap.count("\n")
+    return "paragraph" if newlines >= 2 else "line" if newlines == 1 else "none"
 
 
 def _simple_select_hits(

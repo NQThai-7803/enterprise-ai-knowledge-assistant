@@ -694,7 +694,7 @@ def test_session_history_returns_each_assistant_messages_grounding_status_and_se
     # BR-3 segments: only on answers stored with them; content stays as it was
     segments = [m["segments"] for m in history.json()["data"]["messages"]]
     expected = [{"kind": "verified", "text": "Nhân viên được nghỉ 12 ngày phép năm.",
-                 "citation_ids": [1]}]  # fmt: skip
+                 "citation_ids": [1], "break_after": "none"}]  # fmt: skip
     assert segments == [None, None, expected, None, None]
     assert answered.json()["data"]["assistant_message"]["segments"] == expected
     assert history.json()["data"]["messages"][2]["content"] == GROUNDED_ANSWER_DISPLAY

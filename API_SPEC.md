@@ -47,6 +47,44 @@ List response:
 }
 ```
 
+**`422` validation errors (BR-10).** Every `422` response caused by request validation, and every `422 VALIDATION_ERROR` a service raises, has `details` as a list, one item per invalid field:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Request is invalid.",
+    "details": [
+      { "field": "title", "code": "TOO_LONG", "message": "String should have at most 255 characters" },
+      { "field": "effective_from", "code": "INVALID_DATE", "message": "Input should be a valid date or datetime, month value is outside expected range of 1-12" }
+    ],
+    "request_id": null
+  }
+}
+```
+
+- `field`: the name as sent in the request (form field, JSON key or query parameter), nested JSON names joined with `.` (for example `items.0.name`); `null` when the error concerns the request as a whole (for example a JSON body that fails a rule across fields, or invalid JSON).
+- `code`, stable, for the client to map to its own wording:
+
+  | `code` | Meaning |
+  |---|---|
+  | `REQUIRED` | missing, or empty where a value is required |
+  | `TOO_LONG` / `TOO_SHORT` | above the maximum / below the minimum length |
+  | `OUT_OF_RANGE` | a number outside its bounds |
+  | `INVALID_CHOICE` | not one of the allowed values (enum, sort field, ...) |
+  | `INVALID_DATE` | not a valid date or datetime (or not timezone-aware where required) |
+  | `INVALID_FORMAT` | wrong format: UUID, URL, pattern |
+  | `INVALID_TYPE` | wrong type (a number, a boolean, ...) |
+  | `INVALID_VALUE` | a value a rule rejects (for example an invalid email address) |
+  | `INVALID_RANGE` | the field breaks a rule with another field (`effective_to` before `effective_from`) |
+  | `NOT_ALLOWED` | the field must not be sent in this case (`department_id` with `PRIVATE` or `ORGANIZATION`) |
+  | `UNKNOWN_FIELD` | a field the endpoint does not accept |
+  | `INVALID_JSON` | the body is not valid JSON |
+  | `INVALID` | any other validation failure |
+
+- `message`: an English sentence for logs and fallback display; it may change between versions, `code` does not. It never repeats the submitted value.
+- The error `code` stays `VALIDATION_ERROR`, or the endpoint's specific code where one is documented (`AUDIT_FILTER_INVALID`, `AUDIT_DATE_RANGE_INVALID`, `FEEDBACK_*`); `details` has the same shape for all of them. Other error codes keep `"details": null`.
+
 ## 4. Authentication
 
 Access tokens are short-lived JWTs signed with `HS256`. Refresh tokens are opaque random tokens. Raw refresh tokens are returned only on login or refresh; PostgreSQL stores only their SHA-256 hash. Refresh rotates the refresh token and revokes the old token. Refresh does not require an access token. Logout and `/auth/me` require a Bearer access token.
@@ -571,6 +609,18 @@ Behavior:
   ```
 
   The recognition is a heuristic on three phrases; it is the same one the server uses to decide which sentences it validates.
+- **`break_after` (BR-12).** Every segment also has `break_after`: `"none"`, `"line"` or `"paragraph"`, read from the whitespace in `content` between this segment and the next (no line break, one, two or more); the last segment's is `"none"`. Joining the `text` values with one space for `none`, `\n` for `line` and `\n\n` for `paragraph` gives back the line structure of `content` without its citation numbers. Citation numbers standing alone on a line join the segment before. Segments stored before BR-12 have no `break_after`; the API returns `"none"` for them. Example (a list):
+
+  ```json
+  "segments": [
+    { "kind": "verified", "text": "Quy trình gồm:", "citation_ids": [], "break_after": "line" },
+    { "kind": "verified", "text": "- Bước 1: nộp đơn.", "citation_ids": [1], "break_after": "line" },
+    { "kind": "verified", "text": "- Bước 2: trưởng phòng duyệt.", "citation_ids": [2], "break_after": "paragraph" },
+    { "kind": "unverified", "text": "Chưa xác minh được từ tài liệu bạn được phép truy cập: thời hạn.", "citation_ids": [], "break_after": "none" }
+  ]
+  ```
+
+  A sentence break inside a line (for example after `1.` in a numbered list) also starts a segment, with `"none"`, so a client that renders `none` segments on the same line, separated by one space, shows the text as written.
 - Historical citation metadata may be omitted if the current User no longer has access to the cited Document.
 - The historical Assistant answer text is not redacted in TASK-020.
 - `retrieval_query`, token usage, prompt, vectors, scores, storage keys, permission metadata, and internal source markers are not returned.
@@ -965,7 +1015,32 @@ Response:
 }
 ```
 
-The report does not return actor email, actor full name, request/response bodies, raw headers, exceptions, stack traces, Chat question/answer content, prompts, retrieved context, citation excerpts, Feedback reason, Document filename, storage path, storage key, API key, access token, or refresh token.
+The report does not return actor email, request/response bodies, raw headers, exceptions, stack traces, Chat question/answer content, prompts, retrieved context, citation excerpts, Feedback reason, Document filename, storage path, storage key, API key, access token, or refresh token.
+
+**Names and labels (BR-11, Admin only).** Each item an Admin receives also has:
+
+- `actor_full_name`: the actor's full name; `null` when `actor_user_id` is `null` (a system or failed-login event) or the User no longer exists.
+- `target_label`: a safe label of the target, a display name or a code only:
+
+  | `target_type` | `target_label` |
+  |---|---|
+  | `USER` | the User's full name |
+  | `DEPARTMENT` | the Department code |
+  | `DOCUMENT` | `document_code`, else the title (soft-deleted Documents too) |
+  | `DOCUMENT_PERMISSION` | the label of the Document the grant belongs to; `null` once the grant is revoked |
+  | `CHAT_SESSION`, `CHAT_MESSAGE`, `FEEDBACK`, none | `null`: their only text is user content (a session title can be the question) |
+
+  It never contains Document text, a chat question or answer, an email, or metadata.
+
+The endpoint is Admin-only (`403 AUDIT_REPORT_FORBIDDEN` otherwise), and the serializer checks the role again: an item built for any other role has neither key. Example:
+
+```json
+{ "id": "uuid", "event_type": "DOCUMENT_UPLOADED", "outcome": "SUCCESS",
+  "actor_user_id": "uuid", "actor_full_name": "Admin UAT",
+  "target_type": "DOCUMENT", "target_id": "uuid", "target_label": "ND-HR-007",
+  "request_id": null, "error_code": null, "metadata": { "access_scope": "DEPARTMENT" },
+  "created_at": "2026-11-21T08:00:00Z" }
+```
 
 ## 11. Health
 

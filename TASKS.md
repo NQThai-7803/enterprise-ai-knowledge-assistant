@@ -1,6 +1,14 @@
 
 # Implementation Tasks
 
+## UI backend requests BR-10, BR-11, BR-12 -- 2026-11-21
+
+- **DONE** (answers in `docs/ui/backend-responses-10-12.md`, for the UI session to merge into
+  `docs/ui/backend-requests.md`):
+  - BR-10: `422` `details` as `[{field, code, message}]` with stable codes.
+  - BR-11: `actor_full_name` and `target_label` on the AuditLog report, Admin only.
+  - BR-12: `break_after` on each answer segment.
+
 ## UI backend requests: owner follow-up -- 2026-11-20
 
 - **DONE:** search by `document_code`; answer `segments` (migration `20261120_0014`); BR-4 option

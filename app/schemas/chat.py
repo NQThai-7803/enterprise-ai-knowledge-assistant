@@ -129,11 +129,14 @@ class CitationRead(BaseModel):
 
 
 class AnswerSegment(BaseModel):
-    """BR-3: one sentence of an answer; citation_ids are its citations' citation_order."""
+    """BR-3: one sentence of an answer; citation_ids are its citations' citation_order.
+    BR-12: break_after is what separates it from the next one ("none" = one space)."""
 
     kind: Literal["verified", "unverified"]
     text: str
     citation_ids: list[int] = Field(default_factory=list)
+    # Segments stored before BR-12 have no break_after and read as "none".
+    break_after: Literal["none", "line", "paragraph"] = "none"
 
 
 class ChatMessageRead(BaseModel):

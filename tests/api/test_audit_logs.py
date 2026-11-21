@@ -417,7 +417,8 @@ def test_audit_report_response_is_sanitized(
     assert response.status_code == 200
     assert response.json()["items"][0]["metadata"] == {"role": "ADMIN"}
     assert "hidden-admin@example.com" not in serialized
-    assert "Hidden Admin" not in serialized
+    # BR-11: an Admin caller now gets the actor's full name, never the email or metadata
+    assert response.json()["items"][0]["actor_full_name"] == "Hidden Admin"
     for marker in [
         CONFIDENTIAL_AUDIT_PASSWORD,
         CONFIDENTIAL_AUDIT_TOKEN,
@@ -451,3 +452,91 @@ def test_audit_report_read_does_not_create_audit_event(
 async def count_audit_logs(session_factory: async_sessionmaker[AsyncSession]) -> int:
     async with session_factory() as session:
         return len((await session.scalars(select(AuditLog))).all())
+
+
+async def create_labelled_targets(
+    session_factory: async_sessionmaker[AsyncSession], *, uploader: User, department_id: uuid.UUID
+) -> dict[str, uuid.UUID]:
+    from app.models import (
+        ChatSession,
+        Document,
+        DocumentAccessScope,
+        DocumentPermission,
+        DocumentPermissionLevel,
+        DocumentStatus,
+    )
+
+    async with session_factory() as session:
+
+        def document(title: str, code: str | None) -> Document:
+            return Document(title=title, document_code=code, original_filename="f.pdf",
+                            storage_key=f"documents/{uuid.uuid4()}.pdf",
+                            mime_type="application/pdf",
+                            file_size=1, checksum_sha256=uuid.uuid4().hex * 2,
+                            status=DocumentStatus.READY, access_scope=DocumentAccessScope.PRIVATE,
+                            uploaded_by=uploader.id)  # fmt: skip
+
+        coded, titled = document("Coded title", "ND-HR-007"), document("Quy dinh tieu de", None)
+        chat = ChatSession(user_id=uploader.id, title=CONFIDENTIAL_AUDIT_QUESTION)
+        session.add_all([coded, titled, chat])
+        await session.flush()
+        grant = DocumentPermission(document_id=coded.id, department_id=department_id,
+                                   permission=DocumentPermissionLevel.VIEW,
+                                   created_by=uploader.id)  # fmt: skip
+        session.add(grant)
+        await session.commit()
+        return {"coded": coded.id, "titled": titled.id, "chat": chat.id, "grant": grant.id}
+
+
+def test_admin_report_adds_actor_names_and_safe_target_labels(
+    api_client: TestClient,
+    async_session_factory_for_tests: async_sessionmaker[AsyncSession],
+    make_department: Callable[..., Any],
+    make_user: Callable[..., User],
+    make_auth_headers: Callable[[User], dict[str, str]],
+) -> None:
+    """BR-11: a name or a code only; a chat target has no label, so its title never shows."""
+    department = make_department()
+    admin = make_user(role=UserRole.ADMIN, full_name="Admin Thuc Hien")
+    target_user = make_user(role=UserRole.STAFF, full_name="Nguoi Duoc Tao",
+                            department_id=department.id)  # fmt: skip
+    ids = run_async(create_labelled_targets(
+        async_session_factory_for_tests, uploader=admin, department_id=department.id))  # fmt: skip
+    rows = [
+        ("USER_CREATED", "USER", target_user.id, admin, "Nguoi Duoc Tao"),
+        ("DEPARTMENT_UPDATED", "DEPARTMENT", department.id, admin, department.code),
+        ("DOCUMENT_UPLOADED", "DOCUMENT", ids["coded"], admin, "ND-HR-007"),
+        ("DOCUMENT_UPDATED", "DOCUMENT", ids["titled"], admin, "Quy dinh tieu de"),
+        ("DOCUMENT_PERMISSION_GRANTED", "DOCUMENT_PERMISSION", ids["grant"], admin, "ND-HR-007"),
+        ("CHAT_SESSION_CREATED", "CHAT_SESSION", ids["chat"], admin, None),
+        ("AUTH_LOGIN_FAILED", None, None, None, None),
+    ]
+    for action, entity_type, entity_id, actor, _ in rows:
+        run_async(create_audit_log(async_session_factory_for_tests, actor=actor, action=action,
+                                   entity_type=entity_type, entity_id=entity_id))  # fmt: skip
+
+    response = get_audit_logs(api_client, make_auth_headers(admin), page_size=50)
+
+    assert response.status_code == 200
+    by_event = {item["event_type"]: item for item in response.json()["items"]}
+    for action, _, _, actor, label in rows:
+        assert by_event[action]["target_label"] == label
+        assert by_event[action]["actor_full_name"] == ("Admin Thuc Hien" if actor else None)
+    assert CONFIDENTIAL_AUDIT_QUESTION not in response.text
+
+
+def test_the_serializer_drops_names_for_a_non_admin_even_with_labels() -> None:
+    from app.models import AuditLog
+    from app.schemas.audit import audit_log_view
+    from app.services.display_names import AuditLabels
+
+    actor_id, target_id = uuid.uuid4(), uuid.uuid4()
+    row = AuditLog(id=uuid.uuid4(), user_id=actor_id, action="USER_CREATED", outcome="SUCCESS",
+                   entity_type="USER", entity_id=target_id, metadata_json={},
+                   created_at=datetime.now(UTC))  # fmt: skip
+    labels = AuditLabels(actors={actor_id: "Hidden Actor"}, targets={("USER", target_id): "Hidden"})
+    for role in (UserRole.MANAGER, UserRole.STAFF):
+        body = audit_log_view(row, current_user=User(role=role), labels=labels).model_dump()
+        assert "actor_full_name" not in body and "target_label" not in body
+    admin_body = audit_log_view(row, current_user=User(role=UserRole.ADMIN), labels=labels)
+    assert admin_body.model_dump()["actor_full_name"] == "Hidden Actor"
