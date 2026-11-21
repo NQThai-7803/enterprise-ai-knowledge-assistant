@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { z } from "zod";
-import { ApiError, safeErrorMessage } from "../../api/errors";
+import { safeErrorMessage } from "../../api/errors";
 import { Button } from "../../components/ui/Button";
 import { FieldWrapper, TextInput } from "../../components/ui/Field";
 import { useToast } from "../../components/feedback/ToastProvider";
@@ -51,7 +51,7 @@ export function LoginPage() {
       await login(values);
       navigate(from, { replace: true });
     } catch (error) {
-      setError("root", { message: loginErrorMessage(error) });
+      setError("root", { message: safeErrorMessage(error) });
     }
   });
 
@@ -154,17 +154,3 @@ function Brand({ compact = false }: { compact?: boolean }) {
   );
 }
 
-function loginErrorMessage(error: unknown): string {
-  if (error instanceof ApiError) {
-    if (error.code === "INVALID_CREDENTIALS") {
-      return "Email hoặc mật khẩu không đúng.";
-    }
-    if (error.code === "USER_INACTIVE") {
-      return "Tài khoản đã bị vô hiệu hóa. Liên hệ quản trị viên.";
-    }
-    if (error.status === 429) {
-      return "Đăng nhập sai quá nhiều lần. Thử lại sau ít phút.";
-    }
-  }
-  return safeErrorMessage(error);
-}

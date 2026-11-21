@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useForm, type UseFormReturn } from "react-hook-form";
 import { z } from "zod";
 import { apiClient } from "../../api/client";
-import { isApiError, safeErrorMessage } from "../../api/errors";
+import { safeErrorMessage } from "../../api/errors";
 import type { Department } from "../../api/types";
 import { DataTable } from "../../components/data/DataTable";
 import { useToast } from "../../components/feedback/ToastProvider";
@@ -59,7 +59,7 @@ export function DepartmentsPage() {
       pushToast({ tone: "success", title: "Đã tạo phòng ban" });
     },
     onError: (error) =>
-      pushToast({ tone: "error", title: "Tạo phòng ban thất bại", message: departmentErrorMessage(error) }),
+      pushToast({ tone: "error", title: "Tạo phòng ban thất bại", message: safeErrorMessage(error) }),
   });
 
   const updateMutation = useMutation({
@@ -75,7 +75,7 @@ export function DepartmentsPage() {
       pushToast({ tone: "success", title: "Đã cập nhật phòng ban" });
     },
     onError: (error) =>
-      pushToast({ tone: "error", title: "Cập nhật thất bại", message: departmentErrorMessage(error) }),
+      pushToast({ tone: "error", title: "Cập nhật thất bại", message: safeErrorMessage(error) }),
   });
 
   const deleteMutation = useMutation({
@@ -90,7 +90,7 @@ export function DepartmentsPage() {
     },
     onError: (error) => {
       setDeleteId(null);
-      pushToast({ tone: "error", title: "Xóa thất bại", message: departmentErrorMessage(error) });
+      pushToast({ tone: "error", title: "Xóa thất bại", message: safeErrorMessage(error) });
     },
   });
 
@@ -252,17 +252,3 @@ function DepartmentFields({ form, idPrefix }: { form: UseFormReturn<DepartmentFo
   );
 }
 
-function departmentErrorMessage(error: unknown): string {
-  if (isApiError(error)) {
-    if (error.code === "DEPARTMENT_IN_USE") {
-      return "Phòng ban vẫn còn người dùng đang hoạt động.";
-    }
-    if (error.code === "DEPARTMENT_NAME_ALREADY_EXISTS") {
-      return "Tên phòng ban đã tồn tại.";
-    }
-    if (error.code === "DEPARTMENT_CODE_ALREADY_EXISTS") {
-      return "Mã phòng ban đã tồn tại.";
-    }
-  }
-  return safeErrorMessage(error);
-}

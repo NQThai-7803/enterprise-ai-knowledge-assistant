@@ -148,7 +148,7 @@ export function ToastProvider({
                   className="rounded-token p-1 text-muted transition hover:bg-elevated hover:text-ink"
                   type="button"
                   onClick={() => dismissToast(toast.id)}
-                  aria-label="Dismiss notification"
+                  aria-label="Đóng thông báo"
                 >
                   <X className="h-4 w-4" aria-hidden="true" />
                 </button>

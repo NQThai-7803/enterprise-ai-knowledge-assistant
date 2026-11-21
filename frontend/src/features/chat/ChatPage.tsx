@@ -3,7 +3,7 @@ import { clsx } from "clsx";
 import { ArrowRight, Plus, Square, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { apiClient } from "../../api/client";
-import { ApiError, safeErrorMessage } from "../../api/errors";
+import { ApiError, errorText, safeErrorMessage } from "../../api/errors";
 import { streamChatMessage } from "../../api/sse";
 import type { ChatSessionSummary, FeedbackRating, ListResponse } from "../../api/types";
 import { useToast } from "../../components/feedback/ToastProvider";
@@ -590,7 +590,7 @@ export function ChatPage() {
               />
             ) : null}
             {streamState.status === "error" && streamState.error && selectedSessionId && !sessionNotFound ? (
-              <ErrorState title="Không nhận được câu trả lời" message={streamState.error.message} />
+              <ErrorState title="Không nhận được câu trả lời" message={errorText(streamState.error.code, streamState.error.message)} />
             ) : null}
             {streamState.status === "cancelled" ? (
               <p className="text-center text-xs text-muted">Đã dừng câu trả lời trước khi hoàn tất.</p>

@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { useForm, type UseFormReturn } from "react-hook-form";
 import { z } from "zod";
 import { apiClient } from "../../api/client";
-import { isApiError, safeErrorMessage } from "../../api/errors";
+import { safeErrorMessage } from "../../api/errors";
 import type { Department, User, UserRole } from "../../api/types";
 import { DataTable } from "../../components/data/DataTable";
 import { useToast } from "../../components/feedback/ToastProvider";
@@ -122,7 +122,7 @@ export function UsersPage() {
       await queryClient.invalidateQueries({ queryKey: ["users"] });
       pushToast({ tone: "success", title: "Đã vô hiệu hóa người dùng" });
     },
-    onError: (error) => pushToast({ tone: "error", title: "Vô hiệu hóa thất bại", message: userErrorMessage(error) }),
+    onError: (error) => pushToast({ tone: "error", title: "Vô hiệu hóa thất bại", message: safeErrorMessage(error) }),
   });
 
   const reactivateMutation = useMutation({
@@ -138,7 +138,7 @@ export function UsersPage() {
       await queryClient.invalidateQueries({ queryKey: ["users"] });
       pushToast({ tone: "success", title: "Đã kích hoạt lại người dùng" });
     },
-    onError: (error) => pushToast({ tone: "error", title: "Kích hoạt lại thất bại", message: userErrorMessage(error) }),
+    onError: (error) => pushToast({ tone: "error", title: "Kích hoạt lại thất bại", message: safeErrorMessage(error) }),
   });
 
   const users = usersQuery.data?.data ?? [];
@@ -303,7 +303,7 @@ export function UsersPage() {
           </FieldWrapper>
           {createMutation.isError ? (
             <p className="rounded-token border border-danger/20 bg-danger/5 px-3 py-2 text-sm font-medium text-danger" role="alert">
-              Tạo người dùng thất bại. {userErrorMessage(createMutation.error)}
+              Tạo người dùng thất bại. {safeErrorMessage(createMutation.error)}
             </p>
           ) : null}
           <Button type="submit" loading={createMutation.isPending}>
@@ -328,7 +328,7 @@ export function UsersPage() {
             </FieldWrapper>
             {updateMutation.isError ? (
               <p className="rounded-token border border-danger/20 bg-danger/5 px-3 py-2 text-sm font-medium text-danger" role="alert">
-                Cập nhật thất bại. {userErrorMessage(updateMutation.error)}
+                Cập nhật thất bại. {safeErrorMessage(updateMutation.error)}
               </p>
             ) : null}
             <Button type="submit" loading={updateMutation.isPending}>
@@ -400,17 +400,3 @@ function UserFields({
   );
 }
 
-function userErrorMessage(error: unknown): string {
-  if (isApiError(error)) {
-    if (error.code === "USER_EMAIL_ALREADY_EXISTS") {
-      return "Email này đã được dùng.";
-    }
-    if (error.code === "LAST_ACTIVE_ADMIN") {
-      return "Không thể bỏ quản trị viên đang hoạt động cuối cùng.";
-    }
-    if (error.code === "SELF_MODIFICATION_NOT_ALLOWED") {
-      return "Bạn không thể tự đổi vai trò hoặc trạng thái của chính mình.";
-    }
-  }
-  return safeErrorMessage(error);
-}
