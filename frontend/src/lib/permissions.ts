@@ -32,3 +32,21 @@ export function canViewAuditLogs(user: AuthenticatedUser | null): boolean {
 export function roleLabel(role: UserRole): string {
   return roleLabels[role];
 }
+
+/**
+ * BR-4: a department name the viewer may see. Their own department is named from /auth/me; any other
+ * only when the response carries the key (Admin callers). Never looked up through another call.
+ */
+export function visibleDepartmentName(
+  departmentId: string | null,
+  responseName: string | null | undefined,
+  user: AuthenticatedUser | null,
+): string | null {
+  if (!departmentId) {
+    return null;
+  }
+  if (user?.department_id === departmentId && user.department_name) {
+    return user.department_name;
+  }
+  return responseName ?? null;
+}

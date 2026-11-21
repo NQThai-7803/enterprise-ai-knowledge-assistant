@@ -13,7 +13,7 @@ import { DocumentStatusBadge } from "../../components/ui/StatusBadge";
 import { ErrorState, LoadingState } from "../../components/ui/State";
 import { formatBytes, formatDateTime, formatIsoDate } from "../../lib/format";
 import { lifecycleLabels } from "../../lib/labels";
-import { canManageDocumentPermissions } from "../../lib/permissions";
+import { canManageDocumentPermissions, visibleDepartmentName } from "../../lib/permissions";
 import { useAuth } from "../auth/AuthProvider";
 import { ScopeBadge } from "./ScopeBadge";
 
@@ -200,14 +200,7 @@ function departmentText(documentItem: DocumentItem, user: AuthenticatedUser | nu
   if (!documentItem.department_id) {
     return "Không gắn phòng ban";
   }
-  // BR-4 option (a): the key exists only for an Admin caller.
-  if (documentItem.department_name !== undefined) {
-    return documentItem.department_name ?? "Không gắn phòng ban";
-  }
-  if (user?.department_id === documentItem.department_id && user.department_name) {
-    return user.department_name;
-  }
-  return "Phòng ban của tài liệu";
+  return visibleDepartmentName(documentItem.department_id, documentItem.department_name, user) ?? "Phòng ban của tài liệu";
 }
 
 /** Uploader name only when the response carries it (Admin); others learn only whether it was them. */

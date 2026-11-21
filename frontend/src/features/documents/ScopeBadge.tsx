@@ -1,6 +1,7 @@
 import type { AuthenticatedUser, DocumentItem } from "../../api/types";
 import { Badge } from "../../components/ui/Badge";
 import { accessScopeLabels } from "../../lib/labels";
+import { visibleDepartmentName } from "../../lib/permissions";
 
 const tones = { ORGANIZATION: "neutral", DEPARTMENT: "warning", PRIVATE: "accent" } as const;
 
@@ -16,12 +17,8 @@ export function ScopeBadge({
   user: AuthenticatedUser | null;
 }) {
   const name =
-    document.access_scope !== "DEPARTMENT"
-      ? null
-      : document.department_name !== undefined
-        ? document.department_name
-        : user?.department_id && user.department_id === document.department_id
-          ? user.department_name
-          : null;
+    document.access_scope === "DEPARTMENT"
+      ? visibleDepartmentName(document.department_id, document.department_name, user)
+      : null;
   return <Badge tone={tones[document.access_scope]}>{name ?? accessScopeLabels[document.access_scope]}</Badge>;
 }

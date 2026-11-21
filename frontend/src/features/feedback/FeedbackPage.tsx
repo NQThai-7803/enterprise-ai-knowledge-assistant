@@ -10,6 +10,7 @@ import { Pagination } from "../../components/ui/Pagination";
 import { EmptyState, ErrorState, LoadingState } from "../../components/ui/State";
 import { formatDateTime } from "../../lib/format";
 import { feedbackRatingLabels } from "../../lib/labels";
+import { visibleDepartmentName } from "../../lib/permissions";
 import { useAuth } from "../auth/AuthProvider";
 
 const RATING_FILTERS: { value: FeedbackRating | ""; label: string }[] = [
@@ -141,12 +142,5 @@ function departmentText(row: FeedbackReportItem, user: AuthenticatedUser | null)
   if (!row.department_id) {
     return "Không thuộc phòng ban";
   }
-  if (row.department_name !== undefined) {
-    return row.department_name ?? "Không thuộc phòng ban";
-  }
-  // A Manager's report holds only their own department (BR-4 note), named from /auth/me.
-  if (row.department_id === user?.department_id && user.department_name) {
-    return user.department_name;
-  }
-  return "Phòng ban";
+  return visibleDepartmentName(row.department_id, row.department_name, user) ?? "Phòng ban";
 }

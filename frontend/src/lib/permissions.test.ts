@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AuthenticatedUser } from "../api/types";
-import { canManageDepartments, canManageDocumentPermissions, canManageUsers, canUploadDocuments, canViewAuditLogs, canViewFeedbackReport, roleLabel } from "./permissions";
+import { canManageDepartments, canManageDocumentPermissions, canManageUsers, canUploadDocuments, canViewAuditLogs, canViewFeedbackReport, roleLabel, visibleDepartmentName } from "./permissions";
 
 const user = (role: AuthenticatedUser["role"]): AuthenticatedUser => ({
   id: role.toLowerCase(),
@@ -26,6 +26,15 @@ describe("permission helpers", () => {
     expect(canUploadDocuments(user("MANAGER"))).toBe(true);
     expect(canUploadDocuments(user("STAFF"))).toBe(false);
     expect(canViewFeedbackReport(user("MANAGER"))).toBe(true);
+  });
+
+  it("names the viewer's own department from /auth/me, others only from the response key", () => {
+    const staff = { ...user("STAFF"), department_id: "d-hr", department_name: "Nhân sự" };
+
+    expect(visibleDepartmentName("d-hr", undefined, staff)).toBe("Nhân sự");
+    expect(visibleDepartmentName("d-other", undefined, staff)).toBeNull();
+    expect(visibleDepartmentName("d-other", "Kế toán", user("ADMIN"))).toBe("Kế toán");
+    expect(visibleDepartmentName(null, "Kế toán", user("ADMIN"))).toBeNull();
   });
 
   it("renders stable role labels", () => {
