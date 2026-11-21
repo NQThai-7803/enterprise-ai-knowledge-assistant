@@ -18,6 +18,7 @@ export default {
         muted: "rgb(var(--color-muted) / <alpha-value>)",
         accent: "rgb(var(--color-accent) / <alpha-value>)",
         "accent-contrast": "rgb(var(--color-accent-contrast) / <alpha-value>)",
+        "accent-strong": "rgb(var(--color-accent-strong) / <alpha-value>)",
         success: "rgb(var(--color-success) / <alpha-value>)",
         warning: "rgb(var(--color-warning) / <alpha-value>)",
         danger: "rgb(var(--color-danger) / <alpha-value>)",
@@ -29,8 +30,19 @@ export default {
       borderRadius: {
         token: "var(--radius-md)",
       },
+      // D-2: the bare `transition` class may animate colour (hover/focus), opacity and transform only.
+      transitionProperty: {
+        DEFAULT: "color, background-color, border-color, text-decoration-color, opacity, transform",
+      },
+      transitionDuration: {
+        DEFAULT: "150ms",
+        fast: "150ms",
+        base: "220ms",
+        slow: "320ms",
+      },
       transitionTimingFunction: {
-        product: "cubic-bezier(.2,.8,.2,1)",
+        DEFAULT: "cubic-bezier(0.2, 0, 0, 1)",
+        product: "cubic-bezier(0.2, 0, 0, 1)",
       },
     },
   },

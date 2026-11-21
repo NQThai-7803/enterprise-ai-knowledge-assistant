@@ -1,24 +1,25 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "../../api/errors";
 import { apiClient } from "../../api/client";
-import type { Department, DocumentItem, ListResponse } from "../../api/types";
+import type { AuthenticatedUser, Department, ListResponse } from "../../api/types";
 import { ToastProvider } from "../../components/feedback/ToastProvider";
+import { contractDocument, contractManager } from "../../test/fixtures/contract";
 import { DocumentUploadPage } from "./DocumentUploadPage";
 
 vi.mock("../../api/client", () => ({
   apiClient: {
-    departments: {
-      list: vi.fn(),
-    },
-    documents: {
-      upload: vi.fn(),
-    },
+    departments: { list: vi.fn() },
+    documents: { upload: vi.fn(), list: vi.fn() },
   },
 }));
+
+const admin: AuthenticatedUser = { ...contractManager, id: "admin-uuid", role: "ADMIN", department_id: null, department_name: null };
+let currentUser: AuthenticatedUser = admin;
+vi.mock("../auth/AuthProvider", () => ({ useAuth: () => ({ user: currentUser }) }));
 
 const department: Department = {
   id: "department-uuid-1",
@@ -28,123 +29,191 @@ const department: Department = {
   created_at: "2026-08-09T00:00:00Z",
 };
 
-const uploadedDocument: DocumentItem = {
-  id: "document-uuid-1",
-  title: "Policy",
-  description: null,
-  original_filename: "policy.pdf",
-  mime_type: "application/pdf",
-  file_size: 128,
-  status: "UPLOADED",
-  access_scope: "DEPARTMENT",
-  department_id: department.id,
-  uploaded_by: "user-uuid-1",
-  created_at: "2026-08-09T00:00:00Z",
-  updated_at: "2026-08-09T00:00:00Z",
-};
-
 function listResponse<T>(data: T[]): ListResponse<T> {
-  return {
-    data,
-    meta: { page: 1, page_size: 100, total: data.length, total_pages: data.length ? 1 : 0 },
-  };
+  return { data, meta: { page: 1, page_size: 100, total: data.length, total_pages: data.length ? 1 : 0 } };
 }
 
-function dataResponse(data: DocumentItem) {
-  return { data, meta: null };
+const pdf = () => new File(["pdf"], "nghi-phep.pdf", { type: "application/pdf" });
+const fileInput = () => screen.getByLabelText("Tệp PDF");
+const scope = (name: RegExp) => screen.getByRole("radio", { name });
+
+async function fillRequired(user: ReturnType<typeof userEvent.setup>) {
+  await user.upload(fileInput(), pdf());
+  await user.type(screen.getByLabelText("Tiêu đề"), "Quy định nghỉ phép");
 }
 
 describe("DocumentUploadPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    currentUser = admin;
     vi.stubGlobal("crypto", { randomUUID: () => "toast-id" });
     vi.mocked(apiClient.departments.list).mockResolvedValue(listResponse([department]));
-    vi.mocked(apiClient.documents.upload).mockResolvedValue(dataResponse(uploadedDocument));
+    vi.mocked(apiClient.documents.list).mockResolvedValue(listResponse([contractDocument]));
+    vi.mocked(apiClient.documents.upload).mockResolvedValue({ data: contractDocument, meta: null });
   });
 
-  it("hides the department selector for organization scope", async () => {
+  it("lets an Admin pick any department and sends its id", async () => {
     const user = userEvent.setup();
     renderUploadPage();
 
-    await user.selectOptions(screen.getByLabelText("Access scope"), "ORGANIZATION");
-
-    expect(screen.queryByLabelText("Department")).not.toBeInTheDocument();
-    expect(apiClient.departments.list).not.toHaveBeenCalled();
-  });
-
-  it("loads departments and sends the selected department UUID for department uploads", async () => {
-    const user = userEvent.setup();
-    renderUploadPage();
-
-    await user.type(screen.getByLabelText("Title"), "Policy");
-    await user.upload(fileInput(), new File(["pdf"], "policy.pdf", { type: "application/pdf" }));
-    await user.selectOptions(screen.getByLabelText("Access scope"), "DEPARTMENT");
+    await fillRequired(user);
+    await user.click(scope(/^Phòng ban/));
     await screen.findByRole("option", { name: "UAT Knowledge Operations (UAT-KNOWLEDGE)" });
-    await user.selectOptions(screen.getByLabelText("Department"), department.id);
-    await user.click(screen.getByRole("button", { name: "Upload" }));
+    await user.selectOptions(screen.getByLabelText("Phòng ban"), department.id);
+    await user.click(screen.getByRole("button", { name: "Tải lên" }));
 
-    await waitFor(() => {
+    await waitFor(() =>
       expect(apiClient.documents.upload).toHaveBeenCalledWith(
         expect.objectContaining({ access_scope: "DEPARTMENT", department_id: department.id }),
-      );
-    });
+      ),
+    );
   });
 
-  it("blocks department uploads when no department is selected", async () => {
+  it("blocks a department upload without a department", async () => {
     const user = userEvent.setup();
     renderUploadPage();
 
-    await user.type(screen.getByLabelText("Title"), "Policy");
-    await user.upload(fileInput(), new File(["pdf"], "policy.pdf", { type: "application/pdf" }));
-    await user.selectOptions(screen.getByLabelText("Access scope"), "DEPARTMENT");
+    await fillRequired(user);
+    await user.click(scope(/^Phòng ban/));
     await screen.findByRole("option", { name: "UAT Knowledge Operations (UAT-KNOWLEDGE)" });
-    await user.click(screen.getByRole("button", { name: "Upload" }));
+    await user.click(screen.getByRole("button", { name: "Tải lên" }));
 
-    expect(await screen.findByText("Vui lòng chọn phòng ban.")).toBeInTheDocument();
+    expect(await screen.findByText("Chọn phòng ban.")).toBeInTheDocument();
     expect(apiClient.documents.upload).not.toHaveBeenCalled();
   });
 
-  it("handles department API errors with a retry state", async () => {
+  it("shows a retry state when departments cannot load", async () => {
     const user = userEvent.setup();
     vi.mocked(apiClient.departments.list).mockRejectedValueOnce(new Error("network"));
     renderUploadPage();
 
-    await user.selectOptions(screen.getByLabelText("Access scope"), "DEPARTMENT");
+    await user.click(scope(/^Phòng ban/));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Could not load departments.");
-    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toHaveTextContent("Không tải được danh sách phòng ban.");
+    expect(screen.getByRole("button", { name: "Thử lại" })).toBeInTheDocument();
   });
 
-  it("does not send a department UUID for private uploads", async () => {
+  it("sends no department for a private upload", async () => {
     const user = userEvent.setup();
     renderUploadPage();
 
-    await user.type(screen.getByLabelText("Title"), "Private policy");
-    await user.upload(fileInput(), new File(["pdf"], "private.pdf", { type: "application/pdf" }));
-    await user.click(screen.getByRole("button", { name: "Upload" }));
+    await fillRequired(user);
+    await user.click(screen.getByRole("button", { name: "Tải lên" }));
 
-    await waitFor(() => {
+    await waitFor(() =>
       expect(apiClient.documents.upload).toHaveBeenCalledWith(
-        expect.objectContaining({ access_scope: "PRIVATE", department_id: null }),
-      );
-    });
+        expect.objectContaining({ access_scope: "PRIVATE", department_id: null, lifecycle_status: "ACTIVE" }),
+      ),
+    );
   });
 
-  it("shows a safe validation message for backend 422 upload errors", async () => {
+  it("limits a Manager to PRIVATE or their own department, chosen by hand (BR-1 rule 3)", async () => {
+    currentUser = contractManager;
+    const user = userEvent.setup();
+    renderUploadPage();
+
+    expect(scope(/^Toàn công ty/)).toBeDisabled();
+    await fillRequired(user);
+    await user.click(scope(/^Phòng ban/));
+    const select = screen.getByLabelText("Phòng ban");
+    expect(select).toHaveValue("");
+    expect(within(select).getAllByRole("option").map((option) => option.textContent)).toEqual(["Chọn phòng ban", "Nhân sự"]);
+    expect(apiClient.departments.list).not.toHaveBeenCalled();
+
+    await user.selectOptions(select, "uuid");
+    await user.click(screen.getByRole("button", { name: "Tải lên" }));
+
+    await waitFor(() =>
+      expect(apiClient.documents.upload).toHaveBeenCalledWith(
+        expect.objectContaining({ access_scope: "DEPARTMENT", department_id: "uuid" }),
+      ),
+    );
+  });
+
+  it("disables the department scope for a Manager without a department", () => {
+    currentUser = { ...contractManager, department_id: null, department_name: null };
+    renderUploadPage();
+
+    expect(scope(/^Phòng ban/)).toBeDisabled();
+    expect(screen.getByText("Bạn chưa thuộc phòng ban nào")).toBeInTheDocument();
+  });
+
+  it("sends the BR-1 version fields from the contract example", async () => {
+    const user = userEvent.setup();
+    renderUploadPage();
+
+    await fillRequired(user);
+    await user.type(screen.getByLabelText("Mã tài liệu"), "ND-HR-007");
+    await user.type(screen.getByLabelText("Phiên bản"), "1.0");
+    fireEvent.change(screen.getByLabelText("Hiệu lực từ"), { target: { value: "2026-09-01" } });
+    await user.selectOptions(screen.getByLabelText("Vòng đời"), "DRAFT");
+    expect(screen.getByText("Bản nháp vẫn hiện trong danh sách nhưng không được dùng để trả lời.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Tải lên" }));
+
+    await waitFor(() =>
+      expect(apiClient.documents.upload).toHaveBeenCalledWith(
+        expect.objectContaining({
+          document_code: "ND-HR-007",
+          document_version: "1.0",
+          effective_from: "2026-09-01",
+          effective_to: null,
+          lifecycle_status: "DRAFT",
+          supersedes_document_id: null,
+        }),
+      ),
+    );
+  });
+
+  it("checks the effective dates before sending", async () => {
+    const user = userEvent.setup();
+    renderUploadPage();
+
+    await fillRequired(user);
+    fireEvent.change(screen.getByLabelText("Hiệu lực từ"), { target: { value: "2026-09-01" } });
+    fireEvent.change(screen.getByLabelText("Hiệu lực đến"), { target: { value: "2026-08-01" } });
+    await user.click(screen.getByRole("button", { name: "Tải lên" }));
+
+    expect(await screen.findByText("Ngày hết hiệu lực không được trước ngày bắt đầu hiệu lực.")).toBeInTheDocument();
+    expect(apiClient.documents.upload).not.toHaveBeenCalled();
+  });
+
+  it("puts the documented 422 effective_to message on its field", async () => {
     const user = userEvent.setup();
     vi.mocked(apiClient.documents.upload).mockRejectedValueOnce(
-      new ApiError({ code: "VALIDATION_ERROR", message: "Invalid UUID", status: 422, details: { loc: ["department_id"] } }),
+      new ApiError({ code: "VALIDATION_ERROR", message: "effective_to must not precede effective_from.", status: 422 }),
     );
     renderUploadPage();
 
-    await user.type(screen.getByLabelText("Title"), "Policy");
-    await user.upload(fileInput(), new File(["pdf"], "policy.pdf", { type: "application/pdf" }));
-    await user.selectOptions(screen.getByLabelText("Access scope"), "DEPARTMENT");
-    await screen.findByRole("option", { name: "UAT Knowledge Operations (UAT-KNOWLEDGE)" });
-    await user.selectOptions(screen.getByLabelText("Department"), department.id);
-    await user.click(screen.getByRole("button", { name: "Upload" }));
+    await fillRequired(user);
+    await user.click(screen.getByRole("button", { name: "Tải lên" }));
 
-    expect(await screen.findByText("Vui lòng chọn phòng ban.")).toBeInTheDocument();
+    expect(await screen.findByText("Ngày hết hiệu lực không được trước ngày bắt đầu hiệu lực.")).toBeInTheDocument();
+  });
+
+  it("shows any other 422 and a 403 as a form error", async () => {
+    const user = userEvent.setup();
+    vi.mocked(apiClient.documents.upload)
+      .mockRejectedValueOnce(new ApiError({ code: "VALIDATION_ERROR", message: "Request is invalid", status: 422 }))
+      .mockRejectedValueOnce(new ApiError({ code: "FORBIDDEN", message: "Forbidden", status: 403 }));
+    renderUploadPage();
+
+    await fillRequired(user);
+    await user.click(screen.getByRole("button", { name: "Tải lên" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Thông tin tải lên chưa hợp lệ: Request is invalid");
+
+    await user.click(screen.getByRole("button", { name: "Tải lên" }));
+    expect(await screen.findByText("Bạn không được tải lên với phạm vi hoặc phòng ban này.")).toBeInTheDocument();
+  });
+
+  it("removes the chosen file", async () => {
+    const user = userEvent.setup();
+    renderUploadPage();
+
+    await user.upload(fileInput(), pdf());
+    expect(screen.getByText("nghi-phep.pdf")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Bỏ tệp đã chọn" }));
+
+    expect(screen.queryByText("nghi-phep.pdf")).not.toBeInTheDocument();
   });
 });
 
@@ -159,12 +228,4 @@ function renderUploadPage() {
       </ToastProvider>
     </QueryClientProvider>,
   );
-}
-
-function fileInput() {
-  const input = document.querySelector<HTMLInputElement>('input[type="file"]');
-  if (!input) {
-    throw new Error("File input not found.");
-  }
-  return input;
 }

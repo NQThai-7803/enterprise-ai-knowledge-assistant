@@ -100,9 +100,9 @@ test("admin navigation exposes administrative routes", async ({ page }) => {
   await mockChat(page);
   await page.goto("/chat");
 
-  await expect(page.getByRole("link", { name: "Users" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Departments" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Audit logs" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Người dùng" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Phòng ban" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Nhật ký hệ thống" })).toBeVisible();
 });
 
 test("staff navigation hides administrative routes", async ({ page }) => {
@@ -110,9 +110,9 @@ test("staff navigation hides administrative routes", async ({ page }) => {
   await mockChat(page);
   await page.goto("/chat");
 
-  await expect(page.getByRole("link", { name: "Chat" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Users" })).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Audit logs" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Trò chuyện" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Người dùng" })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Nhật ký hệ thống" })).toHaveCount(0);
 });
 
 
@@ -122,13 +122,13 @@ test("mobile navigation closes with Escape and does not block composer", async (
   await mockChat(page);
   await page.goto("/chat");
 
-  await page.getByRole("button", { name: "Open navigation" }).click();
-  await expect(page.getByRole("navigation", { name: "Primary navigation" })).toBeVisible();
+  await page.getByRole("button", { name: "Mở điều hướng" }).click();
+  await expect(page.getByRole("navigation", { name: "Điều hướng chính" })).toBeVisible();
   await page.keyboard.press("Escape");
-  await expect(page.getByRole("navigation", { name: "Primary navigation" })).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: "Điều hướng chính" })).toHaveCount(0);
 
-  await page.getByLabel("Message").fill("What is the policy?");
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByLabel("Câu hỏi", { exact: true }).fill("What is the policy?");
+  await page.getByRole("button", { name: "Gửi câu hỏi" }).click();
   await expect(page.getByText("Validated final answer")).toBeVisible();
 });
 test("chat renders completed SSE answer and citations", async ({ page }) => {
@@ -136,13 +136,13 @@ test("chat renders completed SSE answer and citations", async ({ page }) => {
   await mockChat(page);
   await page.goto("/chat");
 
-  await page.getByLabel("Message").fill("What is the policy?");
-  await page.getByRole("button", { name: "Send" }).click();
+  await page.getByLabel("Câu hỏi", { exact: true }).fill("What is the policy?");
+  await page.getByRole("button", { name: "Gửi câu hỏi" }).click();
 
   await expect(page.getByText("Validated final answer")).toBeVisible();
-  await expect(page.getByText("Policy Handbook")).toBeVisible();
+  await expect(page.getByRole("complementary", { name: "Trích dẫn" }).getByText("Policy Handbook")).toBeVisible();
   await expect(page.getByText("Approved source excerpt")).toBeVisible();
-  await expect(page.getByLabel("Mark answer helpful")).toBeVisible();
+  await expect(page.getByLabel("Câu trả lời hữu ích")).toBeVisible();
 });
 async function mockUsersApi(page: Page) {
   const now = "2026-07-30T00:00:00Z";
@@ -310,27 +310,38 @@ async function mockDepartmentsApi(page: Page) {
 test("admin user management supports conflict, edit, deactivate, and reactivate", async ({ page }) => {
   await authenticatedPage(page, "ADMIN");
   await mockUsersApi(page);
+  await page.route("**/api/v1/departments?**", (route) =>
+    route.fulfill({
+      json: {
+        data: [{ id: "dept-1", name: "Knowledge", code: "KNOWLEDGE", description: null, created_at: "2026-07-30T00:00:00Z" }],
+        meta: { page: 1, page_size: 100, total: 1, total_pages: 1 },
+      },
+    }),
+  );
   await page.goto("/users");
 
-  await page.getByLabel("Email").fill("staff.admin-ui@example.test");
-  await page.getByLabel("Full name").fill("Duplicate Staff");
-  await page.getByLabel("Temporary password").fill("MockPassword123!");
-  await page.locator("#new-role").selectOption("STAFF");
-  await page.getByLabel("Department ID").fill("dept-1");
-  await page.getByRole("button", { name: "Create user" }).click();
-  await expect(page.getByText("Create user failed")).toBeVisible();
+  await page.getByRole("button", { name: "Tạo người dùng" }).click();
+  const createDrawer = page.getByRole("dialog", { name: "Tạo người dùng" });
+  await createDrawer.getByLabel("Email").fill("staff.admin-ui@example.test");
+  await createDrawer.getByLabel("Họ tên").fill("Duplicate Staff");
+  await createDrawer.getByLabel("Mật khẩu tạm").fill("MockPassword123!");
+  await createDrawer.getByLabel("Vai trò").selectOption("STAFF");
+  await createDrawer.getByLabel("Phòng ban").selectOption("dept-1");
+  await createDrawer.getByRole("button", { name: "Tạo người dùng" }).click();
+  await expect(createDrawer.getByRole("alert")).toContainText("Email này đã được dùng.");
+  await createDrawer.getByRole("button", { name: "Đóng" }).click();
 
-  await page.getByRole("button", { name: "Edit" }).first().click();
-  await page.getByLabel("Edit full name").fill("Edited Admin UI Staff");
-  await page.getByRole("button", { name: "Update user" }).click();
+  await page.getByRole("button", { name: "Sửa" }).first().click();
+  const editDrawer = page.getByRole("dialog", { name: "Sửa người dùng" });
+  await editDrawer.getByLabel("Họ tên").fill("Edited Admin UI Staff");
+  await editDrawer.getByRole("button", { name: "Lưu thay đổi" }).click();
   await expect(page.getByText("Edited Admin UI Staff")).toBeVisible();
-  await page.getByRole("button", { name: "Cancel" }).click();
 
-  await page.getByRole("button", { name: "Deactivate" }).first().click();
-  await page.getByRole("button", { name: "Deactivate" }).last().click();
-  await expect(page.getByText("INACTIVE")).toBeVisible();
-  await page.getByRole("button", { name: "Reactivate" }).first().click();
-  await expect(page.getByText("ACTIVE")).toBeVisible();
+  await page.getByRole("button", { name: "Vô hiệu hóa" }).first().click();
+  await page.getByRole("dialog", { name: "Vô hiệu hóa người dùng?" }).getByRole("button", { name: "Vô hiệu hóa" }).click();
+  await expect(page.getByText("Đã vô hiệu hóa", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Kích hoạt lại" }).first().click();
+  await expect(page.getByText("Đang hoạt động", { exact: true })).toBeVisible();
 });
 
 test("admin department management supports conflict, edit, and delete", async ({ page }) => {
@@ -338,23 +349,23 @@ test("admin department management supports conflict, edit, and delete", async ({
   await mockDepartmentsApi(page);
   await page.goto("/departments");
 
-  await page.getByLabel("Name").fill("Duplicate Knowledge");
-  await page.getByLabel("Code").fill("KNOWLEDGE");
-  await page.getByLabel("Description").fill("Duplicate department.");
-  await page.getByRole("button", { name: "Create department" }).click();
-  await expect(page.getByText("Create department failed")).toBeVisible();
-  await page.getByRole("button", { name: "Logout" }).click();
-  await expect(page.getByRole("heading", { name: "Sign in" })).toBeVisible();
+  await page.getByLabel("Tên", { exact: true }).fill("Duplicate Knowledge");
+  await page.getByLabel("Mã", { exact: true }).fill("KNOWLEDGE");
+  await page.getByLabel("Mô tả (tùy chọn)").fill("Duplicate department.");
+  await page.getByRole("button", { name: "Tạo phòng ban" }).click();
+  await expect(page.getByText("Tạo phòng ban thất bại")).toBeVisible();
+  await page.getByRole("button", { name: "Đăng xuất" }).click();
+  await expect(page.getByRole("heading", { name: "Đăng nhập" })).toBeVisible();
 
   await authenticatedPage(page, "ADMIN");
   await page.goto("/departments");
-  await page.getByRole("button", { name: "Edit" }).first().click();
-  await page.getByLabel("Edit name").fill("Edited Knowledge Operations");
-  await page.getByLabel("Edit code").fill("KNOWLEDGE-EDIT");
-  await page.getByRole("button", { name: "Update department" }).click();
+  await page.getByRole("button", { name: "Sửa" }).first().click();
+  await page.getByLabel("Tên", { exact: true }).fill("Edited Knowledge Operations");
+  await page.getByLabel("Mã", { exact: true }).fill("KNOWLEDGE-EDIT");
+  await page.getByRole("button", { name: "Lưu thay đổi" }).click();
   await expect(page.getByText("KNOWLEDGE-EDIT")).toBeVisible();
 
-  await page.getByRole("button", { name: "Delete" }).first().click();
-  await page.getByRole("button", { name: "Delete" }).last().click();
-  await expect(page.getByText("Department deleted")).toBeVisible();
+  await page.getByRole("button", { name: "Xóa" }).first().click();
+  await page.getByRole("dialog", { name: "Xóa phòng ban?" }).getByRole("button", { name: "Xóa" }).click();
+  await expect(page.getByText("Đã xóa phòng ban")).toBeVisible();
 });

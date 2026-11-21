@@ -6,6 +6,7 @@ export type DocumentPermissionLevel = "VIEW" | "EDIT" | "MANAGE";
 export type FeedbackRating = "HELPFUL" | "NOT_HELPFUL";
 export type ChatMessageRole = "USER" | "ASSISTANT";
 export type GroundingStatus = "ANSWERED" | "NO_ANSWER";
+export type DocumentLifecycleStatus = "ACTIVE" | "SUPERSEDED" | "ARCHIVED" | "DRAFT";
 
 export interface PaginationMeta {
   page: number;
@@ -41,6 +42,8 @@ export interface AuthenticatedUser {
   full_name: string;
   role: UserRole;
   department_id: string | null;
+  /** BR-4: name of the caller's own Department, null without one. */
+  department_name: string | null;
   is_active: boolean;
 }
 
@@ -75,6 +78,13 @@ export interface DocumentItem {
   id: string;
   title: string;
   description: string | null;
+  /** BR-1 version fields. */
+  document_code: string | null;
+  document_version: string | null;
+  effective_from: string | null;
+  effective_to: string | null;
+  lifecycle_status: DocumentLifecycleStatus;
+  supersedes_document_id: string | null;
   original_filename: string;
   mime_type: string;
   file_size: number;
@@ -84,6 +94,11 @@ export interface DocumentItem {
   uploaded_by: string;
   created_at: string;
   updated_at: string;
+  /** BR-4: whether the caller uploaded it; for every viewer. */
+  uploaded_by_me: boolean;
+  /** BR-4 option (a): present only for an Admin caller; the keys are absent otherwise. */
+  uploaded_by_name?: string;
+  department_name?: string | null;
 }
 
 export interface DocumentStatusResponse {
@@ -116,6 +131,15 @@ export interface Citation {
   citation_order: number;
 }
 
+/** BR-3 follow-up: an ANSWERED message cut into sentences by the server's own recognition step. */
+export interface AnswerSegment {
+  kind: "verified" | "unverified";
+  /** The sentence without its citation numbers. */
+  text: string;
+  /** citation_order values of the citations this sentence shows. */
+  citation_ids: number[];
+}
+
 export interface ChatMessage {
   id: string;
   role: ChatMessageRole;
@@ -123,6 +147,10 @@ export interface ChatMessage {
   response_time_ms: number | null;
   citations: Citation[];
   created_at: string;
+  /** BR-3: ANSWERED / NO_ANSWER on ASSISTANT messages; null on USER and on answers stored before it existed. */
+  grounding_status: GroundingStatus | null;
+  /** null on USER, NO_ANSWER and answers stored before the segments migration. */
+  segments?: AnswerSegment[] | null;
 }
 
 export interface ChatSessionSummary {
@@ -164,6 +192,9 @@ export interface Feedback {
 export interface FeedbackReportItem extends Feedback {
   user_id: string;
   department_id: string | null;
+  /** BR-4 option (a): present only for an Admin caller. */
+  user_full_name?: string;
+  department_name?: string | null;
 }
 
 export interface AuditLogItem {
@@ -194,6 +225,57 @@ export interface HealthLiveResponse {
 export interface HealthReadyResponse {
   status: string;
   checks: Record<string, string>;
+  /** API_SPEC §11: what ranks retrieval candidates right now. */
+  reranker_mode?: "cross_encoder" | "lexical_fallback" | "disabled";
+}
+
+// BR-8: TASK-032 Admin Monitoring shapes (only the fields the UI reads).
+export type AdminCheckStatus = "ok" | "degraded" | "unavailable" | "disabled" | "misconfigured" | "not_configured";
+
+export interface AdminHealthCheck {
+  name: string;
+  status: AdminCheckStatus;
+  enabled: boolean;
+  message: string | null;
+}
+
+export interface AdminHealthResponse {
+  status: "healthy" | "degraded" | "unhealthy";
+  generated_at: string;
+  checks: AdminHealthCheck[];
+}
+
+export interface AdminProviderStatus {
+  provider_type: "llm" | "web_search";
+  provider: string;
+  status: "healthy" | "disabled" | "misconfigured" | "unhealthy";
+  enabled: boolean;
+  configured: boolean;
+  display_name: string | null;
+  model: string | null;
+  connectivity_checked: boolean;
+  message: string | null;
+}
+
+export interface AdminVersionResponse {
+  app_name: string;
+  version: string;
+  environment: string;
+  python_version: string;
+  api_prefix: string;
+  migration_head: string;
+  database_revision: string | null;
+  started_at: string | null;
+  uptime_seconds: number;
+}
+
+export interface AdminSystemResponse {
+  generated_at: string;
+  version: AdminVersionResponse;
+  uptime_seconds: number;
+  health: AdminHealthResponse;
+  providers: { llm: AdminProviderStatus; web_search: AdminProviderStatus };
+  statistics: { documents: { total: number; by_status: Partial<Record<DocumentStatus, number>> } };
 }
 
 export interface StreamStartedPayload {
@@ -223,6 +305,7 @@ export interface MessageCompletedPayload {
   usage?: Record<string, number> | null;
   grounding_status: GroundingStatus;
   retrieved_chunk_count: number;
+  segments?: AnswerSegment[] | null;
 }
 
 export interface StreamErrorPayload {

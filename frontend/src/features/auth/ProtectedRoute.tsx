@@ -15,11 +15,11 @@ export function ProtectedRoute({
   const location = useLocation();
 
   if (status === "loading") {
-    return <LoadingState label="Loading session" />;
+    return <LoadingState label="Đang tải phiên đăng nhập" />;
   }
 
   if (status !== "authenticated" || !user) {
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+    return <Navigate to="/login" replace state={{ from: `${location.pathname}${location.search}` }} />;
   }
 
   if (roles && !hasRole(user, roles)) {

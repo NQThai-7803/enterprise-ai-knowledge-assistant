@@ -7,6 +7,7 @@ import { DocumentsPage } from "../features/documents/DocumentsPage";
 import { DocumentUploadPage } from "../features/documents/DocumentUploadPage";
 import { DocumentDetailPage } from "../features/documents/DocumentDetailPage";
 import { DocumentPermissionsPage } from "../features/documents/DocumentPermissionsPage";
+import { DocumentViewerPage } from "../features/documents/DocumentViewerPage";
 import { UsersPage } from "../features/admin/UsersPage";
 import { DepartmentsPage } from "../features/admin/DepartmentsPage";
 import { FeedbackPage } from "../features/feedback/FeedbackPage";
@@ -21,6 +22,14 @@ export function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/access-denied" element={<AccessDeniedPage />} />
+      <Route
+        path="/documents/:documentId/view"
+        element={
+          <ProtectedRoute>
+            <DocumentViewerPage />
+          </ProtectedRoute>
+        }
+      />
       <Route
         element={
           <ProtectedRoute>

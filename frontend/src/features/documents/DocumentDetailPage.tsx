@@ -1,20 +1,21 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, KeyRound, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { clsx } from "clsx";
+import { CheckCircle2, ChevronLeft, Circle, Download, Lock, Trash2, XCircle } from "lucide-react";
+import { type ReactNode, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { apiClient } from "../../api/client";
 import { safeErrorMessage } from "../../api/errors";
+import type { AuthenticatedUser, DocumentItem, DocumentStatus } from "../../api/types";
 import { useToast } from "../../components/feedback/ToastProvider";
-import { PageHeader } from "../../components/layout/PageHeader";
-import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
-import { Panel } from "../../components/ui/Panel";
 import { DocumentStatusBadge } from "../../components/ui/StatusBadge";
 import { ErrorState, LoadingState } from "../../components/ui/State";
-import { formatBytes, formatDateTime, truncateMiddle } from "../../lib/format";
-import { canManageDocumentPermissions } from "../../lib/permissions";
+import { formatBytes, formatDateTime, formatIsoDate } from "../../lib/format";
+import { lifecycleLabels } from "../../lib/labels";
+import { canManageDocumentPermissions, visibleDepartmentName } from "../../lib/permissions";
 import { useAuth } from "../auth/AuthProvider";
+import { ScopeBadge } from "./ScopeBadge";
 
 export function DocumentDetailPage() {
   const { documentId } = useParams();
@@ -46,89 +47,147 @@ export function DocumentDetailPage() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = filename ?? "document.pdf";
+      link.download = filename ?? detailQuery.data?.data.original_filename ?? "tai-lieu";
       link.click();
       URL.revokeObjectURL(url);
     },
-    onError: (error) => pushToast({ tone: "error", title: "Download failed", message: safeErrorMessage(error) }),
+    onError: (error) => pushToast({ tone: "error", title: "Tải xuống thất bại", message: safeErrorMessage(error) }),
   });
 
   const deleteMutation = useMutation({
     mutationFn: () => apiClient.documents.delete(documentId as string),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["documents"] });
-      pushToast({ tone: "success", title: "Document deleted" });
+      pushToast({ tone: "success", title: "Đã xóa tài liệu" });
       navigate("/documents");
     },
-    onError: (error) => pushToast({ tone: "error", title: "Delete failed", message: safeErrorMessage(error) }),
+    onError: (error) => pushToast({ tone: "error", title: "Xóa thất bại", message: safeErrorMessage(error) }),
   });
 
   if (detailQuery.isLoading) {
-    return <LoadingState label="Loading document" />;
+    return <LoadingState label="Đang tải tài liệu" />;
   }
   if (detailQuery.isError) {
-    return <ErrorState message={safeErrorMessage(detailQuery.error)} onRetry={() => void detailQuery.refetch()} />;
+    return (
+      <ErrorState
+        title="Không tải được tài liệu"
+        error={detailQuery.error}
+        onRetry={() => void detailQuery.refetch()}
+      />
+    );
   }
 
   const documentItem = detailQuery.data?.data;
   if (!documentItem) {
-    return <ErrorState message="Document detail is unavailable." />;
+    return <ErrorState title="Không tải được tài liệu" message="Không có dữ liệu chi tiết của tài liệu." />;
   }
   const currentStatus = statusQuery.data?.data.status ?? documentItem.status;
 
   return (
     <div>
-      <PageHeader
-        title={documentItem.title}
-        description={documentItem.description ?? "No description."}
-        actions={
-          <>
-            {canManageDocumentPermissions(user) ? (
-              <Link className="inline-flex min-h-10 items-center justify-center gap-2 rounded-token border border-border bg-surface px-3 text-sm font-semibold text-ink hover:bg-elevated" to={`/documents/${documentItem.id}/permissions`}>
-                <KeyRound className="h-4 w-4" aria-hidden="true" />
-                Permissions
-              </Link>
+      <Link
+        to="/documents"
+        className="mb-5 inline-flex items-center gap-1 text-sm text-muted transition hover:text-ink"
+      >
+        <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+        Tài liệu
+      </Link>
+
+      <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+        <div className="min-w-0">
+          <div className="mb-1.5 flex flex-wrap items-center gap-2.5">
+            {documentItem.document_code ? (
+              <span className="font-mono text-xs text-muted">{documentItem.document_code}</span>
             ) : null}
-            <Button type="button" variant="secondary" loading={downloadMutation.isPending} onClick={() => downloadMutation.mutate()} icon={<Download className="h-4 w-4" aria-hidden="true" />}>
-              Download
-            </Button>
-            <Button type="button" variant="danger" onClick={() => setConfirmDelete(true)} icon={<Trash2 className="h-4 w-4" aria-hidden="true" />}>
-              Delete
-            </Button>
-          </>
-        }
-      />
-
-      <div className="grid gap-4 lg:grid-cols-[1fr_22rem]">
-        <Panel className="p-5">
-          <dl className="grid gap-4 sm:grid-cols-2">
-            <Detail label="Document ID" value={truncateMiddle(documentItem.id, 42)} />
-            <Detail label="Status" value={<DocumentStatusBadge status={currentStatus} />} />
-            <Detail label="Access scope" value={<Badge tone="neutral">{documentItem.access_scope}</Badge>} />
-            <Detail label="Department" value={documentItem.department_id ? truncateMiddle(documentItem.department_id) : "Unscoped"} />
-            <Detail label="Original filename" value={documentItem.original_filename} />
-            <Detail label="File size" value={formatBytes(documentItem.file_size)} />
-            <Detail label="Uploaded by" value={truncateMiddle(documentItem.uploaded_by)} />
-            <Detail label="Created" value={formatDateTime(documentItem.created_at)} />
-            <Detail label="Updated" value={formatDateTime(documentItem.updated_at)} />
-          </dl>
-        </Panel>
-
-        <Panel className="p-5">
-          <h3 className="text-sm font-semibold">Processing status</h3>
-          <div className="mt-3 space-y-3 text-sm text-muted">
             <DocumentStatusBadge status={currentStatus} />
-            <p>{statusQuery.data?.data.error_message ?? "No processing error reported."}</p>
-            <p>Last checked: {statusQuery.data?.data.updated_at ? formatDateTime(statusQuery.data.data.updated_at) : "Unavailable"}</p>
           </div>
-        </Panel>
+          <h1 className="text-2xl font-semibold tracking-normal text-ink">{documentItem.title}</h1>
+          {documentItem.description ? (
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-muted">{documentItem.description}</p>
+          ) : null}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            type="button"
+            variant="secondary"
+            loading={downloadMutation.isPending}
+            onClick={() => downloadMutation.mutate()}
+            icon={<Download className="h-4 w-4" aria-hidden="true" />}
+          >
+            Tải xuống
+          </Button>
+          {canManageDocumentPermissions(user) ? (
+            <Link
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-token border border-border bg-surface px-3 text-sm font-semibold text-ink transition hover:bg-elevated"
+              to={`/documents/${documentItem.id}/permissions`}
+            >
+              <Lock className="h-4 w-4" aria-hidden="true" />
+              Phân quyền
+            </Link>
+          ) : null}
+          {/* D-8: shown to every role as before; the backend answers 403 when the caller may not delete. */}
+          <Button
+            type="button"
+            variant="danger"
+            onClick={() => setConfirmDelete(true)}
+            icon={<Trash2 className="h-4 w-4" aria-hidden="true" />}
+          >
+            Xóa
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_22rem]">
+        <section className="rounded-xl border border-border/70 bg-surface p-6" aria-labelledby="document-info">
+          <h2 id="document-info" className="mb-4 text-[15px] font-semibold">
+            Thông tin
+          </h2>
+          <dl className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+            <Detail label="Tên tệp gốc" value={<span className="break-all">{documentItem.original_filename}</span>} />
+            <Detail label="Phạm vi truy cập" value={<ScopeBadge document={documentItem} user={user} />} />
+            <Detail label="Phòng ban" value={departmentText(documentItem, user)} />
+            <Detail label="Kích thước" value={formatBytes(documentItem.file_size)} />
+            <Detail label="Mã tài liệu" value={documentItem.document_code ?? "Không có"} />
+            <Detail label="Phiên bản" value={documentItem.document_version ?? "Không có"} />
+            <Detail label="Hiệu lực" value={effectiveText(documentItem)} />
+            <Detail label="Vòng đời" value={lifecycleLabels[documentItem.lifecycle_status]} />
+            {documentItem.supersedes_document_id ? (
+              <Detail
+                label="Thay thế tài liệu"
+                value={
+                  <Link
+                    className="text-accent transition hover:text-accent-strong"
+                    to={`/documents/${documentItem.supersedes_document_id}`}
+                  >
+                    Xem tài liệu cũ
+                  </Link>
+                }
+              />
+            ) : null}
+            {uploaderText(documentItem) ? <Detail label="Người tải lên" value={uploaderText(documentItem)} /> : null}
+            <Detail label="Ngày tạo" value={formatDateTime(documentItem.created_at)} />
+            <Detail label="Cập nhật" value={formatDateTime(documentItem.updated_at)} />
+            <Detail label="Mã tài liệu (ID)" value={<span className="break-all font-mono text-xs">{documentItem.id}</span>} />
+          </dl>
+        </section>
+
+        <section className="rounded-xl border border-border/70 bg-surface p-6" aria-labelledby="document-processing">
+          <h2 id="document-processing" className="mb-4 text-[15px] font-semibold">
+            Trạng thái xử lý
+          </h2>
+          <ProcessingTimeline status={currentStatus} errorMessage={statusQuery.data?.data.error_message ?? null} />
+          <p className="mt-4 text-xs text-muted">
+            Kiểm tra lần cuối:{" "}
+            {statusQuery.data?.data.updated_at ? formatDateTime(statusQuery.data.data.updated_at) : "Không có"}
+          </p>
+        </section>
       </div>
 
       <ConfirmDialog
         open={confirmDelete}
-        title="Delete document"
-        message="This sends the backend soft-delete request. The UI will not remove source files directly."
-        confirmLabel="Delete"
+        title="Xóa tài liệu này?"
+        message="Tài liệu sẽ không còn trong danh sách và không được dùng để trả lời. Bản ghi vẫn được giữ cho nhật ký hệ thống."
+        confirmLabel="Xóa"
         loading={deleteMutation.isPending}
         onCancel={() => setConfirmDelete(false)}
         onConfirm={() => deleteMutation.mutate()}
@@ -137,11 +196,91 @@ export function DocumentDetailPage() {
   );
 }
 
-function Detail({ label, value }: { label: string; value: React.ReactNode }) {
+function departmentText(documentItem: DocumentItem, user: AuthenticatedUser | null): string {
+  if (!documentItem.department_id) {
+    return "Không gắn phòng ban";
+  }
+  return visibleDepartmentName(documentItem.department_id, documentItem.department_name, user) ?? "Phòng ban của tài liệu";
+}
+
+/** Uploader name only when the response carries it (Admin); others learn only whether it was them. */
+function uploaderText(documentItem: DocumentItem): string | null {
+  if (documentItem.uploaded_by_name !== undefined) {
+    return documentItem.uploaded_by_me ? `${documentItem.uploaded_by_name} (bạn)` : documentItem.uploaded_by_name;
+  }
+  return documentItem.uploaded_by_me ? "Bạn đã tải lên" : null;
+}
+
+function effectiveText(documentItem: DocumentItem): string {
+  if (!documentItem.effective_from && !documentItem.effective_to) {
+    return "Không ghi";
+  }
+  const from = documentItem.effective_from ? formatIsoDate(documentItem.effective_from) : "…";
+  const to = documentItem.effective_to ? formatIsoDate(documentItem.effective_to) : "nay";
+  return `${from} – ${to}`;
+}
+
+type StepState = "done" | "active" | "pending" | "failed";
+
+/** Three steps derived from status only; finer stages wait for BR-7. */
+function ProcessingTimeline({ status, errorMessage }: { status: DocumentStatus; errorMessage: string | null }) {
+  const steps: { label: string; note: string; state: StepState }[] = [
+    { label: "Đã tải lên", note: "Đã nhận tệp", state: "done" },
+    {
+      label: "Xử lý",
+      note: "Trích xuất văn bản, chia đoạn, tạo embedding",
+      state: status === "UPLOADED" ? "pending" : status === "PROCESSING" ? "active" : "done",
+    },
+    status === "FAILED"
+      ? { label: "Lỗi", note: errorMessage ?? "Xử lý không thành công.", state: "failed" }
+      : {
+          label: status === "ARCHIVED" ? "Lưu trữ" : "Sẵn sàng",
+          note: status === "ARCHIVED" ? "Không còn dùng để hỏi đáp" : "Có thể dùng để hỏi đáp",
+          state: status === "READY" || status === "ARCHIVED" ? "done" : "pending",
+        },
+  ];
+
   return (
-    <div>
-      <dt className="text-xs font-semibold uppercase text-muted">{label}</dt>
-      <dd className="mt-1 break-words text-sm text-ink">{value}</dd>
+    <ol className="flex flex-col gap-4">
+      {steps.map((step) => (
+        <li key={step.label} className="flex gap-3">
+          <StepIcon state={step.state} />
+          <div className="min-w-0">
+            <p className={clsx("text-sm font-medium", step.state === "pending" ? "text-muted" : "text-ink")}>
+              {step.label}
+            </p>
+            <p className={clsx("text-xs", step.state === "failed" ? "text-danger" : "text-muted")}>{step.note}</p>
+          </div>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function StepIcon({ state }: { state: StepState }) {
+  if (state === "done") {
+    return <CheckCircle2 className="mt-0.5 h-[18px] w-[18px] shrink-0 text-accent" aria-label="Xong" />;
+  }
+  if (state === "failed") {
+    return <XCircle className="mt-0.5 h-[18px] w-[18px] shrink-0 text-danger" aria-label="Lỗi" />;
+  }
+  if (state === "active") {
+    return (
+      <span
+        className="mt-0.5 h-[18px] w-[18px] shrink-0 animate-spin rounded-full border-2 border-border border-t-accent"
+        role="img"
+        aria-label="Đang chạy"
+      />
+    );
+  }
+  return <Circle className="mt-0.5 h-[18px] w-[18px] shrink-0 text-border" aria-label="Chưa tới" />;
+}
+
+function Detail({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-xs text-muted">{label}</dt>
+      <dd className="mt-1 text-sm text-ink">{value}</dd>
     </div>
   );
 }

@@ -23,12 +23,20 @@ describe("API error parsing", () => {
     const error = await parseApiError(response);
 
     expect(error.code).toBe("INTERNAL_ERROR");
-    expect(error.message).toBe("The service is temporarily unavailable.");
+    expect(error.message).toBe("Dịch vụ tạm thời không phản hồi.");
     expect(error.requestId).toBe("req-2");
   });
 
+  it("shows documented codes in Vietnamese and keeps the server text for unknown codes", async () => {
+    const known = await parseApiError(new Response(JSON.stringify({ error: { code: "FORBIDDEN", message: "Forbidden" } }), { status: 403 }));
+    const unknown = await parseApiError(new Response(JSON.stringify({ error: { code: "SOMETHING_NEW", message: "Server text" } }), { status: 400 }));
+
+    expect(safeErrorMessage(known)).toBe("Bạn không có quyền thực hiện thao tác này.");
+    expect(safeErrorMessage(unknown)).toBe("Server text");
+  });
+
   it("does not expose unknown errors directly", () => {
-    expect(safeErrorMessage(new Error("raw stack detail"))).toBe("Unexpected error.");
+    expect(safeErrorMessage(new Error("raw stack detail"))).toBe("Đã xảy ra lỗi không mong muốn.");
     expect(parseRetryAfter("0")).toBeNull();
     expect(parseRetryAfter("20")).toBe(20);
   });

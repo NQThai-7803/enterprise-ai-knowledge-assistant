@@ -2,7 +2,7 @@
 
 ## Direction
 
-The TASK-028 interface is a premium enterprise AI workspace: restrained, high-clarity, operational, dark-shell-ready, and table-friendly for administrative screens. It is not a landing page, gaming dashboard, crypto dashboard, or analytics product.
+Since the 2026-11 redesign (`docs/ui/redesign-plan.md`, design canvas "EAKA – UI Animation"), the interface is light: a 240 px white sidebar grouped Làm việc / Quản trị / Tài khoản, no top bar, Geist type, accent `#0F766E`, canvas `#F4F7F9`. All visible labels are Vietnamese (`frontend/src/lib/labels.ts`); enum values stay internal. It is not a landing page or an analytics product.
 
 ## Tokens
 
@@ -16,7 +16,8 @@ Tokens are centralized in `frontend/src/styles/index.css` and extended through `
 - Focus: visible accent focus shadow and border shift.
 - Status: success/warning/danger use both color and text/icon labels.
 - Responsive: desktop-first shell, mobile drawer, horizontal table scroll where data comparison matters.
-- Reduced motion: CSS disables animations/transitions for `prefers-reduced-motion: reduce`.
+- Motion: CSS only, `transform` and `opacity` only, `--motion-fast` 150 ms (hover, focus, citation chip), `--motion-base` 220 ms (badge, menu, toast), `--motion-slow` 320 ms (answer, citation panel, drawer), one curve `--ease: cubic-bezier(0.2, 0, 0, 1)`. D-2 lets hover/focus change colour; the bare Tailwind `transition` class is limited to colour, opacity and transform. No typing effect: an answer appears whole after citation checks.
+- Reduced motion: `prefers-reduced-motion: reduce` sets `animation: none` and `transition: none` everywhere.
 
 ## Surface Rules
 
