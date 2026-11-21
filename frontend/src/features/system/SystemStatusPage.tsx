@@ -2,13 +2,16 @@ import { useQuery } from "@tanstack/react-query";
 import { RefreshCw } from "lucide-react";
 import type { ReactNode } from "react";
 import { apiClient } from "../../api/client";
-import type { AdminCheckStatus, AdminProviderStatus, AdminSystemResponse } from "../../api/types";
+import type { AdminCheckStatus, AdminProviderStatus, AdminSystemResponse, DocumentStatus } from "../../api/types";
 import { PageHeader } from "../../components/layout/PageHeader";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ErrorState, LoadingState } from "../../components/ui/State";
 import { formatDateTime } from "../../lib/format";
+import { documentStatusLabels } from "../../lib/labels";
 import { useAuth } from "../auth/AuthProvider";
+
+// Handoff (8): this screen shows Vietnamese labels; the raw enum or code is only in the tooltip (title).
 
 type Tone = "success" | "warning" | "danger" | "neutral";
 
@@ -20,7 +23,7 @@ const providerStatus: Record<AdminProviderStatus["status"], { label: string; ton
 };
 
 const checkStatus: Record<AdminCheckStatus, { label: string; tone: Tone }> = {
-  ok: { label: "ok", tone: "success" },
+  ok: { label: "Bình thường", tone: "success" },
   degraded: { label: "Suy giảm", tone: "warning" },
   unavailable: { label: "Không phản hồi", tone: "danger" },
   disabled: { label: "Tắt", tone: "neutral" },
@@ -28,11 +31,31 @@ const checkStatus: Record<AdminCheckStatus, { label: string; tone: Tone }> = {
   not_configured: { label: "Chưa cấu hình", tone: "neutral" },
 };
 
+const checkNames: Record<string, string> = {
+  api: "API",
+  postgres: "PostgreSQL",
+  redis: "Redis",
+  worker: "Xử lý nền (worker)",
+  ocr: "Nhận dạng chữ (OCR)",
+  embedding: "Tạo embedding",
+  llm: "Mô hình ngôn ngữ",
+  web_search: "Tìm kiếm web",
+  streaming: "Truyền câu trả lời",
+  conversation: "Bộ nhớ hội thoại",
+};
+
 const rerankerLabels = {
-  cross_encoder: "cross_encoder",
-  lexical_fallback: "lexical_fallback",
+  cross_encoder: "Mô hình xếp hạng lại",
+  lexical_fallback: "Theo từ khóa (dự phòng)",
   disabled: "Tắt",
 } as const;
+
+const environmentLabels: Record<string, string> = {
+  production: "Vận hành",
+  staging: "Thử nghiệm",
+  development: "Phát triển",
+  test: "Kiểm thử",
+};
 
 export function SystemStatusPage() {
   const { user } = useAuth();
@@ -59,6 +82,7 @@ export function SystemStatusPage() {
       void systemQuery.refetch();
     }
   };
+  const live = liveQuery.data;
   const ready = readyQuery.data;
   const system = systemQuery.data?.data;
 
@@ -85,12 +109,12 @@ export function SystemStatusPage() {
         <InfraCard
           label="API live"
           source="GET /health/live"
-          state={liveQuery.data ? (liveQuery.data.status === "ok" ? ["Hoạt động", "success"] : [liveQuery.data.status, "warning"]) : liveQuery.isError ? ["Không phản hồi", "danger"] : null}
+          state={live ? [live.status === "ok" ? "Hoạt động" : "Bất thường", live.status === "ok" ? "success" : "warning", live.status] : failed(liveQuery.isError)}
         />
         <InfraCard
           label="API ready"
           source="GET /health/ready"
-          state={ready ? (ready.status === "ready" ? ["Sẵn sàng", "success"] : [ready.status, "warning"]) : readyQuery.isError ? ["Không phản hồi", "danger"] : null}
+          state={ready ? [ready.status === "ready" ? "Sẵn sàng" : "Chưa sẵn sàng", ready.status === "ready" ? "success" : "warning", ready.status] : failed(readyQuery.isError)}
         />
         <InfraCard label="PostgreSQL" source="checks.database" state={checkState(ready?.checks.database, readyQuery.isError)} />
         <InfraCard label="Redis" source="checks.redis" state={checkState(ready?.checks.redis, readyQuery.isError)} />
@@ -104,7 +128,9 @@ export function SystemStatusPage() {
       <h2 className="mb-3 mt-7 text-sm font-medium text-muted">Mô hình ngôn ngữ và truy xuất</h2>
       <dl className="divide-y divide-border/70 rounded-xl border border-border/70 bg-surface">
         {isAdmin && system ? <ProviderRows system={system} /> : null}
-        {ready?.reranker_mode ? <Row label="Chế độ xếp hạng" value={rerankerLabels[ready.reranker_mode]} mono /> : null}
+        {ready?.reranker_mode ? (
+          <Row label="Chế độ xếp hạng" value={<span title={ready.reranker_mode}>{rerankerLabels[ready.reranker_mode]}</span>} />
+        ) : null}
         <Row label="Chiến lược trả lời" value="Chỉ dùng nguồn đã truy xuất, kiểm tra trích dẫn" />
         <Row label="Truyền câu trả lời (SSE)" value="Gửi sau khi kiểm tra xong" />
       </dl>
@@ -127,22 +153,37 @@ export function SystemStatusPage() {
           <h2 className="mb-3 mt-7 text-sm font-medium text-muted">Kiểm tra chi tiết</h2>
           <ul className="divide-y divide-border/70 rounded-xl border border-border/70 bg-surface">
             {system.health.checks.map((check) => (
-              <li key={check.name} className="flex flex-wrap items-center justify-between gap-3 px-5 py-3">
-                <div className="min-w-0">
-                  <p className="font-mono text-sm text-ink">{check.name}</p>
-                  {check.message ? <p className="text-xs text-muted">{check.message}</p> : null}
-                </div>
-                <Badge tone={checkStatus[check.status]?.tone ?? "neutral"}>
+              // The server's English message stays in the tooltip with the check's code.
+              <li
+                key={check.name}
+                className="flex flex-wrap items-center justify-between gap-3 px-5 py-3"
+                title={[check.name, check.message].filter(Boolean).join(": ")}
+              >
+                <span className="text-sm text-ink">{checkNames[check.name] ?? check.name}</span>
+                <Badge tone={checkStatus[check.status]?.tone ?? "neutral"} title={check.status}>
                   {checkStatus[check.status]?.label ?? check.status}
                 </Badge>
               </li>
             ))}
           </ul>
 
+          <h2 className="mb-3 mt-7 text-sm font-medium text-muted">Tài liệu theo trạng thái</h2>
+          <div className="flex flex-wrap gap-2 rounded-xl border border-border/70 bg-surface px-5 py-4">
+            <span className="mr-2 text-sm text-ink/80">{system.statistics.documents.total} tài liệu</span>
+            {(Object.entries(system.statistics.documents.by_status) as [DocumentStatus, number][]).map(([status, count]) => (
+              <Badge key={status} tone="neutral" title={status}>
+                {documentStatusLabels[status] ?? status} · {count}
+              </Badge>
+            ))}
+          </div>
+
           <h2 className="mb-3 mt-7 text-sm font-medium text-muted">Phiên bản</h2>
           <dl className="divide-y divide-border/70 rounded-xl border border-border/70 bg-surface">
             <Row label="Ứng dụng" value={`${system.version.app_name} ${system.version.version}`} />
-            <Row label="Môi trường" value={system.version.environment} mono />
+            <Row
+              label="Môi trường"
+              value={<span title={system.version.environment}>{environmentLabels[system.version.environment] ?? system.version.environment}</span>}
+            />
             <Row
               label="Migration"
               value={`${system.version.database_revision ?? "chưa rõ"} / ${system.version.migration_head}`}
@@ -174,27 +215,35 @@ function ProviderRows({ system }: { system: AdminSystemResponse }) {
 function ProviderValue({ provider }: { provider: AdminProviderStatus }) {
   const status = providerStatus[provider.status];
   return (
-    <span className="inline-flex items-center gap-2">
+    <span className="inline-flex items-center gap-2" title={provider.provider}>
       {provider.display_name ?? provider.provider}
-      <Badge tone={status?.tone ?? "neutral"}>{status?.label ?? provider.status}</Badge>
+      <Badge tone={status?.tone ?? "neutral"} title={provider.status}>
+        {status?.label ?? provider.status}
+      </Badge>
     </span>
   );
 }
 
-function checkState(value: string | undefined, failed: boolean): [string, Tone] | null {
-  if (value) {
-    return [value, value === "ok" ? "success" : "danger"];
-  }
-  return failed ? ["Không phản hồi", "danger"] : null;
+type InfraState = [label: string, tone: Tone, code: string];
+
+function failed(isError: boolean): InfraState | null {
+  return isError ? ["Không phản hồi", "danger", "unavailable"] : null;
 }
 
-function InfraCard({ label, source, state }: { label: string; source: string; state: [string, Tone] | null }) {
+function checkState(value: string | undefined, isError: boolean): InfraState | null {
+  if (value) {
+    return value === "ok" ? ["Bình thường", "success", value] : ["Lỗi", "danger", value];
+  }
+  return failed(isError);
+}
+
+function InfraCard({ label, source, state }: { label: string; source: string; state: InfraState | null }) {
   return (
     <section className="rounded-xl border border-border/70 bg-surface p-4" aria-label={label}>
       <p className="text-sm font-medium text-ink">{label}</p>
       <div className="my-2.5">
         {state ? (
-          <Badge tone={state[1]}>
+          <Badge tone={state[1]} title={state[2]}>
             <span className="h-1.5 w-1.5 rounded-full bg-current" aria-hidden="true" />
             {state[0]}
           </Badge>

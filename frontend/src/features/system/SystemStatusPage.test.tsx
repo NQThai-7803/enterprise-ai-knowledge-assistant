@@ -56,6 +56,7 @@ const adminSystem: AdminSystemResponse = {
       message: "Web search is disabled.",
     },
   },
+  statistics: { documents: { total: 12, by_status: { READY: 12 } } },
 };
 
 function renderPage() {
@@ -86,10 +87,14 @@ describe("SystemStatusPage", () => {
     expect(await screen.findByText("qwen3.5-text:4b")).toBeInTheDocument();
     expect(screen.getByText("Ollama")).toBeInTheDocument();
     expect(screen.getByText("Mock Web Search")).toBeInTheDocument();
-    expect(screen.getByText("API process is running.")).toBeInTheDocument();
+    expect(screen.getByTitle("api: API process is running.")).toHaveTextContent("API");
     expect(screen.getByText("Enterprise AI Knowledge Assistant 0.1.0")).toBeInTheDocument();
     expect(screen.getByText("20261120_0013 / 20261120_0013")).toBeInTheDocument();
-    expect(screen.getByText("lexical_fallback")).toBeInTheDocument();
+    // Handoff (8): Vietnamese labels, the raw codes only as tooltips.
+    expect(screen.getByText("Theo từ khóa (dự phòng)")).toHaveAttribute("title", "lexical_fallback");
+    expect(screen.getByText("Sẵn sàng · 12")).toHaveAttribute("title", "READY");
+    expect(screen.getByText("Vận hành")).toHaveAttribute("title", "production");
+    expect(screen.queryByText("lexical_fallback")).not.toBeInTheDocument();
   });
 
   it("does not call the Admin endpoint for other roles", async () => {

@@ -275,6 +275,7 @@ export interface AdminSystemResponse {
   uptime_seconds: number;
   health: AdminHealthResponse;
   providers: { llm: AdminProviderStatus; web_search: AdminProviderStatus };
+  statistics: { documents: { total: number; by_status: Partial<Record<DocumentStatus, number>> } };
 }
 
 export interface StreamStartedPayload {
