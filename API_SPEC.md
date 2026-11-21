@@ -47,6 +47,44 @@ List response:
 }
 ```
 
+**`422` validation errors (BR-10).** Every `422` response caused by request validation, and every `422 VALIDATION_ERROR` a service raises, has `details` as a list, one item per invalid field:
+
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Request is invalid.",
+    "details": [
+      { "field": "title", "code": "TOO_LONG", "message": "String should have at most 255 characters" },
+      { "field": "effective_from", "code": "INVALID_DATE", "message": "Input should be a valid date or datetime, month value is outside expected range of 1-12" }
+    ],
+    "request_id": null
+  }
+}
+```
+
+- `field`: the name as sent in the request (form field, JSON key or query parameter), nested JSON names joined with `.` (for example `items.0.name`); `null` when the error concerns the request as a whole (for example a JSON body that fails a rule across fields, or invalid JSON).
+- `code`, stable, for the client to map to its own wording:
+
+  | `code` | Meaning |
+  |---|---|
+  | `REQUIRED` | missing, or empty where a value is required |
+  | `TOO_LONG` / `TOO_SHORT` | above the maximum / below the minimum length |
+  | `OUT_OF_RANGE` | a number outside its bounds |
+  | `INVALID_CHOICE` | not one of the allowed values (enum, sort field, ...) |
+  | `INVALID_DATE` | not a valid date or datetime (or not timezone-aware where required) |
+  | `INVALID_FORMAT` | wrong format: UUID, URL, pattern |
+  | `INVALID_TYPE` | wrong type (a number, a boolean, ...) |
+  | `INVALID_VALUE` | a value a rule rejects (for example an invalid email address) |
+  | `INVALID_RANGE` | the field breaks a rule with another field (`effective_to` before `effective_from`) |
+  | `NOT_ALLOWED` | the field must not be sent in this case (`department_id` with `PRIVATE` or `ORGANIZATION`) |
+  | `UNKNOWN_FIELD` | a field the endpoint does not accept |
+  | `INVALID_JSON` | the body is not valid JSON |
+  | `INVALID` | any other validation failure |
+
+- `message`: an English sentence for logs and fallback display; it may change between versions, `code` does not. It never repeats the submitted value.
+- The error `code` stays `VALIDATION_ERROR`, or the endpoint's specific code where one is documented (`AUDIT_FILTER_INVALID`, `AUDIT_DATE_RANGE_INVALID`, `FEEDBACK_*`); `details` has the same shape for all of them. Other error codes keep `"details": null`.
+
 ## 4. Authentication
 
 Access tokens are short-lived JWTs signed with `HS256`. Refresh tokens are opaque random tokens. Raw refresh tokens are returned only on login or refresh; PostgreSQL stores only their SHA-256 hash. Refresh rotates the refresh token and revokes the old token. Refresh does not require an access token. Logout and `/auth/me` require a Bearer access token.

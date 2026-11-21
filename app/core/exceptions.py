@@ -102,11 +102,20 @@ class ResourceNotFoundError(ApplicationError):
 
 
 class BusinessValidationError(ApplicationError):
-    def __init__(self, message: str = "Request is invalid.") -> None:
+    """A 422 VALIDATION_ERROR found by a service; `details` names the request field (BR-10)."""
+
+    def __init__(
+        self,
+        message: str = "Request is invalid.",
+        *,
+        field: str | None = None,
+        code: str = "INVALID_VALUE",
+    ) -> None:
         super().__init__(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             code="VALIDATION_ERROR",
             message=message,
+            details=[{"field": field, "code": code, "message": message}],
         )
 
 
@@ -649,11 +658,63 @@ async def request_validation_error_handler(
             "error": {
                 "code": code,
                 "message": message,
-                "details": None,
+                "details": validation_details(exc),
                 "request_id": None,
             }
         },
     )
+
+
+# BR-10: the stable `code` of each 422 detail, from the pydantic error type.
+_VALIDATION_CODES = {
+    "missing": "REQUIRED",
+    "string_too_short": "TOO_SHORT",
+    "too_short": "TOO_SHORT",
+    "string_too_long": "TOO_LONG",
+    "too_long": "TOO_LONG",
+    "greater_than": "OUT_OF_RANGE",
+    "greater_than_equal": "OUT_OF_RANGE",
+    "less_than": "OUT_OF_RANGE",
+    "less_than_equal": "OUT_OF_RANGE",
+    "enum": "INVALID_CHOICE",
+    "literal_error": "INVALID_CHOICE",
+    "extra_forbidden": "UNKNOWN_FIELD",
+    "json_invalid": "INVALID_JSON",
+    "value_error": "INVALID_VALUE",
+    "assertion_error": "INVALID_VALUE",
+    "string_pattern_mismatch": "INVALID_FORMAT",
+}
+_REQUEST_LOCATIONS = frozenset({"body", "query", "path", "header", "cookie"})
+
+
+def _validation_code(error_type: str) -> str:
+    if error_type in _VALIDATION_CODES:
+        return _VALIDATION_CODES[error_type]
+    if error_type.startswith(("date", "time", "timezone")):
+        return "INVALID_DATE"
+    if error_type.startswith(("uuid", "url", "email")):
+        return "INVALID_FORMAT"
+    if error_type.endswith(("_parsing", "_type")):
+        return "INVALID_TYPE"
+    return "INVALID"
+
+
+def validation_details(exc: RequestValidationError) -> list[dict[str, str | None]]:
+    """One {field, code, message} per error: `field` is the name as sent (form, JSON or
+    query; nested names joined with "."), null for the request as a whole. Never the input."""
+    details: list[dict[str, str | None]] = []
+    for error in exc.errors():
+        loc = [str(part) for part in error.get("loc", ())]
+        if loc and loc[0] in _REQUEST_LOCATIONS:
+            loc = loc[1:]
+        details.append(
+            {
+                "field": ".".join(loc) or None,
+                "code": _validation_code(str(error.get("type", ""))),
+                "message": str(error.get("msg", "")).removeprefix("Value error, "),
+            }
+        )
+    return details
 
 
 def _security_headers(headers: dict[str, str] | None = None) -> dict[str, str]:
