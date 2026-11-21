@@ -609,6 +609,18 @@ Behavior:
   ```
 
   The recognition is a heuristic on three phrases; it is the same one the server uses to decide which sentences it validates.
+- **`break_after` (BR-12).** Every segment also has `break_after`: `"none"`, `"line"` or `"paragraph"`, read from the whitespace in `content` between this segment and the next (no line break, one, two or more); the last segment's is `"none"`. Joining the `text` values with one space for `none`, `\n` for `line` and `\n\n` for `paragraph` gives back the line structure of `content` without its citation numbers. Citation numbers standing alone on a line join the segment before. Segments stored before BR-12 have no `break_after`; the API returns `"none"` for them. Example (a list):
+
+  ```json
+  "segments": [
+    { "kind": "verified", "text": "Quy trình gồm:", "citation_ids": [], "break_after": "line" },
+    { "kind": "verified", "text": "- Bước 1: nộp đơn.", "citation_ids": [1], "break_after": "line" },
+    { "kind": "verified", "text": "- Bước 2: trưởng phòng duyệt.", "citation_ids": [2], "break_after": "paragraph" },
+    { "kind": "unverified", "text": "Chưa xác minh được từ tài liệu bạn được phép truy cập: thời hạn.", "citation_ids": [], "break_after": "none" }
+  ]
+  ```
+
+  A sentence break inside a line (for example after `1.` in a numbered list) also starts a segment, with `"none"`, so a client that renders `none` segments on the same line, separated by one space, shows the text as written.
 - Historical citation metadata may be omitted if the current User no longer has access to the cited Document.
 - The historical Assistant answer text is not redacted in TASK-020.
 - `retrieval_query`, token usage, prompt, vectors, scores, storage keys, permission metadata, and internal source markers are not returned.

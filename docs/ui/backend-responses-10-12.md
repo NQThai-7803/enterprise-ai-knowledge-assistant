@@ -100,3 +100,37 @@ các khối dưới đây vào file BR sau. Trường mới chỉ có trên `mai
     serializer;
   - `test_audit_report_response_is_sanitized`: đã cập nhật, Admin thấy tên người thực hiện, không
     bao giờ thấy email.
+
+### TRẢ LỜI CHO PHIÊN UI — BR-12 (`break_after` của mỗi segment, owner thêm)
+
+- **Trạng thái:** xong. Chỉ thêm trường.
+- **Field:** mỗi phần tử của `segments` (BR-3) có thêm `break_after`: `"none"` | `"line"` |
+  `"paragraph"`.
+  - Giá trị lấy từ khoảng trắng gốc trong `content` giữa đoạn này và đoạn sau: không xuống dòng
+    là `none`, một lần xuống dòng là `line`, từ hai lần trở lên là `paragraph`.
+  - Đoạn cuối luôn là `"none"`.
+  - Có ở cả lịch sử chat, response của `POST …/messages` và sự kiện SSE `message.completed`.
+  - Spec: `API_SPEC.md` §8.
+- **Cách dùng:** ghép các `text` theo `break_after`: `none` là một dấu cách (cùng dòng), `line` là
+  `\n`, `paragraph` là `\n\n`. Kết quả tái tạo đúng cấu trúc dòng của `content`, chỉ bỏ số
+  trích dẫn.
+- **Ví dụ** (danh sách gạch đầu dòng):
+  ```json
+  "segments": [
+    { "kind": "verified", "text": "Quy trình gồm:", "citation_ids": [], "break_after": "line" },
+    { "kind": "verified", "text": "- Bước 1: nộp đơn.", "citation_ids": [1], "break_after": "line" },
+    { "kind": "verified", "text": "- Bước 2: trưởng phòng duyệt.", "citation_ids": [2], "break_after": "paragraph" },
+    { "kind": "unverified", "text": "Chưa xác minh được từ tài liệu bạn được phép truy cập: thời hạn.", "citation_ids": [], "break_after": "none" }
+  ]
+  ```
+- **Lưu ý:**
+  - Dấu chấm giữa dòng (ví dụ sau `1.` trong danh sách đánh số) cũng tách thành đoạn, với
+    `break_after: "none"`. Hiển thị các đoạn `none` trên cùng một dòng, cách nhau một dấu cách,
+    thì chữ vẫn giữ nguyên như gốc.
+  - Số trích dẫn đứng riêng một dòng được gộp vào đoạn ngay trước.
+  - Segment lưu trước BR-12 không có khóa này; API trả `"none"` cho chúng.
+- **Test:** `tests/unit/test_answer_segments.py`:
+  - `test_break_after_rebuilds_the_line_structure_of_the_content`, với ba dạng: danh sách gạch
+    đầu dòng, nhiều đoạn, một câu;
+  - `test_citation_numbers_alone_on_a_line_join_the_line_before`;
+  - các test BR-3 đã cập nhật.

@@ -1,5 +1,11 @@
 # Project Status
 
+## UI backend requests BR-10, BR-11, BR-12 -- 2026-11-21
+
+- `422` responses carry `details` `[{field, code, message}]` (stable codes, field named as sent);
+  the AuditLog report adds `actor_full_name` and `target_label` for Admin callers only; answer
+  segments add `break_after`. API additions only; answering and retrieval unchanged.
+
 ## UI backend requests: owner follow-up done -- 2026-11-20
 
 - Search by `document_code` inside the access filter; answer `segments` (verified / unverified,
