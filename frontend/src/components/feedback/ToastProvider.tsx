@@ -90,7 +90,7 @@ export function ToastProvider({
       {children}
 
       <div
-        className="pointer-events-none fixed right-4 top-20 z-50 flex w-[min(26rem,calc(100vw-2rem))] flex-col gap-3"
+        className="pointer-events-none fixed left-1/2 top-4 z-50 flex w-[min(26rem,calc(100vw-2rem))] -translate-x-1/2 flex-col gap-3"
         aria-live="polite"
         aria-relevant="additions"
       >
@@ -102,7 +102,7 @@ export function ToastProvider({
             <article
               key={toast.id}
               className={clsx(
-                "pointer-events-auto relative overflow-hidden rounded-token border p-4 text-sm shadow-panel",
+                "pop pointer-events-auto relative overflow-hidden rounded-token border p-4 text-sm shadow-panel",
                 config.container,
               )}
             >
