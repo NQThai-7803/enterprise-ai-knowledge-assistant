@@ -141,11 +141,13 @@ export function AuditLogsPage() {
                     </td>
                     <td className="px-5 py-3 font-mono text-xs text-ink">{row.event_type}</td>
                     <td className="px-5 py-3 text-ink/80">
-                      {/* TODO(BR-11): actor name and target label once the Admin response carries them. */}
-                      {row.actor_user_id ? truncateMiddle(row.actor_user_id, 14) : "Hệ thống"}
+                      {row.actor_full_name ?? (row.actor_user_id ? truncateMiddle(row.actor_user_id, 14) : "Hệ thống")}
                     </td>
                     <td className="px-5 py-3 text-ink/80">
                       {row.target_type ? (auditTargetLabels[row.target_type] ?? row.target_type) : "—"}
+                      {row.target_label ? (
+                        <span className="block font-mono text-xs text-muted">{row.target_label}</span>
+                      ) : null}
                     </td>
                     <td className="px-5 py-3">
                       <Badge tone={row.outcome === "SUCCESS" ? "success" : "danger"}>

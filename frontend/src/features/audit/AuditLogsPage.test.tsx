@@ -59,6 +59,35 @@ describe("AuditLogsPage", () => {
     expect(await screen.findByText("Không có bản ghi phù hợp")).toBeInTheDocument();
   });
 
+  it("shows BR-11 actor_full_name and target_label when the keys are present (contract example)", async () => {
+    vi.mocked(apiClient.audit.list).mockResolvedValue({
+      ...emptyPage,
+      total: 1,
+      total_pages: 1,
+      items: [
+        {
+          id: "uuid",
+          event_type: "DOCUMENT_UPLOADED",
+          outcome: "SUCCESS",
+          actor_user_id: "uuid",
+          actor_full_name: "Admin UAT",
+          target_type: "DOCUMENT",
+          target_id: "uuid",
+          target_label: "ND-HR-007",
+          request_id: null,
+          error_code: null,
+          metadata: { access_scope: "DEPARTMENT" },
+          created_at: "2026-11-21T08:00:00Z",
+        },
+      ],
+    });
+    renderPage();
+
+    expect(await screen.findByText("Admin UAT")).toBeInTheDocument();
+    expect(screen.getByText("ND-HR-007")).toBeInTheDocument();
+    expect(screen.getByText("Tài liệu")).toBeInTheDocument();
+  });
+
   it("shows a row's safe details on demand, never an IP address", async () => {
     const user = userEvent.setup();
     vi.mocked(apiClient.audit.list).mockResolvedValue({

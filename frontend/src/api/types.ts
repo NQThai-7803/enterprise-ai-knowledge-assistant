@@ -215,6 +215,10 @@ export interface AuditLogItem {
   error_code: string | null;
   metadata: Record<string, string | number | boolean | null>;
   created_at: string;
+  /** BR-11: Admin callers only; the keys are absent otherwise. null for system events or a gone user. */
+  actor_full_name?: string | null;
+  /** BR-11: a display name or code of the target (document_code or title, department code, user name). */
+  target_label?: string | null;
 }
 
 export interface AuditLogListResponse {
