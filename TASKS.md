@@ -1,6 +1,13 @@
 
 # Implementation Tasks
 
+## GPU latency of the default measured (DEC-041) -- 2026-11-22
+
+- **DONE:** LLM time per question on the GTX 1650 (p50 18.4 s, p95 25.5 s, first request 23.8 s,
+  33/33 layers on the GPU); hardware recommendation in `DEPLOYMENT.md` 3.3.
+- **NOT MEASURED:** end to end on the owner's machine. RAM available stayed below 2 GB with only
+  the smoke stack and Ollama running; it needs a host with more RAM.
+
 ## UI backend requests BR-10, BR-11, BR-12 -- 2026-11-21
 
 - **DONE** (answers in `docs/ui/backend-responses-10-12.md`, for the UI session to merge into
