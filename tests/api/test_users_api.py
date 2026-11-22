@@ -393,3 +393,37 @@ def test_user_response_never_contains_hashed_password(
     assert response.status_code == 200
     assert "hashed_password" not in response.json()["data"]
     assert "password" not in response.json()["data"]
+
+
+def test_user_create_and_update_422_details_name_each_json_field(
+    api_client: TestClient,
+    make_department: Callable[..., Department],
+    make_user: Callable[..., User],
+    make_auth_headers: Callable[[User], dict[str, str]],
+) -> None:
+    """BR-10: one {field, code, message} per invalid field; the input itself never comes back."""
+    department = make_department()
+    admin = make_user(role=UserRole.ADMIN)
+    target = make_user(role=UserRole.STAFF, department_id=department.id)
+    headers = make_auth_headers(admin)
+    body = create_user_body(str(department.id)) | {"email": "not-an-email", "password": "short-pw"}
+
+    created = api_client.post("/api/v1/users", headers=headers, json=body)
+    no_department = api_client.post(
+        "/api/v1/users",
+        headers=headers,
+        json=create_user_body(str(department.id)) | {"role": "MANAGER", "department_id": None},
+    )
+    updated = api_client.patch(
+        f"/api/v1/users/{target.id}", headers=headers, json={"hashed_password": "x", "role": "ROOT"}
+    )
+
+    def details(response) -> list[tuple[str | None, str]]:  # noqa: ANN001
+        assert response.status_code == 422
+        assert response.json()["error"]["code"] == "VALIDATION_ERROR"
+        return sorted((d["field"], d["code"]) for d in response.json()["error"]["details"])
+
+    assert details(created) == [("email", "INVALID_VALUE"), ("password", "TOO_SHORT")]
+    assert "short-pw" not in created.text and "not-an-email" not in created.text
+    assert details(no_department) == [("department_id", "REQUIRED")]
+    assert details(updated) == [("hashed_password", "UNKNOWN_FIELD"), ("role", "INVALID_CHOICE")]

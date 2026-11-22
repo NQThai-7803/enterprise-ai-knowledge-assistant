@@ -112,3 +112,12 @@ async def names_by_id(session: AsyncSession, department_ids: set[UUID]) -> dict[
         select(Department.id, Department.name).where(Department.id.in_(department_ids))
     )
     return {key: value for key, value in rows.all()}
+
+
+async def codes_by_id(session: AsyncSession, department_ids: set[UUID]) -> dict[UUID, str]:
+    if not department_ids:
+        return {}
+    rows = await session.execute(
+        select(Department.id, Department.code).where(Department.id.in_(department_ids))
+    )
+    return {key: value for key, value in rows.all()}

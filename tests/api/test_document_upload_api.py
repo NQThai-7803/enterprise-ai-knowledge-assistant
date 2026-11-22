@@ -522,3 +522,54 @@ def test_upload_response_names_go_to_admin_only(
         "Admin Co Ten",
         None,
     )
+
+
+@pytest.mark.parametrize(
+    ("fields", "expected"),
+    [
+        ({"title": "x" * 256}, {"field": "title", "code": "TOO_LONG"}),
+        ({"effective_from": "2026-13-01"}, {"field": "effective_from", "code": "INVALID_DATE"}),
+        ({"access_scope": "EVERYONE"}, {"field": "access_scope", "code": "INVALID_CHOICE"}),
+        ({"access_scope": "DEPARTMENT"}, {"field": "department_id", "code": "REQUIRED"}),
+        ({"effective_from": "2026-09-01", "effective_to": "2026-08-31"},
+         {"field": "effective_to", "code": "INVALID_RANGE",
+          "message": "effective_to must not precede effective_from."}),
+    ],
+)  # fmt: skip
+def test_upload_422_details_name_the_form_field(
+    api_client: TestClient,
+    upload_storage: LocalFileStorage,
+    make_user: Any,
+    make_auth_headers: Any,
+    fields: dict[str, str],
+    expected: dict[str, str],
+) -> None:
+    """BR-10: details is a list of {field, code, message}, the field named as in the form."""
+    admin = make_user(role=UserRole.ADMIN)
+
+    response = upload_request(api_client, headers=make_auth_headers(admin), data=fields)
+
+    assert response.status_code == 422
+    error = response.json()["error"]
+    assert error["code"] == "VALIDATION_ERROR"
+    assert [{k: d[k] for k in expected} for d in error["details"]] == [expected]
+    assert all(set(d) == {"field", "code", "message"} for d in error["details"])
+
+
+def test_upload_missing_field_is_a_required_detail(
+    api_client: TestClient,
+    upload_storage: LocalFileStorage,
+    make_user: Any,
+    make_auth_headers: Any,
+) -> None:
+    admin = make_user(role=UserRole.ADMIN)
+    response = api_client.post(
+        UPLOAD_URL,
+        headers=make_auth_headers(admin),
+        data={"title": "Employee Handbook"},
+        files={"file": ("employee-handbook.pdf", PDF_BYTES, "application/pdf")},
+    )
+    assert response.status_code == 422
+    assert [(d["field"], d["code"]) for d in response.json()["error"]["details"]] == [
+        ("access_scope", "REQUIRED")
+    ]

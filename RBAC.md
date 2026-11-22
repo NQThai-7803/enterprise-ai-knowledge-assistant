@@ -201,3 +201,7 @@ Audit reporting:
   Department name is treated as Admin-only too.
 - Every caller who can view a Document gets `uploaded_by_me`. A User's own Department name is on
   their own profile (`GET /auth/me`, `department_name`).
+
+- BR-11 applies the same rule to the AuditLog report: `actor_full_name` and `target_label` (a full
+  name, a Department code, a Document code or title; never chat content) are built for Admin
+  callers only, and the serializer checks the role again.

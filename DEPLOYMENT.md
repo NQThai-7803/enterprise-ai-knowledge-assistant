@@ -86,9 +86,19 @@ Since DEC-040 (2026-11-20) the default is simple answer mode with the s1-s3 fixe
 `qwen3.5-text:4b`, with `RAG_DRAFT_DOCUMENT_POLICY=exclude`. Before it was `legacy` + `qwen2.5:3b`,
 which stays available as the rollback below.
 
-- **Hardware required: an NVIDIA GPU with at least 4 GB VRAM** (DEC-029 (c)).
+- **Hardware required: an NVIDIA GPU with at least 4 GB VRAM** (DEC-029 (c)), **and RAM: at
+  least 8 GB with the system running alone, 16 GB recommended** (DEC-041).
   - Measured on a GTX 1650 4 GB: 2971 MiB of VRAM, 18.7-28.6 s of LLM time per question
     (median 20.7 s), the model 100% on the GPU.
+  - Measured again on 2026-11-22 (DEC-041), on the same GTX 1650 with 8 GB RAM.
+    - Conditions: only the application stack and Ollama running, other stacks stopped,
+      no browser open.
+    - LLM time per question: p50 18.4 s, p95 25.5 s.
+    - The first request, which loads the model, took 23.8 s.
+    - `offloaded 33/33 layers to GPU`: no layer on the CPU.
+    - End to end was not measured: RAM available was 425-500 MB before the run and fell as low
+      as 99 MB during it. With 8 GB the system runs with almost no headroom, so plan 16 GB for
+      a host that also runs other software.
   - A CPU-only host with 16 GB RAM works but is slow: about 77 s per question end to end (UAT
     median, 4 vCPU), about 2.5 times `legacy` + `qwen2.5:3b`. Set `LLM_TIMEOUT_SECONDS=600` there.
 - **Build `qwen3.5-text:4b` once on the Ollama host.** It is `qwen3.5:4b` without its vision

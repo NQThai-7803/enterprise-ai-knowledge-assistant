@@ -878,6 +878,40 @@ refusals (22 with s3t). From now on **UAT is a regression suite to watch, not a 
 choosing a configuration** (DEC-026 updated). The 22 s3t false refusals on UAT and the 6 on
 `natural_dev_v1` are the case set for diagnosing refusals in the shared layer (`TASKS.md`).
 
+### GPU latency on the owner's machine (2026-11-22)
+
+- **Conditions:**
+  - GTX 1650 4 GB, 8 GB RAM (7.8 GiB visible), Windows, Ollama 0.40.15 with the CUDA backend,
+    `qwen3.5-text:4b` with `PARAMETER num_gpu 99`, `num_ctx` 8192.
+  - Only the `eaka-smoke` stack (main at 51c1767, the default configuration) and Ollama were
+    running: the V2 and main stacks were stopped, Edge and the UI session closed. Still open:
+    Docker Desktop, Defender and this Claude Code session.
+  - VRAM free before: 3935 MiB.
+- **End to end: not measured.** RAM available stayed at 425-500 MB, below the 2 GB the owner set
+  for this run.
+- **LLM time per question,** from `scripts/eval/gpu_latency_replay.py`:
+  - Input: the s3t prompts of ND-001 to ND-010 from CI run 44694912116, sent through the app's
+    own provider with the eval settings.
+  - Result: p50 18.4 s, p95 25.5 s (the 10th value), mean 20.1 s, range 17.1-25.5 s, 13 calls.
+    ND-003, ND-005 and ND-006 have a retry.
+  - The first call, which loads the model, took 23.8 s.
+  - These figures match the 18.7-28.6 s measured on 2026-11-18 (`DEPLOYMENT.md` 3.3).
+- **No layer on the CPU:**
+  - The Ollama log shows `offloaded 33/33 layers to GPU`, and `ollama ps` reads `100% GPU`,
+    context 8192.
+  - The host holds 525 MiB of the model (497 MiB weights, 28 MiB compute).
+  - Ollama's fit step reported it could not keep its usual 1 GiB VRAM reserve. Because
+    `num_gpu 99` is set, it loaded every layer on the GPU anyway, using 2903 MiB.
+  - Under the memory pressure the log also shows a GPU-discovery watchdog warning; free memory
+    was read from earlier values.
+- **RAM available during the replay** (one sample every 5 s, 41 samples): lowest 99 MB, highest
+  1017 MB.
+- **Hardware recommendation (owner):**
+  - an NVIDIA GPU with at least 4 GB VRAM;
+  - at least 8 GB RAM with the system running alone, 16 GB recommended.
+  - On 8 GB the system runs, but with almost no free memory: here as little as 99 MB during
+    the LLM calls.
+
 ### The proposal and the measurement it rests on (2026-11-20)
 
 The owner keeps DEC-040 and asked for a hybrid configuration measured on the dev sets only.
@@ -949,7 +983,8 @@ false_refusal_v2 (24), compound (12). On `natural_dev_v1`: correct 3 / 8 / 6, fa
   only because the request order differs; across jobs a configuration moves by a few items
   (s3t `natural_dev_v1` 7 → 8, UAT 71 → 68). Differences of 1-2 items are noise.
 - The sets are small (`natural_dev_v1` has 20 items).
-- **GPU latency not measured.** The owner's machine had about 640 MB of RAM available; the
+- **GPU latency not measured on 2026-11-20** (measured on 2026-11-22, LLM time only, see above).
+  The owner's machine had about 640 MB of RAM available; the
   owner's rule is to stop and not close applications. Ready to run (`docs/eval/runs/dec041-hybrid-dev.md`):
   on ND-001 to ND-010, s3t makes 13 LLM calls and hybrid 10.
 
