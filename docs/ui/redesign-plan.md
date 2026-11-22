@@ -177,3 +177,18 @@ Code giao diện do Claude Code chạy trực tiếp trên máy Windows (git, np
   - BR-6: lúc chờ câu trả lời chỉ có một dòng trạng thái "Đang tìm và kiểm tra nguồn…", không có
     tiến trình theo bước.
   - BR-7: dòng thời gian xử lý tài liệu có 3 bước, suy từ `status`, không có giai đoạn chi tiết.
+- **Ranh giới phiên trong một tab:**
+  - Khi người dùng đổi (đăng nhập, đăng xuất, phiên hết hạn), `useSessionDataReset` hủy các query đang
+    chạy rồi gọi `queryClient.clear()` (gồm cả query và mutation). Trang của người mới chỉ được dựng
+    sau khi cache đã rỗng. Toast bị xóa khi có người đăng nhập.
+  - Bản nháp chat, luồng SSE và form nằm trong state của trang, dưới `ProtectedRoute`, nên bị hủy cùng
+    trang; SSE abort khi trang unmount. Ngoài token trong `sessionStorage` (AuthProvider xóa), app không
+    lưu gì vào `localStorage`, IndexedDB hay Cache API.
+  - Còn lại 2 điểm chưa xử lý:
+    1. Một lượt refresh token đang chạy đúng lúc đăng xuất có thể ghi lại token mới vào
+       `sessionStorage` sau khi đã xóa (`refreshAccessToken` trong `api/client.ts`). Tải lại tab khi đó
+       sẽ khôi phục phiên cũ. Cách sửa đề xuất: chỉ lưu khi refresh token hiện tại vẫn là token đã gửi
+       đi. Cần owner đồng ý vì `client.ts` không được đổi logic.
+    2. Khi phiên hết hạn, màn đăng nhập giữ đường dẫn cuối (`from`) để quay lại đúng chỗ. Nếu người
+       khác đăng nhập ở tab đó, họ được đưa tới đường dẫn ấy. Đường dẫn có thể chứa id tài liệu, nhưng
+       API vẫn kiểm quyền, nên nội dung không lộ.

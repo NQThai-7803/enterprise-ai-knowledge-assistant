@@ -29,6 +29,8 @@ interface ToastItem extends ToastInput {
 interface ToastContextValue {
   pushToast: (toast: ToastInput) => void;
   dismissToast: (id: string) => void;
+  /** Drops every toast, e.g. when the signed-in user changes. */
+  clearToasts: () => void;
 }
 
 const ToastContext = createContext<ToastContextValue | null>(null);
@@ -37,11 +39,15 @@ const TOAST_DURATION_MS = 5000;
 
 type ToastAction =
   | { type: "push"; toast: ToastItem }
-  | { type: "dismiss"; id: string };
+  | { type: "dismiss"; id: string }
+  | { type: "clear" };
 
 function reducer(state: ToastItem[], action: ToastAction): ToastItem[] {
   if (action.type === "push") {
     return [action.toast, ...state].slice(0, 4);
+  }
+  if (action.type === "clear") {
+    return [];
   }
 
   return state.filter((toast) => toast.id !== action.id);
@@ -57,6 +63,8 @@ export function ToastProvider({
   const dismissToast = useCallback((id: string) => {
     dispatch({ type: "dismiss", id });
   }, []);
+
+  const clearToasts = useCallback(() => dispatch({ type: "clear" }), []);
 
   const pushToast = useCallback(
     (toast: ToastInput) => {
@@ -81,8 +89,9 @@ export function ToastProvider({
     () => ({
       pushToast,
       dismissToast,
+      clearToasts,
     }),
-    [dismissToast, pushToast],
+    [clearToasts, dismissToast, pushToast],
   );
 
   return (
