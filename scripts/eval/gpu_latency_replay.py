@@ -112,7 +112,11 @@ async def replay(
         records = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
         per_item = {}
         for item in items:
-            drafts = [r for r in records if _key(r.get("asked") or "") == _key(item["question"])]
+            drafts = [
+                r
+                for r in records
+                if "draft" in r and _key(r.get("asked") or "") == _key(item["question"])
+            ]
             times = []
             for messages in prompts(drafts, settings):
                 generation = await provider.generate(messages=messages, **args)
