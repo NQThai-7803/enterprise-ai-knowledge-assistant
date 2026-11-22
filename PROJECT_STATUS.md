@@ -1,5 +1,13 @@
 # Project Status
 
+## Chat cache audit -- 2026-11-22
+
+- No answer, retrieval or embedding cache exists; Redis holds rate-limit counters only; the Ollama
+  KV cache reuses only an exact prefix of the prompt being answered. A repeated question is
+  faster (LLM time 2.6-3.3 s instead of 17-27 s on the GTX 1650) because its prompt is
+  byte-identical and Ollama skips the prefill.
+- Open: the frontend keeps its query cache across logout (`SECURITY.md`).
+
 ## GPU latency of the default measured (DEC-041) -- 2026-11-22
 
 - GTX 1650 4 GB, 8 GB RAM, only the smoke stack and Ollama running: LLM time per question p50
