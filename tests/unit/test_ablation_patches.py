@@ -294,7 +294,7 @@ def test_simple_trace_names_the_final_no_answer_reason(
         if name.startswith("_") and callable(value):
             monkeypatch.setattr(validation, name, value)
     ablation_patches._patch_simple_trace(gas)
-    wrong = "Tai trong toi da cua xe toi la 9.900 kg [SOURCE_1]."
+    wrong = "Xe chiu duoc 9.900 kg [SOURCE_1]."
     result, _ = _ask(wrong, wrong)
     assert result.assistant_message.grounding_status == "NO_ANSWER"
     summary = json.loads(trace.read_text("utf-8").splitlines()[-1])
