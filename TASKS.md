@@ -1,6 +1,13 @@
 
 # Implementation Tasks
 
+## Chat cache audit -- 2026-11-22
+
+- **DONE:** no backend cache crosses users or outlives a revoked grant (`SECURITY.md`, "Chat path
+  caches"); regression test `tests/api/test_chat_permission_isolation.py`.
+- **NEXT, owner decision (frontend):** **[High]** clear the React Query cache on logout and login;
+  until then a second account on the same browser tab can be shown the first one's cached data.
+
 ## GPU latency of the default measured (DEC-041) -- 2026-11-22
 
 - **DONE:** LLM time per question on the GTX 1650 (p50 18.4 s, p95 25.5 s, first request 23.8 s,

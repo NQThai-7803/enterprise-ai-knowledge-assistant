@@ -596,6 +596,33 @@ Frontend controls implemented in TASK-028:
 - Decorative motion is non-interactive and respects reduced-motion CSS.
 
 Known browser-token limitation: the current backend contract exposes bearer tokens to the SPA. TASK-028 stores them in `sessionStorage` to avoid long-lived persistence. A future cookie-based or BFF architecture would reduce XSS token exposure further.
+
+### Chat path caches (audit 2026-11-22)
+
+Every cache between a question and its answer, and what it is keyed on:
+
+- **Answers, retrieval results, query embeddings, question rewrites:** none. Each request
+  retrieves with the permission filter in SQL; follow-up resolution reads only the caller's own
+  session.
+- **Models in the API process:** the embedding model (in the shared `app.state` retrieval
+  service) and the reranker (`_RERANKER_CACHE`, keyed on settings). Weights only, no per-request
+  data.
+- **Redis:** rate-limit counters (`rate-limit:<scope>:<identity>:<window>`, TTL = window) and the
+  Celery broker for document processing. No chat data.
+- **Ollama:** the KV cache of the last prompts and the loaded model (`keep_alive` 10 min). It
+  reuses only an exact token prefix of the prompt being answered, so it cannot add text that is
+  not in that prompt. Residual: a fast reply tells a user that a prompt sharing a long prefix with
+  theirs was answered recently (a timing signal, no content).
+- **HTTP:** API responses carry `Cache-Control: no-store`; SSE `no-cache`.
+- Nothing above holds permission-dependent data, so granting or revoking access needs no
+  invalidation. `tests/api/test_chat_permission_isolation.py` checks it through one shared
+  service: a Staff user asking a Manager's question gets nothing from the Manager's PRIVATE
+  document (content, title, id, citation), and a revoked grant stops answers from the document
+  in the same and a new session.
+- **Open (frontend):** logout does not clear the React Query cache (`staleTime` 20 s, keys without
+  the user). A second account signing in on the same tab can be shown the previous account's
+  cached session list, documents or messages until the refetch returns. Fix: `queryClient.clear()`
+  on logout and login. Found by reading the code; not reproduced in a browser.
 ### Frontend Dependency Advisory
 
 `npm audit --audit-level=high` currently reports a high advisory for `react-router` in the 7.12.0-8.2.0 range. The TASK-028 frontend uses React Router in SPA/browser mode only and does not use RSC mode, server actions, route actions, or SSR redirects. Downgrading to 7.11.0 was evaluated and exposed a broader set of React Router advisories, so the project remains pinned to `react-router-dom@7.18.2` until an upstream non-vulnerable release compatible with the SPA is available. Avoid enabling React Router RSC/action features without re-evaluating this advisory.
