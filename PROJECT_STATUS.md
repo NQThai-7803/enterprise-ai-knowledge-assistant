@@ -1,5 +1,12 @@
 # Project Status
 
+## Shared-layer refusals diagnosed -- 2026-11-22
+
+- The 28 dev cases all reach the LLM. 12: the gold document is in the prompt but its gold chunk is
+  not (7 of them cut by the 2-chunks-per-document limit); 5: the model refuses with the gold chunk
+  in the prompt; 9: the validator rejects (7 drafts right, 2 wrong); 2 answered in this batch.
+  Fix direction: owner decision (`TASKS.md`).
+
 ## Chat cache audit -- 2026-11-22
 
 - No answer, retrieval or embedding cache exists; Redis holds rate-limit counters only; the Ollama

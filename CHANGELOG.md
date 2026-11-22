@@ -6,6 +6,12 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### Shared-layer refusal diagnosis -- 2026-11-22
+
+- **Eval diagnostics:** `simple_trace` adds a per-question record (retrieval count, prompt chunks
+  with scores, gold ranks, each LLM attempt, final reason); `ci_batch.sh` builds the dev gold map
+  for trace configurations; `scripts/diagnostics/refusal_classes.py`. No runtime change.
+
 ### Chat cache audit -- 2026-11-22
 
 - **Tests:** cross-user and revoked-grant isolation through one shared answer service, both chat

@@ -622,7 +622,8 @@ Every cache between a question and its answer, and what it is keyed on:
 - **Open (frontend):** logout does not clear the React Query cache (`staleTime` 20 s, keys without
   the user). A second account signing in on the same tab can be shown the previous account's
   cached session list, documents or messages until the refetch returns. Fix: `queryClient.clear()`
-  on logout and login. Found by reading the code; not reproduced in a browser.
+  on logout and login. Found by reading the code; not reproduced in a browser. Handed to the UI
+  session (PR #42).
 ### Frontend Dependency Advisory
 
 `npm audit --audit-level=high` currently reports a high advisory for `react-router` in the 7.12.0-8.2.0 range. The TASK-028 frontend uses React Router in SPA/browser mode only and does not use RSC mode, server actions, route actions, or SSR redirects. Downgrading to 7.11.0 was evaluated and exposed a broader set of React Router advisories, so the project remains pinned to `react-router-dom@7.18.2` until an upstream non-vulnerable release compatible with the SPA is available. Avoid enabling React Router RSC/action features without re-evaluating this advisory.
