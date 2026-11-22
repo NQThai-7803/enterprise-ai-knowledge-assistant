@@ -179,6 +179,81 @@ test("admin: names in documents, audit filtered by event_type, system status", a
   await logout(page);
 });
 
+test("one tab, manager then staff: nothing the manager loaded reaches the staff's screens", async ({
+  page,
+  context,
+  playwright,
+}) => {
+  // Every manager item carries the stamp: a PRIVATE document only the manager can see, a chat session
+  // and the question asked in it.
+  const stamp = String(Date.now());
+  const documentTitle = `Riêng manager ${stamp}`;
+  const sessionTitle = `Phiên manager ${stamp}`;
+  const question = `Mã ${stamp}: ${answerableQuestion}`;
+  const api = await playwright.request.newContext({ baseURL: apiBaseUrl });
+  const managerToken = await apiLogin(api, accounts.manager);
+  const upload = await api.post("/api/v1/documents/upload", {
+    headers: bearer(managerToken),
+    multipart: {
+      file: { name: "smoke-private.pdf", mimeType: "application/pdf", buffer: await makePdf(context, documentTitle) },
+      title: documentTitle,
+      access_scope: "PRIVATE",
+    },
+  });
+  expect(upload.status(), "PRIVATE upload").toBe(202);
+  const documentId = (await upload.json()).data.id as string;
+  const created = await api.post("/api/v1/chat/sessions", { headers: bearer(managerToken), data: { title: sessionTitle } });
+  expect(created.status(), "chat session").toBe(201);
+  const sessionId = (await created.json()).data.id as string;
+
+  try {
+    await login(page, accounts.manager);
+    await page.getByRole("button", { name: new RegExp(`^${sessionTitle}`) }).click();
+    await expect(page.getByText("Chưa có tin nhắn")).toBeVisible();
+    await ask(page, question, "manager, then staff in the same tab");
+    await page.getByRole("link", { name: "Tài liệu", exact: true }).click();
+    await expect(page.getByText(documentTitle)).toBeVisible();
+    await logout(page);
+
+    // From here the page records every text it shows, including frames replaced at once.
+    await page.evaluate((marker) => {
+      const seen: string[] = [];
+      (window as unknown as { __managerTextSeen: string[] }).__managerTextSeen = seen;
+      new MutationObserver((records) => {
+        for (const record of records) {
+          const nodes = [...record.addedNodes, ...record.removedNodes];
+          const texts = [record.oldValue, record.target.textContent, ...nodes.map((node) => node.textContent)];
+          const hit = texts.find((text) => text?.includes(marker));
+          if (hit) seen.push(hit.slice(Math.max(0, hit.indexOf(marker) - 60), hit.indexOf(marker) + 40));
+        }
+      }).observe(document.body, { childList: true, subtree: true, characterData: true, characterDataOldValue: true });
+    }, stamp);
+
+    // Same document, no reload: staff signs in on the login form the logout left. Each screen is
+    // checked once it has settled; no wait on a request, since a stale cache would send none.
+    const loading = page.getByRole("status").filter({ hasText: /^Đang tải/ });
+    const managerTextSeen = () =>
+      page.evaluate(() => (window as unknown as { __managerTextSeen?: string[] }).__managerTextSeen);
+    await page.getByLabel("Email").fill(accounts.staff.email);
+    await page.getByLabel("Mật khẩu", { exact: true }).fill(accounts.staff.password);
+    await page.getByRole("button", { name: "Đăng nhập" }).click();
+    await expect(page.getByRole("button", { name: "Cuộc trò chuyện mới", exact: true })).toBeVisible();
+    await expect(loading).toHaveCount(0);
+    expect(await managerTextSeen(), "manager text on the staff's chat").toEqual([]);
+
+    await page.getByRole("link", { name: "Tài liệu", exact: true }).click();
+    await expect(page.getByRole("heading", { level: 1, name: "Tài liệu" })).toBeVisible();
+    await expect(loading).toHaveCount(0);
+    expect(await managerTextSeen(), "manager text on the staff's documents").toEqual([]);
+    await expect(page.getByText(stamp)).toHaveCount(0);
+    await logout(page);
+  } finally {
+    await api.delete(`/api/v1/chat/sessions/${sessionId}`, { headers: bearer(managerToken) });
+    await api.delete(`/api/v1/documents/${documentId}`, { headers: bearer(managerToken) });
+    await api.dispose();
+  }
+});
+
 async function login(page: Page, account: Account): Promise<void> {
   await page.goto("/login");
   await page.getByLabel("Email").fill(account.email);
