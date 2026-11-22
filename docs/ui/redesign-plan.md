@@ -157,3 +157,23 @@ Thứ tự theo yêu cầu: AppShell → Chat → Documents/DocumentDetail → L
 ## 6. Môi trường thực hiện
 
 Code giao diện do Claude Code chạy trực tiếp trên máy Windows (git, npm lint/typecheck/test/build chạy được). Các rào cản git/node_modules chỉ áp dụng cho phiên chat Linux dùng để lập kế hoạch.
+
+## 7. Hạn chế đã biết (22/11/2026)
+
+- **Mở tài liệu đúng trang (D-7, BR-2):** liên kết "Mở tài liệu tại trang N" gắn `#page=N` vào `blob:` URL của
+  PDF lấy từ `/preview`. Mới kiểm trên Chromium (trình xem PDF của Chrome và Edge): bằng Playwright với
+  Chromium bản đầy đủ, trên một PDF 6 trang (mở ở 4/6) và trên stack eaka-smoke (mở ở 4/13). Firefox
+  và Safari **chưa kiểm**. Ở trình duyệt không đọc `#page`, tài liệu vẫn mở, nhưng ở trang 1. Ảnh
+  PNG/JPEG không có trang, nên không gắn `#page`.
+- **Refresh token dùng chung giữa hai tab (BR-2):**
+  - Token nằm trong `sessionStorage`. Liên kết dùng `rel="opener"` để tab xem tài liệu nhận bản sao
+    token.
+  - Hai tab vì vậy dùng chung một refresh token, mà refresh thì xoay vòng token (API_SPEC §4). Nếu
+    tab xem tài liệu phải refresh (access token sắp hết hạn lúc mở), tab gốc sẽ bị đăng xuất ở lần
+    refresh sau.
+  - Chỉ gỡ được rủi ro này bằng URL ký tạm thời; backend chưa làm (xem khối trả lời BR-2).
+- **BR-5, BR-6, BR-7 đang hoãn** theo quyết định của owner:
+  - BR-5: không hiện số trang ở danh sách, chi tiết và thẻ tệp khi tải lên.
+  - BR-6: lúc chờ câu trả lời chỉ có một dòng trạng thái "Đang tìm và kiểm tra nguồn…", không có
+    tiến trình theo bước.
+  - BR-7: dòng thời gian xử lý tài liệu có 3 bước, suy từ `status`, không có giai đoạn chi tiết.
