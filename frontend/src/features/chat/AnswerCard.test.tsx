@@ -101,3 +101,66 @@ describe("AnswerCard", () => {
     expect(screen.getByRole("button", { name: "Mở trích dẫn 1" })).toBeInTheDocument();
   });
 });
+
+describe("AnswerCard BR-12 break_after", () => {
+  // The answer text box, with chip buttons dropped so only the rebuilt text is compared.
+  function answerText(container: HTMLElement): string {
+    const box = container.querySelector("article p")!.cloneNode(true) as HTMLElement;
+    box.querySelectorAll("button").forEach((chip) => chip.remove());
+    return box.textContent ?? "";
+  }
+
+  function renderSegments(segments: NonNullable<ChatMessage["segments"]>) {
+    return render(
+      <AnswerCard
+        content={segments.map((segment) => segment.text).join(" ")}
+        citations={[citation, { ...citation, citation_order: 2 }]}
+        citationMap={new Map([[1, 1], [2, 2]])}
+        groundingStatus="ANSWERED"
+        segments={segments}
+        onCitationClick={vi.fn()}
+      />,
+    );
+  }
+
+  it("rebuilds a bulleted list and a paragraph break (API_SPEC §8 example)", () => {
+    const { container } = renderSegments([
+      { kind: "verified", text: "Quy trình gồm:", citation_ids: [], break_after: "line" },
+      { kind: "verified", text: "- Bước 1: nộp đơn.", citation_ids: [1], break_after: "line" },
+      { kind: "verified", text: "- Bước 2: trưởng phòng duyệt.", citation_ids: [2], break_after: "paragraph" },
+      {
+        kind: "unverified",
+        text: "Chưa xác minh được từ tài liệu bạn được phép truy cập: thời hạn.",
+        citation_ids: [],
+        break_after: "none",
+      },
+    ]);
+
+    expect(answerText(container)).toBe(
+      "Quy trình gồm:\n- Bước 1: nộp đơn.\n- Bước 2: trưởng phòng duyệt.\n\nChưa xác minh được từ tài liệu bạn được phép truy cập: thời hạn.",
+    );
+    expect(screen.getAllByRole("button", { name: /Mở trích dẫn/ })).toHaveLength(2);
+  });
+
+  it("rebuilds several paragraphs", () => {
+    const { container } = renderSegments([
+      { kind: "verified", text: "Đoạn một.", citation_ids: [1], break_after: "paragraph" },
+      { kind: "verified", text: "Đoạn hai, câu một.", citation_ids: [], break_after: "none" },
+      { kind: "verified", text: "Câu hai.", citation_ids: [2], break_after: "none" },
+    ]);
+
+    expect(answerText(container)).toBe("Đoạn một.\n\nĐoạn hai, câu một. Câu hai.");
+  });
+
+  it("keeps a numbered list as written when '1.' is its own segment with break_after none", () => {
+    const { container } = renderSegments([
+      { kind: "verified", text: "Các bước:", citation_ids: [], break_after: "line" },
+      { kind: "verified", text: "1.", citation_ids: [], break_after: "none" },
+      { kind: "verified", text: "Nộp đơn.", citation_ids: [1], break_after: "line" },
+      { kind: "verified", text: "2.", citation_ids: [], break_after: "none" },
+      { kind: "verified", text: "Trưởng phòng duyệt.", citation_ids: [2] },
+    ]);
+
+    expect(answerText(container)).toBe("Các bước:\n1. Nộp đơn.\n2. Trưởng phòng duyệt.");
+  });
+});

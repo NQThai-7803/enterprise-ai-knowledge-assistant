@@ -4,6 +4,9 @@ import { Fragment, type ReactNode } from "react";
 import type { AnswerSegment, Citation, FeedbackRating, GroundingStatus } from "../../api/types";
 import { formatDateTime } from "../../lib/format";
 
+// BR-12: rebuild the line structure of `content`; the text box keeps whitespace (whitespace-pre-wrap).
+const SEGMENT_BREAKS = { none: " ", line: "\n", paragraph: "\n\n" } as const;
+
 export function AnswerCard({
   content,
   citations,
@@ -73,7 +76,6 @@ export function AnswerCard({
         {segments
           ? segments.map((segment, index) => (
               <Fragment key={index}>
-                {index > 0 ? " " : null}
                 {segment.kind === "unverified" ? (
                   <span className="text-muted">{segment.text}</span>
                 ) : (
@@ -87,6 +89,7 @@ export function AnswerCard({
                     })}
                   </>
                 )}
+                {index < segments.length - 1 ? SEGMENT_BREAKS[segment.break_after ?? "none"] : null}
               </Fragment>
             ))
           : withCitationChips(content, citationMap, onCitationClick)}

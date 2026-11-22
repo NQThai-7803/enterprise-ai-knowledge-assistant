@@ -145,6 +145,8 @@ export interface AnswerSegment {
   text: string;
   /** citation_order values of the citations this sentence shows. */
   citation_ids: number[];
+  /** BR-12: whitespace to the next segment in the original content; "none" on the last one. */
+  break_after?: "none" | "line" | "paragraph";
 }
 
 export interface ChatMessage {
