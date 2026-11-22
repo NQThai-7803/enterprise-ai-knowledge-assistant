@@ -6,6 +6,11 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### Chat cache audit -- 2026-11-22
+
+- **Tests:** cross-user and revoked-grant isolation through one shared answer service, both chat
+  endpoints. **Docs:** chat path caches in `SECURITY.md`. No runtime change.
+
 ### GPU latency of the default (DEC-041) -- 2026-11-22
 
 - **Measured:** LLM time per question on a GTX 1650 4 GB: p50 18.4 s, p95 25.5 s, first request
