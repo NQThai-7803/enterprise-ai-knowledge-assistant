@@ -177,10 +177,19 @@ describe("DocumentUploadPage", () => {
     expect(apiClient.documents.upload).not.toHaveBeenCalled();
   });
 
-  it("puts the documented 422 effective_to message on its field", async () => {
+  it("puts BR-10 422 details on their fields (contract example) and keeps the rest as a form error", async () => {
     const user = userEvent.setup();
     vi.mocked(apiClient.documents.upload).mockRejectedValueOnce(
-      new ApiError({ code: "VALIDATION_ERROR", message: "effective_to must not precede effective_from.", status: 422 }),
+      new ApiError({
+        code: "VALIDATION_ERROR",
+        message: "effective_to must not precede effective_from.",
+        status: 422,
+        details: [
+          { field: "effective_to", code: "INVALID_RANGE", message: "effective_to must not precede effective_from." },
+          { field: "title", code: "TOO_LONG", message: "title is too long." },
+          { field: null, code: "INVALID", message: "Request is invalid." },
+        ],
+      }),
     );
     renderUploadPage();
 
@@ -188,6 +197,9 @@ describe("DocumentUploadPage", () => {
     await user.click(screen.getByRole("button", { name: "Tải lên" }));
 
     expect(await screen.findByText("Ngày hết hiệu lực không được trước ngày bắt đầu hiệu lực.")).toBeInTheDocument();
+    expect(screen.getByText("Nội dung quá dài.")).toBeInTheDocument();
+    expect(screen.getAllByRole("alert").map((node) => node.textContent)).toContain("Giá trị không hợp lệ.");
+    expect(screen.queryByText(/must not precede/)).not.toBeInTheDocument();
   });
 
   it("shows any other 422 and a 403 as a form error", async () => {
@@ -199,7 +211,7 @@ describe("DocumentUploadPage", () => {
 
     await fillRequired(user);
     await user.click(screen.getByRole("button", { name: "Tải lên" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("Thông tin tải lên chưa hợp lệ: Request is invalid");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Dữ liệu gửi lên chưa hợp lệ.");
 
     await user.click(screen.getByRole("button", { name: "Tải lên" }));
     expect(await screen.findByText("Bạn không được tải lên với phạm vi hoặc phòng ban này.")).toBeInTheDocument();

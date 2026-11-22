@@ -18,6 +18,7 @@ import { FieldWrapper, SelectInput, TextInput } from "../../components/ui/Field"
 import { Pagination } from "../../components/ui/Pagination";
 import { EmptyState, ErrorState, LoadingState } from "../../components/ui/State";
 import { initials } from "../../lib/format";
+import { applyFieldErrors } from "../../lib/formErrors";
 import { roleLabels } from "../../lib/labels";
 
 // API_SPEC §5: Manager and Staff need a department, an Admin may have none; passwords are at least 12 characters.
@@ -97,6 +98,7 @@ export function UsersPage() {
       await queryClient.invalidateQueries({ queryKey: ["users"] });
       pushToast({ tone: "success", title: "Đã tạo người dùng" });
     },
+    onError: (error) => applyFieldErrors(error, createForm.setError, ["email", "full_name", "password", "role", "department_id"]),
   });
 
   const updateMutation = useMutation({
@@ -113,6 +115,8 @@ export function UsersPage() {
       await queryClient.invalidateQueries({ queryKey: ["users"] });
       pushToast({ tone: "success", title: "Đã cập nhật người dùng" });
     },
+    onError: (error) =>
+      applyFieldErrors(error, editForm.setError, ["email", "full_name", "role", "department_id", "is_active"]),
   });
 
   const deactivateMutation = useMutation({

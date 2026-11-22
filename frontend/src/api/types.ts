@@ -32,6 +32,13 @@ export interface ApiErrorPayload {
   request_id?: string | null;
 }
 
+/** BR-10 (API_SPEC §3): one entry per invalid field of a 422; `code` is stable, `message` English. */
+export interface ValidationDetail {
+  field: string | null;
+  code: string;
+  message: string;
+}
+
 export interface ApiErrorEnvelope {
   error: ApiErrorPayload;
 }

@@ -12,11 +12,10 @@ import { useToast } from "../../components/feedback/ToastProvider";
 import { Button } from "../../components/ui/Button";
 import { FieldWrapper, SelectInput, TextArea, TextInput } from "../../components/ui/Field";
 import { formatBytes } from "../../lib/format";
+import { applyFieldErrors } from "../../lib/formErrors";
 import { lifecycleLabels } from "../../lib/labels";
 import { useAuth } from "../auth/AuthProvider";
 
-// The one 422 message API_SPEC §7 documents word for word.
-const EFFECTIVE_ORDER_MESSAGE = "effective_to must not precede effective_from.";
 const EFFECTIVE_ORDER_TEXT = "Ngày hết hiệu lực không được trước ngày bắt đầu hiệu lực.";
 
 const uploadSchema = z
@@ -49,6 +48,21 @@ const uploadSchema = z
   });
 
 type UploadForm = z.infer<typeof uploadSchema>;
+
+// Form fields a 422 detail can name (BR-10); the form posts them under these names.
+const UPLOAD_FIELDS = [
+  "file",
+  "title",
+  "description",
+  "access_scope",
+  "department_id",
+  "document_code",
+  "document_version",
+  "effective_from",
+  "effective_to",
+  "lifecycle_status",
+  "supersedes_document_id",
+] as const;
 
 const VERSION_FIELDS = [
   "document_code",
@@ -156,12 +170,18 @@ export function DocumentUploadPage() {
       navigate(`/documents/${response.data.id}`);
     },
     onError: (error) => {
-      if (isApiError(error) && error.status === 422 && error.message === EFFECTIVE_ORDER_MESSAGE) {
-        setVersionOpen(true);
-        setError("effective_to", { message: EFFECTIVE_ORDER_TEXT });
+      // BR-10: put each 422 detail on its field; what matches no field becomes the form error.
+      const result = applyFieldErrors(error, setError, UPLOAD_FIELDS, {
+        "effective_to.INVALID_RANGE": EFFECTIVE_ORDER_TEXT,
+      });
+      if (!result) {
+        setServerError(uploadErrorMessage(error));
         return;
       }
-      setServerError(uploadErrorMessage(error));
+      if (result.fields.some((field) => (VERSION_FIELDS as readonly string[]).includes(field))) {
+        setVersionOpen(true);
+      }
+      setServerError(result.rest.length ? result.rest.join(" ") : null);
     },
   });
 
@@ -473,10 +493,6 @@ export function DocumentUploadPage() {
 function uploadErrorMessage(error: unknown): string {
   if (!isApiError(error)) {
     return safeErrorMessage(error);
-  }
-  if (error.status === 422) {
-    // TODO(BR-10): map 422 details to fields once API_SPEC documents their shape.
-    return `Thông tin tải lên chưa hợp lệ: ${error.message}`;
   }
   if (error.status === 403) {
     return "Bạn không được tải lên với phạm vi hoặc phòng ban này.";

@@ -15,6 +15,7 @@ import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { FieldWrapper, TextArea, TextInput } from "../../components/ui/Field";
 import { Pagination } from "../../components/ui/Pagination";
 import { EmptyState, ErrorState, LoadingState } from "../../components/ui/State";
+import { applyFieldErrors } from "../../lib/formErrors";
 
 const departmentSchema = z.object({
   name: z.string().trim().min(1, "Nhập tên phòng ban.").max(120, "Tên tối đa 120 ký tự."),
@@ -58,8 +59,10 @@ export function DepartmentsPage() {
       await queryClient.invalidateQueries({ queryKey: ["departments"] });
       pushToast({ tone: "success", title: "Đã tạo phòng ban" });
     },
-    onError: (error) =>
-      pushToast({ tone: "error", title: "Tạo phòng ban thất bại", message: safeErrorMessage(error) }),
+    onError: (error) => {
+      applyFieldErrors(error, createForm.setError, ["name", "code", "description"]);
+      pushToast({ tone: "error", title: "Tạo phòng ban thất bại", message: safeErrorMessage(error) });
+    },
   });
 
   const updateMutation = useMutation({
@@ -74,8 +77,10 @@ export function DepartmentsPage() {
       await queryClient.invalidateQueries({ queryKey: ["departments"] });
       pushToast({ tone: "success", title: "Đã cập nhật phòng ban" });
     },
-    onError: (error) =>
-      pushToast({ tone: "error", title: "Cập nhật thất bại", message: safeErrorMessage(error) }),
+    onError: (error) => {
+      applyFieldErrors(error, editForm.setError, ["name", "code", "description"]);
+      pushToast({ tone: "error", title: "Cập nhật thất bại", message: safeErrorMessage(error) });
+    },
   });
 
   const deleteMutation = useMutation({
