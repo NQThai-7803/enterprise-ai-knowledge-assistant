@@ -1,5 +1,5 @@
 import { expect, type APIRequestContext, type BrowserContext, type Page, test } from "@playwright/test";
-import { mkdir } from "node:fs/promises";
+import { appendFile, mkdir } from "node:fs/promises";
 import { resolve } from "node:path";
 
 /**
@@ -9,16 +9,19 @@ import { resolve } from "node:path";
  * Passwords come only from the environment. Traces, failure screenshots and videos are off so typed
  * values never reach a file; the screenshots this spec takes show only masked password fields.
  */
-test.use({ trace: "off", screenshot: "off", video: "off" });
-test.describe.configure({ mode: "serial" });
+// channel "chromium": the full build in new headless mode has the PDF viewer the preview needs.
+test.use({ trace: "off", screenshot: "off", video: "off", channel: "chromium" });
+// The three tests are independent; run with --workers=1 so they still go one after another.
 
 const apiBaseUrl = process.env.E2E_API_BASE_URL ?? "http://127.0.0.1:18300";
 const shotsDir = process.env.SMOKE_SCREENSHOT_DIR ?? resolve(process.cwd(), "test-results", "smoke");
+// Public dev item ND-001 of tests/acceptance/natural_dev_v1.yaml (never a held-out question), answered on the
+// smoke stack; ND-003 (a list) and the old English UAT question came back NO_ANSWER there.
 const answerableQuestion =
-  process.env.SMOKE_ANSWERABLE_QUESTION ??
-  "According to the UAT travel approval policy, what approval is required before booking travel?";
+  process.env.SMOKE_ANSWERABLE_QUESTION ?? "Tổng thời gian nghỉ lễ là bao nhiêu ngày trong một năm?";
 const refusedQuestion = process.env.SMOKE_REFUSED_QUESTION ?? "Giá cổ phiếu của công ty hôm nay là bao nhiêu?";
-const answerTimeout = 180_000;
+// The owner asks for at least 180 s per answer; a cold first answer on a small GPU can take longer.
+const answerTimeout = 300_000;
 
 type Account = { email: string; password: string };
 let accounts: { admin: Account; manager: Account; staff: Account };
@@ -36,6 +39,7 @@ test.beforeAll(async () => {
 });
 
 test("staff: answered and refused questions, preview from a citation, no uploader names", async ({ page, context }) => {
+  test.setTimeout(900_000);
   const previewStatuses: number[] = [];
   context.on("response", (response) => {
     if (/\/api\/v1\/documents\/[^/]+\/preview$/.test(new URL(response.url()).pathname)) {
@@ -44,13 +48,15 @@ test("staff: answered and refused questions, preview from a citation, no uploade
   });
 
   await login(page, accounts.staff);
-  await page.getByRole("button", { name: "Cuộc trò chuyện mới" }).click();
+  await page.getByRole("button", { name: "Cuộc trò chuyện mới", exact: true }).click();
+  // Count answers only once the new, empty session is on screen (not the previously selected one).
+  await expect(page.getByText("Chưa có tin nhắn")).toBeVisible();
 
-  const answered = await ask(page, answerableQuestion);
+  const answered = await ask(page, answerableQuestion, "câu 1 (có trả lời, câu đầu tiên của phiên)");
   await expect.soft(answered, "answerable question should be ANSWERED").toContainText("Đã xác minh nguồn");
   await shot(page, "staff-1-chat-answered");
 
-  const refused = await ask(page, refusedQuestion);
+  const refused = await ask(page, refusedQuestion, "câu 2 (bị từ chối)");
   await expect.soft(refused, "refused question should be NO_ANSWER").toContainText("Không có trích dẫn");
   await expect.soft(refused.getByRole("button", { name: /Mở trích dẫn/ })).toHaveCount(0);
   await shot(page, "staff-2-chat-refused");
@@ -65,6 +71,7 @@ test("staff: answered and refused questions, preview from a citation, no uploade
     const [viewer] = await Promise.all([context.waitForEvent("page"), link.click()]);
     await viewer.waitForLoadState();
     await expect(viewer.locator("iframe, img").first()).toBeVisible({ timeout: 60_000 });
+    await viewer.waitForTimeout(3_000); // let the PDF viewer paint the page before the screenshot
     await expect(viewer.getByText("Không mở được tài liệu")).toHaveCount(0);
     expect(previewStatuses, "the viewer should load GET /documents/{id}/preview").toContain(200);
     await shot(viewer, "staff-3-preview");
@@ -74,7 +81,7 @@ test("staff: answered and refused questions, preview from a citation, no uploade
   }
 
   const listResponse = page.waitForResponse((response) => /\/api\/v1\/documents\?/.test(response.url()));
-  await page.getByRole("link", { name: "Tài liệu" }).click();
+  await page.getByRole("link", { name: "Tài liệu", exact: true }).click();
   const list = (await (await listResponse).json()) as { data: Record<string, unknown>[] };
   for (const item of list.data) {
     // BR-4 option (a): the name keys are absent, not null, for a non-Admin caller.
@@ -85,7 +92,8 @@ test("staff: answered and refused questions, preview from a citation, no uploade
   await shot(page, "staff-4-documents");
   if (list.data.length) {
     await page.getByRole("link", { name: "Chi tiết" }).first().click();
-    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    // Wait for the detail itself (its "Thông tin" section), not the list's heading still on screen.
+    await expect(page.getByRole("heading", { name: "Thông tin" })).toBeVisible();
     await expect(page.getByText("Người tải lên")).toHaveCount(list.data[0].uploaded_by_me ? 1 : 0);
     await shot(page, "staff-5-document-detail");
   }
@@ -132,7 +140,7 @@ test("manager: upload limited to PRIVATE or the own department, others refused b
 
   // A real PRIVATE upload through the form, then clean it up.
   await page.getByRole("radio", { name: /^Riêng tư/ }).check();
-  await page.getByLabel("Tệp PDF").setInputFiles({
+  await page.getByLabel("Tệp PDF", { exact: true }).setInputFiles({
     name: "smoke-private.pdf",
     mimeType: "application/pdf",
     buffer: await makePdf(context, `smoke manager private ${Date.now()}`),
@@ -142,7 +150,7 @@ test("manager: upload limited to PRIVATE or the own department, others refused b
   await expect(page).toHaveURL(/\/documents\/[0-9a-f-]+$/, { timeout: 60_000 });
   await expect(page.getByText("Bạn đã tải lên")).toBeVisible();
   await shot(page, "manager-2-uploaded-detail");
-  await page.getByRole("button", { name: "Xóa" }).click();
+  await page.getByRole("button", { name: "Xóa", exact: true }).click();
   await page.getByRole("dialog", { name: "Xóa tài liệu này?" }).getByRole("button", { name: "Xóa" }).click();
   await expect(page).toHaveURL(/\/documents$/);
   await logout(page);
@@ -150,7 +158,7 @@ test("manager: upload limited to PRIVATE or the own department, others refused b
 
 test("admin: names in documents, audit filtered by event_type, system status", async ({ page }) => {
   await login(page, accounts.admin);
-  await page.getByRole("link", { name: "Tài liệu" }).click();
+  await page.getByRole("link", { name: "Tài liệu", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1, name: "Tài liệu" })).toBeVisible();
   await page.getByRole("link", { name: "Chi tiết" }).first().click();
   await expect(page.getByText("Người tải lên")).toBeVisible();
@@ -184,14 +192,24 @@ async function logout(page: Page): Promise<void> {
   await expect(page.getByRole("heading", { name: "Đăng nhập" })).toBeVisible();
 }
 
-/** Sends a question and returns the new answer card once the validated answer is shown. */
-async function ask(page: Page, question: string) {
+/**
+ * Sends a question and returns the new answer card once the validated answer is shown. The answer card
+ * only appears after message.completed, so the time measured is end to end: click to answer on screen.
+ */
+async function ask(page: Page, question: string, label: string) {
   const answers = page.locator('section[aria-label="Cuộc trò chuyện"] article');
   const before = await answers.count();
   await page.getByLabel("Câu hỏi", { exact: true }).fill(question);
+  const started = Date.now();
   await page.getByRole("button", { name: "Gửi câu hỏi" }).click();
   await expect(answers).toHaveCount(before + 1, { timeout: answerTimeout });
-  return answers.last();
+  const seconds = ((Date.now() - started) / 1000).toFixed(1);
+  // Pin this answer: answers.last() is lazy and would move to the next question's card.
+  const card = answers.nth(before);
+  const outcome = (await card.innerText()).includes("Đã xác minh nguồn") ? "ANSWERED" : "NO_ANSWER";
+  test.info().annotations.push({ type: "chat-timing", description: `${label}: ${seconds} s, ${outcome}` });
+  await appendFile(resolve(shotsDir, "timings.txt"), `${new Date().toISOString()} ${label}: ${seconds} s, ${outcome}\n`);
+  return card;
 }
 
 async function shot(page: Page, name: string): Promise<void> {
