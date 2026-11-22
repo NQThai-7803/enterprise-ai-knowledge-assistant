@@ -1,12 +1,52 @@
 
 # Implementation Tasks
 
+## Shared-layer refusals diagnosed (dev sets only) -- 2026-11-22
+
+- **DONE:** the 28 cases of priority 1 (below, "Order of the next work -- 2026-11-20") traced on
+  main + eval-only diagnostics (branch `diag/refusal-trace`), s3t, 2 runs each, identical in both:
+  UAT run 45021071406, `natural_dev_v1` run 45021074583. `simple_trace` now records one summary
+  per question (retrieval count, the prompt's chunks with scores, gold ranks, every LLM attempt);
+  `scripts/diagnostics/refusal_classes.py` classifies with rules fixed before the run.
+- **Every case reached the LLM** with 5 sources from 50 retrieved chunks; no pre-LLM gate refused
+  any. The eval reranker is heuristic (no scores), so the prompt takes the hybrid (RRF) order.
+
+  | Class | Cases | Evidence |
+  |---|---|---|
+  | answered in this batch (both runs) | Q039 Q064 | - |
+  | **retrieval miss: gold document in the prompt, gold chunk not** | Q003 Q006 Q042 Q048 Q075 ND-008 ND-009 | gold chunk ranked 3-4, cut by the 2-chunks-per-document limit (two other chunks of the same document come first) |
+  | same | Q031 Q063 | gold chunk ranked 6 (Q031 by the per-document limit, Q063 by the top 5) |
+  | same | Q001 Q007 Q093 | gold chunk ranked 9-13 |
+  | gate blocked although the right document | - | (Q031 ended on `claim_irrelevant` but its gold chunk was not in the prompt) |
+  | **LLM refused** (gold chunk in the prompt, ranked 1-2) | Q026 Q071 Q080 ND-003 ND-007 | `refusal_text` (absence sentences only); Q026 and ND-007 refused only at the retry after the validator rejected the first draft |
+  | **validator rejected, draft right** | Q029 Q030 Q033 Q037 ND-006 Q086 ND-018 | rules: `_passive_action_polarity_is_contradicted` (Q030 Q037), `_polarity_is_contradicted` (Q033), `_yes_no_evidence_has_required_anchor` (Q029), `_scoped_policy_yes_no_status` (ND-006), `_conditional_allowance_yes_no_status` (Q086), `_numbers_are_contradicted` (ND-018) |
+  | **validator rejected, model wrong** | Q096 Q097 | Q096 answers another topic (the reference value is not in the prompt); Q097 states a wrong rate: that sentence was SUPPORTED, the rejection came from the polarity rule on its right sentence |
+
+  The 12 retrieval misses end on `refusal_text` (8), `claim_insufficient` (2),
+  `claim_contradicted` (1), `claim_irrelevant` (1); in Q042 the reference value is in the prompt
+  anyway (from another chunk). Validator verdicts: by values for Q086 Q096 Q097 ND-018, by reading
+  the draft against the reference for the others.
+- **NEXT, owner decision (not fixed): one of**
+  1. **Prompt chunk selection:** let a third chunk of a document in (or rank chunks within a
+     document) in `_simple_select_hits`; targets the 7 cases at rank 3-4. Risk: rbac none (it only
+     chooses among permission-filtered hits); false_answer can rise (more same-document
+     distractors, e.g. neighbouring table rows); longer prompts (GPU latency).
+  2. **Validator rules in simple mode:** fix the misfires of the polarity, yes/no-status and
+     number-range rules; targets the 7 right drafts. Risk: false_answer, the largest: Q097 shows a
+     wrong value passing as SUPPORTED, so relaxing polarity alone would answer it wrongly; the
+     value check must hold first. rbac none (citations are still revalidated).
+  3. **Model refusals:** the absence-sentence prompt and the retry instruction (2 of 5 refused only
+     at the retry). Risk: false_answer on items that must be refused (false_refusal, relevance,
+     rbac deny items: an answer from a neighbouring permitted document); rbac leak none (the prompt
+     holds permitted chunks only).
+
 ## Chat cache audit -- 2026-11-22
 
 - **DONE:** no backend cache crosses users or outlives a revoked grant (`SECURITY.md`, "Chat path
   caches"); regression test `tests/api/test_chat_permission_isolation.py`.
-- **NEXT, owner decision (frontend):** **[High]** clear the React Query cache on logout and login;
-  until then a second account on the same browser tab can be shown the first one's cached data.
+- **HANDED TO THE UI SESSION (PR #42):** **[High]** clear the React Query cache on logout and
+  login; until then a second account on the same browser tab can be shown the first one's cached
+  data.
 
 ## GPU latency of the default measured (DEC-041) -- 2026-11-22
 
