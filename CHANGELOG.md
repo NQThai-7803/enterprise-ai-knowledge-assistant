@@ -6,6 +6,12 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### GPU latency of the default (DEC-041) -- 2026-11-22
+
+- **Measured:** LLM time per question on a GTX 1650 4 GB: p50 18.4 s, p95 25.5 s, first request
+  23.8 s, 33/33 layers on the GPU; end to end not measured (RAM). **Docs:** RAM recommendation
+  (8 GB minimum alone, 16 GB recommended) in `DEPLOYMENT.md` 3.3.
+
 ### UI backend requests BR-10, BR-11, BR-12 -- 2026-11-21
 
 - **Changed:** `422` responses fill `details` (was always `null`) with `[{field, code, message}]`

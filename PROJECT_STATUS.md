@@ -1,5 +1,13 @@
 # Project Status
 
+## GPU latency of the default measured (DEC-041) -- 2026-11-22
+
+- GTX 1650 4 GB, 8 GB RAM, only the smoke stack and Ollama running: LLM time per question p50
+  18.4 s, p95 25.5 s; first request (model load) 23.8 s; every layer on the GPU. End to end not
+  measured: RAM available stayed at 425-500 MB (lowest 99 MB during the calls).
+- Hardware recommendation: NVIDIA GPU with at least 4 GB VRAM; RAM at least 8 GB with the system
+  alone, 16 GB recommended (`DEPLOYMENT.md` 3.3).
+
 ## UI backend requests BR-10, BR-11, BR-12 -- 2026-11-21
 
 - `422` responses carry `details` `[{field, code, message}]` (stable codes, field named as sent);
