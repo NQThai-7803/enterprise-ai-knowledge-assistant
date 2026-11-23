@@ -14,10 +14,11 @@ export function ProtectedRoute({
 }) {
   const { status, user } = useAuth();
   const location = useLocation();
-  // Remember a signed-in session (derived state from earlier renders) to tell an explicit logout apart.
-  const [wasAuthenticated, setWasAuthenticated] = useState(false);
-  if (status === "authenticated" && !wasAuthenticated) {
-    setWasAuthenticated(true);
+  // The user signed in on this route (derived state from earlier renders): tells an explicit logout
+  // apart and binds an expired session's return path to that user.
+  const [sessionUserId, setSessionUserId] = useState<string | null>(null);
+  if (status === "authenticated" && user && user.id !== sessionUserId) {
+    setSessionUserId(user.id);
   }
 
   if (status === "loading") {
@@ -25,12 +26,17 @@ export function ProtectedRoute({
   }
 
   if (status !== "authenticated" || !user) {
-    // After an explicit logout the next person signs in fresh, not on the previous user's last page;
-    // an expired session or a tab opened without a token (D-7 viewer) still returns where it was.
-    const loggedOut = wasAuthenticated && status === "unauthenticated";
-    return (
-      <Navigate to="/login" replace state={loggedOut ? null : { from: `${location.pathname}${location.search}` }} />
-    );
+    // Return path: none after an explicit logout; for the same user only after an expired session
+    // (LoginPage compares userId), none if whose session it was is unknown (a reload with a dead
+    // token); for whoever signs in on a tab that never had a session (D-7 viewer without a token).
+    const from = `${location.pathname}${location.search}`;
+    let returnTo: { from: string; userId?: string } | null = null;
+    if (status === "expired" && sessionUserId) {
+      returnTo = { from, userId: sessionUserId };
+    } else if (status !== "expired" && !sessionUserId) {
+      returnTo = { from };
+    }
+    return <Navigate to="/login" replace state={returnTo} />;
   }
 
   if (roles && !hasRole(user, roles)) {

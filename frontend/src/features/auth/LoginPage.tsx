@@ -2,7 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Box, Eye, EyeOff } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 import { z } from "zod";
 import { safeErrorMessage } from "../../api/errors";
 import { Button } from "../../components/ui/Button";
@@ -22,12 +22,12 @@ type LoginForm = z.infer<typeof loginSchema>;
 const FEATURES = ["Trích dẫn từng ý", "Phân quyền theo phòng ban"];
 
 export function LoginPage() {
-  const { status, login } = useAuth();
-  const navigate = useNavigate();
+  const { status, user, login } = useAuth();
   const location = useLocation();
   const { pushToast } = useToast();
   const [showPassword, setShowPassword] = useState(false);
-  const from = (location.state as { from?: string } | null)?.from ?? "/chat";
+  // Set by ProtectedRoute; userId is present when the path belongs to an expired session.
+  const returnTo = location.state as { from?: string; userId?: string } | null;
 
   const {
     register,
@@ -42,14 +42,16 @@ export function LoginPage() {
     }
   }, [pushToast, status]);
 
-  if (status === "authenticated") {
-    return <Navigate to={from} replace />;
+  if (status === "authenticated" && user) {
+    // Another user than the expired session's starts at the home page (/chat for every role).
+    const owned = !returnTo?.userId || returnTo.userId === user.id;
+    return <Navigate to={(owned && returnTo?.from) || "/chat"} replace />;
   }
 
   const onSubmit = handleSubmit(async (values) => {
     try {
+      // The authenticated render above navigates.
       await login(values);
-      navigate(from, { replace: true });
     } catch (error) {
       setError("root", { message: safeErrorMessage(error) });
     }

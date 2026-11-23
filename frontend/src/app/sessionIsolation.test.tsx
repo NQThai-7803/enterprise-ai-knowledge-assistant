@@ -3,6 +3,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { refreshAccessToken } from "../api/client";
 import type { AuthenticatedUser } from "../api/types";
 import { ToastProvider } from "../components/feedback/ToastProvider";
 import { AuthProvider } from "../features/auth/AuthProvider";
@@ -82,6 +83,10 @@ function setup({ path: initialPath = "/login", seed }: { path?: string; seed?: (
   const staffGate = new Promise<void>((resolve) => {
     releaseStaff = resolve;
   });
+  let releaseRefresh!: () => void;
+  const refreshGate = new Promise<void>((resolve) => {
+    releaseRefresh = resolve;
+  });
   // The cache as the staff's first request leaves: before any of the staff's data can arrive.
   const atFirstStaffRequest: { cached: unknown[]; mutations: number } = { cached: [], mutations: -1 };
 
@@ -101,6 +106,14 @@ function setup({ path: initialPath = "/login", seed }: { path?: string; seed?: (
       }
       if (path === "/api/v1/auth/logout") return new Response(null, { status: 204 });
       if (path === "/api/v1/auth/me" && token === "Bearer staff-access") return json({ data: users.staff, meta: null });
+      if (path === "/api/v1/auth/me" && token === "Bearer admin-access-2") return json({ data: users.admin, meta: null });
+      if (path === "/api/v1/auth/refresh") {
+        await refreshGate;
+        return json({
+          data: { access_token: "admin-access-2", refresh_token: "admin-refresh-2", token_type: "bearer", expires_in: 900, user: users.admin },
+          meta: null,
+        });
+      }
       if (path.startsWith("/health")) return json({ status: "ready", checks: {} });
 
       if (token === "Bearer staff-access") {
@@ -114,6 +127,7 @@ function setup({ path: initialPath = "/login", seed }: { path?: string; seed?: (
       }
       if (token === "Bearer admin-access") {
         if (path === "/api/v1/chat/sessions") return json(list([adminSession]));
+        if (path === "/api/v1/users" || path === "/api/v1/departments") return json(list([]));
         if (path === "/api/v1/messages/m2/feedback") {
           return json({ data: { id: "f1", message_id: "m2", rating: "HELPFUL", reason: null, created_at: CREATED, updated_at: CREATED }, meta: null });
         }
@@ -132,18 +146,25 @@ function setup({ path: initialPath = "/login", seed }: { path?: string; seed?: (
     }),
   );
 
-  render(
-    <QueryClientProvider client={queryClient}>
-      <ToastProvider>
-        <AuthProvider>
-          <MemoryRouter initialEntries={[initialPath]}>
-            <App />
-          </MemoryRouter>
-        </AuthProvider>
-      </ToastProvider>
-    </QueryClientProvider>,
-  );
-  return { user: userEvent.setup(), queryClient, cachedKeys, releaseStaff, atFirstStaffRequest };
+  const renderApp = (path: string, client: QueryClient) =>
+    render(
+      <QueryClientProvider client={client}>
+        <ToastProvider>
+          <AuthProvider>
+            <MemoryRouter initialEntries={[path]}>
+              <App />
+            </MemoryRouter>
+          </AuthProvider>
+        </ToastProvider>
+      </QueryClientProvider>,
+    );
+  let view = renderApp(initialPath, queryClient);
+  // A tab reload: a fresh app on the same sessionStorage.
+  const reload = (path: string) => {
+    view.unmount();
+    view = renderApp(path, new QueryClient({ defaultOptions: { queries: { retry: false } } }));
+  };
+  return { user: userEvent.setup(), queryClient, cachedKeys, releaseStaff, releaseRefresh, atFirstStaffRequest, reload };
 }
 
 async function signIn(user: ReturnType<typeof userEvent.setup>, email: string) {
@@ -250,5 +271,52 @@ describe("session boundary", () => {
     expect(await screen.findByRole("button", { name: "Đăng nhập" })).toBeInTheDocument();
     expect(cachedKeys()).toEqual([]);
     expect(document.body.textContent).not.toContain(MARK);
+  });
+});
+
+describe("token refresh during a logout", () => {
+  it("a refresh answered after the logout leaves no tokens, and a reload opens the sign-in page", async () => {
+    const { user, releaseRefresh, reload } = setup();
+    await signIn(user, users.admin.email);
+    expect(await screen.findByText(`Trả lời ${MARK}`)).toBeInTheDocument();
+
+    // A request found its access token expired and is refreshing when the user logs out.
+    const refreshing = refreshAccessToken();
+    await user.click(screen.getByRole("button", { name: "Đăng xuất" }));
+    expect(await screen.findByRole("button", { name: "Đăng nhập" })).toBeInTheDocument();
+    releaseRefresh();
+    expect(await refreshing).toBe(false);
+    expect(sessionStorage.length).toBe(0);
+
+    reload("/chat");
+    expect(await screen.findByRole("button", { name: "Đăng nhập" })).toBeInTheDocument();
+    expect(screen.queryByText(`Trả lời ${MARK}`)).not.toBeInTheDocument();
+  });
+});
+
+describe("return path after an expired session", () => {
+  async function adminOnUsersPageThenExpires(user: ReturnType<typeof userEvent.setup>) {
+    await signIn(user, users.admin.email);
+    await user.click(await screen.findByRole("link", { name: "Người dùng" }));
+    expect(await screen.findByRole("heading", { level: 1, name: "Người dùng" })).toBeInTheDocument();
+    window.dispatchEvent(new CustomEvent("auth:expired"));
+    expect(await screen.findByRole("button", { name: "Đăng nhập" })).toBeInTheDocument();
+  }
+
+  it("brings the same user back to the page they were on", async () => {
+    const { user } = setup();
+    await adminOnUsersPageThenExpires(user);
+    await signIn(user, users.admin.email);
+    expect(await screen.findByRole("heading", { level: 1, name: "Người dùng" })).toBeInTheDocument();
+  });
+
+  it("sends another user to the home page, not to the expired session's page", async () => {
+    const { user, releaseStaff } = setup();
+    releaseStaff();
+    await adminOnUsersPageThenExpires(user);
+    await signIn(user, users.staff.email);
+    expect(await screen.findByRole("button", { name: "Cuộc trò chuyện mới" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Bạn không có quyền xem trang này" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { level: 1, name: "Người dùng" })).not.toBeInTheDocument();
   });
 });

@@ -184,11 +184,14 @@ Code giao diện do Claude Code chạy trực tiếp trên máy Windows (git, np
   - Bản nháp chat, luồng SSE và form nằm trong state của trang, dưới `ProtectedRoute`, nên bị hủy cùng
     trang; SSE abort khi trang unmount. Ngoài token trong `sessionStorage` (AuthProvider xóa), app không
     lưu gì vào `localStorage`, IndexedDB hay Cache API.
-  - Còn lại 2 điểm chưa xử lý:
-    1. Một lượt refresh token đang chạy đúng lúc đăng xuất có thể ghi lại token mới vào
-       `sessionStorage` sau khi đã xóa (`refreshAccessToken` trong `api/client.ts`). Tải lại tab khi đó
-       sẽ khôi phục phiên cũ. Cách sửa đề xuất: chỉ lưu khi refresh token hiện tại vẫn là token đã gửi
-       đi. Cần owner đồng ý vì `client.ts` không được đổi logic.
-    2. Khi phiên hết hạn, màn đăng nhập giữ đường dẫn cuối (`from`) để quay lại đúng chỗ. Nếu người
-       khác đăng nhập ở tab đó, họ được đưa tới đường dẫn ấy. Đường dẫn có thể chứa id tài liệu, nhưng
-       API vẫn kiểm quyền, nên nội dung không lộ.
+  - Hai điểm từng ghi là rủi ro đã sửa (23/11/2026, owner đồng ý):
+    1. **Refresh token khi đăng xuất:** `refreshAccessToken` (`api/client.ts`) giờ là compare-and-set.
+       Token mới chỉ được lưu nếu refresh token đang lưu vẫn là token đã gửi đi. Nếu trong lúc chờ
+       người dùng đã đăng xuất hoặc người khác đã đăng nhập, kết quả bị bỏ và hàm trả `false`. Lượt
+       refresh thất bại cũng chỉ kết thúc phiên đã gửi nó, không xóa token hay phát `auth:expired` cho
+       phiên mới hơn. Sau khi đăng xuất, tải lại tab sẽ vào màn đăng nhập.
+    2. **Đường dẫn quay lại sau khi phiên hết hạn:** `ProtectedRoute` lưu đường dẫn kèm user id. Nếu
+       đúng user đó đăng nhập lại, họ quay về trang cũ; user khác về trang chủ (`/chat`, chung cho cả
+       3 vai trò). Sau khi đăng xuất chủ động thì không giữ đường dẫn. Nếu tab không biết phiên đã
+       hết hạn là của ai (tải lại khi token đã chết), cũng không giữ. Tab chưa từng có phiên (D-7, mở
+       trình xem ở tab mới mà không có token) vẫn quay về đúng trang cho người đăng nhập.
