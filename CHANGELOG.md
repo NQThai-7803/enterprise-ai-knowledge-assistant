@@ -6,6 +6,16 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### Refusal fixes behind flags (DEC-042) -- 2026-11-24
+
+- **Added (off):**
+  - `RAG_PROMPT_CHUNK_SELECTION` = `rrf` | `per_document_3` | `lexical`;
+  - `RAG_VALIDATOR_V2_ENABLED`: corrected passive-action, polarity, unit, scope, fixed-benefit and grounding rules, plus a presence check for amounts, days and rates.
+- **Eval:**
+  - `simple_trace` records prompt tokens;
+  - `scripts/diagnostics/dec042_table.py`.
+- **Docs:** DEC-042 (rule registered before measuring, result, proposal). No default changed.
+
 ### Shared-layer refusal diagnosis -- 2026-11-22
 
 - **Eval diagnostics:** `simple_trace` adds a per-question record (retrieval count, prompt chunks

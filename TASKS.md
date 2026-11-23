@@ -1,6 +1,24 @@
 
 # Implementation Tasks
 
+## Refusal fixes measured (DEC-042) -- 2026-11-24
+
+- **DONE, flags off:**
+  - `RAG_PROMPT_CHUNK_SELECTION` (2a `per_document_3`, 2b `lexical`);
+  - `RAG_VALIDATOR_V2_ENABLED` (the corrected rules and the value presence check).
+- **Measured** on the 7 dev sets × 6 configurations. Under the rule registered before measuring:
+  - accepted: 2a, 1 and 2a+1;
+  - rejected: 2b.
+  - No guard set moved under any configuration, so they are no evidence for either direction.
+  - Details and item IDs in `DECISIONS.md` DEC-042.
+- **WAITING FOR OWNER:** which, if any, becomes the default.
+  - Proposal: 2a.
+  - Not 1 yet: it brings 3 more false answers + wrong values on natural + UAT, including a value of another row of the cited chunk.
+- **NEXT if 1 is pursued:**
+  - bind a value to the row it belongs to (the Q097 / ND-015 kind);
+  - find why the model cites ND-HR-005 for the on-call items (Q030, Q037).
+- **Correction to the PHA 2 table below:** Q029 is decided by `_answer_has_grounded_signal` (words of 4+ letters only), not by `_yes_no_evidence_has_required_anchor`.
+
 ## Shared-layer refusals diagnosed (dev sets only) -- 2026-11-22
 
 - **DONE:** the 28 cases of priority 1 (below, "Order of the next work -- 2026-11-20") traced on

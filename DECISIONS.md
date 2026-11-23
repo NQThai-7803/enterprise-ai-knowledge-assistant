@@ -1042,3 +1042,86 @@ answers + wrong values on the five other sets, then to the smaller mean prompt.
 **Known limitation:** the 28 diagnosed cases are UAT and `natural_dev_v1` items, and the fixes were
 designed on them, so a gain on those two sets is biased upward. The five other sets are the guard
 that matters. No default changes under this decision; the result is a proposal for the owner.
+
+### Result (2026-11-24) and the proposal; no default changed
+
+**Runs** (commit 4930af6, one run each, all six configurations in every job):
+
+- `natural_dev_v1`: 45177644610.
+- rbac: 45177651696.
+- relevance: 45177658451.
+- false_refusal: 45177665692.
+- false_refusal_v2: 45177671410.
+- compound: 45177676731.
+- UAT, in three parts:
+  - 45177685295, attempt 2. Attempt 1 failed: the runner's Ollama had no `llama-server` binary, so all 34 items were infra errors and the job was run again.
+  - 45177692884.
+  - 45177701483.
+
+No infra error in the measured attempts.
+
+| | base | 2a | 2b | 1 | 2a+1 | 2b+1 |
+|---|---:|---:|---:|---:|---:|---:|
+| `natural_dev_v1`: correct | 7 | 8 | 8 | 9 | 10 | 10 |
+| false refusals | 8 | 7 | 6 | 5 | 3 | 4 |
+| false answers + wrong values | 5 | 5 | 6 | 6 | 7 | 6 |
+| UAT (100): correct | 69 | 72 | 66 | 71 | 74 | 67 |
+| false refusals | 23 | 20 | 26 | 19 | 15 | 24 |
+| wrong values | 8 | 8 | 8 | 10 | 11 | 9 |
+| 5 guard sets (137 items): correct / false answers + wrong values | 106 / 10 | 106 / 10 | 106 / 10 | 106 / 10 | 106 / 10 | 106 / 10 |
+| leaks, every set | 0 | 0 | 0 | 0 | 0 | 0 |
+| mean prompt tokens per LLM call, natural / UAT | 2273 / 2273 | 2271 / 2273 | 2243 / 2269 | 2272 / 2269 | 2264 / 2267 | 2250 / 2267 |
+
+**Verdicts under the rule:**
+
+- 2a: accepted (+4).
+- 2b: rejected (natural + UAT correct −2).
+- 1: accepted (+4).
+- 2a+1, the combination chosen since only 2a of 2a/2b is accepted: accepted (+8).
+- 2b+1: +1, not the chosen combination.
+
+**What the rule could not see:** no guard set moved under any configuration. Their documents are short, so 2a and 2b put the same chunks in the prompt (identical prompt sizes). Variant 1 changed one retry on compound, with the same outcome. The guard sets are therefore no evidence for or against either direction. The only signal comes from `natural_dev_v1` and UAT, the two sets the fixes were designed on.
+
+**Items (IDs only):**
+
+- **2a:**
+  - fixed: ND-005; Q031, Q039, Q042, Q046, Q048;
+  - broken: Q052, Q090;
+  - newly wrong: ND-003, Q041 (as many wrong items were fixed, so the totals stay equal).
+- **1:**
+  - fixed: ND-006, ND-019; Q046, Q086;
+  - newly wrong:
+    - ND-015: a value of another row of the cited chunk (the known limit of the presence check);
+    - ND-007: a partial answer, graded wrong;
+    - Q030, Q037: content as the reference, but the cited document is ND-HR-005, not the reference ND-HR-003.
+- **2a+1:**
+  - fixed: ND-005, ND-006, ND-019; Q031, Q039, Q042, Q046, Q048, Q086;
+  - broken: Q052;
+  - newly wrong: ND-003, ND-007, ND-015, Q030, Q037, Q041, Q071.
+- **2b:**
+  - fixes 3 natural and 7 UAT items;
+  - breaks 2 and 10.
+
+**Validator v2, against the PHA 2 diagnosis:**
+
+- **The 7 right drafts:**
+  - All 7 pass the corrected rules when the recorded drafts are validated again.
+  - In the measurement, only Q086 and ND-006 became correct.
+  - Q030 and Q037 became answers that cite another document.
+  - Q029, Q033 and ND-018 were refused again: the model wrote a new draft, which failed another check.
+- **Correction to the PHA 2 table:** Q029 was rejected by `_answer_has_grounded_signal`, which counts only words of 4+ letters, not by `_yes_no_evidence_has_required_anchor`. The anchor rule is unchanged.
+- **The value check is presence only.** A rule binding a value to the subject the claim gives it was tried, and rejected right claims each time: an answer normally repeats the question's words. The real Q097 (a right rate of another row, given for a day the source never names) is still rejected, but by another rule.
+
+**Reranker (step 3, report only):** the demo stack `eaka-smoke` (main defaults) and the eval stack both run `RERANKER_PROVIDER=heuristic`, mode `lexical_fallback`. The simple path (s3t) does not rerank: the reranker only sets the candidate count (50), and the prompt takes the hybrid order. Only the legacy path calls `rerank()`.
+
+**Proposal for the owner (no default changes until the owner chooses):**
+
+1. **2a, `RAG_PROMPT_CHUNK_SELECTION=per_document_3`:**
+   - The cleanest: +4 right answers on natural + UAT, no change in false answers + wrong values on any set, same prompt size.
+   - Limit: the guard sets do not exercise it.
+2. **1, `RAG_VALIDATOR_V2_ENABLED`, not as a default yet:**
+   - It gives +4, but 3 more false answers + wrong values on natural + UAT.
+   - Before it can be a default, it needs the value-of-another-row limit and the choice of cited document.
+3. **2a+1:** the largest gain (+8), with 5 more false answers + wrong values on natural + UAT.
+
+A default flip still follows DEC-026, and the two-job rule of DEC-027.
