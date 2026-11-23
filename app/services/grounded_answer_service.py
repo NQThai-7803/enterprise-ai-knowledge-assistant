@@ -1428,7 +1428,11 @@ class GroundedAnswerService:
                 )
             except Exception as exc:
                 raise ChatRetrievalFailedError() from exc
-            hits = _simple_select_hits(result.hits)
+            hits = _simple_select_hits(
+                result.hits,
+                selection=self.settings.rag_prompt_chunk_selection,
+                question=grounding_question,
+            )
         sentinel = self.settings.llm_no_answer_sentinel
         short = self.settings.rag_simple_short_prompt_enabled
         selected = select_context_for_prompt(
@@ -1534,6 +1538,7 @@ class GroundedAnswerService:
         validation_flags = {
             "relaxed_rules": settings.rag_simple_relaxed_rules_enabled,
             "question_list_segments": settings.rag_simple_question_list_segments_enabled,
+            "validator_v2": settings.rag_validator_v2_enabled,
         }
         # s4 and s2/s5 drop claims; none left is an end point: a retry would cite the same.
         if settings.rag_simple_subject_binding_enabled:
@@ -5681,18 +5686,40 @@ def _segment_break(gap: str) -> str:
 
 def _simple_select_hits(
     hits: Sequence[HybridRetrievalHit],
+    *,
+    selection: str = "rrf",
+    question: str = "",
 ) -> tuple[HybridRetrievalHit, ...]:
-    """Hybrid order, the first 5 chunks with at most 2 from one document."""
+    """Hybrid order, the first 5 chunks with at most 2 from one document. DEC-042:
+    `per_document_3` allows 3; `lexical` keeps each document's places but gives them to its
+    retrieved chunks with the most word overlap with the question (hybrid order on a tie).
+    The hits are already permission- and DRAFT-filtered by retrieval."""
+    cap = 3 if selection == "per_document_3" else _SIMPLE_MAX_CHUNKS_PER_DOCUMENT
     chosen: list[HybridRetrievalHit] = []
     per_document: dict[UUID, int] = {}
     for hit in hits:
-        if per_document.get(hit.document_id, 0) >= _SIMPLE_MAX_CHUNKS_PER_DOCUMENT:
+        if per_document.get(hit.document_id, 0) >= cap:
             continue
         chosen.append(hit)
         per_document[hit.document_id] = per_document.get(hit.document_id, 0) + 1
         if len(chosen) == _SIMPLE_TOP_K:
             break
-    return tuple(chosen)
+    if selection != "lexical":
+        return tuple(chosen)
+    by_document: dict[UUID, list[tuple[int, int, HybridRetrievalHit]]] = {}
+    for index, hit in enumerate(hits):
+        overlap = _question_word_overlap(question, hit.text)
+        by_document.setdefault(hit.document_id, []).append((-overlap, index, hit))
+    queues = {document: sorted(items) for document, items in by_document.items()}
+    return tuple(queues[hit.document_id].pop(0)[2] for hit in chosen)
+
+
+def _question_word_overlap(question: str, text: str) -> int:
+    """Word pairs (counted twice) and content words a chunk shares with the question."""
+    asked = re.findall(r"\w+", fold_text(question))
+    words = re.findall(r"\w+", fold_text(text))
+    pairs = set(zip(asked, asked[1:], strict=False)) & set(zip(words, words[1:], strict=False))
+    return 2 * len(pairs) + len(question_content_terms(question) & set(words))
 
 
 def _simple_claim_labels(claim: str) -> tuple[str, ...]:

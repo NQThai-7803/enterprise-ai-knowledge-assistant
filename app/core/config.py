@@ -200,6 +200,13 @@ class Settings(BaseSettings):
     # s4: a value in a claim must sit in a cited sentence or table row that names the subject
     # the question asks about, when another sentence or row with a value of that kind does.
     rag_simple_subject_binding_enabled: bool = False
+    # DEC-042 direction 2, the simple path's prompt chunks (5, in hybrid order): rrf = at most 2
+    # per document; per_document_3 = at most 3; lexical = at most 2, a document's chunks ordered
+    # by word overlap with the question. Chosen among permission- and DRAFT-filtered hits only.
+    rag_prompt_chunk_selection: Literal["rrf", "per_document_3", "lexical"] = "rrf"
+    # DEC-042 direction 1, simple path only: validator rules corrected where they rejected right
+    # drafts, and every amount, number of days and rate of a claim checked against its source.
+    rag_validator_v2_enabled: bool = False
     # s5: the per-claim relevance check scores (question or part, cited sentence) with this
     # cross-encoder instead of e5 (DEC-027); loaded on first use from reranker_model_cache_path.
     rag_simple_claim_cross_encoder_enabled: bool = False

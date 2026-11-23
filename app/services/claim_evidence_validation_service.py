@@ -777,9 +777,13 @@ def _scoped_policy_yes_no_status(
 
 def _scoped_policy_proposition(text: str) -> _ScopedPolicyProposition:
     folded = f" {fold_text(text)} "
+    owner_text = folded
+    if _VALIDATOR_V2.get():
+        # v2: "cho nguoi khac" (to others) is who is told, not whose data it is.
+        owner_text = _RECIPIENT_OTHER.sub(" ", folded)
     scope = (
         "OTHER"
-        if _has_any_phrase(folded, _YES_NO_OTHER_REFERENCE_CUES)
+        if _has_any_phrase(owner_text, _YES_NO_OTHER_REFERENCE_CUES)
         else "OWN"
         if _has_any_phrase(folded, _YES_NO_SELF_REFERENCE_CUES)
         else "UNSPECIFIED"
@@ -815,6 +819,12 @@ def _scoped_policy_proposition(text: str) -> _ScopedPolicyProposition:
         governing_predicate=governing_predicate,
         negated=negated,
     )
+
+
+_RECIPIENT_OTHER = re.compile(
+    r"\b(?:cho|voi|toi|den|to|with)\s+(?:nguoi|nhan vien|nguoi lao dong|dong nghiep)\s+khac\b"
+    r"|\b(?:to|with)\s+(?:others|other employees|another employee)\b"
+)
 
 
 def _effective_policy_relation(proposition: _ScopedPolicyProposition) -> str | None:
@@ -1348,6 +1358,9 @@ def _validate_answer_against_evidence(
     analysis = analyze_question(question) if question is not None else None
     is_yes_no = analysis is not None and analysis.is_yes_no
 
+    if _VALIDATOR_V2.get() and _claim_values_unsupported(answer=answer, evidence=evidence):
+        return ClaimEvidenceStatus.CONTRADICTED
+
     relaxed = _RELAXED_RULES.get()
     if not relaxed and question is not None and annual_leave_relation_intent(question):
         leave_status = _annual_leave_relation_alignment_status(
@@ -1724,6 +1737,7 @@ def _conditional_allowance_yes_no_status(
 ) -> ClaimEvidenceStatus | None:
     """Validate an explicit monetary allowance and its applicability clause."""
 
+    rows = re.split(r"(?<=[.!?;])\s+|\n+", evidence)
     evidence = " ".join(evidence.split())
     if not analyze_question(question).is_yes_no:
         return None
@@ -1764,6 +1778,19 @@ def _conditional_allowance_yes_no_status(
 
     # A YES may establish benefit existence, or a qualifying scenario. It must
     # reproduce an explicit positive relationship rather than a bare amount.
+    if not positive_clause and _VALIDATOR_V2.get():
+        # v2: a fixed benefit in a table has no "ap dung" clause; the row that holds the
+        # answer's amount and names what is asked about grants it.
+        answer_numbers = set(_numbers(answer))
+        positive_clause = next(
+            (
+                " ".join(row.split())
+                for row in rows
+                if answer_numbers.intersection(_numbers(row))
+                and question_terms.intersection(_conditional_allowance_terms(row))
+            ),
+            "",
+        )
     if not positive_clause:
         return ClaimEvidenceStatus.INSUFFICIENT
     if not any(cue in answer for cue in ("ap dung", "duoc", "eligible", "approved", "regular")):
@@ -2569,6 +2596,10 @@ def _contains_folded_term(text: str, term: str) -> bool:
 def _polarity_is_contradicted(answer: str, evidence: str) -> bool:
     if _passive_action_polarity_is_contradicted(answer=answer, evidence=evidence):
         return True
+    if _VALIDATOR_V2.get():
+        # A cue elsewhere in a wide chunk ("khong the" about another step) says nothing about
+        # the sentence the claim rests on.
+        evidence = supporting_sentence(answer=answer, evidence=evidence) or evidence
 
     evidence_must_not = _has_any(evidence, _MUST_NOT_CUES)
     answer_must_not = _has_any(answer, _MUST_NOT_CUES)
@@ -2691,6 +2722,12 @@ def _attendance_policy_yes_no_status(
 
 def _passive_action_polarity_is_contradicted(*, answer: str, evidence: str) -> bool:
     """Reject reversing a source's `duoc <action>` passive policy statement."""
+    if _VALIDATOR_V2.get():
+        return _passive_actions_conflict(
+            _passive_actions(answer, negated=True), _passive_actions(evidence, negated=False)
+        ) or _passive_actions_conflict(
+            _passive_actions(evidence, negated=True), _passive_actions(answer, negated=False)
+        )
 
     def negated_actions(value: str) -> tuple[str, ...]:
         actions: list[str] = []
@@ -2711,6 +2748,36 @@ def _passive_action_polarity_is_contradicted(*, answer: str, evidence: str) -> b
 
     return any(has_positive_action(evidence, action) for action in negated_actions(answer)) or any(
         has_positive_action(answer, action) for action in negated_actions(evidence)
+    )
+
+
+# v2: "khong duoc ghi nhan la X" and "duoc ghi nhan de Y" state different things.
+_ACTION_LINK_WORDS = frozenset(
+    {"la", "de", "cho", "khi", "neu", "vao", "voi", "theo", "tai", "tu", "boi", "nhu"}
+)
+
+
+def _passive_actions(value: str, *, negated: bool) -> set[tuple[str, str | None]]:
+    """(action, the link word right after it or None) of each `[khong] duoc <action>`."""
+    pattern = r"\bkhong\s+duoc\s+" if negated else r"(?<!khong\s)\bduoc\s+"
+    actions = set()
+    for match in re.finditer(pattern + r"((?:\w+\s+){0,2}\w+)", value):
+        tokens = match.group(1).split()
+        cut = next((i for i, token in enumerate(tokens) if token in _ACTION_LINK_WORDS), None)
+        verb = tokens[: 2 if cut is None else min(cut, 2)]
+        if verb:
+            link = tokens[cut] if cut is not None and cut <= 2 else None
+            actions.add((" ".join(verb), link))
+    return actions
+
+
+def _passive_actions_conflict(
+    negated: set[tuple[str, str | None]], positive: set[tuple[str, str | None]]
+) -> bool:
+    return any(
+        action == other and (link is None or other_link is None or link == other_link)
+        for action, link in negated
+        for other, other_link in positive
     )
 
 
@@ -2765,9 +2832,20 @@ def canonical_number_unit_pairs(folded_text: str) -> tuple[tuple[str, str], ...]
     return tuple(pairs)
 
 
+# v2: "Thang 01 - 02 cua nam" holds no number of a unit "cua".
+_NOT_A_UNIT = frozenset(
+    {"cua", "va", "hoac", "la", "cho", "trong", "tu", "den", "toi", "voi", "theo", "tai", "ve",
+     "khi", "neu", "thi", "de", "nay", "do", "duoc", "se", "da", "cung", "nhu", "ma", "cac",
+     "nhung", "of", "and", "or", "to", "in", "for", "the"}
+)  # fmt: skip
+
+
 def _canonical_numbers_are_contradicted(answer: str, evidence: str) -> bool:
     answer_pairs = canonical_number_unit_pairs(answer)
     evidence_pairs = canonical_number_unit_pairs(evidence)
+    if _VALIDATOR_V2.get():
+        answer_pairs = tuple((v, "" if u in _NOT_A_UNIT else u) for v, u in answer_pairs)
+        evidence_pairs = tuple((v, "" if u in _NOT_A_UNIT else u) for v, u in evidence_pairs)
     with_unit = {pair for pair in answer_pairs if pair[1]}
     evidence_with_unit = {pair for pair in evidence_pairs if pair[1]}
     if with_unit and evidence_with_unit and with_unit.isdisjoint(evidence_with_unit):
@@ -2804,6 +2882,7 @@ _EVIDENCE_SEGMENT_BREAK = re.compile(r"(?<=[.!?])\s+|\n+")
 _RELAXED_RULES: contextvars.ContextVar[bool] = contextvars.ContextVar(
     "relaxed_rules", default=False
 )
+_VALIDATOR_V2: contextvars.ContextVar[bool] = contextvars.ContextVar("validator_v2", default=False)
 # s3: a whole question-list chunk counts by its answer segments too.
 _QUESTION_LIST_SEGMENTS: contextvars.ContextVar[bool] = contextvars.ContextVar(
     "question_list_segments", default=False
@@ -2812,22 +2891,29 @@ _QUESTION_LIST_SEGMENTS: contextvars.ContextVar[bool] = contextvars.ContextVar(
 
 @contextlib.contextmanager
 def simple_validation(
-    *, relaxed_rules: bool = False, question_list_segments: bool = False
+    *,
+    relaxed_rules: bool = False,
+    question_list_segments: bool = False,
+    validator_v2: bool = False,
 ) -> Iterator[None]:
     """Simple answer mode: normalized numbers, and a whole chunk that classifies as reference
     (document control, related documents, ...) counts as evidence by its answer segments.
     `relaxed_rules` (s2) skips the subject-alignment rule and the attendance, annual-leave and
     bereavement rules; the number, polarity and evidence checks stay. `question_list_segments`
-    (s3) lets a question-list chunk count by its segments that are not questions."""
+    (s3) lets a question-list chunk count by its segments that are not questions.
+    `validator_v2` (DEC-042) corrects the rules that rejected right drafts and checks every
+    amount, number of days and rate of a claim against its source."""
     tokens = (
         _REFERENCE_SEGMENTS.set(True),
         _RELAXED_RULES.set(relaxed_rules),
         _QUESTION_LIST_SEGMENTS.set(question_list_segments),
+        _VALIDATOR_V2.set(validator_v2),
     )
     try:
         with number_normalization():
             yield
     finally:
+        _VALIDATOR_V2.reset(tokens[3])
         _QUESTION_LIST_SEGMENTS.reset(tokens[2])
         _RELAXED_RULES.reset(tokens[1])
         _REFERENCE_SEGMENTS.reset(tokens[0])
@@ -3131,10 +3217,43 @@ def _answer_has_grounded_signal(*, answer: str, evidence: str) -> bool:
         for term in re.findall(r"\w+", answer)
         if len(term) >= 4 and term not in {"khong", "duoc", "phai", "trong", "answer"}
     }
+    if _VALIDATOR_V2.get():
+        # v2: most Vietnamese syllables are under 4 letters ("gio cot loi"); two word pairs of
+        # the answer found in the evidence are a grounded signal.
+        words = re.findall(r"\w+", answer)
+        flat = " ".join(re.findall(r"\w+", evidence))
+        pairs = {f"{a} {b}" for a, b in zip(words, words[1:], strict=False)}
+        pairs = {pair for pair in pairs if not set(pair.split()) <= _GROUNDING_PAIR_FILLERS}
+        # ...but only when the claim negates as the sentence it rests on does.
+        resting = supporting_sentence(answer=answer, evidence=evidence) or evidence
+        same_polarity = _has_any(answer, _NEGATION_CUES) == _has_any(resting, _NEGATION_CUES)
+        if same_polarity and sum(f" {pair} " in f" {flat} " for pair in pairs) >= 2:
+            return True
     if len(substantive_terms) < 2:
         return False
     matched = {term for term in substantive_terms if term in evidence}
     return len(matched) >= min(3, len(substantive_terms))
+
+
+_GROUNDING_PAIR_FILLERS = frozenset(
+    {"co", "khong", "duoc", "phai", "la", "va", "cua", "cho", "trong", "theo", "neu", "thi",
+     "khi", "nhan", "vien", "cong", "ty"}
+)  # fmt: skip
+# v2: the values a claim is checked for: amounts of money, numbers of days, rates.
+_CHECKED_VALUE_UNITS = frozenset({"dong", "ngay", "%"})
+
+
+def _claim_values_unsupported(*, answer: str, evidence: str) -> bool:
+    """v2: True when an amount of money, a number of days or a rate in the claim is not in the
+    cited source, both written one way. shortcut: presence only; a value of another row of the
+    same source (a holiday rate given for a weekday) passes, as no word rule told those apart
+    on the diagnosis drafts without rejecting right claims (DEC-042)."""
+    claimed = {
+        pair
+        for pair in canonical_number_unit_pairs(fold_text(answer))
+        if pair[1] in _CHECKED_VALUE_UNITS
+    }
+    return bool(claimed) and not claimed <= set(canonical_number_unit_pairs(fold_text(evidence)))
 
 
 # shortcut: Vietnamese units only, extend when English value questions show the same failure.
