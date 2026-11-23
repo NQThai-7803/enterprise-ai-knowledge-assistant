@@ -410,10 +410,14 @@ export async function refreshAccessToken(): Promise<boolean> {
   refreshPromise ??= apiClient.auth
     .refresh(refreshToken)
     .then((response) => {
-      setStoredTokens({
-        accessToken: response.data.access_token,
-        refreshToken: response.data.refresh_token,
-      });
+      // Compare-and-set: tokens cleared or replaced while this ran (a logout, another sign-in) stay
+      // as they are, and these new tokens are dropped.
+      if (getRefreshToken() === refreshToken) {
+        setStoredTokens({
+          accessToken: response.data.access_token,
+          refreshToken: response.data.refresh_token,
+        });
+      }
       return response.data;
     })
     .finally(() => {
@@ -421,11 +425,14 @@ export async function refreshAccessToken(): Promise<boolean> {
     });
 
   try {
-    await refreshPromise;
-    return true;
+    const refreshed = await refreshPromise;
+    return getRefreshToken() === refreshed.refresh_token;
   } catch {
-    clearStoredTokens();
-    window.dispatchEvent(new CustomEvent("auth:expired"));
+    // Same rule on failure: only the session that sent this refresh ends, never a newer one.
+    if (getRefreshToken() === refreshToken) {
+      clearStoredTokens();
+      window.dispatchEvent(new CustomEvent("auth:expired"));
+    }
     return false;
   }
 }
