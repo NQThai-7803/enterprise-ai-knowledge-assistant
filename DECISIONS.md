@@ -992,3 +992,53 @@ false_refusal_v2 (24), compound (12). On `natural_dev_v1`: correct 3 / 8 / 6, fa
 `answer_route_<route>` and each no-answer diagnostic `no_answer_<reason>`; every dev runner
 records `answer_route`, `no_answer_reasons`, `retrieved`; `scripts/eval/route_matrix.py`,
 `scripts/eval/gpu_latency_replay.py`.
+
+## DEC-042 — Shared-layer refusal fixes: selection rule registered before measuring (2026-11-23)
+
+The owner approved the PHA 2 diagnosis (`TASKS.md`, "Shared-layer refusals diagnosed") and asked
+for directions 2 and 1, each behind its own flag, off by default; direction 3 is not attempted.
+Dev sets only; no held-out set is run or read. **This rule is committed before any result.**
+
+**Variants** (s3t = the default, DEC-040/041):
+
+- `base`: s3t.
+- `2a`: `RAG_PROMPT_CHUNK_SELECTION=per_document_3`: at most 3 chunks per document, 5 sources in
+  total as before.
+- `2b`: `RAG_PROMPT_CHUNK_SELECTION=lexical`: at most 2 chunks per document; within a document the
+  chunks are ordered by their word overlap with the question instead of the RRF order.
+- `1`: `RAG_VALIDATOR_V2_ENABLED=true`: the validator rules that rejected right drafts are
+  corrected, and every amount of money, number of days and rate in a claim must be in the cited
+  chunk, bound to what the claim attributes it to.
+- `2a+1`, `2b+1`: both. Both combinations run, so that every comparison stays inside one job
+  (DEC-011); "the best of 2 + 1" is the combination with the variant of 2 chosen below.
+
+**Measurement:** the 7 dev sets (UAT, `natural_dev_v1`, rbac, relevance, false_refusal,
+false_refusal_v2, compound), one job per set with all six configurations, 1 run (the LLM is seeded:
+DEC-041 found the s3t path deterministic within a job). UAT runs as 3 jobs (Q001-Q034, Q035-Q067,
+Q068-Q100), each with its own `base`, because six configurations of 100 items exceed the 340-minute
+job limit; its counts are summed over the three. Categories are those of
+`scripts/diagnostics/summarize_ablation.py` (`categories`, `leaks`): correct, false refusal, false
+answer, wrong value, infra.
+
+**A variant is accepted when, against `base` of the same job:**
+
+1. leaks = 0 on every set;
+2. on each of rbac, relevance, false_refusal, false_refusal_v2 and compound, false answers + wrong
+   values do not increase. Tolerance 0 (the path is deterministic), except the items known to move
+   with the order of the requests: **FR2-L01 and FR2-L06** (DEC-041). A change on those two is
+   reported and not counted;
+3. correct answers on `natural_dev_v1` + UAT together increase.
+
+An item with an infra error in either configuration is left out of both and reported; more than 2
+in one job, and the job is run again.
+
+**The variant of 2 for the combination:** the one of 2a and 2b that is accepted; if both or
+neither, the one with more correct answers on `natural_dev_v1` + UAT; a tie goes to fewer false
+answers + wrong values on the five other sets, then to the smaller mean prompt.
+
+**Also reported:** the mean prompt tokens per LLM call of each configuration (Ollama usage, from
+`simple_trace`), and the items each variant fixes or breaks (IDs only).
+
+**Known limitation:** the 28 diagnosed cases are UAT and `natural_dev_v1` items, and the fixes were
+designed on them, so a gain on those two sets is biased upward. The five other sets are the guard
+that matters. No default changes under this decision; the result is a proposal for the owner.
