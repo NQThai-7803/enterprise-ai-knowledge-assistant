@@ -1,5 +1,21 @@
 # Project Status
 
+## Refusal fixes measured (DEC-042) -- 2026-11-24
+
+- Two flags, both off by default:
+  - `RAG_PROMPT_CHUNK_SELECTION`;
+  - `RAG_VALIDATOR_V2_ENABLED`.
+- On `natural_dev_v1` + UAT, right answers:
+  - base 76;
+  - 2a 80;
+  - 1 80;
+  - 2a+1 84;
+  - 2b 74.
+- Guard sets: unchanged everywhere.
+- Leaks: 0 everywhere.
+- 2a keeps false answers + wrong values unchanged; 1 and 2a+1 raise them on natural + UAT.
+- The owner chooses the default.
+
 ## Shared-layer refusals diagnosed -- 2026-11-22
 
 - The 28 dev cases all reach the LLM. 12: the gold document is in the prompt but its gold chunk is

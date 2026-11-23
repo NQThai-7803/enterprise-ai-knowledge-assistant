@@ -349,6 +349,7 @@ async def question_record(summary: dict[str, Any], gold: dict[str, Any]) -> dict
         "gold_codes": sorted({g["document"] for g in entry or ()}),
         "llm_calls": len(summary["outcomes"]),
         "outcomes": summary["outcomes"],
+        "prompt_tokens": summary["prompt_tokens"],
         "no_answer_reason": summary["no_answer"],
     }
 
@@ -370,6 +371,7 @@ def _patch_simple_trace(gas: Any) -> None:
         return {
             "relaxed_rules": self.settings.rag_simple_relaxed_rules_enabled,
             "question_list_segments": self.settings.rag_simple_question_list_segments_enabled,
+            "validator_v2": self.settings.rag_validator_v2_enabled,
         }
 
     async def judged(self: Any, *, question: str, answer: str, registry: Any, labels: Any) -> dict:
@@ -394,8 +396,8 @@ def _patch_simple_trace(gas: Any) -> None:
     oracle_file = Path(os.environ.get("EVAL_ORACLE_FILE") or "")
     gold = _load_oracle() if oracle_file.is_file() else {}
 
-    def select_hits(hits: Any) -> Any:
-        chosen = original_select(hits)
+    def select_hits(hits: Any, **kwargs: Any) -> Any:
+        chosen = original_select(hits, **kwargs)
         summary = _summary.get()
         if summary is not None:
             summary["hits"], summary["chosen"] = tuple(hits), tuple(chosen)
@@ -409,7 +411,9 @@ def _patch_simple_trace(gas: Any) -> None:
 
     async def simple_answer_draft(self: Any, **kwargs: Any) -> Any:
         token = _attempt.set([0])  # LLM drafts of this question
-        summary = {"hits": (), "chosen": (), "outcomes": [], "no_answer": None}
+        summary = {
+            "hits": (), "chosen": (), "outcomes": [], "prompt_tokens": [], "no_answer": None
+        }  # fmt: skip
         summary_token = _summary.set(summary)
         try:
             draft = await original_draft(self, **kwargs)
@@ -461,6 +465,7 @@ def _patch_simple_trace(gas: Any) -> None:
                 summary["outcomes"].append(
                     "answered" if not isinstance(outcome, tuple) else outcome[0]
                 )
+                summary["prompt_tokens"].append(generation.prompt_tokens)
             similarities = _similarities.get() or []
             bindings = _bindings.get() or []
         finally:
