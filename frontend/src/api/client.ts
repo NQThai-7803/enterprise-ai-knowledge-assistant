@@ -7,6 +7,7 @@ import {
   setStoredTokens,
 } from "./tokenStore";
 import type {
+  AdminSystemResponse,
   AuditLogListResponse,
   AuthenticatedUser,
   ChatAnswerResponse,
@@ -15,6 +16,7 @@ import type {
   DataResponse,
   Department,
   DocumentAccessScope,
+  DocumentLifecycleStatus,
   DocumentItem,
   DocumentPermission,
   DocumentPermissionLevel,
@@ -163,6 +165,13 @@ export const apiClient = {
       description?: string | null;
       access_scope: DocumentAccessScope;
       department_id?: string | null;
+      /** BR-1 optional form fields (API_SPEC §7). */
+      document_code?: string | null;
+      document_version?: string | null;
+      effective_from?: string | null;
+      effective_to?: string | null;
+      lifecycle_status?: DocumentLifecycleStatus | null;
+      supersedes_document_id?: string | null;
     }) {
       const formData = new FormData();
       formData.append("file", payload.file);
@@ -173,6 +182,19 @@ export const apiClient = {
       }
       if (payload.department_id) {
         formData.append("department_id", payload.department_id);
+      }
+      for (const field of [
+        "document_code",
+        "document_version",
+        "effective_from",
+        "effective_to",
+        "lifecycle_status",
+        "supersedes_document_id",
+      ] as const) {
+        const value = payload[field];
+        if (value) {
+          formData.append(field, value);
+        }
       }
       return request<DataResponse<DocumentItem>>("/documents/upload", {
         method: "POST",
@@ -199,6 +221,10 @@ export const apiClient = {
     },
     download(documentId: string) {
       return download(`/documents/${documentId}/download`);
+    },
+    /** BR-2: same bytes and access rules as download, served inline for the viewer. */
+    preview(documentId: string) {
+      return download(`/documents/${documentId}/preview`);
     },
     permissions(documentId: string) {
       return request<DataResponse<DocumentPermission[]>>(`/documents/${documentId}/permissions`);
@@ -294,6 +320,12 @@ export const apiClient = {
       return request<AuditLogListResponse>("/audit-logs", { query });
     },
   },
+  admin: {
+    /** BR-8: Admin only (Manager and Staff get 403); version, health and providers in one call. */
+    system() {
+      return request<DataResponse<AdminSystemResponse>>("/admin/system");
+    },
+  },
   health: {
     live() {
       return request<HealthLiveResponse>("/health/live", { auth: false, apiPrefix: false });
@@ -378,10 +410,14 @@ export async function refreshAccessToken(): Promise<boolean> {
   refreshPromise ??= apiClient.auth
     .refresh(refreshToken)
     .then((response) => {
-      setStoredTokens({
-        accessToken: response.data.access_token,
-        refreshToken: response.data.refresh_token,
-      });
+      // Compare-and-set: tokens cleared or replaced while this ran (a logout, another sign-in) stay
+      // as they are, and these new tokens are dropped.
+      if (getRefreshToken() === refreshToken) {
+        setStoredTokens({
+          accessToken: response.data.access_token,
+          refreshToken: response.data.refresh_token,
+        });
+      }
       return response.data;
     })
     .finally(() => {
@@ -389,11 +425,14 @@ export async function refreshAccessToken(): Promise<boolean> {
     });
 
   try {
-    await refreshPromise;
-    return true;
+    const refreshed = await refreshPromise;
+    return getRefreshToken() === refreshed.refresh_token;
   } catch {
-    clearStoredTokens();
-    window.dispatchEvent(new CustomEvent("auth:expired"));
+    // Same rule on failure: only the session that sent this refresh ends, never a newer one.
+    if (getRefreshToken() === refreshToken) {
+      clearStoredTokens();
+      window.dispatchEvent(new CustomEvent("auth:expired"));
+    }
     return false;
   }
 }

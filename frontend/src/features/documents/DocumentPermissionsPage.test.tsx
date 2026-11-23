@@ -7,6 +7,7 @@ import { apiClient } from "../../api/client";
 import { ApiError } from "../../api/errors";
 import type { Department, DocumentPermission, ListResponse, User } from "../../api/types";
 import { ToastProvider } from "../../components/feedback/ToastProvider";
+import { contractDocument } from "../../test/fixtures/contract";
 import { DocumentPermissionsPage } from "./DocumentPermissionsPage";
 
 vi.mock("../../api/client", () => ({
@@ -18,6 +19,7 @@ vi.mock("../../api/client", () => ({
       list: vi.fn(),
     },
     documents: {
+      detail: vi.fn(),
       permissions: vi.fn(),
       grantPermission: vi.fn(),
       revokePermission: vi.fn(),
@@ -92,6 +94,9 @@ describe("DocumentPermissionsPage", () => {
     vi.mocked(apiClient.users.list).mockResolvedValue(listResponse([manager, staff]));
     vi.mocked(apiClient.departments.list).mockResolvedValue(listResponse([department]));
     vi.mocked(apiClient.documents.permissions).mockResolvedValue(dataResponse([]));
+    vi.mocked(apiClient.documents.detail).mockResolvedValue(
+      dataResponse({ ...contractDocument, id: ids.document, department_id: ids.department }),
+    );
     vi.mocked(apiClient.documents.grantPermission).mockResolvedValue(dataResponse(grantedPermission));
     vi.mocked(apiClient.documents.revokePermission).mockResolvedValue(undefined);
   });
@@ -103,8 +108,8 @@ describe("DocumentPermissionsPage", () => {
     await screen.findByRole("option", { name: "UAT Manager — manager.uat@example.test" });
     expect(screen.queryByLabelText("Grantee ID")).not.toBeInTheDocument();
 
-    await user.selectOptions(screen.getByLabelText("User"), ids.manager);
-    await user.click(screen.getByRole("button", { name: "Grant" }));
+    await user.selectOptions(screen.getByLabelText("Chọn người dùng"), ids.manager);
+    await user.click(screen.getByRole("button", { name: "Cấp quyền" }));
 
     await waitFor(() => {
       expect(apiClient.documents.grantPermission).toHaveBeenCalledWith(ids.document, {
@@ -121,16 +126,16 @@ describe("DocumentPermissionsPage", () => {
     renderPermissionsPage();
 
     await screen.findByRole("option", { name: "UAT Manager — manager.uat@example.test" });
-    await user.selectOptions(screen.getByLabelText("User"), ids.manager);
-    await user.selectOptions(screen.getByLabelText("Grantee type"), "department");
+    await user.selectOptions(screen.getByLabelText("Chọn người dùng"), ids.manager);
+    await user.click(screen.getByRole("radio", { name: "Phòng ban" }));
 
-    const departmentSelect = await screen.findByLabelText("Department");
+    const departmentSelect = await screen.findByLabelText("Chọn phòng ban");
     expect(departmentSelect).toHaveValue("");
     await screen.findByRole("option", { name: "UAT Knowledge Operations (UAT-KNOWLEDGE)" });
 
     await user.selectOptions(departmentSelect, ids.department);
-    await user.selectOptions(screen.getByLabelText("Permission"), "EDIT");
-    await user.click(screen.getByRole("button", { name: "Grant" }));
+    await user.selectOptions(screen.getByLabelText("Quyền"), "EDIT");
+    await user.click(screen.getByRole("button", { name: "Cấp quyền" }));
 
     await waitFor(() => {
       expect(apiClient.documents.grantPermission).toHaveBeenCalledWith(ids.document, {
@@ -146,7 +151,7 @@ describe("DocumentPermissionsPage", () => {
     renderPermissionsPage();
 
     await screen.findByRole("option", { name: "UAT Manager — manager.uat@example.test" });
-    await user.click(screen.getByRole("button", { name: "Grant" }));
+    await user.click(screen.getByRole("button", { name: "Cấp quyền" }));
 
     expect(await screen.findByText("Vui lòng chọn người dùng hoặc phòng ban.")).toBeInTheDocument();
     expect(apiClient.documents.grantPermission).not.toHaveBeenCalled();
@@ -160,8 +165,8 @@ describe("DocumentPermissionsPage", () => {
     renderPermissionsPage();
 
     await screen.findByRole("option", { name: "UAT Manager — manager.uat@example.test" });
-    await user.selectOptions(screen.getByLabelText("User"), ids.manager);
-    await user.click(screen.getByRole("button", { name: "Grant" }));
+    await user.selectOptions(screen.getByLabelText("Chọn người dùng"), ids.manager);
+    await user.click(screen.getByRole("button", { name: "Cấp quyền" }));
 
     expect(await screen.findByText("Người dùng hoặc phòng ban được chọn không hợp lệ.")).toBeInTheDocument();
   });
@@ -170,7 +175,7 @@ describe("DocumentPermissionsPage", () => {
     vi.mocked(apiClient.documents.permissions).mockResolvedValueOnce(dataResponse([grantedPermission]));
     renderPermissionsPage();
 
-    expect(await screen.findByText("User UAT Manager — manager.uat@example.test")).toBeInTheDocument();
+    expect(await screen.findByRole("cell", { name: "UAT Manager" })).toBeInTheDocument();
   });
 
   it("shows a retry state when department grantees cannot be loaded", async () => {
@@ -178,10 +183,30 @@ describe("DocumentPermissionsPage", () => {
     vi.mocked(apiClient.departments.list).mockRejectedValueOnce(new Error("network"));
     renderPermissionsPage();
 
-    await user.selectOptions(screen.getByLabelText("Grantee type"), "department");
+    await user.click(screen.getByRole("radio", { name: "Phòng ban" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("Could not load departments.");
-    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+    expect(await screen.findByRole("alert")).toHaveTextContent("Không tải được danh sách phòng ban.");
+    expect(screen.getByRole("button", { name: "Thử lại" })).toBeInTheDocument();
+  });
+});
+
+describe("DocumentPermissionsPage scope summary", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(apiClient.users.list).mockResolvedValue(listResponse([]));
+    vi.mocked(apiClient.departments.list).mockResolvedValue(listResponse([department]));
+    vi.mocked(apiClient.documents.permissions).mockResolvedValue(dataResponse([]));
+    vi.mocked(apiClient.documents.detail).mockResolvedValue(
+      dataResponse({ ...contractDocument, id: ids.document, department_id: ids.department }),
+    );
+  });
+
+  it("names the current scope and its department, and the BR-1 code in the back link", async () => {
+    renderPermissionsPage();
+
+    expect(await screen.findByText(/Phạm vi hiện tại: Phòng ban · UAT Knowledge Operations\./)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "ND-HR-007" })).toBeInTheDocument();
+    expect(screen.getByText("Chưa có quyền cấp trực tiếp nào.")).toBeInTheDocument();
   });
 });
 

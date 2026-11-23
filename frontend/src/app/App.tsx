@@ -2,11 +2,13 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "../layouts/AppShell";
 import { LoginPage } from "../features/auth/LoginPage";
 import { ProtectedRoute } from "../features/auth/ProtectedRoute";
+import { useSessionDataReset } from "../features/auth/useSessionDataReset";
 import { ChatPage } from "../features/chat/ChatPage";
 import { DocumentsPage } from "../features/documents/DocumentsPage";
 import { DocumentUploadPage } from "../features/documents/DocumentUploadPage";
 import { DocumentDetailPage } from "../features/documents/DocumentDetailPage";
 import { DocumentPermissionsPage } from "../features/documents/DocumentPermissionsPage";
+import { DocumentViewerPage } from "../features/documents/DocumentViewerPage";
 import { UsersPage } from "../features/admin/UsersPage";
 import { DepartmentsPage } from "../features/admin/DepartmentsPage";
 import { FeedbackPage } from "../features/feedback/FeedbackPage";
@@ -17,10 +19,23 @@ import { AccessDeniedPage } from "../routes/AccessDeniedPage";
 import { NotFoundPage } from "../routes/NotFoundPage";
 
 export function App() {
+  // The previous user's cached data is cleared before a new user's pages mount.
+  const sessionDataReady = useSessionDataReset();
+  if (!sessionDataReady) {
+    return null;
+  }
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/access-denied" element={<AccessDeniedPage />} />
+      <Route
+        path="/documents/:documentId/view"
+        element={
+          <ProtectedRoute>
+            <DocumentViewerPage />
+          </ProtectedRoute>
+        }
+      />
       <Route
         element={
           <ProtectedRoute>

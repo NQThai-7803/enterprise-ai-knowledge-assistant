@@ -48,7 +48,7 @@ describe("ConfirmDialog keyboard contract", () => {
     const descriptionId = dialog.getAttribute("aria-describedby");
     expect(descriptionId).toBeTruthy();
     expect(document.getElementById(descriptionId!)).toHaveTextContent("removes the item");
-    expect(screen.getByRole("button", { name: "Cancel" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Hủy" })).toHaveFocus();
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(trigger).toHaveFocus();
@@ -62,7 +62,7 @@ describe("ConfirmDialog keyboard contract", () => {
     const dialog = screen.getByRole("dialog", { name: "Delete item" });
     await user.click(screen.getByRole("button", { name: "Delete" }));
     expect(dialog).toHaveFocus();
-    expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Hủy" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Delete" })).toBeDisabled();
     await user.keyboard("{Escape}{Tab}");
     expect(dialog).toBeInTheDocument();

@@ -1,33 +1,33 @@
-import { formatDistanceToNowStrict } from "date-fns";
+import { format, formatDistanceToNowStrict } from "date-fns";
+import { vi } from "date-fns/locale";
 
-export function formatDateTime(value: string | null | undefined): string {
+const UNAVAILABLE = "Không có";
+
+export function formatDateTime(value: string | null | undefined, pattern = "dd/MM/yyyy HH:mm"): string {
   if (!value) {
-    return "Unavailable";
+    return UNAVAILABLE;
   }
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
-    return "Unavailable";
+    return UNAVAILABLE;
   }
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
+  return format(date, pattern);
 }
 
 export function formatRelative(value: string | null | undefined): string {
   if (!value) {
-    return "Unavailable";
+    return UNAVAILABLE;
   }
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) {
-    return "Unavailable";
+    return UNAVAILABLE;
   }
-  return `${formatDistanceToNowStrict(date)} ago`;
+  return `${formatDistanceToNowStrict(date, { locale: vi })} trước`;
 }
 
 export function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes < 0) {
-    return "Unavailable";
+    return UNAVAILABLE;
   }
   const units = ["B", "KB", "MB", "GB"];
   let value = bytes;
@@ -45,4 +45,21 @@ export function truncateMiddle(value: string, maxLength = 36): string {
   }
   const half = Math.floor((maxLength - 3) / 2);
   return `${value.slice(0, half)}...${value.slice(-half)}`;
+}
+
+export function initials(name: string | null | undefined): string {
+  const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) {
+    return "?";
+  }
+  // Array.from keeps a surrogate pair together; first word + last word, like "Staff Nhân sự" -> "SS".
+  const first = Array.from(parts[0])[0];
+  const last = parts.length > 1 ? Array.from(parts[parts.length - 1])[0] : "";
+  return `${first}${last}`.toUpperCase();
+}
+
+/** A calendar date "YYYY-MM-DD" as dd/MM/yyyy, without a timezone shift. */
+export function formatIsoDate(value: string | null | undefined): string {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value ?? "");
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : UNAVAILABLE;
 }

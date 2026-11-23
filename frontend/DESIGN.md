@@ -1,41 +1,9 @@
 # Frontend Design Notes
 
-TASK-028 implements a production React/Vite frontend for the Enterprise AI Knowledge Assistant. It follows the UI documentation in `docs/ui/` and uses real backend API contracts.
+The 2026-11 redesign follows `docs/ui/redesign-plan.md` (owner-approved) and the design canvas "EAKA – UI Animation". Tokens, motion rules and accessibility rules are in `docs/ui/DESIGN_SYSTEM.md`; backend contracts the UI relies on are tracked in `docs/ui/backend-requests.md`.
 
-- Primary shell: graphite enterprise sidebar with light workspace surfaces.
-- Motion: local controlled motion primitives for login background, chat spotlight, and waiting text only.
-- Data screens: table-first, accessible, compact, and minimally animated.
-- Chat: explicitly communicates the TASK-027 `buffer_after_validation` SSE strategy.
-- Documents/admin/audit: no mock production data and no raw secret/internal metadata display.
-
-# Enterprise AI Knowledge Assistant Design System
-
-## Theme
-- Dark enterprise AI workspace
-- Premium but restrained
-- High information density
-
-## Layout
-- Navigation sidebar: 76px
-- Conversation panel: 250px
-- Source panel: 340px
-- Header height: 64px
-
-## Radius
-- Small: 6px
-- Medium: 8px
-- Large: 10px
-
-## Motion
-- Page transition: 240–320ms
-- Drawer: spring transition
-- Citation pulse: one cycle only
-- Continuous background effect: maximum one per page
-
-## React Bits
-- Animated Content: AI answer
-- Animated List: conversations and sources
-- Spotlight Card: selected source
-- Border Glow: chat composer
-- Shiny Text: AI processing
-- Threads or Dark Veil: subtle background
+- Shell: light grouped sidebar, no top bar, API readiness as a status dot (D-6), mobile drawer.
+- Chat: conversation list | conversation | citations. Answers appear whole after validation (`buffer_after_validation`). ANSWERED shows "Đã xác minh nguồn"; NO_ANSWER a neutral dashed card; unverified sentences come from the server's `segments` (BR-3), never from matching words in the UI.
+- Documents: BR-1 version fields, scope and status badges; the viewer `/documents/:id/view?page=N` opens `/preview` in a new tab (D-7, BR-2).
+- Names of other people or departments only when the response carries them (BR-4 option a, Admin).
+- Admin screens: tables, a native `<dialog>` drawer for user forms, no decorative motion on Permissions and Audit.

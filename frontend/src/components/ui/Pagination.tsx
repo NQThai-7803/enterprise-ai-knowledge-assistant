@@ -13,9 +13,9 @@ export function Pagination({
   const canNext = meta.page < meta.total_pages;
 
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3 text-sm text-muted">
+    <div className="flex flex-wrap items-center justify-between gap-3 pt-4 text-sm text-muted">
       <span>
-        Page {meta.page} of {Math.max(meta.total_pages, 1)} - {meta.total} total
+        Trang {meta.page} / {Math.max(meta.total_pages, 1)} · {meta.total} kết quả
       </span>
       <div className="flex items-center gap-2">
         <Button
@@ -25,7 +25,7 @@ export function Pagination({
           onClick={() => onPageChange(meta.page - 1)}
           icon={<ChevronLeft className="h-4 w-4" aria-hidden="true" />}
         >
-          Previous
+          Trước
         </Button>
         <Button
           type="button"
@@ -34,7 +34,7 @@ export function Pagination({
           onClick={() => onPageChange(meta.page + 1)}
           icon={<ChevronRight className="h-4 w-4" aria-hidden="true" />}
         >
-          Next
+          Sau
         </Button>
       </div>
     </div>

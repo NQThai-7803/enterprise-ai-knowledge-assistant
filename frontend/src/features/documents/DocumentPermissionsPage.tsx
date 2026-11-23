@@ -1,23 +1,22 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ShieldPlus, Trash2 } from "lucide-react";
+import { ChevronLeft, Info } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import { z } from "zod";
 import { apiClient } from "../../api/client";
 import { isApiError, safeErrorMessage } from "../../api/errors";
-import type { Department, DocumentPermission, User } from "../../api/types";
+import type { Department, DocumentItem, DocumentPermission, User } from "../../api/types";
 import { DataTable } from "../../components/data/DataTable";
 import { useToast } from "../../components/feedback/ToastProvider";
-import { PageHeader } from "../../components/layout/PageHeader";
 import { Badge } from "../../components/ui/Badge";
 import { Button } from "../../components/ui/Button";
 import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 import { FieldWrapper, SelectInput, TextInput } from "../../components/ui/Field";
-import { Panel } from "../../components/ui/Panel";
 import { EmptyState, ErrorState, LoadingState } from "../../components/ui/State";
-import { formatDateTime, truncateMiddle } from "../../lib/format";
+import { truncateMiddle } from "../../lib/format";
+import { accessScopeLabels, permissionLevelLabels } from "../../lib/labels";
 
 const permissionSchema = z.object({
   grantee_type: z.enum(["user", "department"]),
@@ -32,6 +31,11 @@ const defaultGrant: PermissionForm = {
   grantee_id: "",
   permission: "VIEW",
 };
+
+const GRANTEE_TYPES = [
+  ["user", "Người dùng"],
+  ["department", "Phòng ban"],
+] as const;
 
 export function DocumentPermissionsPage() {
   const { documentId } = useParams();
@@ -49,6 +53,12 @@ export function DocumentPermissionsPage() {
     clearErrors,
     formState: { errors },
   } = useForm<PermissionForm>({ resolver: zodResolver(permissionSchema), defaultValues: defaultGrant });
+
+  const detailQuery = useQuery({
+    queryKey: ["documents", "detail", documentId],
+    queryFn: () => apiClient.documents.detail(documentId as string),
+    enabled: Boolean(documentId),
+  });
 
   const permissionsQuery = useQuery({
     queryKey: ["documents", "permissions", documentId],
@@ -68,9 +78,10 @@ export function DocumentPermissionsPage() {
     staleTime: 5 * 60_000,
   });
 
-  const permissions = permissionsQuery.data?.data ?? [];
-  const users = usersQuery.data?.data ?? [];
-  const departments = departmentsQuery.data?.data ?? [];
+  const documentItem = detailQuery.data?.data;
+  const permissions = useMemo(() => permissionsQuery.data?.data ?? [], [permissionsQuery.data]);
+  const users = useMemo(() => usersQuery.data?.data ?? [], [usersQuery.data]);
+  const departments = useMemo(() => departmentsQuery.data?.data ?? [], [departmentsQuery.data]);
   const usersById = useMemo(() => new Map(users.map((user) => [user.id, user])), [users]);
   const departmentsById = useMemo(
     () => new Map(departments.map((department) => [department.id, department])),
@@ -115,9 +126,9 @@ export function DocumentPermissionsPage() {
       setUserFilter("");
       setDepartmentFilter("");
       await queryClient.invalidateQueries({ queryKey: ["documents", "permissions", documentId] });
-      pushToast({ tone: "success", title: "Permission granted" });
+      pushToast({ tone: "success", title: "Đã cấp quyền" });
     },
-    onError: (error) => pushToast({ tone: "error", title: "Grant failed", message: grantErrorMessage(error) }),
+    onError: (error) => pushToast({ tone: "error", title: "Cấp quyền thất bại", message: grantErrorMessage(error) }),
   });
 
   const revokeMutation = useMutation({
@@ -125,9 +136,9 @@ export function DocumentPermissionsPage() {
     onSuccess: async () => {
       setDeleteId(null);
       await queryClient.invalidateQueries({ queryKey: ["documents", "permissions", documentId] });
-      pushToast({ tone: "success", title: "Permission revoked" });
+      pushToast({ tone: "success", title: "Đã thu hồi quyền" });
     },
-    onError: (error) => pushToast({ tone: "error", title: "Revoke failed", message: safeErrorMessage(error) }),
+    onError: (error) => pushToast({ tone: "error", title: "Thu hồi thất bại", message: safeErrorMessage(error) }),
   });
 
   const granteeTypeField = register("grantee_type", {
@@ -142,152 +153,212 @@ export function DocumentPermissionsPage() {
     onChange: (event) => setGrantDraft((current) => ({ ...current, grantee_id: event.target.value })),
   });
   const permissionField = register("permission", {
-    onChange: (event) => setGrantDraft((current) => ({ ...current, permission: event.target.value as PermissionForm["permission"] })),
+    onChange: (event) =>
+      setGrantDraft((current) => ({ ...current, permission: event.target.value as PermissionForm["permission"] })),
   });
 
+  // No decorative motion on this screen (motion rules).
   return (
     <div>
-      <PageHeader title="Document permission management" description="Direct grants supplement backend scope permissions. Effective access remains server-side." />
-      <div className="grid gap-4 lg:grid-cols-[24rem_1fr]">
-        <Panel className="p-5">
-          <h3 className="mb-4 text-sm font-semibold">Grant permission</h3>
-          <form className="space-y-4" onSubmit={handleSubmit((values) => grantMutation.mutate(values))} noValidate>
-            <FieldWrapper id="grantee_type" label="Grantee type" error={errors.grantee_type?.message}>
-              <SelectInput id="grantee_type" {...granteeTypeField}>
-                <option value="user">User</option>
-                <option value="department">Department</option>
-              </SelectInput>
-            </FieldWrapper>
-            {grantDraft.grantee_type === "user" ? (
-              <div className="space-y-3">
-                {users.length > 8 ? (
-                  <FieldWrapper id="user_filter" label="Find user" help="Filter by name or email.">
-                    <TextInput
-                      id="user_filter"
-                      value={userFilter}
-                      onChange={(event) => setUserFilter(event.target.value)}
-                      disabled={usersQuery.isLoading}
-                      placeholder="Search users"
-                    />
-                  </FieldWrapper>
-                ) : null}
-                <FieldWrapper id="grantee_id" label="User" error={errors.grantee_id?.message}>
-                  <SelectInput
-                    id="grantee_id"
-                    {...granteeIdField}
-                    disabled={usersQuery.isLoading || usersQuery.isError || users.length === 0}
-                  >
-                    <option value="">{usersQuery.isLoading ? "Loading users..." : "Select a user"}</option>
-                    {filteredUsers.map((user) => (
-                      <option key={user.id} value={user.id}>
-                        {formatUserOption(user)}
-                      </option>
-                    ))}
-                  </SelectInput>
+      <Link
+        to={`/documents/${documentId}`}
+        className="mb-5 inline-flex items-center gap-1 text-sm text-muted transition hover:text-ink"
+      >
+        <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+        {documentItem?.document_code ?? documentItem?.title ?? "Tài liệu"}
+      </Link>
+      <div className="mb-6">
+        <h1 className="text-2xl font-semibold tracking-normal text-ink">Phân quyền tài liệu</h1>
+        {documentItem ? <p className="mt-1 text-sm text-muted">{documentItem.title}</p> : null}
+      </div>
+
+      {documentItem ? (
+        <p className="mb-5 flex gap-3 rounded-xl border border-border/70 bg-surface px-5 py-4 text-sm text-ink/80">
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-accent" aria-hidden="true" />
+          <span>{scopeSummary(documentItem, departmentsById)}</span>
+        </p>
+      ) : null}
+
+      <form
+        className="mb-5 rounded-xl border border-border/70 bg-surface p-5"
+        onSubmit={handleSubmit((values) => grantMutation.mutate(values))}
+        noValidate
+      >
+        <h2 className="mb-4 text-[15px] font-semibold">Cấp quyền trực tiếp</h2>
+        <div className="grid items-start gap-4 lg:grid-cols-[auto_minmax(0,1fr)_11rem_auto]">
+          <fieldset>
+            <legend className="mb-1.5 text-sm font-medium text-ink">Đối tượng</legend>
+            <div className="inline-flex rounded-token bg-elevated p-1">
+              {GRANTEE_TYPES.map(([value, label]) => (
+                <label
+                  key={value}
+                  className="cursor-pointer rounded-[6px] px-3.5 py-1.5 text-sm text-muted has-[:checked]:bg-surface has-[:checked]:font-medium has-[:checked]:text-ink has-[:checked]:shadow-sm has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-accent/30"
+                >
+                  <input type="radio" value={value} className="sr-only" {...granteeTypeField} />
+                  {label}
+                </label>
+              ))}
+            </div>
+          </fieldset>
+          {grantDraft.grantee_type === "user" ? (
+            <div className="space-y-3">
+              {users.length > 8 ? (
+                <FieldWrapper id="user_filter" label="Tìm người dùng" help="Lọc theo tên hoặc email.">
+                  <TextInput
+                    id="user_filter"
+                    value={userFilter}
+                    onChange={(event) => setUserFilter(event.target.value)}
+                    disabled={usersQuery.isLoading}
+                  />
                 </FieldWrapper>
-                {renderSelectorState({
-                  isLoading: usersQuery.isLoading,
-                  isError: usersQuery.isError,
-                  total: users.length,
-                  filteredTotal: filteredUsers.length,
-                  loadingLabel: "Loading users...",
-                  emptyLabel: "No users available.",
-                  emptyFilterLabel: "No users match the filter.",
-                  errorLabel: "Could not load users.",
-                  onRetry: () => void usersQuery.refetch(),
-                })}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {departments.length > 8 ? (
-                  <FieldWrapper id="department_filter" label="Find department" help="Filter by name or code.">
-                    <TextInput
-                      id="department_filter"
-                      value={departmentFilter}
-                      onChange={(event) => setDepartmentFilter(event.target.value)}
-                      disabled={departmentsQuery.isLoading}
-                      placeholder="Search departments"
-                    />
-                  </FieldWrapper>
-                ) : null}
-                <FieldWrapper id="grantee_id" label="Department" error={errors.grantee_id?.message}>
-                  <SelectInput
-                    id="grantee_id"
-                    {...granteeIdField}
-                    disabled={departmentsQuery.isLoading || departmentsQuery.isError || departments.length === 0}
-                  >
-                    <option value="">{departmentsQuery.isLoading ? "Loading departments..." : "Select a department"}</option>
-                    {filteredDepartments.map((department) => (
-                      <option key={department.id} value={department.id}>
-                        {formatDepartmentOption(department)}
-                      </option>
-                    ))}
-                  </SelectInput>
+              ) : null}
+              <FieldWrapper id="grantee_id" label="Chọn người dùng" error={errors.grantee_id?.message}>
+                <SelectInput
+                  id="grantee_id"
+                  {...granteeIdField}
+                  disabled={usersQuery.isLoading || usersQuery.isError || users.length === 0}
+                >
+                  <option value="">{usersQuery.isLoading ? "Đang tải người dùng…" : "Chọn người dùng"}</option>
+                  {filteredUsers.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {formatUserOption(user)}
+                    </option>
+                  ))}
+                </SelectInput>
+              </FieldWrapper>
+              {renderSelectorState({
+                isLoading: usersQuery.isLoading,
+                isError: usersQuery.isError,
+                total: users.length,
+                filteredTotal: filteredUsers.length,
+                loadingLabel: "Đang tải người dùng…",
+                emptyLabel: "Chưa có người dùng nào.",
+                emptyFilterLabel: "Không có người dùng khớp bộ lọc.",
+                errorLabel: "Không tải được danh sách người dùng.",
+                onRetry: () => void usersQuery.refetch(),
+              })}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {departments.length > 8 ? (
+                <FieldWrapper id="department_filter" label="Tìm phòng ban" help="Lọc theo tên hoặc mã.">
+                  <TextInput
+                    id="department_filter"
+                    value={departmentFilter}
+                    onChange={(event) => setDepartmentFilter(event.target.value)}
+                    disabled={departmentsQuery.isLoading}
+                  />
                 </FieldWrapper>
-                {renderSelectorState({
-                  isLoading: departmentsQuery.isLoading,
-                  isError: departmentsQuery.isError,
-                  total: departments.length,
-                  filteredTotal: filteredDepartments.length,
-                  loadingLabel: "Loading departments...",
-                  emptyLabel: "No departments available.",
-                  emptyFilterLabel: "No departments match the filter.",
-                  errorLabel: "Could not load departments.",
-                  onRetry: () => void departmentsQuery.refetch(),
-                })}
-              </div>
-            )}
-            <FieldWrapper id="permission" label="Permission" error={errors.permission?.message}>
-              <SelectInput id="permission" {...permissionField}>
-                <option value="VIEW">View</option>
-                <option value="EDIT">Edit</option>
-                <option value="MANAGE">Manage</option>
-              </SelectInput>
-            </FieldWrapper>
+              ) : null}
+              <FieldWrapper id="grantee_id" label="Chọn phòng ban" error={errors.grantee_id?.message}>
+                <SelectInput
+                  id="grantee_id"
+                  {...granteeIdField}
+                  disabled={departmentsQuery.isLoading || departmentsQuery.isError || departments.length === 0}
+                >
+                  <option value="">{departmentsQuery.isLoading ? "Đang tải phòng ban…" : "Chọn phòng ban"}</option>
+                  {filteredDepartments.map((department) => (
+                    <option key={department.id} value={department.id}>
+                      {formatDepartmentOption(department)}
+                    </option>
+                  ))}
+                </SelectInput>
+              </FieldWrapper>
+              {renderSelectorState({
+                isLoading: departmentsQuery.isLoading,
+                isError: departmentsQuery.isError,
+                total: departments.length,
+                filteredTotal: filteredDepartments.length,
+                loadingLabel: "Đang tải phòng ban…",
+                emptyLabel: "Chưa có phòng ban nào.",
+                emptyFilterLabel: "Không có phòng ban khớp bộ lọc.",
+                errorLabel: "Không tải được danh sách phòng ban.",
+                onRetry: () => void departmentsQuery.refetch(),
+              })}
+            </div>
+          )}
+          <FieldWrapper id="permission" label="Quyền" error={errors.permission?.message}>
+            <SelectInput id="permission" {...permissionField}>
+              {(["VIEW", "EDIT", "MANAGE"] as const).map((level) => (
+                <option key={level} value={level}>
+                  {permissionLevelLabels[level]}
+                </option>
+              ))}
+            </SelectInput>
+          </FieldWrapper>
+          <div className="lg:pt-[26px]">
             <Button
               type="submit"
               disabled={duplicateGrant || activeSelectorBusy || activeSelectorError || activeSelectorEmpty}
               loading={grantMutation.isPending}
-              icon={<ShieldPlus className="h-4 w-4" aria-hidden="true" />}
             >
-              Grant
+              Cấp quyền
             </Button>
-            {duplicateGrant ? <p className="text-xs font-medium text-warning">This exact direct grant already exists.</p> : null}
-          </form>
-        </Panel>
+          </div>
+        </div>
+        {duplicateGrant ? <p className="mt-3 text-xs font-medium text-warning">Quyền này đã tồn tại.</p> : null}
+      </form>
 
-        <section>
-          {permissionsQuery.isLoading ? <LoadingState label="Loading permissions" /> : null}
-          {permissionsQuery.isError ? <ErrorState message={safeErrorMessage(permissionsQuery.error)} onRetry={() => void permissionsQuery.refetch()} /> : null}
-          {!permissionsQuery.isLoading && permissions.length === 0 ? <EmptyState title="No direct permissions" /> : null}
-          {permissions.length ? (
-            <DataTable columns={["Grantee", "Permission", "Created by", "Created", "Actions"]}>
-              {permissions.map((permission) => (
-                <tr key={permission.id}>
-                  <td className="px-4 py-3 text-sm">{formatGrantee(permission, usersById, departmentsById)}</td>
-                  <td className="px-4 py-3"><Badge tone="accent">{permission.permission}</Badge></td>
-                  <td className="px-4 py-3 text-muted">{truncateMiddle(permission.created_by)}</td>
-                  <td className="px-4 py-3 text-muted">{formatDateTime(permission.created_at)}</td>
-                  <td className="px-4 py-3">
-                    <Button type="button" variant="danger" onClick={() => setDeleteId(permission.id)} icon={<Trash2 className="h-4 w-4" aria-hidden="true" />}>Revoke</Button>
-                  </td>
-                </tr>
-              ))}
-            </DataTable>
-          ) : null}
-        </section>
-      </div>
+      <section aria-label="Quyền cấp trực tiếp">
+        {permissionsQuery.isLoading ? <LoadingState label="Đang tải quyền" /> : null}
+        {permissionsQuery.isError ? (
+          <ErrorState
+            title="Không tải được danh sách quyền"
+            error={permissionsQuery.error}
+            onRetry={() => void permissionsQuery.refetch()}
+          />
+        ) : null}
+        {!permissionsQuery.isLoading && !permissionsQuery.isError && permissions.length === 0 ? (
+          <EmptyState title="Chưa có quyền cấp trực tiếp nào." />
+        ) : null}
+        {permissions.length ? (
+          <DataTable columns={["Đối tượng", "Loại", "Quyền", "Thao tác"]}>
+            {permissions.map((permission) => (
+              <tr key={permission.id}>
+                <td className="px-5 py-3.5 font-medium">{formatGrantee(permission, usersById, departmentsById)}</td>
+                <td className="px-5 py-3.5 text-muted">{permission.user_id ? "Người dùng" : "Phòng ban"}</td>
+                <td className="px-5 py-3.5">
+                  <Badge tone="accent">{permissionLevelLabels[permission.permission]}</Badge>
+                </td>
+                <td className="px-5 py-3.5 text-right">
+                  <button
+                    type="button"
+                    className="rounded-token border border-danger/30 px-3 py-1.5 text-sm text-danger transition hover:bg-danger/5"
+                    onClick={() => setDeleteId(permission.id)}
+                  >
+                    Thu hồi
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </DataTable>
+        ) : null}
+      </section>
+
       <ConfirmDialog
         open={Boolean(deleteId)}
-        title="Revoke permission"
-        message="This removes only the direct grant row. Scope-based access may still apply."
-        confirmLabel="Revoke"
+        title="Thu hồi quyền này?"
+        message="Chỉ xóa quyền cấp trực tiếp. Quyền theo phạm vi của tài liệu vẫn giữ nguyên."
+        confirmLabel="Thu hồi"
         loading={revokeMutation.isPending}
         onCancel={() => setDeleteId(null)}
         onConfirm={() => deleteId && revokeMutation.mutate(deleteId)}
       />
     </div>
   );
+}
+
+function scopeSummary(documentItem: DocumentItem, departmentsById: ReadonlyMap<string, Department>): string {
+  const scope = accessScopeLabels[documentItem.access_scope];
+  if (documentItem.access_scope === "DEPARTMENT") {
+    const department = documentItem.department_id ? departmentsById.get(documentItem.department_id) : undefined;
+    const name = department?.name ?? "của tài liệu";
+    return `Phạm vi hiện tại: ${scope} · ${name}. Thành viên phòng ${name} đã xem được. Quyền cấp trực tiếp dưới đây dành cho người hoặc phòng ban khác, và có hiệu lực ngay.`;
+  }
+  if (documentItem.access_scope === "ORGANIZATION") {
+    return `Phạm vi hiện tại: ${scope}. Mọi người dùng đang hoạt động đã xem được. Quyền cấp trực tiếp dưới đây có hiệu lực ngay.`;
+  }
+  return `Phạm vi hiện tại: ${scope}. Chỉ người tải lên xem được. Quyền cấp trực tiếp dưới đây mở thêm cho người hoặc phòng ban khác, và có hiệu lực ngay.`;
 }
 
 function renderSelectorState({
@@ -320,10 +391,13 @@ function renderSelectorState({
   }
   if (isError) {
     return (
-      <div className="flex items-center justify-between gap-3 rounded-token border border-danger/20 bg-danger/5 p-3 text-xs text-danger" role="alert">
+      <div
+        className="flex items-center justify-between gap-3 rounded-token border border-danger/20 bg-danger/5 p-3 text-xs text-danger"
+        role="alert"
+      >
         <span>{errorLabel}</span>
         <Button type="button" variant="secondary" onClick={onRetry}>
-          Retry
+          Thử lại
         </Button>
       </div>
     );
@@ -352,11 +426,11 @@ function formatGrantee(
 ) {
   if (permission.user_id) {
     const user = usersById.get(permission.user_id);
-    return user ? <span>User {formatUserOption(user)}</span> : <span>User {truncateMiddle(permission.user_id)}</span>;
+    return user ? (user.full_name || user.email) : truncateMiddle(permission.user_id);
   }
   const departmentId = permission.department_id ?? "";
   const department = departmentsById.get(departmentId);
-  return department ? <span>Department {formatDepartmentOption(department)}</span> : <span>Department {truncateMiddle(departmentId)}</span>;
+  return department ? formatDepartmentOption(department) : truncateMiddle(departmentId);
 }
 
 function formatUserOption(user: User) {
