@@ -1125,3 +1125,41 @@ No infra error in the measured attempts.
 3. **2a+1:** the largest gain (+8), with 5 more false answers + wrong values on natural + UAT.
 
 A default flip still follows DEC-026, and the two-job rule of DEC-027.
+
+### Amendment after the result (2026-11-25, owner) and the DEC-027 confirmation of 2a
+
+**Written after the result above was known.** The rule as registered and its verdicts stay above,
+unchanged, for comparison.
+
+- **The gap:**
+  - Rule 2 blocked a rise in false answers + wrong values only on the five guard sets.
+  - Those sets gave no signal: every configuration equals base there.
+  - So a variant could add false answers + wrong values on `natural_dev_v1` and UAT and still be accepted.
+- **Rule from now on:** false answers + wrong values must not increase on **any** set, `natural_dev_v1` and UAT included. Rules 1 and 3 are unchanged.
+- **Verdicts under it:**
+
+  | Variant | False answers + wrong values (base → variant) | Right answers | Verdict |
+  |---|---|---|---|
+  | 2a | natural 5 → 5, UAT 8 → 8 | +4 | **accepted** |
+  | 1 | natural 5 → 6, UAT 8 → 10 | | **rejected** |
+  | 2a+1 | natural 5 → 7, UAT 8 → 11 | | **rejected** |
+
+  2b stays rejected.
+
+**Confirmation of 2a before the flip (DEC-027), registered before its runs:**
+
+- **Runs:**
+  - Two rounds, separate from the PR #59 jobs.
+  - Each round is one `natural_dev_v1` job and one UAT job (Q001-Q100).
+  - Each job runs both `base` and `2a` on the same image (main 4ebf927; the branch adds only docs), 1 run each.
+  - Round 2 sets `EVAL_LLM_SEED` to its default value only so that its jobs differ from round 1's in the concurrency group and run alongside it.
+- **2a is accepted if, in both rounds:**
+  - its right answers on `natural_dev_v1` + UAT together exceed base's;
+  - its false answers + wrong values do not exceed base's, on `natural_dev_v1` and on UAT each.
+  - Leaks stay 0.
+- **Also reported:**
+  - the DEC-027 tie test per count;
+  - the items whose category differs between the two rounds, and from the PR #59 jobs (IDs only).
+- **Outcome:**
+  - If accepted, DEC-043 makes `per_document_3` the default and keeps the flag for rollback.
+  - If not, base stays, and the result is written here.
