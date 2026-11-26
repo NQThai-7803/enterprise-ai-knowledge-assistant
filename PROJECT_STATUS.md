@@ -1,5 +1,13 @@
 # Project Status
 
+## 2a not confirmed (DEC-042) -- 2026-11-26
+
+- The DEC-027 confirmation of `RAG_PROMPT_CHUNK_SELECTION=per_document_3`:
+  - right answers up again on `natural_dev_v1` + UAT;
+  - but in round 2 one more false answer + wrong value on UAT, so it is not accepted.
+- Base varies by 7 UAT items between jobs, as much as the 2a gain.
+- The default stays `rrf`.
+
 ## Refusal fixes measured (DEC-042) -- 2026-11-24
 
 - Two flags, both off by default:

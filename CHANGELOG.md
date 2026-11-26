@@ -6,6 +6,13 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### DEC-042 amended; 2a not confirmed -- 2026-11-26
+
+- **Docs:**
+  - DEC-042's rule tightened after its result (no rise in false answers + wrong values on any set);
+  - the DEC-027 confirmation of 2a recorded as not accepted.
+- **No code or default changed.**
+
 ### Refusal fixes behind flags (DEC-042) -- 2026-11-24
 
 - **Added (off):**

@@ -1163,3 +1163,49 @@ unchanged, for comparison.
 - **Outcome:**
   - If accepted, DEC-043 makes `per_document_3` the default and keeps the flag for rollback.
   - If not, base stays, and the result is written here.
+
+### Confirmation result (2026-11-26): 2a not accepted, base stays
+
+**Runs:**
+
+| Round | `natural_dev_v1` | UAT |
+|---|---|---|
+| 1 | 45779822077 | 45779832197 |
+| 2 | 45779827292 | 45779837610 |
+
+Branch `eval/dec042-confirm` (main 4ebf927 plus docs), configurations `base` and `2a`.
+
+**Round 1's UAT job ended at the job time limit both times** (attempts 1 and 2):
+
+- each time `base` finished (12772 s and 12699 s, against 5700 s in round 2);
+- `2a` stopped at Q058-Q059.
+
+That job has no complete `2a`, and it was not run a third time: the rule needs both rounds to pass, and round 2 does not.
+
+| | PR #59 jobs (UAT in 3 parts) | round 1 | round 2 |
+|---|---|---|---|
+| `natural_dev_v1` base: correct / false answers + wrong values | 7 / 5 | 7 / 5 | 7 / 5 |
+| `natural_dev_v1` 2a | 8 / 5 | 8 / 5 | 8 / 5 |
+| UAT base | 69 / 8 | 71 / 9 | 68 / 9 |
+| UAT 2a | 72 / 8 | incomplete (time limit) | 70 / **10** |
+| leaks | 0 | 0 | 0 |
+
+**Verdict under the registered criteria: not accepted.**
+
+- In round 2, 2a's false answers + wrong values on UAT exceed base's (10 > 9). The new one is Q057, right under base and wrong under 2a. Q041 is newly wrong under 2a, as it was in the PR #59 jobs.
+- Right answers on natural + UAT were higher (+3), but that alone is not enough.
+- **DEC-043 is not written:** `RAG_PROMPT_CHUNK_SELECTION` stays `rrf` by default, and `per_document_3` stays available behind the flag.
+
+**The DEC-027 tie test** (PR #59 jobs against round 2, the two jobs with both configurations complete):
+
+- `natural_dev_v1` +1 in both, with no change between jobs: a real but one-item difference.
+- UAT right answers +3 and +2. Base moved by 1 between those jobs, 2a by 2; across all three jobs, base moved between 68 and 71. That is a tie.
+- UAT false answers + wrong values: 0 and +1, so not the same sign: a tie.
+
+**Items whose category differs between jobs** (IDs only):
+
+- `natural_dev_v1`: none, for both configurations.
+- UAT base, across the three jobs: Q028, Q029, Q033, Q036, Q046, Q048, Q063.
+- UAT 2a, PR #59 jobs against round 2: Q003, Q020, Q031, Q057, Q074, Q076, Q080.
+
+The UAT gain of 2a is no larger than the variation of base between jobs.
