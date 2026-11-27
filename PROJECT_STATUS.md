@@ -1,5 +1,19 @@
 # Project Status
 
+## Demo stack eaka-demo -- 2026-11-27
+
+- **What it is:** `main` (PR #61 UI) on one machine, the frontend at <http://127.0.0.1:18480>.
+- **New in the repo:** `deploy/frontend/` (nginx image with the same-origin API proxy) and `DEMO.md`.
+- **Data:** UAT Corpus v2 plus the RBAC dev documents, so each visibility level has a document.
+- **Accounts:** admin; manager and staff of UAT-KNOWLEDGE; a staff of UAT-OPS.
+- **Times:**
+
+  | Question | Time |
+  |---|---|
+  | First, cold | 49-60 s |
+  | New, model loaded | 15-19 s |
+  | Repeated (cache) | 1-2 s |
+
 ## 2a not confirmed (DEC-042) -- 2026-11-26
 
 - The DEC-027 confirmation of `RAG_PROMPT_CHUNK_SELECTION=per_document_3`:
