@@ -20,6 +20,70 @@ def display_text(text: str) -> str:
     return _SYMBOL_FONT_PUA_PATTERN.sub("•", text)
 
 
+# BR-15: a word for evidence matching; "…" (the excerpt's own cut mark) is never part of one.
+_SPAN_WORD_PATTERN = re.compile(r"[^\s…]+")
+_MIN_SPAN_COVERAGE = 0.6
+
+
+def evidence_spans(excerpt: str, evidence_text: str | None) -> list[tuple[int, int]]:
+    """Where ``evidence_text`` sits in ``excerpt``, as [start, end) character offsets (BR-15).
+
+    Display only. The evidence is matched word by word and in order, so it may skip words of
+    the excerpt (a heading between two of its parts) and give several spans; its first word may
+    be the end of an excerpt word and its last word the start of one. A part of one word inside
+    longer evidence is ignored as chance, and [] is returned when less than 60% of the evidence
+    words are found. Both texts are compared as shown (``display_text``), which keeps offsets.
+    """
+
+    if not evidence_text or not excerpt:
+        return []
+    # Case-sensitive: both texts come from the same chunk, and offsets must stay exact.
+    words = [
+        (match.start(), match.end(), match.group())
+        for match in _SPAN_WORD_PATTERN.finditer(display_text(excerpt))
+    ]
+    wanted = _SPAN_WORD_PATTERN.findall(display_text(evidence_text))
+    if not wanted:
+        return []
+
+    def run_at(k: int, i: int) -> tuple[int, int, int]:
+        """Words matched from excerpt word k and evidence word i: (count, start, end)."""
+
+        count, start, end = 0, words[k][0], words[k][1]
+        while k + count < len(words) and i + count < len(wanted):
+            word_start, word_end, word = words[k + count]
+            target = wanted[i + count]
+            if word == target:
+                end = word_end
+            elif i + count == len(wanted) - 1 and word.startswith(target):
+                end = word_start + len(target)
+            elif i + count == 0 and count == 0 and word.endswith(target):
+                start, end = word_end - len(target), word_end
+            else:
+                break
+            count += 1
+        return count, start, end
+
+    spans: list[tuple[int, int]] = []
+    matched, i, j = 0, 0, 0
+    while i < len(wanted):
+        best = (0, 0, 0, 0)  # count, excerpt word, start, end
+        for k in range(j, len(words)):
+            count, start, end = run_at(k, i)
+            if count > best[0]:
+                best = (count, k, start, end)
+        count, k, start, end = best
+        if count == 0 or (count == 1 and len(wanted) > 1):
+            i += 1  # not in the excerpt (or only by chance): skip this evidence word
+            continue
+        spans.append((start, end))
+        matched += count
+        i, j = i + count, k + count
+    if matched < _MIN_SPAN_COVERAGE * len(wanted):
+        return []
+    return spans
+
+
 def build_excerpt(*, source_text: str, max_characters: int) -> str:
     if max_characters <= 0:
         msg = "max_characters must be greater than zero."

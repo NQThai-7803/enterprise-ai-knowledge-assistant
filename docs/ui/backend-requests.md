@@ -728,3 +728,33 @@ Owner dán nguyên khối này sang phiên backend:
   - Hoặc, nếu bằng chứng cố ý không liền, ghi rõ vào API_SPEC §8A và trả vị trí từng mảnh trong
     `excerpt`, để UI tô từng mảnh.
 - **Ghi chú:** đây là bằng chứng hiển thị. Không đổi validation hay việc chọn trích dẫn.
+
+### TRẢ LỜI CHO PHIÊN UI — BR-15 (`evidence_spans`: vị trí bằng chứng trong `excerpt`)
+
+- **Trạng thái:** xong, chọn cách thứ hai của BR-15 (owner duyệt). Chỉ thêm trường.
+- **Field:** mỗi citation có thêm `evidence_spans`: `[{ "start": int, "end": int }]`.
+  - `[start, end)` là vị trí ký tự trong `excerpt` đúng như API trả về, tức là bản đã chuẩn hóa sau BR-14.
+  - Trường luôn có mặt, ở lịch sử chat, response của `POST …/messages` và SSE (`citations.ready`, `message.completed`).
+  - Spec: `API_SPEC.md` §8A.
+- **Nhiều span:** bằng chứng không liền thì mỗi mảnh là một span. Ví dụ Q016: bằng chứng thiếu `Điều 5.` ở giữa, nên có 2 span.
+- **`[]`:** không có `evidence_text`, hoặc không tìm được trong `excerpt` (khớp dưới 60% số từ). Khi đó UI hiện đoạn trích không tô sáng.
+- **`evidence_text`:** giữ nguyên để tương thích. UI nên dùng `evidence_spans` trước, và chỉ quay về cách tìm chuỗi hiện tại khi trường này không có.
+- **Cách tính:**
+  - khớp từng từ theo thứ tự, chọn đoạn liền dài nhất;
+  - từ cuối của bằng chứng có thể là phần đầu của một từ trong `excerpt` (Q084: `2.400.000 đ` nằm trong `2.400.000 đ/năm`);
+  - một từ lẻ trong bằng chứng dài bị bỏ qua, coi là trùng ngẫu nhiên;
+  - `…` không bao giờ nằm trong span; `•` và ký tự Symbol cũ được so như nhau.
+- **Lưu ý cho UI:**
+  - vị trí đếm theo code point. Văn bản trong BMP (tiếng Việt, `•`, `…`) thì trùng chỉ số chuỗi của JavaScript;
+  - không đổi chunk, embedding, retrieval, prompt hay validation;
+  - spans được tính lúc đọc, nên trích dẫn cũ cũng có.
+- **Đã kiểm trên demo** (staff):
+  - Q016: 2 span;
+  - Q043: 1 span (`03 ngày`, chỗ xuất hiện đầu tiên);
+  - Q084: 1 span (`2.400.000 đ`).
+- **Test:** `tests/unit/test_evidence_spans.py`:
+  - các ca giống hình dạng Q016, Q043, Q084;
+  - `•` và `…` ở đầu;
+  - ký tự Symbol trong trích dẫn cũ;
+  - không tìm thấy;
+  - schema.

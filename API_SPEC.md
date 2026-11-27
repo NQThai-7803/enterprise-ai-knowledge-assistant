@@ -829,6 +829,19 @@ Rules:
 - BR-14, display only (the chunk text itself is unchanged):
   - in `excerpt` and `evidence_text`, Symbol/Wingdings Private Use Area characters (U+F000-U+F0FF) are shown as `•`;
   - an `excerpt` taken from a chunk that opens inside a word (the previous chunk's token overlap) starts at the next word, after `…`.
+- BR-15, `evidence_spans` (always present, display only):
+  - a list of `{"start": int, "end": int}`, the `[start, end)` character offsets of each piece of the evidence inside `excerpt` exactly as returned;
+  - offsets count Unicode code points; for text in the Basic Multilingual Plane (Vietnamese, `•`, `…`) they equal JavaScript string indices;
+  - the evidence is matched word by word in order, so evidence that skips words of the excerpt (for example a heading such as `Điều 5.` between two of its parts) gives several spans;
+  - `[]` when the evidence is absent or not found: show the excerpt without highlight;
+  - computed when the citation is read, so citations stored before BR-15 get spans too;
+  - `evidence_text` is unchanged and kept for compatibility.
+
+  ```json
+  "excerpt": "…công nghệ Điều 5. Thời giờ làm việc tiêu chuẩn •Thời gian…",
+  "evidence_text": "công nghệ Thời giờ làm việc tiêu chuẩn",
+  "evidence_spans": [{"start": 1, "end": 10}, {"start": 19, "end": 47}]
+  ```
 - `evidence_text` must never be supplied by the client or trusted from arbitrary LLM metadata.
 - Original PDF/DOCX content is not modified.
 - `GET /chat/sessions/{session_id}`, non-streaming message responses, and SSE citation payloads use the same safe citation metadata contract.

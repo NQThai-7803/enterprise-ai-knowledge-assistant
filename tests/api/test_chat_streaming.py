@@ -434,6 +434,7 @@ def test_stream_success_persists_assistant_message_once_and_returns_final_payloa
             "chunk_id": str(chunk_id),
             "page_number": 14,
             "excerpt": "Nhan vien chinh thuc duoc huong 12 ngay nghi phep.",
+            "evidence_spans": [],  # BR-15: no evidence_text here
             "relevance_score": 0.87,
             "citation_order": 1,
         }
@@ -752,6 +753,7 @@ def test_stream_success_returns_web_citations_ready_event(
             "chunk_id": None,
             "page_number": 1,
             "excerpt": "Microsoft Learn describes Azure AI services.",
+            "evidence_spans": [],  # BR-15: no evidence_text here
             "relevance_score": None,
             "citation_order": 1,
             "source_type": "WEB",

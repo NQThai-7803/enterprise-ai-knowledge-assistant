@@ -390,6 +390,7 @@ def test_answered_response_returns_citations(
             "chunk_id": str(chunk_id),
             "page_number": 14,
             "excerpt": "Nh?n vi?n ch?nh th?c ???c h??ng 12 ng?y ngh? ph?p.",
+            "evidence_spans": [],  # BR-15: no evidence_text here
             "relevance_score": 0.87,
             "citation_order": 1,
         }
@@ -652,6 +653,7 @@ def test_answered_response_returns_web_citations(
             "chunk_id": None,
             "page_number": 1,
             "excerpt": "The Responses API is documented by OpenAI.",
+            "evidence_spans": [],  # BR-15: no evidence_text here
             "relevance_score": None,
             "citation_order": 1,
             "source_type": "WEB",
