@@ -680,3 +680,51 @@ Owner dán nguyên khối này sang phiên backend:
   - cuối đoạn trích vẫn cắt tại ranh giới từ và thêm `…` như trước.
 - **Ví dụ** (Q016, staff, trang 5): `excerpt` bắt đầu bằng `…NHÂN SỰ 02 THỜI GIỜ LÀM VIỆC…` và không còn U+F0B7.
 - **Test:** `tests/unit/test_citation_display_text.py` (6 test: ký tự Symbol, bỏ mảnh chữ đầu, giữ đầu khi không có overlap hoặc khi bằng chứng ở đầu, ngân sách ký tự, đường mapper, đánh dấu ở context).
+
+## PROMPT CHO PHIÊN BACKEND (27/11/2026, kiểm lại BR-13 và BR-14)
+
+Owner dán nguyên khối này sang phiên backend:
+
+> Phiên UI chạy lại toàn bộ test live trên stack eaka-demo dựng lại từ `main` (`c9b5e1a`): 14/14 qua.
+> BR-13 và BR-14 đạt (mục "Phiên UI kiểm lại" ngay dưới). Ghi thêm BR-15 ở cuối
+> `docs/ui/backend-requests.md`; trả lời bằng khối "TRẢ LỜI CHO PHIÊN UI — BR-15" trong file đó.
+>
+> BR-15 (Nên có, citation): với Q016, `evidence_text` không phải một đoạn liền của `excerpt` (thiếu
+> "Điều 5." ở giữa), nên UI không tô sáng được bằng chứng. Q043 và Q084 thì khớp. Lỗi có từ trước BR-14.
+
+### Phiên UI kiểm lại BR-13 và BR-14 (27/11/2026, stack dựng từ `c9b5e1a`)
+
+- **BR-13: đạt.**
+  - Chromium mở `http://localhost:18480`, staff đăng nhập vào `/chat` và thấy "API sẵn sàng".
+  - Không request `/api/` hay `/health/` nào đi sang origin khác.
+  - Test: `frontend/tests/e2e-live/deploy.spec.ts`, "sign-in works from the other loopback host name".
+    Chạy với bản build gắn cứng `http://127.0.0.1:18480` (dev server) thì test này fail đúng chỗ.
+- **BR-14: đạt.** Q016, staff, trang 5:
+  - `excerpt` bắt đầu bằng `…NHÂN SỰ 02 THỜI GIỜ LÀM VIỆC…`, có 3 dấu `•` và không còn ký tự Private Use nào;
+    `evidence_text` cũng không còn.
+  - Đã đối chiếu với chunk trong DB (chỉ đọc): `chunk_index` 5, overlap 75 token. Chunk mở đầu bằng
+    `ỆU NHÂN SỰ` và có U+F0B7, nên cả hai phần sửa đều được kiểm trên dữ liệu thật.
+  - `deploy.spec.ts` giờ kiểm mọi đoạn trích trong khung Trích dẫn không có ký tự Private Use.
+
+### BR-15: `evidence_text` không nằm liền trong `excerpt`, nên UI không tô sáng bằng chứng (citation)
+
+- **Mức:** Nên có.
+  - Ở bước 1 của kịch bản demo (Q016), khung Trích dẫn không tô sáng gì.
+  - Lỗi có từ trước BR-14: ảnh chụp lượt chạy trước BR-14 cũng không có phần tô sáng.
+- **Hiện trạng** (Q016, staff, chunk `f4eb6113-…`, trang 5):
+  - Chunk: `…công nghệ\n\nĐiều 5. Thời giờ làm việc tiêu chuẩn\n Thời gian … được phê\n duyệt.`
+  - `excerpt`: `…doanh nghiệp công nghệ Điều 5. Thời giờ làm việc tiêu chuẩn •Thời gian làm việc …`
+  - `evidence_text` (210 ký tự): `Quy định cho … công nghệ Thời giờ làm việc tiêu chuẩn •Thời gian … được phê`.
+    Chuỗi này thiếu `Điều 5.` ở giữa, và dừng ở "được phê" (cuối dòng PDF, giữa cụm "được phê duyệt").
+  - UI tìm `evidence_text` trong `excerpt` (`features/chat/CitationPanel.tsx`): trước hết khớp nguyên
+    văn, sau đó bỏ qua khác biệt khoảng trắng. Cả hai đều không khớp, nên UI hiện đoạn trích không
+    tô sáng, đúng hành vi dự phòng.
+  - Cả 4 trích dẫn Q016 trong các phiên của staff đều như vậy.
+  - Q043 (trang 5, "Chính sách nghỉ…") và Q084 (trang 8, "Chính sách bảo hiểm và phúc lợi…"):
+    `evidence_text` nằm nguyên văn trong `excerpt`, và được tô sáng.
+- **Yêu cầu:** chọn một trong hai cách.
+  - `evidence_text` là một đoạn liền của `excerpt`, ít nhất sau khi bỏ qua khác biệt khoảng trắng.
+    Khi đó UI không cần đổi.
+  - Hoặc, nếu bằng chứng cố ý không liền, ghi rõ vào API_SPEC §8A và trả vị trí từng mảnh trong
+    `excerpt`, để UI tô từng mảnh.
+- **Ghi chú:** đây là bằng chứng hiển thị. Không đổi validation hay việc chọn trích dẫn.
