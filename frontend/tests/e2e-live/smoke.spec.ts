@@ -64,10 +64,13 @@ test("staff: answered and refused questions, preview from a citation, no uploade
   const chip = answered.getByRole("button", { name: /Mở trích dẫn/ }).first();
   if (await chip.count()) {
     await chip.click();
-    const link = page
-      .getByRole("complementary", { name: "Trích dẫn" })
-      .getByRole("link", { name: /Mở tài liệu tại trang/ })
-      .first();
+    const citations = page.getByRole("complementary", { name: "Trích dẫn" });
+    // BR-15: the opened citation highlights exactly the API's evidence_spans, and nothing when they are [].
+    const evidence = await apiEvidencePieces(page);
+    test.info().annotations.push({ type: "evidence-highlight", description: `${evidence.length} piece(s): ${evidence.join(" | ")}` });
+    await expect(citations.locator("#citation-1 .citation-evidence"), "highlighted evidence").toHaveText(evidence);
+    await citations.screenshot({ path: resolve(shotsDir, "staff-1b-citation-highlight.png") });
+    const link = citations.getByRole("link", { name: /Mở tài liệu tại trang/ }).first();
     const [viewer] = await Promise.all([context.waitForEvent("page"), link.click()]);
     await viewer.waitForLoadState();
     await expect(viewer.locator("iframe, img").first()).toBeVisible({ timeout: 60_000 });
@@ -352,6 +355,23 @@ async function ask(page: Page, question: string, label: string) {
   test.info().annotations.push({ type: "chat-timing", description: `${label}: ${seconds} s, ${outcome}` });
   await appendFile(resolve(shotsDir, "timings.txt"), `${new Date().toISOString()} ${label}: ${seconds} s, ${outcome}\n`);
   return card;
+}
+
+// Citation 1 of the newest chat session, read from GET /chat/sessions/{id} inside the page (the token
+// stays there): the excerpt's text at each evidence span, offsets in code points (API_SPEC §8A).
+async function apiEvidencePieces(page: Page): Promise<string[]> {
+  return page.evaluate(async (api) => {
+    type Citation = { citation_order: number; excerpt: string; evidence_spans: { start: number; end: number }[] };
+    const headers = { Authorization: `Bearer ${sessionStorage.getItem("enterprise_ai_access_token")}` };
+    const get = async (path: string) => (await (await fetch(`${api}/api/v1${path}`, { headers })).json()).data;
+    const list = await get("/chat/sessions");
+    const sessions = (Array.isArray(list) ? list : list.items) as { id: string; updated_at: string }[];
+    const newest = sessions.sort((a, b) => b.updated_at.localeCompare(a.updated_at))[0];
+    const messages = (await get(`/chat/sessions/${newest.id}`)).messages as { citations?: Citation[] }[];
+    const citation = messages.flatMap((message) => message.citations ?? []).find((item) => item.citation_order === 1)!;
+    const characters = Array.from(citation.excerpt);
+    return citation.evidence_spans.map(({ start, end }) => characters.slice(start, end).join(""));
+  }, apiBaseUrl);
 }
 
 async function shot(page: Page, name: string): Promise<void> {
