@@ -4,9 +4,12 @@ Prints ids, codes, statuses and times only, never a password, token or answer te
 Passwords: user environment variables EAKA_DEMO_{ADMIN,MANAGER,STAFF,OPS}_PASSWORD.
 The questions are dev-set ids; their text is read from the repository (UAT Q001-Q100 in
 eval-data/uat/questions.json, RBAC dev in tests/acceptance/rbac_dev_v1.yaml).
+Also checks the Host handling of the nginx (TC-SEC-08) and, through `docker exec`, the
+deployment profile of the API (deploy/demo/check_profile.py).
 usage: python deploy/demo/check_demo.py [--matrix]
 """
 
+import http.client
 import json
 import os
 import re
@@ -19,6 +22,7 @@ from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parents[2]
 BASE = "http://127.0.0.1:18480"
+API_CONTAINER = f"{os.environ.get('EAKA_DEMO_PROJECT') or 'eaka-demo'}-api-1"
 ACCOUNTS = {
     "admin": "admin.uat@example.test",
     "manager": "manager.uat@example.test",
@@ -34,6 +38,18 @@ QUESTIONS = [
     ("RBD-13", "RBAC-REV-001"),
     ("RBD-07", "RBAC-OPS-001"),
 ]
+# What demo.ps1 seed loads: UAT Corpus v2 (uat/corpus-v2/manifest.json) and the RBAC dev documents.
+DEMO_DOCUMENTS = {
+    *(f"ND-HR-00{n}" for n in range(2, 7)),
+    "ND-CORP-001",
+    "UAT-LEAVE-AUTHORITY-001",
+    "UAT-GROUNDING-001",
+    "UAT-SHARED-001",
+    "RBAC-MGR-001",
+    "RBAC-OPS-001",
+    "RBAC-REV-001",
+    "RBAC-ORG-001",
+}
 RESULTS = []
 
 
@@ -44,6 +60,71 @@ def dev_questions():
     rbac = (ROOT / "tests/acceptance/rbac_dev_v1.yaml").read_text(encoding="utf-8")
     text.update(re.findall(r'\{id: (RBD-\d+),.*\bquestion: "([^"]*)"', rbac))
     return text
+
+
+def raw_get(path, host):
+    """(status, Location) of one GET with this Host header, redirects not followed;
+    (None, None) when nginx closes the connection without an answer (444)."""
+    connection = http.client.HTTPConnection("127.0.0.1", 18480, timeout=30)
+    try:
+        connection.request("GET", path, headers={"Host": host})
+        response = connection.getresponse()
+        return response.status, response.getheader("Location")
+    except (http.client.RemoteDisconnected, ConnectionResetError):
+        return None, None
+    finally:
+        connection.close()
+
+
+def check_host_handling():
+    """TC-SEC-08: a forged Host gets no answer; a redirect never names a host or a port."""
+    for path in ("/", "/assets", "/api", "/health/live", "/api/v1/auth/me"):
+        status, location = raw_get(path, "evil.example")
+        check(f"Host evil.example {path}: no answer (444)", status is None, f"{status} {location}")
+    for host in ("127.0.0.1:18480", "localhost:18480"):
+        for path in ("/assets", "/api"):
+            status, location = raw_get(path, host)
+            check(
+                f"Host {host} {path}: relative redirect",
+                status == 301 and location == f"{path}/",
+                f"{status} Location={location}",
+            )
+
+
+def expected_model():
+    """LLM_OLLAMA_MODEL of .env.example: main's deployment default (DEC-040)."""
+    example = (ROOT / ".env.example").read_text(encoding="utf-8")
+    return re.search(r"(?m)^LLM_OLLAMA_MODEL=(\S+)", example).group(1)
+
+
+def check_profile():
+    """M1/L3: the API runs main's defaults for every RAG_* flag, with the default model."""
+    try:
+        run = subprocess.run(
+            ["docker", "exec", "-i", API_CONTAINER, "python", "-"],
+            input=(ROOT / "deploy/demo/check_profile.py").read_bytes(),
+            capture_output=True,
+            timeout=120,
+        )
+        profile = json.loads(run.stdout)
+    except (OSError, subprocess.SubprocessError, ValueError) as exc:
+        check(f"profile of {API_CONTAINER}", False, f"{type(exc).__name__}")
+        return
+    differs = profile["rag_differs"]
+    check(
+        "profile: every RAG_* flag at main's default",
+        not differs,
+        f"{profile['rag_flags']} flags" + (f", differ: {sorted(differs)}" if differs else ""),
+    )
+    model = expected_model()
+    check(
+        "profile: simple mode on the default model",
+        profile["rag_answer_mode"] == "simple"
+        and profile["llm_enabled"]
+        and profile["llm_ollama_model"] == model,
+        f"{profile['rag_answer_mode']} {profile['llm_provider']} {profile['llm_ollama_model']}"
+        f" (expected {model})",
+    )
 
 
 def password(role):
@@ -142,6 +223,8 @@ def main():
     )
     status, headers, body = call("GET", "/chat/some-session", accept="text/html")
     check("SPA fallback for an app route", status == 200 and b'<div id="root"' in body, str(status))
+    check_host_handling()
+    check_profile()
 
     tokens = {}
     for role, email in ACCOUNTS.items():
@@ -181,15 +264,22 @@ def main():
     documents = json.loads(body)["data"]
     code_of = {d["id"]: d["document_code"] for d in documents}
     id_of = {v: k for k, v in code_of.items()}
+    ready = {d["document_code"] for d in documents if d.get("status") == "READY"}
     check(
-        "13 documents READY",
-        len(documents) == 13 and all(d.get("status") == "READY" for d in documents),
-        str(len(documents)),
+        "the 13 demo documents are READY",
+        ready >= DEMO_DOCUMENTS,
+        f"missing: {sorted(DEMO_DOCUMENTS - ready)}" if DEMO_DOCUMENTS - ready else "13",
+    )
+    others = [d for d in documents if d["document_code"] not in DEMO_DOCUMENTS]
+    check(
+        "no other document (else: demo.ps1 reset)",
+        not others,
+        f"{len(others)} other: {[d.get('original_filename') for d in others]}" if others else "",
     )
     for d in documents:
         print(
-            f"      {d['document_code']:<24} {d.get('access_scope')} {d.get('lifecycle_status')}"
-            f" {d.get('status')}"
+            f"      {str(d['document_code']):<24} {d.get('access_scope')}"
+            f" {d.get('lifecycle_status')} {d.get('status')}"
         )
 
     session = json.loads(
@@ -238,7 +328,7 @@ def main():
 
     seen = {role: visible(role) for role in tokens}
     for role in tokens:
-        print(f"      {role:<8} sees {len(seen[role])}: {sorted(seen[role])}")
+        print(f"      {role:<8} sees {len(seen[role])}: {sorted(seen[role], key=str)}")
     rev, ops_doc = id_of["RBAC-REV-001"], id_of["RBAC-OPS-001"]
     check(
         "ops staff does not see UAT-KNOWLEDGE's DEPARTMENT document",
@@ -275,7 +365,7 @@ def main():
                 seconds = time.monotonic() - started
                 data = json.loads(body)["data"]
                 citations = data["assistant_message"].get("citations") or []
-                cited = sorted({code_of.get(c.get("document_id"), "?") for c in citations})
+                cited = sorted({code_of.get(c.get("document_id"), "?") for c in citations}, key=str)
                 shown = " ".join(
                     (c.get("excerpt") or "") + (c.get("evidence_text") or "") for c in citations
                 )

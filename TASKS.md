@@ -1,6 +1,23 @@
 
 # Implementation Tasks
 
+## Tester findings of 2026-11-27 -- 2026-11-28
+
+- **DONE:**
+  - TC-SEC-08: the frontend nginx answers only `localhost`, `127.0.0.1` and `FRONTEND_SERVER_NAMES`. Any other Host gets 444 (a `default_server`), and `absolute_redirect off` keeps every `Location` relative. `check_demo.py` checks both.
+  - Every GitHub action in `ci.yml`, `eval.yml`, `heldout-v2.yml` and `heldout-v3.yml` is pinned to a commit SHA, as in `frontend-ci.yml`.
+  - `.semgrepignore`: `docs/eval/` and `tests/acceptance/*held*` are excluded; `tests/` is scanned otherwise.
+  - M1/L3: `deploy/demo/check_profile.py`, run by `check_demo.py`, fails when a `RAG_*` flag or the model differs from main's default. `DEPLOYMENT.md` 1.1 names the demo stack as the reference deployment and retires the old development stack, which is kept.
+- **NEXT, [Medium] Recalibrate for `qwen3.5-text:4b` on a corpus v3 calibration set** (not UAT, never held-out), with the rule written before measuring:
+  - `RAG_SIMPLE_CLAIM_RELEVANCE_MIN_SIMILARITY` (0.78): it was calibrated on `qwen2.5:3b` drafts of 5 dev sets (`docs/design/simple-answer-mode.md`, 109 positive and 39 negative drafts). With 4B (DEC-042 base run) the lowest claim cosine is 0.741 on UAT, 0.780 on false_refusal_v2 and 0.786 on natural_dev_v1, so the margin is gone.
+  - `LLM_TOKEN_ESTIMATE_RATIO` (0.99): it was calibrated on 36 Ollama calls (PROMPT 4) with another model. With 4B, every long prompt logs `USAGE_BELOW_ESTIMATE`: 112 of 114 UAT drafts and 27 of 27 natural_dev_v1 drafts.
+- **NEXT, [Medium] Production nginx** (`deploy/nginx/conf.d/app.conf`, `compose.prod.yaml`): the same TC-SEC-08 fix (allowed `server_name` with a 444 `default_server`, `absolute_redirect off`). It still has `server_name _`.
+- **Owner:** eaka-demo has a 14th document (uploaded 2026-11-27 13:02 UTC, `ND-HR-002_Noi_quy_lao_dong_v2.0.pdf`), so `check_demo.py` reports "no other document" as FAIL. Run `demo.ps1 reset` before the next demo.
+- **NEXT, [Medium] Dev sets outside UAT for yes/no, PERSON and TIME questions.**
+  - In the DEC-042 base run, YES_NO is 23 UAT items against 7 in natural_dev_v1 and 1 each in false_refusal v1 and v2; TIME, TIME_RANGE, YEAR, COUNT and TIMELINE are UAT only.
+  - The validator branches for these types fire on UAT only: 8 return points of `_validate_answer_against_evidence`, 86 branch arcs.
+  - Add items of these types to a dev set (corpus v3), dev only. Per DEC-041, UAT stays a regression suite.
+
 ## Demo from a fresh clone -- 2026-11-28
 
 - **DONE:**
@@ -8,7 +25,7 @@
   - `DEMO.md` "Chạy từ bản clone mới".
   - Tried from a fresh GitHub clone of `a4add79`, as project `eaka-democlone`: init, build, up, seed (13 READY), warmup, `check_demo.py --matrix` 47/47.
 - **NEXT (owner):** move the tag `test-2026-11-27` to the merge commit of this change.
-- **[Low]** Delete the test project's volumes `eaka-democlone_*` and `C:\dev\eaka-clonetest` once the owner approves.
+- **DONE (owner approved, 2026-11-28):** the test project's leftovers are deleted: the `eaka-democlone_*` volumes, `C:\dev\eaka-clonetest`, its build log, and the `demo-a4add79` images.
 - Not tried: a cold image build on a machine with no Docker cache, `init` creating the passwords (they already existed here), and building `qwen3.5-text:4b` (the model already existed).
 
 ## BR-16 (not done) -- 2026-11-27

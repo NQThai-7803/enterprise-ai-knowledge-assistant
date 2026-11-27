@@ -1,5 +1,22 @@
 # Project Status
 
+## Tester findings of 2026-11-27 fixed -- 2026-11-28
+
+- **TC-SEC-08:** checked on eaka-demo with the new images (`demo-45e01ec`).
+  - Before the fix, `Host: evil.example` on `/assets` and `/api` got 301 to `http://evil.example:8080/…`.
+  - Now it gets no answer at all (444, curl "Empty reply") on every path.
+  - `localhost` and `127.0.0.1` get relative redirects (`Location: /assets/`, `/api/`), and the normal flow (logins on both hosts, SSE, PDF preview) passes.
+- **Pinned actions:** no action in `.github/workflows` uses a tag any more.
+- **Semgrep 1.186.0** (OWASP Top 10 + secrets) with `.semgrepignore`: 856 targets, none under `docs/eval/`. 9 findings:
+  - 2 `use-defused-xml-parse` in eaka-verify scripts;
+  - 2 `run-shell-injection` in `eval.yml`, on `type: choice` inputs;
+  - 4 `request-host-used` on `proxy_set_header Host $host`, which now only gets allowed names on the frontend;
+  - 1 `jwt-python-none-alg` in `test_none_algorithm_rejected`, a test that sends `alg=none` on purpose.
+  - The 12 `github-actions-mutable-action-tag` findings are gone.
+- **`check_demo.py --matrix`:** 58/59 on eaka-demo. The profile check passes: 39 `RAG_*` flags at main's defaults, simple mode, `qwen3.5-text:4b`.
+  - The one failure is a real finding: the demo has a 14th document. It was uploaded on 2026-11-27 13:02 UTC, after the last reset: `ND-HR-002_Noi_quy_lao_dong_v2.0.pdf`, with no document code. Run `demo.ps1 reset` before the next demo.
+- **Not changed:** the production nginx (`deploy/nginx/conf.d/app.conf`). It still has `server_name _` and is outside this task.
+
 ## Demo from a fresh clone -- 2026-11-28
 
 - **Changed:** a fresh clone now builds the demo with the repo alone. `deploy/demo/demo.ps1 init | build | up | seed | warmup` follows `DEMO.md` "Chạy từ bản clone mới".

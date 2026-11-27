@@ -515,6 +515,17 @@ CORS_ALLOWED_METHODS=GET,POST,PUT,PATCH,DELETE,OPTIONS
 CORS_ALLOWED_HEADERS=Authorization,Content-Type,Accept,Origin
 ```
 
+## Frontend nginx (`deploy/frontend`)
+
+```text
+FRONTEND_SERVER_NAMES=
+```
+
+- `FRONTEND_SERVER_NAMES` (string, space-separated host names, default empty; 2026-11-28, TC-SEC-08): environment of the frontend container of `deploy/frontend/Dockerfile`.
+  - Its nginx answers `localhost`, `127.0.0.1` and these names.
+  - Any other `Host` header gets no answer (444).
+  - Each name must also be in the API's `TRUSTED_HOSTS`.
+
 ## Logging
 
 ```text

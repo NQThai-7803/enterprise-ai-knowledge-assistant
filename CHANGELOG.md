@@ -6,6 +6,17 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### Tester findings of 2026-11-27 -- 2026-11-28
+
+- **Security (TC-SEC-08):** the frontend nginx answers only `localhost`, `127.0.0.1` and the names in `FRONTEND_SERVER_NAMES` (new, empty by default).
+  - Any other `Host` gets 444 from a `default_server`.
+  - `absolute_redirect off`: a redirect's `Location` is a relative path, never a forged host or the container port 8080.
+  - `nginx.conf` is now an envsubst template, limited to that one variable.
+- **CI:** `actions/checkout`, `actions/setup-python` and `actions/upload-artifact` are pinned to commit SHAs in `ci.yml`, `eval.yml`, `heldout-v2.yml` and `heldout-v3.yml`, as in `frontend-ci.yml`. These are the same commits the `v7` tags point to.
+- **Semgrep:** `.semgrepignore` excludes `docs/eval/` and `tests/acceptance/*held*`, keeps the generic build and vendor paths, and scans `tests/`.
+- **Demo checks:** `check_demo.py` checks Host handling and, through `deploy/demo/check_profile.py`, that every `RAG_*` flag and the model match main's defaults.
+- **Docs:** `DEPLOYMENT.md` 1.1: the demo stack is the reference deployment; the old development stack is retired, not deleted.
+
 ### Demo from a fresh clone -- 2026-11-27
 
 - **Added:** `deploy/demo/`, the demo tooling that lived only outside the repo:
