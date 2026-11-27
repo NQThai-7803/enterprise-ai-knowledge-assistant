@@ -236,6 +236,10 @@ Set by the owner on 2026-11-16, before s4 and s5 are measured.
 - **A difference smaller than the variation between the jobs counts as a tie.** Applied per count (false refusals, false answers + wrong, ...): the difference between two configurations is taken in each job; it counts only when it has the same sign in both jobs and its smaller size is larger than the largest change of either configuration between the two jobs on that count.
 - DEC-011/016 (baseline in the same job) and DEC-026 (selection order) still apply inside each job.
 - Recorded with it, at the owner's instruction: s5 uses a cross-encoder (`cross-encoder/mmarco-mMiniLMv2-L12-H384-v1`) as a per-claim relevance check behind its flag, for measurement. DEC-025 (no cross-encoder reranker) is unchanged; the eval workflow downloads that model only for a configuration that turns the check on.
+- **Observed variation between jobs (recorded 2026-11-27, DEC-042):**
+  - the same image and the `base` configuration gave 69, 71 and 68 right answers on UAT, in the PR #59 jobs and confirmation rounds 1 and 2;
+  - the items whose category changed: Q028, Q029, Q033, Q036, Q046, Q048, Q063;
+  - so a UAT difference of 2-3 items between configurations is within that variation.
 
 ## DEC-028 — Model comparison: candidates and rule, fixed before measuring
 
@@ -1125,3 +1129,87 @@ No infra error in the measured attempts.
 3. **2a+1:** the largest gain (+8), with 5 more false answers + wrong values on natural + UAT.
 
 A default flip still follows DEC-026, and the two-job rule of DEC-027.
+
+### Amendment after the result (2026-11-25, owner) and the DEC-027 confirmation of 2a
+
+**Written after the result above was known.** The rule as registered and its verdicts stay above,
+unchanged, for comparison.
+
+- **The gap:**
+  - Rule 2 blocked a rise in false answers + wrong values only on the five guard sets.
+  - Those sets gave no signal: every configuration equals base there.
+  - So a variant could add false answers + wrong values on `natural_dev_v1` and UAT and still be accepted.
+- **Rule from now on:** false answers + wrong values must not increase on **any** set, `natural_dev_v1` and UAT included. Rules 1 and 3 are unchanged.
+- **Verdicts under it:**
+
+  | Variant | False answers + wrong values (base → variant) | Right answers | Verdict |
+  |---|---|---|---|
+  | 2a | natural 5 → 5, UAT 8 → 8 | +4 | **accepted** |
+  | 1 | natural 5 → 6, UAT 8 → 10 | | **rejected** |
+  | 2a+1 | natural 5 → 7, UAT 8 → 11 | | **rejected** |
+
+  2b stays rejected.
+
+**Confirmation of 2a before the flip (DEC-027), registered before its runs:**
+
+- **Runs:**
+  - Two rounds, separate from the PR #59 jobs.
+  - Each round is one `natural_dev_v1` job and one UAT job (Q001-Q100).
+  - Each job runs both `base` and `2a` on the same image (main 4ebf927; the branch adds only docs), 1 run each.
+  - Round 2 sets `EVAL_LLM_SEED` to its default value only so that its jobs differ from round 1's in the concurrency group and run alongside it.
+- **2a is accepted if, in both rounds:**
+  - its right answers on `natural_dev_v1` + UAT together exceed base's;
+  - its false answers + wrong values do not exceed base's, on `natural_dev_v1` and on UAT each.
+  - Leaks stay 0.
+- **Also reported:**
+  - the DEC-027 tie test per count;
+  - the items whose category differs between the two rounds, and from the PR #59 jobs (IDs only).
+- **Outcome:**
+  - If accepted, DEC-043 makes `per_document_3` the default and keeps the flag for rollback.
+  - If not, base stays, and the result is written here.
+
+### Confirmation result (2026-11-26): 2a not accepted, base stays
+
+**Runs:**
+
+| Round | `natural_dev_v1` | UAT |
+|---|---|---|
+| 1 | 45779822077 | 45779832197 |
+| 2 | 45779827292 | 45779837610 |
+
+Branch `eval/dec042-confirm` (main 4ebf927 plus docs), configurations `base` and `2a`.
+
+**Round 1's UAT job ended at the job time limit both times** (attempts 1 and 2):
+
+- each time `base` finished (12772 s and 12699 s, against 5700 s in round 2);
+- `2a` stopped at Q058-Q059.
+
+That job has no complete `2a`, and it was not run a third time: the rule needs both rounds to pass, and round 2 does not.
+
+| | PR #59 jobs (UAT in 3 parts) | round 1 | round 2 |
+|---|---|---|---|
+| `natural_dev_v1` base: correct / false answers + wrong values | 7 / 5 | 7 / 5 | 7 / 5 |
+| `natural_dev_v1` 2a | 8 / 5 | 8 / 5 | 8 / 5 |
+| UAT base | 69 / 8 | 71 / 9 | 68 / 9 |
+| UAT 2a | 72 / 8 | incomplete (time limit) | 70 / **10** |
+| leaks | 0 | 0 | 0 |
+
+**Verdict under the registered criteria: not accepted.**
+
+- In round 2, 2a's false answers + wrong values on UAT exceed base's (10 > 9). The new one is Q057, right under base and wrong under 2a. Q041 is newly wrong under 2a, as it was in the PR #59 jobs.
+- Right answers on natural + UAT were higher (+3), but that alone is not enough.
+- **DEC-043 is not written:** `RAG_PROMPT_CHUNK_SELECTION` stays `rrf` by default, and `per_document_3` stays available behind the flag.
+
+**The DEC-027 tie test** (PR #59 jobs against round 2, the two jobs with both configurations complete):
+
+- `natural_dev_v1` +1 in both, with no change between jobs: a real but one-item difference.
+- UAT right answers +3 and +2. Base moved by 1 between those jobs, 2a by 2; across all three jobs, base moved between 68 and 71. That is a tie.
+- UAT false answers + wrong values: 0 and +1, so not the same sign: a tie.
+
+**Items whose category differs between jobs** (IDs only):
+
+- `natural_dev_v1`: none, for both configurations.
+- UAT base, across the three jobs: Q028, Q029, Q033, Q036, Q046, Q048, Q063.
+- UAT 2a, PR #59 jobs against round 2: Q003, Q020, Q031, Q057, Q074, Q076, Q080.
+
+The UAT gain of 2a is no larger than the variation of base between jobs.

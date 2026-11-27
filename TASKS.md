@@ -1,6 +1,27 @@
 
 # Implementation Tasks
 
+## 2a confirmation under DEC-027: not accepted -- 2026-11-26
+
+- **DONE:**
+  - DEC-042 amended after its result: false answers + wrong values must not rise on any set. Under it 2a passes, 1 and 2a+1 fail.
+  - The two-round confirmation of 2a: in round 2, false answers + wrong values on UAT went up by 1 (10 > 9), so **2a is not accepted**.
+  - `RAG_PROMPT_CHUNK_SELECTION` stays `rrf` by default; no DEC-043.
+  - Round 1's UAT job hit the job time limit twice (the runner was slow), so `2a` there is incomplete.
+  - Details in `DECISIONS.md` DEC-042.
+- **NEXT:**
+  - **[High]** The five guard sets cannot tell configurations apart: their documents are short, so every DEC-042 configuration equalled base there. A guard dev set is needed with long documents and several chunks per document, tied to corpus v3.
+  - **[Medium]** Validator v2:
+    - bind a value to its own row or subject (the Q097 and ND-015 kind);
+    - find why the on-call items cite ND-HR-005 instead of ND-HR-003 (Q030, Q037);
+    - `_answer_has_grounded_signal` counts only words of 4+ letters (Q029).
+  - **[Medium]** Logout must revoke the whole refresh-token family (not done):
+    - today `AuthService.logout` revokes only the token it is given, and `refresh` rotates without linking the new token to the old one;
+    - so a refresh in flight at logout issues a new token that the client drops but that stays valid until it expires: `REFRESH_TOKEN_EXPIRE_DAYS`, default 7 days (access token 15 minutes);
+    - needs a family link on `refresh_tokens` (a migration), revoked as a whole on logout.
+  - **[Low]** s3t does not use the reranker to rank (the prompt takes the RRF order). Consider a real reranker when the hardware allows.
+  - **[Low]** The UAT job (100 items × 2 configurations) can exceed the 340-minute limit on a slow runner. Split UAT across jobs when a configuration runs alone for long.
+
 ## Refusal fixes measured (DEC-042) -- 2026-11-24
 
 - **DONE, flags off:**
