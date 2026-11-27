@@ -1,6 +1,12 @@
 
 # Implementation Tasks
 
+## BR-16 (not done) -- 2026-11-27
+
+- **NEXT, [Low] BR-16:** an evidence span stops where the evidence text stops, often at the end of a PDF line ("được phê" instead of "được phê duyệt.").
+  - Extend the last span to the end of its sentence inside the excerpt (display only, `evidence_spans`).
+  - Do it together with the corpus v3 extraction normalisation (Symbol characters, chunk overlap at word boundaries), because that changes where PDF lines break.
+
 ## BR-15 evidence_spans -- 2026-11-27
 
 - **DONE:**
