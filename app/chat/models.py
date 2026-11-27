@@ -29,6 +29,8 @@ class SelectedContextItem:
     keyword_score: float | None = None
     hybrid_score: float | None = None
     reranker_score: float | None = None
+    # The text opens with the previous chunk's token overlap, maybe inside a word (BR-14).
+    starts_mid_word: bool = False
 
     def __post_init__(self) -> None:
         if self.ordinal < 1:
