@@ -254,6 +254,73 @@ test("one tab, manager then staff: nothing the manager loaded reaches the staff'
   }
 });
 
+test("staff: logout while a token refresh runs, then a reload opens the sign-in page", async ({ page, playwright }) => {
+  const stamp = String(Date.now());
+  await login(page, accounts.staff);
+
+  // The server answers the refresh (and rotates the token) at once; its answer reaches the page only
+  // after the logout. That is the race: new tokens arriving once the old ones were cleared.
+  let refreshStatus = 0;
+  let refreshAnswered!: () => void;
+  const answered = new Promise<void>((resolve) => (refreshAnswered = resolve));
+  let deliver!: () => void;
+  const delivered = new Promise<void>((resolve) => (deliver = resolve));
+  await page.route("**/api/v1/auth/refresh", async (route) => {
+    const response = await route.fetch();
+    refreshStatus = response.status();
+    refreshAnswered();
+    await delivered;
+    await route.fulfill({ response });
+  });
+
+  try {
+    // Access token about to expire: the client refreshes before a chat stream when fewer than 30 s
+    // are left, so the browser clock is set 10 s before the real token's exp.
+    const accessToken = await page.evaluate(() => sessionStorage.getItem("enterprise_ai_access_token"));
+    const { exp } = JSON.parse(Buffer.from(accessToken!.split(".")[1], "base64url").toString()) as { exp: number };
+    await page.clock.setFixedTime(new Date((exp - 10) * 1000));
+    await page.getByLabel("Câu hỏi", { exact: true }).fill(`Mã ${stamp}: câu hỏi khi token sắp hết hạn`);
+    await page.getByRole("button", { name: "Gửi câu hỏi" }).click();
+    await answered;
+    expect(refreshStatus, "the server accepted the refresh").toBe(200);
+
+    await page.getByRole("button", { name: "Đăng xuất" }).click();
+    await expect(page.getByRole("heading", { name: "Đăng nhập" })).toBeVisible();
+    deliver();
+    // The chat request the logout aborted ends only once the refresh answer was handled: its toast is
+    // the signal that the client has decided whether to keep the new tokens.
+    await expect(page.getByText("Đã dừng câu trả lời")).toBeVisible();
+    // Names of the token keys still stored, never their values: a failure must not print a token.
+    const storedAuthKeys = () =>
+      page.evaluate(() =>
+        ["enterprise_ai_access_token", "enterprise_ai_refresh_token"].filter((key) => sessionStorage.getItem(key) !== null),
+      );
+    expect(await storedAuthKeys(), "tokens after the late refresh answer").toEqual([]);
+
+    const restoreAttempts: string[] = [];
+    page.on("request", (request) => {
+      if (request.url().includes("/api/v1/auth/me")) restoreAttempts.push(request.url());
+    });
+    await page.reload();
+    await page.waitForLoadState("networkidle");
+    await expect(page).toHaveURL(/\/login$/);
+    await expect(page.getByRole("heading", { name: "Đăng nhập" })).toBeVisible();
+    expect(restoreAttempts, "no session to restore after the reload").toEqual([]);
+    expect(await storedAuthKeys()).toEqual([]);
+  } finally {
+    // Only if staff had no chat session would the question have created one (titled with the stamp).
+    const api = await playwright.request.newContext({ baseURL: apiBaseUrl });
+    const staffToken = await apiLogin(api, accounts.staff);
+    const sessions = await (await api.get("/api/v1/chat/sessions?page_size=50", { headers: bearer(staffToken) })).json();
+    for (const session of sessions.data as { id: string; title: string | null }[]) {
+      if (session.title?.includes(stamp)) {
+        await api.delete(`/api/v1/chat/sessions/${session.id}`, { headers: bearer(staffToken) });
+      }
+    }
+    await api.dispose();
+  }
+});
+
 async function login(page: Page, account: Account): Promise<void> {
   await page.goto("/login");
   await page.getByLabel("Email").fill(account.email);
