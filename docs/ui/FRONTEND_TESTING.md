@@ -31,6 +31,20 @@ Playwright smoke tests cover:
 
 Frontend tests must not call live external LLM providers. Tests use deterministic local streams and fake fetch responses. Browser E2E smoke tests do not require a backend token.
 
+## Secrets in Tests
+
+A failing assertion prints both its received and its expected value: to the terminal, to CI logs and into Playwright's `error-context.md`. So:
+
+- **Never assert on the value of a token, password, secret or cookie**, neither as what `expect()` receives nor as the expected value. Compare only key names (which storage keys exist), a length, or presence: `expect(Boolean(token)).toBe(true)`, `expect(token !== null).toBe(true)`, `expect(token.length).toBeGreaterThan(20)`. Presence matchers do not help on their own: `expect(token).toBeNull()` still prints the token when it fails.
+- **Scope:** every test that touches real credentials, that is everything under `frontend/tests/` (live runs against a real backend) and any test that reads a password from the environment. Unit tests under `src/` may compare fixed fake values written in the test itself (e.g. `"new-access"`), because those are not secrets.
+- **Enforced by ESLint** for `tests/**` (`no-restricted-syntax` in `frontend/eslint.config.js`; `npm run lint`, which Frontend CI runs). An `expect()` whose subject or expected value is a variable, property, call or storage key named like token, password, secret or cookie fails the lint, awaited or not. The check goes by names, so name a helper after what it returns (`storedAuthKeys()` returns key names, not tokens). `src/test/secretAssertionRule.test.ts` keeps the rule working.
+- Live specs keep traces, failure screenshots and videos off. Delete `frontend/test-results/` after a local live run. It is ignored by git and never uploaded: Frontend CI uploads only five summary text files.
+- **If a secret was printed anyway:**
+  1. Delete the output files.
+  2. Revoke the token: `POST /api/v1/auth/logout` with it.
+  3. Check that it is now refused.
+  4. Report it.
+
 ## Future Expansion
 
 When a seeded test backend is available, add E2E coverage for admin user management, manager document permission flow, staff document upload and chat, SSE success/error, citation display, logout/expired session, unauthorized direct route access, and mobile layout checks.

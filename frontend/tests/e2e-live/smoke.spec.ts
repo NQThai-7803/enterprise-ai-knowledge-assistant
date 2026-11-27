@@ -291,11 +291,11 @@ test("staff: logout while a token refresh runs, then a reload opens the sign-in 
     // the signal that the client has decided whether to keep the new tokens.
     await expect(page.getByText("Đã dừng câu trả lời")).toBeVisible();
     // Names of the token keys still stored, never their values: a failure must not print a token.
-    const tokens = () =>
+    const storedAuthKeys = () =>
       page.evaluate(() =>
         ["enterprise_ai_access_token", "enterprise_ai_refresh_token"].filter((key) => sessionStorage.getItem(key) !== null),
       );
-    expect(await tokens(), "tokens after the late refresh answer").toEqual([]);
+    expect(await storedAuthKeys(), "tokens after the late refresh answer").toEqual([]);
 
     const restoreAttempts: string[] = [];
     page.on("request", (request) => {
@@ -306,7 +306,7 @@ test("staff: logout while a token refresh runs, then a reload opens the sign-in 
     await expect(page).toHaveURL(/\/login$/);
     await expect(page.getByRole("heading", { name: "Đăng nhập" })).toBeVisible();
     expect(restoreAttempts, "no session to restore after the reload").toEqual([]);
-    expect(await tokens()).toEqual([]);
+    expect(await storedAuthKeys()).toEqual([]);
   } finally {
     // Only if staff had no chat session would the question have created one (titled with the stamp).
     const api = await playwright.request.newContext({ baseURL: apiBaseUrl });
