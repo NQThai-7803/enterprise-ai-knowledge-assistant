@@ -570,6 +570,7 @@ def test_session_history_returns_assistant_citations(
             "chunk_id": str(messages[1]["citations"][0]["chunk_id"]),
             "page_number": 14,
             "excerpt": "Nh?n vi?n ???c h??ng 12 ng?y ngh? ph?p.",
+            "evidence_spans": [],  # BR-15: no evidence_text here
             "relevance_score": 0.87,
             "citation_order": 1,
         }
