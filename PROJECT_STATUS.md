@@ -1,5 +1,10 @@
 # Project Status
 
+## BR-15 evidence_spans -- 2026-11-27
+
+- Citations now say where their evidence sits in the excerpt, one span per piece, so non-contiguous evidence (Q016) can be highlighted.
+- No change to answers, retrieval or validation.
+
 ## BR-13, BR-14 (narrow), demo reset -- 2026-11-27
 
 - **Demo:** same-origin frontend, so it works at `localhost` as well as `127.0.0.1`.
