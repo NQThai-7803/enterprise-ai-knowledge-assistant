@@ -1,6 +1,22 @@
 
 # Implementation Tasks
 
+## Demo stack eaka-demo -- 2026-11-27
+
+- **DONE:**
+  - `deploy/frontend/Dockerfile` + `nginx.conf`: the SPA served by nginx, with `/api/` and `/health/` proxied to the API on the same origin. SSE is unbuffered and uncompressed, with a 300 s read timeout; app routes fall back to `index.html`.
+  - `DEMO.md`: hardware, commands, accounts (emails only), a 5-7 minute script by role (question IDs from the dev sets), what to do when the first question is slow.
+  - The stack itself lives outside the repo in `C:\dev\eaka-demo`. Its checks through 18480 pass:
+    - health, login of the 4 accounts, SSE to `message.completed`, PDF preview inline;
+    - DEPARTMENT documents hidden from the other department;
+    - no leak in the question x role matrix.
+- **NEXT:**
+  - **[Low]** Delete the `eaka-smoke_*` volumes once the owner approves. The smoke stack is stopped, and the demo copied its e5 cache.
+  - **[Medium, for the UI session, not a blocker]** Let the API base URL be relative (same origin):
+    - today `frontend/src/lib/config.ts` falls back to `http://127.0.0.1:8000` on an empty `VITE_API_BASE_URL`, and `api/client.ts` calls `new URL(...)` with no base;
+    - so a same-origin build must bake in its origin (`http://127.0.0.1:18480`), and a page opened at `http://localhost:18480` is cross-origin and blocked (preflight 400).
+  - **[Low]** Demo API memory: 1.0 of its 1.2 GiB limit (`restart: "no"`). If it is OOM-killed during a demo, `demo.ps1 up` restarts it; raise the limit if it happens.
+
 ## 2a confirmation under DEC-027: not accepted -- 2026-11-26
 
 - **DONE:**

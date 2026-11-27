@@ -6,6 +6,12 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### Demo stack -- 2026-11-27
+
+- **Added:**
+  - `deploy/frontend/Dockerfile` and `deploy/frontend/nginx.conf`: a single-host frontend image (SPA plus a same-origin `/api/` proxy, SSE unbuffered);
+  - `DEMO.md`: how to run and present the demo stack.
+
 ### DEC-042 amended; 2a not confirmed -- 2026-11-26
 
 - **Docs:**

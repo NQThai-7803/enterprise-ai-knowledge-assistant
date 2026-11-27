@@ -12,6 +12,7 @@ Danh sách tài liệu được tạo cho dự án.
 - `CONTRIBUTING.md`
 - `DATABASE_DESIGN.md`
 - `DECISIONS.md`
+- `DEMO.md`
 - `DEMO_SCENARIO.md`
 - `DEPLOYMENT.md`
 - `DEVELOPMENT_GUIDE.md`
