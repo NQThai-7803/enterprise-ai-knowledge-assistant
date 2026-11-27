@@ -125,6 +125,11 @@ export interface DocumentPermission {
   created_at: string;
 }
 
+export interface EvidenceSpan {
+  start: number;
+  end: number;
+}
+
 export interface Citation {
   document_id: string;
   document_title: string;
@@ -133,6 +138,8 @@ export interface Citation {
   excerpt: string;
 
   evidence_text?: string | null;
+  // BR-15 (API_SPEC §8A): [start, end) code-point offsets of each evidence piece in `excerpt`; [] = no highlight.
+  evidence_spans?: EvidenceSpan[];
 
   relevance_score: number | null;
   citation_order: number;
