@@ -1,0 +1,17 @@
+# Semgrep exclusions. This file replaces Semgrep's built-in one, so its generic entries are kept
+# here; tests/ is scanned (the built-in file skips it), except the held-out files below.
+:include .gitignore
+
+node_modules/
+build/
+dist/
+vendor/
+.venv/
+.tox/
+*.min.js
+.semgrep
+.semgrep_logs/
+
+# Held-out evaluation data is never read by tools (DEC-012).
+docs/eval/
+tests/acceptance/*held*

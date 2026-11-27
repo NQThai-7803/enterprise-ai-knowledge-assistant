@@ -100,7 +100,8 @@ python deploy\demo\check_demo.py --matrix
 | `deploy/demo/demo.ps1` | `init` / `build` / `up` / `seed` / `warmup` / `questions` / `status` / `down` / `reset`; chạy trên repo chứa nó, từ thư mục nào cũng được |
 | `deploy/demo/compose.demo.yaml` | Phủ lên `compose.yaml` + `compose.uat-corpus-v2.yaml`:<br>• image riêng;<br>• `restart: "no"`;<br>• giới hạn bộ nhớ;<br>• chỉ frontend có cổng (`127.0.0.1:18480`);<br>• `RAG_DIAGNOSTICS_ENABLED=false` (mặc định của app) |
 | `deploy/demo/seed_demo.py` | Nạp dữ liệu demo (chạy qua `demo.ps1 seed`, trong mạng của container API, repo mount chỉ đọc) |
-| `deploy/demo/check_demo.py` | Kiểm qua nginx; `--matrix` hỏi các câu mẫu bằng cả 4 tài khoản |
+| `deploy/demo/check_demo.py` | Kiểm qua nginx, gồm cả xử lý Host (TC-SEC-08: Host lạ không được trả lời, redirect chỉ có đường dẫn tương đối) và profile của API; `--matrix` hỏi các câu mẫu bằng cả 4 tài khoản |
+| `deploy/demo/check_profile.py` | Chạy trong container API (qua `check_demo.py`): báo cờ `RAG_*` nào khác mặc định của `main`, cùng model và chế độ trả lời |
 | `.env` (gốc repo) | Do `demo.ps1 init` tạo từ `.env.example`, secret ngẫu nhiên; không commit (`.gitignore`) |
 
 - **Câu hỏi:** repo công khai chỉ ghi ID. `demo.ps1` và `check_demo.py` đọc nội dung theo ID từ bộ dev trong repo, không có câu held-out nào.

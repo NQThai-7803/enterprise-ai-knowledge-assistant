@@ -13,6 +13,19 @@ Nginx
             └── Object storage
 ```
 
+### 1.1 Reference deployment (2026-11-28)
+
+- **The demo stack is the reference deployment:** `DEMO.md`, `deploy/demo/`, project `eaka-demo`.
+  - It runs main's defaults: every `RAG_*` flag at its code default, `qwen3.5-text:4b` from `.env.example`.
+  - `python deploy/demo/check_demo.py` checks this profile through `deploy/demo/check_profile.py` and fails on any difference.
+  - Tests and measurements of a deployment are made on this stack, or on a stack built the same way.
+- **Retired:** the old development stack `enterprise-ai-knowledge-assistant` (`compose.yaml` with a hand-edited `.env`).
+  - Its image is from 2026-10-31, from before the simple answer path, and its `.env` runs `qwen2.5:3b` with `APP_DEBUG` and `RAG_DIAGNOSTICS_ENABLED` on.
+  - Do not use it to test or to measure.
+  - It is not deleted: whether and when to remove it is the owner's decision.
+- **Host names:** the frontend nginx (`deploy/frontend/nginx.conf`) answers only `localhost`, `127.0.0.1` and the names in `FRONTEND_SERVER_NAMES` (space-separated, frontend container environment). Any other `Host` gets no answer (444, TC-SEC-08), and redirects carry a relative `Location`.
+  - A deployment on its own domain sets that name both in `FRONTEND_SERVER_NAMES` and in the API's `TRUSTED_HOSTS`.
+
 ## 2. Containers
 
 - backend
