@@ -576,3 +576,78 @@ không có mục yêu cầu riêng.
     đầu dòng, nhiều đoạn, một câu;
   - `test_citation_numbers_alone_on_a_line_join_the_line_before`;
   - các test BR-3 đã cập nhật.
+
+## PROMPT CHO PHIÊN BACKEND (27/11/2026, demo qua nginx)
+
+Owner dán nguyên khối này sang phiên backend:
+
+> Phiên UI chạy toàn bộ test live trên stack eaka-demo (nginx ở 18480, bản build production) và
+> ghi thêm hai yêu cầu, BR-13 và BR-14, ở cuối `docs/ui/backend-requests.md`. Không có lỗi nào làm
+> fail test; cả hai lộ ra khi xem demo.
+> Trả lời bằng khối "TRẢ LỜI CHO PHIÊN UI — BR-n" trong file đó.
+>
+> BR-13 (Nên có, deploy): mở demo bằng `http://localhost:18480` thì không đăng nhập được, vì bản
+> build gọi API ở `http://127.0.0.1:18480` (origin khác) và preflight CORS trả 400. Phía UI đã làm
+> phần của mình: `VITE_API_BASE_URL=""` giờ nghĩa là cùng origin. Phía deploy còn phải làm: cho
+> `deploy/frontend/Dockerfile` nhận build arg rỗng (hiện bị `test -n` chặn), build demo với
+> `VITE_API_BASE_URL=""`, rồi cập nhật DEMO.md.
+>
+> BR-14 (Nên có, trích xuất): đoạn trích của trích dẫn bắt đầu giữa chữ và chứa ký tự U+F0B7 (bullet
+> của font Symbol trong PDF), hiện thành ô vuông. Sửa qua pipeline xử lý tài liệu rồi xử lý lại tài
+> liệu; không sửa `document_chunks` trực tiếp.
+
+### BR-13: Demo mở bằng `localhost` không đăng nhập được (deploy, CORS)
+
+- **Mức:** Nên có. Chỉ ảnh hưởng khi mở bằng `localhost`; `http://127.0.0.1:18480` (URL trong
+  DEMO.md) vẫn chạy đúng.
+- **Hiện trạng:**
+  - `deploy/frontend/Dockerfile` build với `VITE_API_BASE_URL=http://127.0.0.1:18480`, nên giá trị
+    này nằm cứng trong bundle.
+  - Trang ở `http://localhost:18480` gọi `http://127.0.0.1:18480/api/v1/auth/login`, tức là một
+    request khác origin.
+  - Preflight `OPTIONS` với `Origin: http://localhost:18480` trả 400, không có
+    `Access-Control-Allow-Origin`.
+  - Kiểm bằng Chromium: `fetch` từ trang `localhost` bị chặn (`TypeError: Failed to fetch`).
+- **Hai cách sửa:**
+  - **(a)** Build frontend để gọi API cùng origin (đường dẫn tương đối `/api/v1/...`). Phía UI cần
+    một thay đổi nhỏ trong `frontend/src/lib/config.ts`. Hiện `VITE_API_BASE_URL || "http://127.0.0.1:8000"`
+    coi chuỗi rỗng là chưa đặt, nên không build "cùng origin" được. Đổi sang `??` thì
+    `VITE_API_BASE_URL=""` nghĩa là cùng origin, còn khi biến không được đặt thì vẫn giữ mặc định cho
+    dev. Phiên UI làm phần này nếu owner đồng ý. Phía deploy đổi build arg thành chuỗi rỗng.
+  - **(b)** Thêm `http://localhost:18480` vào danh sách CORS origin của API trong `compose.demo.yaml`.
+- **Đề xuất:** (a). Với nginx cùng origin thì trình duyệt không cần CORS, và cùng một image chạy
+  được với mọi host name.
+- **Owner chọn (a). Phía UI đã làm (27/11/2026):**
+  - `frontend/src/lib/config.ts` dùng `??`:
+    - biến không đặt: dùng mặc định dev `http://127.0.0.1:8000`;
+    - `""`: cùng origin;
+    - giá trị tuyệt đối: giữ nguyên như trước (dev ở 5173 gọi API ở cổng khác).
+  - `buildUrl` trong `client.ts` lấy `window.location.origin` làm base khi base rỗng. Luồng chat
+    trong `sse.ts` (không đổi) tạo URL tương đối `/api/v1/...`, nên cũng đi về cùng origin.
+  - Test: `frontend/src/lib/config.test.ts` (3 trường hợp).
+  - Đã kiểm bằng build thật: với `VITE_API_BASE_URL=""`, bundle không còn origin cứng nào.
+- **Phía deploy còn phải làm:**
+  - `deploy/frontend/Dockerfile` dòng `RUN test -n "$VITE_API_BASE_URL" || …` đang chặn giá trị
+    rỗng. Muốn vẫn bắt lỗi quên đặt arg thì kiểm "đã đặt" thay vì "khác rỗng", ví dụ
+    `test "${VITE_API_BASE_URL+set}" = set`.
+  - Build demo với `--build-arg VITE_API_BASE_URL=`.
+  - Cập nhật lệnh build trong DEMO.md.
+  - Sau đó mở bằng cả `127.0.0.1:18480` lẫn `localhost:18480` đều phải đăng nhập được.
+
+### BR-14: Đoạn trích của trích dẫn bắt đầu giữa chữ và có ký tự U+F0B7 (trích xuất)
+
+- **Mức:** Nên có. Lỗi lộ ra ngay ở bước 1 của kịch bản demo: staff hỏi Q016 rồi mở trích dẫn.
+- **Hiện trạng:** câu trả lời Q016 trích "Nội quy lao động Công ty Công nghệ Nova Digital", trang 5.
+  `excerpt` do API trả về:
+  - bắt đầu bằng `ỆU NHÂN SỰ 02 THỜI GIỜ L…`, tức là cắt giữa chữ "LIỆU" (dòng đầu trang
+    "TÀI LIỆU NHÂN SỰ");
+  - chứa U+F0B7 ở chỗ dấu đầu dòng của PDF ("…tiêu chuẩn Thời gian làm việc…"). Font giao diện
+    không có glyph cho ký tự này nên hiện thành ô vuông.
+  - `evidence_text` của cùng trích dẫn đã bắt đầu đúng chữ.
+  - UI hiển thị `excerpt` nguyên văn, không sửa.
+- **Yêu cầu:**
+  - Ở bước trích xuất: chuẩn hóa các bullet thuộc vùng Private Use của font Symbol/Wingdings (U+F0B7,
+    U+F0A7, …) thành `•`.
+  - Ở bước dựng `excerpt`: bắt đầu và kết thúc tại ranh giới từ.
+  - Sau đó xử lý lại tài liệu qua pipeline (CLAUDE.md: không sửa `document_chunks` trực tiếp).
+- **Ghi chú:** đây không phải lỗi riêng của nginx; mọi stack dùng corpus này đều gặp.
