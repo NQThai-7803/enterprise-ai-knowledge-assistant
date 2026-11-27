@@ -25,7 +25,8 @@ async function flaggedLines(filePath: string): Promise<number[]> {
   return result.messages.filter((message) => message.ruleId === "no-restricted-syntax").map((message) => message.line);
 }
 
-describe("secret assertion lint rule", () => {
+// The first lintText loads the ESLint config and the TypeScript parser: slow when files run in parallel.
+describe("secret assertion lint rule", { timeout: 30_000 }, () => {
   it("flags assertions on token, password, secret or cookie values in tests/**", async () => {
     expect(await flaggedLines("tests/e2e-live/example.spec.ts")).toEqual([1, 2, 3, 4, 5, 6, 7]);
   });

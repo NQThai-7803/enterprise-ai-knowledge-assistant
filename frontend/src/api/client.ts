@@ -496,7 +496,9 @@ function buildHeaders({
 }
 
 function buildUrl(path: string, query?: QueryParams, apiPrefix = true): string {
-  const url = new URL(`${appConfig.apiBaseUrl}${apiPrefix ? appConfig.apiPrefix : ""}${path}`);
+  // An empty base (same-origin build) means the page's own origin.
+  const base = appConfig.apiBaseUrl || window.location.origin;
+  const url = new URL(`${base}${apiPrefix ? appConfig.apiPrefix : ""}${path}`);
   for (const [key, value] of Object.entries(query ?? {})) {
     if (value !== undefined && value !== null && value !== "") {
       url.searchParams.set(key, String(value));
