@@ -1,0 +1,41 @@
+# Demo stack (DEMO.md), layered on compose.yaml + compose.uat-corpus-v2.yaml of the repository
+# root; run it through deploy/demo/demo.ps1. Own images and volumes; nothing restarts by itself
+# (an 8 GB machine); only the frontend is published, on 127.0.0.1:18480, and its nginx proxies
+# /api/ and /health/ to the API.
+x-demo-backend: &demo_backend
+  image: ${DEMO_BACKEND_IMAGE:?}
+  pull_policy: never
+
+services:
+  postgres:
+    restart: "no"
+    mem_limit: 384m
+    ports: !reset []
+  redis:
+    restart: "no"
+    mem_limit: 64m
+    ports: !reset []
+  migration:
+    <<: *demo_backend
+    mem_limit: 512m
+  uat-v2-accounts:
+    <<: *demo_backend
+    mem_limit: 512m
+  worker:
+    <<: *demo_backend
+    restart: "no"
+    mem_limit: 1600m  # e5 and OCR stay loaded after an ingestion
+  api:
+    <<: *demo_backend
+    restart: "no"
+    mem_limit: 1536m  # 1.5 GiB: the api reached its 1200m limit in the live test (2026-11-27)
+    ports: !reset []
+    environment:
+      RAG_DIAGNOSTICS_ENABLED: "false"  # the app default; the UAT overlay turns it on
+  frontend:
+    image: ${DEMO_FRONTEND_IMAGE:?}
+    pull_policy: never
+    restart: "no"
+    mem_limit: 64m
+    ports: !override
+      - "127.0.0.1:18480:8080"
