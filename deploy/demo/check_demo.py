@@ -38,6 +38,18 @@ QUESTIONS = [
     ("RBD-13", "RBAC-REV-001"),
     ("RBD-07", "RBAC-OPS-001"),
 ]
+# What demo.ps1 seed loads: UAT Corpus v2 (uat/corpus-v2/manifest.json) and the RBAC dev documents.
+DEMO_DOCUMENTS = {
+    *(f"ND-HR-00{n}" for n in range(2, 7)),
+    "ND-CORP-001",
+    "UAT-LEAVE-AUTHORITY-001",
+    "UAT-GROUNDING-001",
+    "UAT-SHARED-001",
+    "RBAC-MGR-001",
+    "RBAC-OPS-001",
+    "RBAC-REV-001",
+    "RBAC-ORG-001",
+}
 RESULTS = []
 
 
@@ -252,15 +264,22 @@ def main():
     documents = json.loads(body)["data"]
     code_of = {d["id"]: d["document_code"] for d in documents}
     id_of = {v: k for k, v in code_of.items()}
+    ready = {d["document_code"] for d in documents if d.get("status") == "READY"}
     check(
-        "13 documents READY",
-        len(documents) == 13 and all(d.get("status") == "READY" for d in documents),
-        str(len(documents)),
+        "the 13 demo documents are READY",
+        ready >= DEMO_DOCUMENTS,
+        f"missing: {sorted(DEMO_DOCUMENTS - ready)}" if DEMO_DOCUMENTS - ready else "13",
+    )
+    others = [d for d in documents if d["document_code"] not in DEMO_DOCUMENTS]
+    check(
+        "no other document (else: demo.ps1 reset)",
+        not others,
+        f"{len(others)} other: {[d.get('original_filename') for d in others]}" if others else "",
     )
     for d in documents:
         print(
-            f"      {d['document_code']:<24} {d.get('access_scope')} {d.get('lifecycle_status')}"
-            f" {d.get('status')}"
+            f"      {str(d['document_code']):<24} {d.get('access_scope')}"
+            f" {d.get('lifecycle_status')} {d.get('status')}"
         )
 
     session = json.loads(
@@ -309,7 +328,7 @@ def main():
 
     seen = {role: visible(role) for role in tokens}
     for role in tokens:
-        print(f"      {role:<8} sees {len(seen[role])}: {sorted(seen[role])}")
+        print(f"      {role:<8} sees {len(seen[role])}: {sorted(seen[role], key=str)}")
     rev, ops_doc = id_of["RBAC-REV-001"], id_of["RBAC-OPS-001"]
     check(
         "ops staff does not see UAT-KNOWLEDGE's DEPARTMENT document",
@@ -346,7 +365,7 @@ def main():
                 seconds = time.monotonic() - started
                 data = json.loads(body)["data"]
                 citations = data["assistant_message"].get("citations") or []
-                cited = sorted({code_of.get(c.get("document_id"), "?") for c in citations})
+                cited = sorted({code_of.get(c.get("document_id"), "?") for c in citations}, key=str)
                 shown = " ".join(
                     (c.get("excerpt") or "") + (c.get("evidence_text") or "") for c in citations
                 )

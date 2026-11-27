@@ -69,6 +69,10 @@ python deploy\demo\check_demo.py --matrix
   - `seed` báo `READY` cho cả 13 tài liệu, khoảng 6,5 phút (gồm tải model e5);
   - `warmup` in 3 dòng `ANSWERED citations=1`; câu đầu tiên sau khi dựng mới mất khoảng 130 s, hai câu sau khoảng 16-17 s;
   - `check_demo.py --matrix` kết thúc bằng `N/N checks passed`, và bảng câu hỏi × vai trò khớp bảng ở mục "Kịch bản".
+- **`.env` và volume đi cùng nhau:** `demo.ps1` dùng `.env` ở gốc repo nó nằm trong, và volume Postgres giữ mật khẩu của `.env` lúc volume được tạo.
+  - Chạy từ một checkout có `.env` khác (ví dụ `.env` của stack phát triển) trên volume cũ thì `migration` dừng với `password authentication failed`, và không ghi gì vào DB.
+  - Volume `eaka-demo_*` có sẵn trên máy của owner được tạo bằng `C:\dev\eaka-demo\src\.env`.
+  - Với một bản clone mới, `init` rồi `reset` cho ra cặp `.env` và volume khớp nhau.
 - **Chạy song song với một stack demo khác trên cùng máy:** đặt `$env:EAKA_DEMO_PROJECT` (mặc định `eaka-demo`) trước mọi lệnh. Hai stack vẫn dùng chung cổng 18480, nên chỉ bật một stack mỗi lúc.
 
 ## Phần cứng và chuẩn bị
