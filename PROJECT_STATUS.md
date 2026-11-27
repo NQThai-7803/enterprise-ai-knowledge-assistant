@@ -1,5 +1,26 @@
 # Project Status
 
+## Demo complete on main 5197874 / 39f851f -- 2026-11-27
+
+- **Stack:** eaka-demo runs `eaka-backend:demo-5197874` and `eaka-frontend:demo-5197874`, at `http://127.0.0.1:18480` or `http://localhost:18480`.
+  - `39f851f` adds only a TASKS entry, so the images are the same.
+- **Last `demo.ps1 reset`:**
+  - 13 documents READY, 4 accounts;
+  - no chat session, message, citation or feedback; no test document or user;
+  - warmup done.
+- **Checks:**
+  - UI session: 14/14 live checks on `demo-5197874`.
+  - Backend `check_demo.py`: 46/46 with the question x role matrix (on `e049091`, same backend), and 17/17 basic checks on `5197874`.
+  - CI on `39f851f`: Frontend CI and Backend CI green.
+- **Key numbers:**
+  - SSE through nginx: `stream.started` → `message.delta` → `citations.ready` → `message.completed` (with `segments`, `grounding_status`), `text/event-stream`, not compressed. A cached question streams in 2-3 s.
+  - First question after `up` / `reset`, cold: 54-107 s over seven resets.
+  - New question with the model loaded: 13-21 s in the matrix (7-31 s in warmups).
+  - Repeated question (answer cache): 1-3 s.
+  - API memory peak: 1200 MiB at the old 1200m limit, then 1249 and 1280 MiB of the new 1536m.
+- **Answered:** BR-13, BR-14 (narrow), BR-15.
+- **Open:** BR-16 [Low], and BR-14's extraction part with corpus v3 (TASKS).
+
 ## BR-15 evidence_spans -- 2026-11-27
 
 - Citations now say where their evidence sits in the excerpt, one span per piece, so non-contiguous evidence (Q016) can be highlighted.
