@@ -1,6 +1,20 @@
 
 # Implementation Tasks
 
+## BR-13, BR-14 (narrow), demo reset -- 2026-11-27
+
+- **DONE:**
+  - **BR-13:** the demo frontend is built same-origin (`VITE_API_BASE_URL=""`, with PR #63's `config.ts`). `deploy/frontend/Dockerfile` requires the arg to be set, not non-empty. Login works through both `localhost:18480` and `127.0.0.1:18480`.
+  - **BR-14, display only** (`app/citations/excerpt.py`):
+    - citation `excerpt` and `evidence_text` map Symbol/Wingdings PUA code points (U+F000-U+F0FF) to "•";
+    - a later TEXT chunk that opens with the previous chunk's token overlap (`starts_mid_word`) loses its partial first word behind "…";
+    - chunks, embeddings, retrieval, prompts and validation are unchanged.
+  - **`demo.ps1 reset`:** asks for "reset demo", then deletes only the `eaka-demo` data volumes (postgres, redis, uploads), then up, seed and warmup. DEMO.md says to run it right before a demo.
+  - **Demo API memory:** the peak reached the 1200m limit in the live test (1200 MiB > 1.1 GiB), so the limit is now 1536m.
+- **NEXT:**
+  - **[Medium]** Normalise Symbol/Wingdings PUA characters at extraction, so chunks and embeddings get "•" too, then reprocess. Do it together with corpus v3 (a re-ingestion changes chunk text, so it needs the eval baselines measured again).
+  - **[Low]** Chunk overlap starts mid-word: the excerpt hides it, but the prompt still begins with a fragment. Consider snapping the overlap to a word boundary in the chunker, also with corpus v3.
+
 ## Demo stack eaka-demo -- 2026-11-27
 
 - **DONE:**
@@ -12,10 +26,8 @@
     - no leak in the question x role matrix.
 - **NEXT:**
   - **[Low]** Delete the `eaka-smoke_*` volumes once the owner approves. The smoke stack is stopped, and the demo copied its e5 cache.
-  - **[Medium, for the UI session, not a blocker]** Let the API base URL be relative (same origin):
-    - today `frontend/src/lib/config.ts` falls back to `http://127.0.0.1:8000` on an empty `VITE_API_BASE_URL`, and `api/client.ts` calls `new URL(...)` with no base;
-    - so a same-origin build must bake in its origin (`http://127.0.0.1:18480`), and a page opened at `http://localhost:18480` is cross-origin and blocked (preflight 400).
-  - **[Low]** Demo API memory: 1.0 of its 1.2 GiB limit (`restart: "no"`). If it is OOM-killed during a demo, `demo.ps1 up` restarts it; raise the limit if it happens.
+  - ~~Relative API base URL for the UI session~~: done as BR-13 (section above).
+  - ~~Demo API memory~~: done (section above), the limit is now 1.5 GiB.
 
 ## 2a confirmation under DEC-027: not accepted -- 2026-11-26
 

@@ -3,8 +3,8 @@
 Stack trình diễn trên một máy, có frontend mới (PR #61), chạy từ một bản export của `main`.
 Không có secret trong file này. Kịch bản cũ của MVP nằm ở `DEMO_SCENARIO.md`.
 
-- **URL:** <http://127.0.0.1:18480>.
-  - Mở đúng `127.0.0.1`, **không dùng `localhost`**: bản build đã cố định địa chỉ API, nên trang mở bằng `localhost` gọi API khác origin và bị chặn CORS.
+- **URL:** <http://127.0.0.1:18480> hoặc <http://localhost:18480>.
+  - Bản build gọi API cùng origin (BR-13, `VITE_API_BASE_URL=""`), nên host nào cũng chạy.
   - Không publish cổng nào khác: nginx của frontend chuyển `/api/` và `/health/` sang container API.
 - **Cấu hình:**
   - mặc định của `main`: `simple` (s1-s3), `qwen3.5-text:4b`, DRAFT `exclude`, chọn chunk `rrf`;
@@ -24,7 +24,7 @@ Không có secret trong file này. Kịch bản cũ của MVP nằm ở `DEMO_SC
 
   | Container | Giới hạn | Đã dùng |
   |---|---|---|
-  | api | 1200m | khoảng 1,0 GiB |
+  | api | 1536m (1,5 GiB) | đỉnh 1200 MiB, chạm giới hạn cũ 1200m trong lượt test 2026-11-27, nên đã nâng |
   | worker | 1600m | 1,2 GiB sau khi nạp tài liệu |
   | postgres | 384m | |
   | redis | 64m | |
@@ -38,7 +38,7 @@ Không có secret trong file này. Kịch bản cũ của MVP nằm ở `DEMO_SC
 |---|---|
 | `src\` | `git archive` của `main`; `src\.env` là `.env` riêng của demo (secret ngẫu nhiên, không nằm trong repo nào) |
 | `compose.demo.yaml` | Phủ lên `compose.yaml` + `compose.uat-corpus-v2.yaml`:<br>• image riêng;<br>• `restart: "no"`;<br>• giới hạn bộ nhớ;<br>• chỉ frontend có cổng (`127.0.0.1:18480`);<br>• `RAG_DIAGNOSTICS_ENABLED=false` (mặc định của app) |
-| `demo.ps1` | `up` / `down` / `status` / `warmup` / `seed` |
+| `demo.ps1` | `up` / `down` / `status` / `warmup` / `seed` / `reset` |
 | `seed_demo.py` | Nạp dữ liệu demo (chạy qua `demo.ps1 seed`) |
 | `check_demo.py` | Kiểm qua nginx; `--matrix` hỏi các câu mẫu bằng cả 4 tài khoản |
 | `questions.md` | Nội dung các câu mẫu (chỉ ở máy, vì repo công khai chỉ ghi ID) |
@@ -48,7 +48,7 @@ Không có secret trong file này. Kịch bản cũ của MVP nằm ở `DEMO_SC
   - frontend `eaka-frontend:demo-<sha>`:
 
     ```
-    docker build -f deploy/frontend/Dockerfile --build-arg VITE_API_BASE_URL=http://127.0.0.1:18480 .
+    docker build -f deploy/frontend/Dockerfile --build-arg VITE_API_BASE_URL= .
     ```
 
     Image này là nginx phục vụ bản build của SPA, kèm reverse proxy `/api/`. SSE không bị buffer hay nén, `proxy_read_timeout` là 300 s, và mọi route của app đều trả về `index.html`.
@@ -59,8 +59,17 @@ Không có secret trong file này. Kịch bản cũ của MVP nằm ở `DEMO_SC
 
 ## Lệnh
 
+**Ngay trước buổi demo, chạy `.\demo.ps1 reset`.**
+
+- Lệnh hỏi xác nhận: phải gõ `reset demo`.
+- Sau đó nó chạy `down`, xoá **chỉ** 3 volume dữ liệu `eaka-demo_postgres_data`, `eaka-demo_redis_data`, `eaka-demo_uploads_data`, rồi chạy lại `up` (gồm migrate), `seed` và `warmup`.
+- Nhờ vậy không còn lịch sử chat của lần thử trước, và cache trả lời cũng sạch.
+- Volume cache model e5 được giữ lại.
+- Toàn bộ mất khoảng 5 phút.
+
 ```powershell
 cd C:\dev\eaka-demo
+.\demo.ps1 reset    # trước buổi demo: xoá dữ liệu demo, dựng lại (hỏi xác nhận)
 .\demo.ps1 up       # bật stack, chờ /health/live qua 18480
 .\demo.ps1 warmup   # nạp LLM + embedding, đo 3 câu dev (chạy trước khi trình bày)
 .\demo.ps1 status
@@ -93,12 +102,17 @@ Câu hỏi chỉ lấy từ bộ dev (UAT Q001-Q100 và RBAC dev), không dùng 
 |---|---|---|---|---|---|
 | Q016 | ND-HR-002 (ORGANIZATION) | trả lời | trả lời | trả lời | trả lời |
 | Q043 | ND-HR-004 (ORGANIZATION) | trả lời | trả lời | trả lời | trả lời |
+| Q084 | ND-HR-006 (ORGANIZATION) | trả lời | trả lời | trả lời | trả lời |
 | RBD-01 | RBAC-MGR-001 (PRIVATE, quyền cho manager) | trả lời | trả lời | từ chối | từ chối |
 | RBD-13 | RBAC-REV-001 (DEPARTMENT, UAT-KNOWLEDGE) | trả lời | trả lời | trả lời | từ chối |
 | RBD-07 | RBAC-OPS-001 (DEPARTMENT, UAT-OPS) | trả lời | từ chối | từ chối | trả lời |
 
 1. **(1 phút) staff:** đăng nhập, hỏi Q016, rồi mở trích dẫn để xem trang PDF.
-2. **(1 phút) staff:** hỏi Q043, một câu khác trong cùng bộ quy định chung.
+   - Q016 đã chạy trong `warmup`, nên trả lời trong 1-2 s nhờ cache.
+2. **(1,5 phút) staff:** hỏi Q084, một câu **mới** chưa có trong `warmup`.
+   - Mất 15-19 s: đây là thời gian thật, gồm tìm tài liệu, gọi LLM và kiểm câu trả lời.
+   - Nói rõ: câu đã hỏi trước đó thì trả nhanh vì có cache trả lời.
+   - Nếu còn thời gian, hỏi thêm Q043.
 3. **(1,5 phút) staff rồi manager:**
    - staff hỏi RBD-01 và nhận câu từ chối cố định, không có trích dẫn (tài liệu PRIVATE của manager);
    - đổi sang manager, hỏi lại RBD-01 và được trả lời từ RBAC-MGR-001.
@@ -114,9 +128,9 @@ Câu hỏi chỉ lấy từ bộ dev (UAT Q001-Q100 và RBAC dev), không dùng 
 
 | Trạng thái | Thời gian |
 |---|---|
-| Câu đầu sau `up` (model chưa nạp) | 49-60 s |
-| Câu mới khi model đã nạp | 15-19 s |
-| Câu đã hỏi (cache trả lời) | 1-2 s |
+| Câu đầu sau `up` hoặc `reset` (model và API còn nguội) | 50-100 s |
+| Câu mới khi model đã nạp | 15-21 s |
+| Câu đã hỏi (cache trả lời) | 1-3 s |
 
 - Luôn chạy `.\demo.ps1 warmup` sau `up` và ngay trước khi trình bày.
 - Model ở lại trên GPU 30 phút sau câu cuối. Nếu ngồi chờ lâu hơn, chạy `warmup` lại.
