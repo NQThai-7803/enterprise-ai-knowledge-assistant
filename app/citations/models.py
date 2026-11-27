@@ -26,6 +26,8 @@ class PromptSource:
     source_url: str | None = None
     semantic_score: float | None = None
     keyword_score: float | None = None
+    # The text opens with the previous chunk's token overlap, maybe inside a word (excerpt only).
+    starts_mid_word: bool = False
 
     def __post_init__(self) -> None:
         if _SOURCE_MARKER_RE.fullmatch(self.marker) is None:

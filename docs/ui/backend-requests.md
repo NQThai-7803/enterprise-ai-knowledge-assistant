@@ -651,3 +651,32 @@ Owner dán nguyên khối này sang phiên backend:
   - Ở bước dựng `excerpt`: bắt đầu và kết thúc tại ranh giới từ.
   - Sau đó xử lý lại tài liệu qua pipeline (CLAUDE.md: không sửa `document_chunks` trực tiếp).
 - **Ghi chú:** đây không phải lỗi riêng của nginx; mọi stack dùng corpus này đều gặp.
+
+### TRẢ LỜI CHO PHIÊN UI — BR-13 (demo cùng origin, đăng nhập qua `localhost`)
+
+- **Trạng thái:** xong, phía deploy. Không đổi API.
+- **`deploy/frontend/Dockerfile`:**
+  - kiểm arg đã được đặt (`test "${VITE_API_BASE_URL+set}" = set`) thay vì khác rỗng;
+  - quên `--build-arg VITE_API_BASE_URL` thì build dừng, kèm lời nhắc;
+  - `VITE_API_BASE_URL=` (rỗng) thì build ra bản cùng origin, nhờ `config.ts` của PR #63.
+- **Demo:** image frontend build với `--build-arg VITE_API_BASE_URL=`; DEMO.md ghi cả hai URL và lệnh build mới.
+- **Đã kiểm trên stack demo** (`check_demo.py`, qua nginx 18480):
+  - bundle không còn `127.0.0.1:18480` hay `127.0.0.1:8000`;
+  - `POST /api/v1/auth/login` kèm `Origin` cùng host trả 200 ở cả `http://localhost:18480` và `http://127.0.0.1:18480`.
+- **Chưa kiểm:** đăng nhập bằng trình duyệt thật. Phiên UI chạy lại `frontend/tests/e2e-live/deploy.spec.ts` trên stack đã dựng lại từ `main`.
+
+### TRẢ LỜI CHO PHIÊN UI — BR-14 (đoạn trích: ranh giới từ và ký tự U+F0B7), bản hẹp
+
+- **Trạng thái:** xong phần hiển thị, theo bản hẹp owner duyệt.
+- **Không đổi:** nội dung chunk, embedding, retrieval, prompt và validation, nên không cần xử lý lại tài liệu.
+- **Phần chuẩn hóa ở bước trích xuất** chuyển vào TASKS [TB], làm cùng corpus v3.
+- **`excerpt` và `evidence_text` của citation** (`app/citations/excerpt.py`, `display_text()`):
+  - mọi code point U+F000-U+F0FF (vùng Private Use của font Symbol/Wingdings, như U+F0B7, U+F0A7, U+F0D8) hiển thị thành `•`, độ dài chuỗi giữ nguyên;
+  - `evidence_text` được đổi giống hệt `excerpt`, nên UI vẫn tìm được `evidence_text` bên trong `excerpt` để tô sáng.
+- **Đầu đoạn trích:**
+  - nguyên nhân: chunk thứ 2 trở đi mở đầu bằng phần overlap token của chunk trước, có thể bắt đầu giữa chữ ("ỆU NHÂN SỰ" là đầu thật của chunk đó trong DB);
+  - khi đó `excerpt` bỏ mảnh chữ đầu và mở bằng `…`, trừ khi bằng chứng bắt đầu đúng chỗ đó;
+  - chunk đầu tài liệu và chunk dòng bảng (DEC-034) giữ nguyên;
+  - cuối đoạn trích vẫn cắt tại ranh giới từ và thêm `…` như trước.
+- **Ví dụ** (Q016, staff, trang 5): `excerpt` bắt đầu bằng `…NHÂN SỰ 02 THỜI GIỜ LÀM VIỆC…` và không còn U+F0B7.
+- **Test:** `tests/unit/test_citation_display_text.py` (6 test: ký tự Symbol, bỏ mảnh chữ đầu, giữ đầu khi không có overlap hoặc khi bằng chứng ở đầu, ngân sách ký tự, đường mapper, đánh dấu ở context).

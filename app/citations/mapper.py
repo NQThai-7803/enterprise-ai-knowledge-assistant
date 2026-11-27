@@ -5,7 +5,7 @@ from collections.abc import Mapping, Sequence
 
 from app.citations.errors import CitationFailureCode, CitationMappingError
 from app.citations.evidence import extract_exact_evidence
-from app.citations.excerpt import build_evidence_centered_excerpt
+from app.citations.excerpt import build_evidence_centered_excerpt, display_text
 from app.citations.models import PromptSourceRegistry, ValidatedCitation, ValidatedCitationAnswer
 from app.citations.parser import SOURCE_MARKER_PATTERN
 from app.citations.pruning import (
@@ -84,11 +84,16 @@ def map_validated_citations(
                 source_text=source.text,
             )
             excerpt_anchor = shared_value_anchor or evidence_text
-            excerpt = build_evidence_centered_excerpt(
-                source_text=source.text,
-                evidence_text=excerpt_anchor,
-                max_characters=excerpt_max_characters,
+            excerpt = display_text(
+                build_evidence_centered_excerpt(
+                    source_text=source.text,
+                    evidence_text=excerpt_anchor,
+                    max_characters=excerpt_max_characters,
+                    starts_mid_word=source.starts_mid_word,
+                )
             )
+            # The UI highlights the evidence inside the excerpt, so both are shown the same way.
+            evidence_text = display_text(evidence_text) if evidence_text else evidence_text
 
             if source.source_type == CitationSourceType.INTERNAL:
                 document_title = document_titles_by_id.get(source.document_id)

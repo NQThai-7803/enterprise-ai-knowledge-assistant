@@ -198,6 +198,7 @@ def select_context_for_prompt(
                 keyword_score=hit.keyword_score,
                 hybrid_score=hit.hybrid_score,
                 reranker_score=hit.reranker_score,
+                starts_mid_word=_starts_with_chunk_overlap(hit, source_text),
             )
         )
         used_tokens += candidate_tokens
@@ -1336,6 +1337,19 @@ def _needle_positions(text: str, needles: tuple[str, ...]) -> tuple[int, ...]:
         if position >= 0:
             positions.append(position)
     return tuple(dict.fromkeys(sorted(positions)))
+
+
+def _starts_with_chunk_overlap(hit: HybridRetrievalHit, source_text: str) -> bool:
+    """A later TEXT chunk opens with the previous chunk's token overlap, maybe mid-word (BR-14).
+
+    shortcut: any chunk after the first counts, even one that happens to start a new unit
+    (the excerpt then loses its first whole word behind "…"); table-row chunks (DEC-034) never.
+    """
+
+    if hit.chunk_index == 0 or hit.group_id not in (None, hit.chunk_id):
+        return False
+    head = _collapse_whitespace(hit.text)[:40]
+    return bool(head) and _collapse_whitespace(source_text).startswith(head)
 
 
 def _collapse_whitespace(text: str) -> str:

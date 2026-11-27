@@ -826,6 +826,9 @@ Rules:
 - `evidence_text` is optional for backward compatibility; historical citations may omit it.
 - Blank evidence is not persisted.
 - `excerpt` remains the broader server-generated context snapshot.
+- BR-14, display only (the chunk text itself is unchanged):
+  - in `excerpt` and `evidence_text`, Symbol/Wingdings Private Use Area characters (U+F000-U+F0FF) are shown as `•`;
+  - an `excerpt` taken from a chunk that opens inside a word (the previous chunk's token overlap) starts at the next word, after `…`.
 - `evidence_text` must never be supplied by the client or trusted from arbitrary LLM metadata.
 - Original PDF/DOCX content is not modified.
 - `GET /chat/sessions/{session_id}`, non-streaming message responses, and SSE citation payloads use the same safe citation metadata contract.

@@ -1,5 +1,12 @@
 # Project Status
 
+## BR-13, BR-14 (narrow), demo reset -- 2026-11-27
+
+- **Demo:** same-origin frontend, so it works at `localhost` as well as `127.0.0.1`.
+- **Citation excerpts:** no longer start mid-word or show U+F0B7 boxes. Display only.
+- **`demo.ps1 reset`:** rebuilds the demo data before a presentation.
+- **Demo API memory limit:** now 1.5 GiB.
+
 ## Demo stack eaka-demo -- 2026-11-27
 
 - **What it is:** `main` (PR #61 UI) on one machine, the frontend at <http://127.0.0.1:18480>.

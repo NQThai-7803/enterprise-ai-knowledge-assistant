@@ -6,6 +6,13 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### BR-13, BR-14 (narrow) -- 2026-11-27
+
+- **Fixed:**
+  - citation excerpts start on a word boundary when the chunk opens with a token overlap ("…" marks the cut);
+  - Symbol/Wingdings PUA bullets show as "•" in `excerpt` and `evidence_text`, display only (BR-14).
+- **Changed:** `deploy/frontend/Dockerfile` accepts `VITE_API_BASE_URL=""` (same origin) and fails only when the arg is not passed (BR-13).
+
 ### Demo stack -- 2026-11-27
 
 - **Added:**

@@ -34,6 +34,7 @@ def build_prompt_source_registry(
                     keyword_score=item.keyword_score,
                     hybrid_score=_require(item.hybrid_score, "hybrid_score"),
                     reranker_score=item.reranker_score,
+                    starts_mid_word=item.starts_mid_word,
                 )
             )
             continue
