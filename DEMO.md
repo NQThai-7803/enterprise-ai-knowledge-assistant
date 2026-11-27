@@ -65,9 +65,9 @@ python deploy\demo\check_demo.py --matrix
   - không ghi đè `.env` có sẵn, không in mật khẩu nào.
 - **Máy chỉ có CPU:** sau `init`, sửa `LLM_TIMEOUT_SECONDS=600` trong `.env`.
 - **Mật khẩu để đăng nhập giao diện:** `[Environment]::GetEnvironmentVariable('EAKA_DEMO_STAFF_PASSWORD', 'User')` (thay `STAFF` bằng vai trò cần dùng).
-- **Kết quả mong đợi:**
-  - `seed` báo `READY` cho từng tài liệu;
-  - `warmup` in 3 dòng `ANSWERED citations=1`;
+- **Kết quả mong đợi** (đã thử từ bản clone mới của `a4add79` ngày 2026-11-28, 47/47 kiểm tra đạt):
+  - `seed` báo `READY` cho cả 13 tài liệu, khoảng 6,5 phút (gồm tải model e5);
+  - `warmup` in 3 dòng `ANSWERED citations=1`; câu đầu tiên sau khi dựng mới mất khoảng 130 s, hai câu sau khoảng 16-17 s;
   - `check_demo.py --matrix` kết thúc bằng `N/N checks passed`, và bảng câu hỏi × vai trò khớp bảng ở mục "Kịch bản".
 - **Chạy song song với một stack demo khác trên cùng máy:** đặt `$env:EAKA_DEMO_PROJECT` (mặc định `eaka-demo`) trước mọi lệnh. Hai stack vẫn dùng chung cổng 18480, nên chỉ bật một stack mỗi lúc.
 
@@ -190,7 +190,7 @@ Câu hỏi chỉ lấy từ bộ dev (UAT Q001-Q100 và RBAC dev), không dùng 
 
 | Trạng thái | Thời gian |
 |---|---|
-| Câu đầu sau `up` hoặc `reset` (model và API còn nguội) | 50-100 s |
+| Câu đầu sau `up` hoặc `reset` (model và API còn nguội) | 50-100 s; khoảng 130 s ngay sau khi dựng mới |
 | Câu mới khi model đã nạp | 15-21 s |
 | Câu đã hỏi (cache trả lời) | 1-3 s |
 

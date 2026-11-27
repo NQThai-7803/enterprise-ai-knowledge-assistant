@@ -1,6 +1,16 @@
 
 # Implementation Tasks
 
+## Demo from a fresh clone -- 2026-11-28
+
+- **DONE:**
+  - The demo tooling moved into the repo, `deploy/demo/`: `demo.ps1` (with new `init`, `build`, `questions`), `compose.demo.yaml`, `seed_demo.py`, `check_demo.py`. No secret, and dev-set ids only.
+  - `DEMO.md` "Chạy từ bản clone mới".
+  - Tried from a fresh GitHub clone of `a4add79`, as project `eaka-democlone`: init, build, up, seed (13 READY), warmup, `check_demo.py --matrix` 47/47.
+- **NEXT (owner):** move the tag `test-2026-11-27` to the merge commit of this change.
+- **[Low]** Delete the test project's volumes `eaka-democlone_*` and `C:\dev\eaka-clonetest` once the owner approves.
+- Not tried: a cold image build on a machine with no Docker cache, `init` creating the passwords (they already existed here), and building `qwen3.5-text:4b` (the model already existed).
+
 ## BR-16 (not done) -- 2026-11-27
 
 - **NEXT, [Low] BR-16:** an evidence span stops where the evidence text stops, often at the end of a PDF line ("được phê" instead of "được phê duyệt.").

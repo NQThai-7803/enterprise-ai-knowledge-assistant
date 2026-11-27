@@ -6,6 +6,14 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### Demo from a fresh clone -- 2026-11-27
+
+- **Added:** `deploy/demo/`, the demo tooling that lived only outside the repo:
+  - `demo.ps1`: `init` (`.env` from `.env.example` with random secrets and the demo's LLM settings, the four demo passwords in the user environment, nothing printed), `build` (images tagged by commit), `up`, `seed`, `warmup`, `questions`, `status`, `down`, `reset`;
+  - `compose.demo.yaml`, `seed_demo.py`, `check_demo.py`.
+  - Questions are dev-set ids only; their text is read from `eval-data/uat/questions.json` and `tests/acceptance/rbac_dev_v1.yaml`.
+- **Docs:** `DEMO.md` "Chạy từ bản clone mới": machine requirements, Ollama settings, building `qwen3.5-text:4b`, then init, build, up, seed, warmup and the checks.
+
 ### BR-15 -- 2026-11-27
 
 - **Added:** `evidence_spans` on every citation: the `[start, end)` character offsets of each piece of the evidence inside `excerpt`, or `[]` when it is not found. Display only.

@@ -1,5 +1,16 @@
 # Project Status
 
+## Demo from a fresh clone -- 2026-11-28
+
+- **Changed:** a fresh clone now builds the demo with the repo alone. `deploy/demo/demo.ps1 init | build | up | seed | warmup` follows `DEMO.md` "Chạy từ bản clone mới".
+- **Tried:** a fresh GitHub clone of `a4add79`, run as project `eaka-democlone`.
+  - init wrote `.env` with random secrets.
+  - Images built from the clone.
+  - seed: 13 documents READY in 6.5 min, including the e5 download.
+  - warmup: 133 s, 17 s, 16 s.
+  - `check_demo.py --matrix`: 47/47, and the question x role table matches `DEMO.md`.
+- **Owner:** move the tag `test-2026-11-27` to the merge commit.
+
 ## Demo complete on main 5197874 / 39f851f -- 2026-11-27
 
 - **Stack:** eaka-demo runs `eaka-backend:demo-5197874` and `eaka-frontend:demo-5197874`, at `http://127.0.0.1:18480` or `http://localhost:18480`.

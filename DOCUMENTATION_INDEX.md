@@ -12,7 +12,7 @@ Danh sách tài liệu được tạo cho dự án.
 - `CONTRIBUTING.md`
 - `DATABASE_DESIGN.md`
 - `DECISIONS.md`
-- `DEMO.md`
+- `DEMO.md` (demo stack, with `deploy/demo/`; "Chạy từ bản clone mới")
 - `DEMO_SCENARIO.md`
 - `DEPLOYMENT.md`
 - `DEVELOPMENT_GUIDE.md`
