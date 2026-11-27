@@ -1,6 +1,14 @@
 
 # Implementation Tasks
 
+## BR-15 evidence_spans -- 2026-11-27
+
+- **DONE:**
+  - every citation has `evidence_spans` (`[{start, end}]` in its excerpt), computed on read (`app/citations/excerpt.py`, `app/schemas/chat.py`), so the UI can highlight evidence that skips a heading;
+  - display only; `evidence_text` kept;
+  - API_SPEC §8A; answered in `docs/ui/backend-requests.md`.
+- **NEXT:** the UI session switches `CitationPanel` to `evidence_spans`, keeping the string match as the fallback.
+
 ## BR-13, BR-14 (narrow), demo reset -- 2026-11-27
 
 - **DONE:**

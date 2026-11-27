@@ -6,6 +6,10 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### BR-15 -- 2026-11-27
+
+- **Added:** `evidence_spans` on every citation: the `[start, end)` character offsets of each piece of the evidence inside `excerpt`, or `[]` when it is not found. Display only.
+
 ### BR-13, BR-14 (narrow) -- 2026-11-27
 
 - **Fixed:**

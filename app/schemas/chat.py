@@ -7,6 +7,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_serializer
 
 from app.chat.models import ChatAnswerResult, GroundingStatus
+from app.citations.excerpt import evidence_spans
 from app.models import ChatMessage, ChatSession, CitationSourceType
 from app.repositories.chat_message_repository import VisibleChatMessageRow
 from app.repositories.chat_session_repository import ChatSessionListRow
@@ -78,6 +79,13 @@ class ChatSessionSummary(BaseModel):
         )
 
 
+class EvidenceSpan(BaseModel):
+    """One piece of the evidence inside ``excerpt``: [start, end) in characters (BR-15)."""
+
+    start: int = Field(ge=0)
+    end: int = Field(gt=0)
+
+
 class CitationRead(BaseModel):
     document_id: UUID | None
     document_title: str
@@ -85,6 +93,8 @@ class CitationRead(BaseModel):
     page_number: int = Field(gt=0)
     excerpt: str
     evidence_text: str | None = None
+    # BR-15: where the evidence sits in this excerpt; [] when it is not found (no highlight).
+    evidence_spans: list[EvidenceSpan] = Field(default_factory=list)
     relevance_score: float | None
     citation_order: int = Field(ge=1)
     source_type: CitationSourceType | None = None
@@ -106,17 +116,19 @@ class CitationRead(BaseModel):
         source_type = CitationSourceType(
             getattr(citation, "source_type", CitationSourceType.INTERNAL)
         )
+        evidence_text = getattr(citation, "evidence_text", None)
         return cls(
             document_id=getattr(citation, "document_id", None),
             document_title=citation.document_title,
             chunk_id=getattr(citation, "chunk_id", None),
             page_number=citation.page_number,
             excerpt=citation.excerpt,
-            evidence_text=getattr(
-                citation,
-                "evidence_text",
-                None,
-            ),
+            evidence_text=evidence_text,
+            # Computed on read from the stored pair, so older citations get spans too.
+            evidence_spans=[
+                EvidenceSpan(start=start, end=end)
+                for start, end in evidence_spans(citation.excerpt, evidence_text)
+            ],
             relevance_score=citation.relevance_score,
             citation_order=citation.citation_order,
             source_type=source_type if source_type == CitationSourceType.WEB else None,
