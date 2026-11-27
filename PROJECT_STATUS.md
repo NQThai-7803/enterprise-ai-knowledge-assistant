@@ -1,5 +1,44 @@
 # Project Status
 
+## 2a not confirmed (DEC-042) -- 2026-11-26
+
+- The DEC-027 confirmation of `RAG_PROMPT_CHUNK_SELECTION=per_document_3`:
+  - right answers up again on `natural_dev_v1` + UAT;
+  - but in round 2 one more false answer + wrong value on UAT, so it is not accepted.
+- Base varies by 7 UAT items between jobs, as much as the 2a gain.
+- The default stays `rrf`.
+
+## Refusal fixes measured (DEC-042) -- 2026-11-24
+
+- Two flags, both off by default:
+  - `RAG_PROMPT_CHUNK_SELECTION`;
+  - `RAG_VALIDATOR_V2_ENABLED`.
+- On `natural_dev_v1` + UAT, right answers:
+  - base 76;
+  - 2a 80;
+  - 1 80;
+  - 2a+1 84;
+  - 2b 74.
+- Guard sets: unchanged everywhere.
+- Leaks: 0 everywhere.
+- 2a keeps false answers + wrong values unchanged; 1 and 2a+1 raise them on natural + UAT.
+- The owner chooses the default.
+
+## Shared-layer refusals diagnosed -- 2026-11-22
+
+- The 28 dev cases all reach the LLM. 12: the gold document is in the prompt but its gold chunk is
+  not (7 of them cut by the 2-chunks-per-document limit); 5: the model refuses with the gold chunk
+  in the prompt; 9: the validator rejects (7 drafts right, 2 wrong); 2 answered in this batch.
+  Fix direction: owner decision (`TASKS.md`).
+
+## Chat cache audit -- 2026-11-22
+
+- No answer, retrieval or embedding cache exists; Redis holds rate-limit counters only; the Ollama
+  KV cache reuses only an exact prefix of the prompt being answered. A repeated question is
+  faster (LLM time 2.6-3.3 s instead of 17-27 s on the GTX 1650) because its prompt is
+  byte-identical and Ollama skips the prefill.
+- Open: the frontend keeps its query cache across logout (`SECURITY.md`).
+
 ## GPU latency of the default measured (DEC-041) -- 2026-11-22
 
 - GTX 1650 4 GB, 8 GB RAM, only the smoke stack and Ollama running: LLM time per question p50

@@ -193,7 +193,8 @@ run_one() {  # $1 = config index, $2 = run number
     | tee -a "$OUT/batch.log"
 }
 
-if [[ "$CONFIGS" == *EVAL_ABLATION=*oracle* ]]; then  # gold map, mounted read-only at /oracle
+# gold map, mounted read-only at /oracle; simple_trace (and EVAL_S3T) flags the gold chunks with it
+if [[ "$CONFIGS" == *EVAL_ABLATION=*oracle* || "$CONFIGS" == *simple_trace* || "$CONFIGS" == *EVAL_S3T=1* ]]; then
   python scripts/diagnostics/build_oracle.py --set "$SET" --output "${ORACLE_DIR:?}/oracle.json" \
     | tee -a "$OUT/batch.log"
 fi

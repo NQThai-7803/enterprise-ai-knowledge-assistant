@@ -236,6 +236,10 @@ Set by the owner on 2026-11-16, before s4 and s5 are measured.
 - **A difference smaller than the variation between the jobs counts as a tie.** Applied per count (false refusals, false answers + wrong, ...): the difference between two configurations is taken in each job; it counts only when it has the same sign in both jobs and its smaller size is larger than the largest change of either configuration between the two jobs on that count.
 - DEC-011/016 (baseline in the same job) and DEC-026 (selection order) still apply inside each job.
 - Recorded with it, at the owner's instruction: s5 uses a cross-encoder (`cross-encoder/mmarco-mMiniLMv2-L12-H384-v1`) as a per-claim relevance check behind its flag, for measurement. DEC-025 (no cross-encoder reranker) is unchanged; the eval workflow downloads that model only for a configuration that turns the check on.
+- **Observed variation between jobs (recorded 2026-11-27, DEC-042):**
+  - the same image and the `base` configuration gave 69, 71 and 68 right answers on UAT, in the PR #59 jobs and confirmation rounds 1 and 2;
+  - the items whose category changed: Q028, Q029, Q033, Q036, Q046, Q048, Q063;
+  - so a UAT difference of 2-3 items between configurations is within that variation.
 
 ## DEC-028 — Model comparison: candidates and rule, fixed before measuring
 
@@ -992,3 +996,220 @@ false_refusal_v2 (24), compound (12). On `natural_dev_v1`: correct 3 / 8 / 6, fa
 `answer_route_<route>` and each no-answer diagnostic `no_answer_<reason>`; every dev runner
 records `answer_route`, `no_answer_reasons`, `retrieved`; `scripts/eval/route_matrix.py`,
 `scripts/eval/gpu_latency_replay.py`.
+
+## DEC-042 — Shared-layer refusal fixes: selection rule registered before measuring (2026-11-23)
+
+The owner approved the PHA 2 diagnosis (`TASKS.md`, "Shared-layer refusals diagnosed") and asked
+for directions 2 and 1, each behind its own flag, off by default; direction 3 is not attempted.
+Dev sets only; no held-out set is run or read. **This rule is committed before any result.**
+
+**Variants** (s3t = the default, DEC-040/041):
+
+- `base`: s3t.
+- `2a`: `RAG_PROMPT_CHUNK_SELECTION=per_document_3`: at most 3 chunks per document, 5 sources in
+  total as before.
+- `2b`: `RAG_PROMPT_CHUNK_SELECTION=lexical`: at most 2 chunks per document; within a document the
+  chunks are ordered by their word overlap with the question instead of the RRF order.
+- `1`: `RAG_VALIDATOR_V2_ENABLED=true`: the validator rules that rejected right drafts are
+  corrected, and every amount of money, number of days and rate in a claim must be in the cited
+  chunk, bound to what the claim attributes it to.
+- `2a+1`, `2b+1`: both. Both combinations run, so that every comparison stays inside one job
+  (DEC-011); "the best of 2 + 1" is the combination with the variant of 2 chosen below.
+
+**Measurement:** the 7 dev sets (UAT, `natural_dev_v1`, rbac, relevance, false_refusal,
+false_refusal_v2, compound), one job per set with all six configurations, 1 run (the LLM is seeded:
+DEC-041 found the s3t path deterministic within a job). UAT runs as 3 jobs (Q001-Q034, Q035-Q067,
+Q068-Q100), each with its own `base`, because six configurations of 100 items exceed the 340-minute
+job limit; its counts are summed over the three. Categories are those of
+`scripts/diagnostics/summarize_ablation.py` (`categories`, `leaks`): correct, false refusal, false
+answer, wrong value, infra.
+
+**A variant is accepted when, against `base` of the same job:**
+
+1. leaks = 0 on every set;
+2. on each of rbac, relevance, false_refusal, false_refusal_v2 and compound, false answers + wrong
+   values do not increase. Tolerance 0 (the path is deterministic), except the items known to move
+   with the order of the requests: **FR2-L01 and FR2-L06** (DEC-041). A change on those two is
+   reported and not counted;
+3. correct answers on `natural_dev_v1` + UAT together increase.
+
+An item with an infra error in either configuration is left out of both and reported; more than 2
+in one job, and the job is run again.
+
+**The variant of 2 for the combination:** the one of 2a and 2b that is accepted; if both or
+neither, the one with more correct answers on `natural_dev_v1` + UAT; a tie goes to fewer false
+answers + wrong values on the five other sets, then to the smaller mean prompt.
+
+**Also reported:** the mean prompt tokens per LLM call of each configuration (Ollama usage, from
+`simple_trace`), and the items each variant fixes or breaks (IDs only).
+
+**Known limitation:** the 28 diagnosed cases are UAT and `natural_dev_v1` items, and the fixes were
+designed on them, so a gain on those two sets is biased upward. The five other sets are the guard
+that matters. No default changes under this decision; the result is a proposal for the owner.
+
+### Result (2026-11-24) and the proposal; no default changed
+
+**Runs** (commit 4930af6, one run each, all six configurations in every job):
+
+- `natural_dev_v1`: 45177644610.
+- rbac: 45177651696.
+- relevance: 45177658451.
+- false_refusal: 45177665692.
+- false_refusal_v2: 45177671410.
+- compound: 45177676731.
+- UAT, in three parts:
+  - 45177685295, attempt 2. Attempt 1 failed: the runner's Ollama had no `llama-server` binary, so all 34 items were infra errors and the job was run again.
+  - 45177692884.
+  - 45177701483.
+
+No infra error in the measured attempts.
+
+| | base | 2a | 2b | 1 | 2a+1 | 2b+1 |
+|---|---:|---:|---:|---:|---:|---:|
+| `natural_dev_v1`: correct | 7 | 8 | 8 | 9 | 10 | 10 |
+| false refusals | 8 | 7 | 6 | 5 | 3 | 4 |
+| false answers + wrong values | 5 | 5 | 6 | 6 | 7 | 6 |
+| UAT (100): correct | 69 | 72 | 66 | 71 | 74 | 67 |
+| false refusals | 23 | 20 | 26 | 19 | 15 | 24 |
+| wrong values | 8 | 8 | 8 | 10 | 11 | 9 |
+| 5 guard sets (137 items): correct / false answers + wrong values | 106 / 10 | 106 / 10 | 106 / 10 | 106 / 10 | 106 / 10 | 106 / 10 |
+| leaks, every set | 0 | 0 | 0 | 0 | 0 | 0 |
+| mean prompt tokens per LLM call, natural / UAT | 2273 / 2273 | 2271 / 2273 | 2243 / 2269 | 2272 / 2269 | 2264 / 2267 | 2250 / 2267 |
+
+**Verdicts under the rule:**
+
+- 2a: accepted (+4).
+- 2b: rejected (natural + UAT correct −2).
+- 1: accepted (+4).
+- 2a+1, the combination chosen since only 2a of 2a/2b is accepted: accepted (+8).
+- 2b+1: +1, not the chosen combination.
+
+**What the rule could not see:** no guard set moved under any configuration. Their documents are short, so 2a and 2b put the same chunks in the prompt (identical prompt sizes). Variant 1 changed one retry on compound, with the same outcome. The guard sets are therefore no evidence for or against either direction. The only signal comes from `natural_dev_v1` and UAT, the two sets the fixes were designed on.
+
+**Items (IDs only):**
+
+- **2a:**
+  - fixed: ND-005; Q031, Q039, Q042, Q046, Q048;
+  - broken: Q052, Q090;
+  - newly wrong: ND-003, Q041 (as many wrong items were fixed, so the totals stay equal).
+- **1:**
+  - fixed: ND-006, ND-019; Q046, Q086;
+  - newly wrong:
+    - ND-015: a value of another row of the cited chunk (the known limit of the presence check);
+    - ND-007: a partial answer, graded wrong;
+    - Q030, Q037: content as the reference, but the cited document is ND-HR-005, not the reference ND-HR-003.
+- **2a+1:**
+  - fixed: ND-005, ND-006, ND-019; Q031, Q039, Q042, Q046, Q048, Q086;
+  - broken: Q052;
+  - newly wrong: ND-003, ND-007, ND-015, Q030, Q037, Q041, Q071.
+- **2b:**
+  - fixes 3 natural and 7 UAT items;
+  - breaks 2 and 10.
+
+**Validator v2, against the PHA 2 diagnosis:**
+
+- **The 7 right drafts:**
+  - All 7 pass the corrected rules when the recorded drafts are validated again.
+  - In the measurement, only Q086 and ND-006 became correct.
+  - Q030 and Q037 became answers that cite another document.
+  - Q029, Q033 and ND-018 were refused again: the model wrote a new draft, which failed another check.
+- **Correction to the PHA 2 table:** Q029 was rejected by `_answer_has_grounded_signal`, which counts only words of 4+ letters, not by `_yes_no_evidence_has_required_anchor`. The anchor rule is unchanged.
+- **The value check is presence only.** A rule binding a value to the subject the claim gives it was tried, and rejected right claims each time: an answer normally repeats the question's words. The real Q097 (a right rate of another row, given for a day the source never names) is still rejected, but by another rule.
+
+**Reranker (step 3, report only):** the demo stack `eaka-smoke` (main defaults) and the eval stack both run `RERANKER_PROVIDER=heuristic`, mode `lexical_fallback`. The simple path (s3t) does not rerank: the reranker only sets the candidate count (50), and the prompt takes the hybrid order. Only the legacy path calls `rerank()`.
+
+**Proposal for the owner (no default changes until the owner chooses):**
+
+1. **2a, `RAG_PROMPT_CHUNK_SELECTION=per_document_3`:**
+   - The cleanest: +4 right answers on natural + UAT, no change in false answers + wrong values on any set, same prompt size.
+   - Limit: the guard sets do not exercise it.
+2. **1, `RAG_VALIDATOR_V2_ENABLED`, not as a default yet:**
+   - It gives +4, but 3 more false answers + wrong values on natural + UAT.
+   - Before it can be a default, it needs the value-of-another-row limit and the choice of cited document.
+3. **2a+1:** the largest gain (+8), with 5 more false answers + wrong values on natural + UAT.
+
+A default flip still follows DEC-026, and the two-job rule of DEC-027.
+
+### Amendment after the result (2026-11-25, owner) and the DEC-027 confirmation of 2a
+
+**Written after the result above was known.** The rule as registered and its verdicts stay above,
+unchanged, for comparison.
+
+- **The gap:**
+  - Rule 2 blocked a rise in false answers + wrong values only on the five guard sets.
+  - Those sets gave no signal: every configuration equals base there.
+  - So a variant could add false answers + wrong values on `natural_dev_v1` and UAT and still be accepted.
+- **Rule from now on:** false answers + wrong values must not increase on **any** set, `natural_dev_v1` and UAT included. Rules 1 and 3 are unchanged.
+- **Verdicts under it:**
+
+  | Variant | False answers + wrong values (base → variant) | Right answers | Verdict |
+  |---|---|---|---|
+  | 2a | natural 5 → 5, UAT 8 → 8 | +4 | **accepted** |
+  | 1 | natural 5 → 6, UAT 8 → 10 | | **rejected** |
+  | 2a+1 | natural 5 → 7, UAT 8 → 11 | | **rejected** |
+
+  2b stays rejected.
+
+**Confirmation of 2a before the flip (DEC-027), registered before its runs:**
+
+- **Runs:**
+  - Two rounds, separate from the PR #59 jobs.
+  - Each round is one `natural_dev_v1` job and one UAT job (Q001-Q100).
+  - Each job runs both `base` and `2a` on the same image (main 4ebf927; the branch adds only docs), 1 run each.
+  - Round 2 sets `EVAL_LLM_SEED` to its default value only so that its jobs differ from round 1's in the concurrency group and run alongside it.
+- **2a is accepted if, in both rounds:**
+  - its right answers on `natural_dev_v1` + UAT together exceed base's;
+  - its false answers + wrong values do not exceed base's, on `natural_dev_v1` and on UAT each.
+  - Leaks stay 0.
+- **Also reported:**
+  - the DEC-027 tie test per count;
+  - the items whose category differs between the two rounds, and from the PR #59 jobs (IDs only).
+- **Outcome:**
+  - If accepted, DEC-043 makes `per_document_3` the default and keeps the flag for rollback.
+  - If not, base stays, and the result is written here.
+
+### Confirmation result (2026-11-26): 2a not accepted, base stays
+
+**Runs:**
+
+| Round | `natural_dev_v1` | UAT |
+|---|---|---|
+| 1 | 45779822077 | 45779832197 |
+| 2 | 45779827292 | 45779837610 |
+
+Branch `eval/dec042-confirm` (main 4ebf927 plus docs), configurations `base` and `2a`.
+
+**Round 1's UAT job ended at the job time limit both times** (attempts 1 and 2):
+
+- each time `base` finished (12772 s and 12699 s, against 5700 s in round 2);
+- `2a` stopped at Q058-Q059.
+
+That job has no complete `2a`, and it was not run a third time: the rule needs both rounds to pass, and round 2 does not.
+
+| | PR #59 jobs (UAT in 3 parts) | round 1 | round 2 |
+|---|---|---|---|
+| `natural_dev_v1` base: correct / false answers + wrong values | 7 / 5 | 7 / 5 | 7 / 5 |
+| `natural_dev_v1` 2a | 8 / 5 | 8 / 5 | 8 / 5 |
+| UAT base | 69 / 8 | 71 / 9 | 68 / 9 |
+| UAT 2a | 72 / 8 | incomplete (time limit) | 70 / **10** |
+| leaks | 0 | 0 | 0 |
+
+**Verdict under the registered criteria: not accepted.**
+
+- In round 2, 2a's false answers + wrong values on UAT exceed base's (10 > 9). The new one is Q057, right under base and wrong under 2a. Q041 is newly wrong under 2a, as it was in the PR #59 jobs.
+- Right answers on natural + UAT were higher (+3), but that alone is not enough.
+- **DEC-043 is not written:** `RAG_PROMPT_CHUNK_SELECTION` stays `rrf` by default, and `per_document_3` stays available behind the flag.
+
+**The DEC-027 tie test** (PR #59 jobs against round 2, the two jobs with both configurations complete):
+
+- `natural_dev_v1` +1 in both, with no change between jobs: a real but one-item difference.
+- UAT right answers +3 and +2. Base moved by 1 between those jobs, 2a by 2; across all three jobs, base moved between 68 and 71. That is a tie.
+- UAT false answers + wrong values: 0 and +1, so not the same sign: a tie.
+
+**Items whose category differs between jobs** (IDs only):
+
+- `natural_dev_v1`: none, for both configurations.
+- UAT base, across the three jobs: Q028, Q029, Q033, Q036, Q046, Q048, Q063.
+- UAT 2a, PR #59 jobs against round 2: Q003, Q020, Q031, Q057, Q074, Q076, Q080.
+
+The UAT gain of 2a is no larger than the variation of base between jobs.

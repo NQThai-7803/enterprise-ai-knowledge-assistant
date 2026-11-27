@@ -21,7 +21,12 @@ more names joined by "." select what is patched:
                       rejected, is appended to EVAL_SIMPLE_TRACE_FILE (default
                       /tmp/simple_trace.jsonl) with its sources, its outcome, and each sentence
                       with the markers it cites and the claim validator's status and deciding
-                      rule for that sentence against its own cited sources.
+                      rule for that sentence against its own cited sources. Then one
+                      "kind": "question" record per question, LLM called or not: how many
+                      chunks retrieval returned, the chunks given to the prompt with their
+                      scores, the ranks of the gold chunks among everything retrieved (when
+                      EVAL_ORACLE_FILE exists), the outcome of each LLM attempt and the final
+                      no-answer reason.
   retrieval_oracle    no LLM (DEC-034 retrieval gate): the simple answer mode records the chunks
                       it would give the prompt (hybrid retrieval, then at most 5, at most 2 per
                       document) and which are gold (EVAL_ORACLE_FILE), to EVAL_SIMPLE_TRACE_FILE,
@@ -308,6 +313,45 @@ _similarities: contextvars.ContextVar[list[dict[str, Any]] | None] = contextvars
 _bindings: contextvars.ContextVar[list[dict[str, Any]] | None] = contextvars.ContextVar(
     "bindings", default=None
 )
+_summary: contextvars.ContextVar[dict[str, Any] | None] = contextvars.ContextVar(
+    "summary", default=None
+)
+
+
+async def question_record(summary: dict[str, Any], gold: dict[str, Any]) -> dict[str, Any]:
+    """The "kind": "question" trace record of one simple-mode question."""
+    hits, chosen = summary["hits"], summary["chosen"]
+    codes = await _document_codes({hit.document_id for hit in hits})
+    entry = gold.get(question_key(_question.get() or ""))
+
+    def gold_hit(hit: Any) -> bool:
+        return bool(entry) and is_gold(hit, codes.get(hit.document_id), entry)
+
+    return {
+        "kind": "question",
+        "asked": _question.get(),
+        "retrieved": len(hits),
+        "selected": [
+            {
+                "rank": rank,
+                "code": codes.get(hit.document_id),
+                "pages": list(hit.page_numbers),
+                "hybrid": hit.hybrid_score,
+                "semantic": hit.semantic_score,
+                "keyword": hit.keyword_score,
+                "reranker": hit.reranker_score,
+                "gold": gold_hit(hit),
+            }
+            for rank, hit in enumerate(chosen, 1)
+        ],
+        "has_gold": entry is not None,
+        "gold_ranks": [rank for rank, hit in enumerate(hits, 1) if gold_hit(hit)],
+        "gold_codes": sorted({g["document"] for g in entry or ()}),
+        "llm_calls": len(summary["outcomes"]),
+        "outcomes": summary["outcomes"],
+        "prompt_tokens": summary["prompt_tokens"],
+        "no_answer_reason": summary["no_answer"],
+    }
 
 
 def _patch_simple_trace(gas: Any) -> None:
@@ -327,6 +371,7 @@ def _patch_simple_trace(gas: Any) -> None:
         return {
             "relaxed_rules": self.settings.rag_simple_relaxed_rules_enabled,
             "question_list_segments": self.settings.rag_simple_question_list_segments_enabled,
+            "validator_v2": self.settings.rag_validator_v2_enabled,
         }
 
     async def judged(self: Any, *, question: str, answer: str, registry: Any, labels: Any) -> dict:
@@ -346,13 +391,39 @@ def _patch_simple_trace(gas: Any) -> None:
     original = gas.GroundedAnswerService._simple_validate
     original_draft = gas.GroundedAnswerService._simple_answer_draft
     original_similarity = gas.GroundedAnswerService._simple_claim_similarity
+    original_select = gas._simple_select_hits
+    original_no_answer = gas.GroundedAnswerService._simple_no_answer
+    oracle_file = Path(os.environ.get("EVAL_ORACLE_FILE") or "")
+    gold = _load_oracle() if oracle_file.is_file() else {}
+
+    def select_hits(hits: Any, **kwargs: Any) -> Any:
+        chosen = original_select(hits, **kwargs)
+        summary = _summary.get()
+        if summary is not None:
+            summary["hits"], summary["chosen"] = tuple(hits), tuple(chosen)
+        return chosen
+
+    def simple_no_answer(self: Any, reason: str, **kwargs: Any) -> Any:
+        summary = _summary.get()
+        if summary is not None:
+            summary["no_answer"] = reason
+        return original_no_answer(self, reason, **kwargs)
 
     async def simple_answer_draft(self: Any, **kwargs: Any) -> Any:
         token = _attempt.set([0])  # LLM drafts of this question
+        summary = {
+            "hits": (), "chosen": (), "outcomes": [], "prompt_tokens": [], "no_answer": None
+        }  # fmt: skip
+        summary_token = _summary.set(summary)
         try:
-            return await original_draft(self, **kwargs)
+            draft = await original_draft(self, **kwargs)
         finally:
             _attempt.reset(token)
+            _summary.reset(summary_token)
+        record = await question_record(summary, gold)
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(record, ensure_ascii=False) + "\n")
+        return draft
 
     original_binding = gas.value_bound_to_subject
 
@@ -389,6 +460,12 @@ def _patch_simple_trace(gas: Any) -> None:
         bindings_token = _bindings.set([])
         try:
             outcome = await original(self, generation, **kwargs)
+            summary = _summary.get()
+            if summary is not None:
+                summary["outcomes"].append(
+                    "answered" if not isinstance(outcome, tuple) else outcome[0]
+                )
+                summary["prompt_tokens"].append(generation.prompt_tokens)
             similarities = _similarities.get() or []
             bindings = _bindings.get() or []
         finally:
@@ -451,6 +528,8 @@ def _patch_simple_trace(gas: Any) -> None:
     gas.GroundedAnswerService._simple_validate = simple_validate
     gas.GroundedAnswerService._simple_answer_draft = simple_answer_draft
     gas.GroundedAnswerService._simple_claim_similarity = claim_similarity
+    gas.GroundedAnswerService._simple_no_answer = simple_no_answer
+    gas._simple_select_hits = select_hits
     gas.value_bound_to_subject = value_bound
 
 

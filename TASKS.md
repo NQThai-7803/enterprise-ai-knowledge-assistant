@@ -1,6 +1,92 @@
 
 # Implementation Tasks
 
+## 2a confirmation under DEC-027: not accepted -- 2026-11-26
+
+- **DONE:**
+  - DEC-042 amended after its result: false answers + wrong values must not rise on any set. Under it 2a passes, 1 and 2a+1 fail.
+  - The two-round confirmation of 2a: in round 2, false answers + wrong values on UAT went up by 1 (10 > 9), so **2a is not accepted**.
+  - `RAG_PROMPT_CHUNK_SELECTION` stays `rrf` by default; no DEC-043.
+  - Round 1's UAT job hit the job time limit twice (the runner was slow), so `2a` there is incomplete.
+  - Details in `DECISIONS.md` DEC-042.
+- **NEXT:**
+  - **[High]** The five guard sets cannot tell configurations apart: their documents are short, so every DEC-042 configuration equalled base there. A guard dev set is needed with long documents and several chunks per document, tied to corpus v3.
+  - **[Medium]** Validator v2:
+    - bind a value to its own row or subject (the Q097 and ND-015 kind);
+    - find why the on-call items cite ND-HR-005 instead of ND-HR-003 (Q030, Q037);
+    - `_answer_has_grounded_signal` counts only words of 4+ letters (Q029).
+  - **[Medium]** Logout must revoke the whole refresh-token family (not done):
+    - today `AuthService.logout` revokes only the token it is given, and `refresh` rotates without linking the new token to the old one;
+    - so a refresh in flight at logout issues a new token that the client drops but that stays valid until it expires: `REFRESH_TOKEN_EXPIRE_DAYS`, default 7 days (access token 15 minutes);
+    - needs a family link on `refresh_tokens` (a migration), revoked as a whole on logout.
+  - **[Low]** s3t does not use the reranker to rank (the prompt takes the RRF order). Consider a real reranker when the hardware allows.
+  - **[Low]** The UAT job (100 items × 2 configurations) can exceed the 340-minute limit on a slow runner. Split UAT across jobs when a configuration runs alone for long.
+
+## Refusal fixes measured (DEC-042) -- 2026-11-24
+
+- **DONE, flags off:**
+  - `RAG_PROMPT_CHUNK_SELECTION` (2a `per_document_3`, 2b `lexical`);
+  - `RAG_VALIDATOR_V2_ENABLED` (the corrected rules and the value presence check).
+- **Measured** on the 7 dev sets × 6 configurations. Under the rule registered before measuring:
+  - accepted: 2a, 1 and 2a+1;
+  - rejected: 2b.
+  - No guard set moved under any configuration, so they are no evidence for either direction.
+  - Details and item IDs in `DECISIONS.md` DEC-042.
+- **WAITING FOR OWNER:** which, if any, becomes the default.
+  - Proposal: 2a.
+  - Not 1 yet: it brings 3 more false answers + wrong values on natural + UAT, including a value of another row of the cited chunk.
+- **NEXT if 1 is pursued:**
+  - bind a value to the row it belongs to (the Q097 / ND-015 kind);
+  - find why the model cites ND-HR-005 for the on-call items (Q030, Q037).
+- **Correction to the PHA 2 table below:** Q029 is decided by `_answer_has_grounded_signal` (words of 4+ letters only), not by `_yes_no_evidence_has_required_anchor`.
+
+## Shared-layer refusals diagnosed (dev sets only) -- 2026-11-22
+
+- **DONE:** the 28 cases of priority 1 (below, "Order of the next work -- 2026-11-20") traced on
+  main + eval-only diagnostics (branch `diag/refusal-trace`), s3t, 2 runs each, identical in both:
+  UAT run 45021071406, `natural_dev_v1` run 45021074583. `simple_trace` now records one summary
+  per question (retrieval count, the prompt's chunks with scores, gold ranks, every LLM attempt);
+  `scripts/diagnostics/refusal_classes.py` classifies with rules fixed before the run.
+- **Every case reached the LLM** with 5 sources from 50 retrieved chunks; no pre-LLM gate refused
+  any. The eval reranker is heuristic (no scores), so the prompt takes the hybrid (RRF) order.
+
+  | Class | Cases | Evidence |
+  |---|---|---|
+  | answered in this batch (both runs) | Q039 Q064 | - |
+  | **retrieval miss: gold document in the prompt, gold chunk not** | Q003 Q006 Q042 Q048 Q075 ND-008 ND-009 | gold chunk ranked 3-4, cut by the 2-chunks-per-document limit (two other chunks of the same document come first) |
+  | same | Q031 Q063 | gold chunk ranked 6 (Q031 by the per-document limit, Q063 by the top 5) |
+  | same | Q001 Q007 Q093 | gold chunk ranked 9-13 |
+  | gate blocked although the right document | - | (Q031 ended on `claim_irrelevant` but its gold chunk was not in the prompt) |
+  | **LLM refused** (gold chunk in the prompt, ranked 1-2) | Q026 Q071 Q080 ND-003 ND-007 | `refusal_text` (absence sentences only); Q026 and ND-007 refused only at the retry after the validator rejected the first draft |
+  | **validator rejected, draft right** | Q029 Q030 Q033 Q037 ND-006 Q086 ND-018 | rules: `_passive_action_polarity_is_contradicted` (Q030 Q037), `_polarity_is_contradicted` (Q033), `_yes_no_evidence_has_required_anchor` (Q029), `_scoped_policy_yes_no_status` (ND-006), `_conditional_allowance_yes_no_status` (Q086), `_numbers_are_contradicted` (ND-018) |
+  | **validator rejected, model wrong** | Q096 Q097 | Q096 answers another topic (the reference value is not in the prompt); Q097 states a wrong rate: that sentence was SUPPORTED, the rejection came from the polarity rule on its right sentence |
+
+  The 12 retrieval misses end on `refusal_text` (8), `claim_insufficient` (2),
+  `claim_contradicted` (1), `claim_irrelevant` (1); in Q042 the reference value is in the prompt
+  anyway (from another chunk). Validator verdicts: by values for Q086 Q096 Q097 ND-018, by reading
+  the draft against the reference for the others.
+- **NEXT, owner decision (not fixed): one of**
+  1. **Prompt chunk selection:** let a third chunk of a document in (or rank chunks within a
+     document) in `_simple_select_hits`; targets the 7 cases at rank 3-4. Risk: rbac none (it only
+     chooses among permission-filtered hits); false_answer can rise (more same-document
+     distractors, e.g. neighbouring table rows); longer prompts (GPU latency).
+  2. **Validator rules in simple mode:** fix the misfires of the polarity, yes/no-status and
+     number-range rules; targets the 7 right drafts. Risk: false_answer, the largest: Q097 shows a
+     wrong value passing as SUPPORTED, so relaxing polarity alone would answer it wrongly; the
+     value check must hold first. rbac none (citations are still revalidated).
+  3. **Model refusals:** the absence-sentence prompt and the retry instruction (2 of 5 refused only
+     at the retry). Risk: false_answer on items that must be refused (false_refusal, relevance,
+     rbac deny items: an answer from a neighbouring permitted document); rbac leak none (the prompt
+     holds permitted chunks only).
+
+## Chat cache audit -- 2026-11-22
+
+- **DONE:** no backend cache crosses users or outlives a revoked grant (`SECURITY.md`, "Chat path
+  caches"); regression test `tests/api/test_chat_permission_isolation.py`.
+- **HANDED TO THE UI SESSION (PR #42):** **[High]** clear the React Query cache on logout and
+  login; until then a second account on the same browser tab can be shown the first one's cached
+  data.
+
 ## GPU latency of the default measured (DEC-041) -- 2026-11-22
 
 - **DONE:** LLM time per question on the GTX 1650 (p50 18.4 s, p95 25.5 s, first request 23.8 s,
