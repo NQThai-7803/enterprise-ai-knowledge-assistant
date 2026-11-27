@@ -15,6 +15,10 @@
     - bind a value to its own row or subject (the Q097 and ND-015 kind);
     - find why the on-call items cite ND-HR-005 instead of ND-HR-003 (Q030, Q037);
     - `_answer_has_grounded_signal` counts only words of 4+ letters (Q029).
+  - **[Medium]** Logout must revoke the whole refresh-token family (not done):
+    - today `AuthService.logout` revokes only the token it is given, and `refresh` rotates without linking the new token to the old one;
+    - so a refresh in flight at logout issues a new token that the client drops but that stays valid until it expires: `REFRESH_TOKEN_EXPIRE_DAYS`, default 7 days (access token 15 minutes);
+    - needs a family link on `refresh_tokens` (a migration), revoked as a whole on logout.
   - **[Low]** s3t does not use the reranker to rank (the prompt takes the RRF order). Consider a real reranker when the hardware allows.
   - **[Low]** The UAT job (100 items × 2 configurations) can exceed the 340-minute limit on a slow runner. Split UAT across jobs when a configuration runs alone for long.
 

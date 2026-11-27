@@ -236,6 +236,10 @@ Set by the owner on 2026-11-16, before s4 and s5 are measured.
 - **A difference smaller than the variation between the jobs counts as a tie.** Applied per count (false refusals, false answers + wrong, ...): the difference between two configurations is taken in each job; it counts only when it has the same sign in both jobs and its smaller size is larger than the largest change of either configuration between the two jobs on that count.
 - DEC-011/016 (baseline in the same job) and DEC-026 (selection order) still apply inside each job.
 - Recorded with it, at the owner's instruction: s5 uses a cross-encoder (`cross-encoder/mmarco-mMiniLMv2-L12-H384-v1`) as a per-claim relevance check behind its flag, for measurement. DEC-025 (no cross-encoder reranker) is unchanged; the eval workflow downloads that model only for a configuration that turns the check on.
+- **Observed variation between jobs (recorded 2026-11-27, DEC-042):**
+  - the same image and the `base` configuration gave 69, 71 and 68 right answers on UAT, in the PR #59 jobs and confirmation rounds 1 and 2;
+  - the items whose category changed: Q028, Q029, Q033, Q036, Q046, Q048, Q063;
+  - so a UAT difference of 2-3 items between configurations is within that variation.
 
 ## DEC-028 — Model comparison: candidates and rule, fixed before measuring
 

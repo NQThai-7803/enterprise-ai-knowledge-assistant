@@ -10,6 +10,8 @@ Format follows a simplified Keep a Changelog style.
 
 - **Docs:**
   - DEC-042's rule tightened after its result (no rise in false answers + wrong values on any set);
+  - DEC-027 records the variation of `base` between jobs on UAT (68-71);
+  - TASKS: logout to revoke the whole refresh-token family;
   - the DEC-027 confirmation of 2a recorded as not accepted.
 - **No code or default changed.**
 
