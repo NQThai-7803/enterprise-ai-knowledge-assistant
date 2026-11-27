@@ -4,8 +4,9 @@ import { resolve } from "node:path";
 
 /**
  * Checks that only show behind a production build and its reverse proxy (DEMO.md: nginx serves the SPA
- * and proxies /api/ and /health/ on the same origin): SSE passed on event by event, token refresh
- * through the proxy, the cited PDF opened at its page, and a reload on deep routes.
+ * and proxies /api/ and /health/ on the same origin): sign-in from either loopback host name (BR-13),
+ * SSE passed on event by event, token refresh through the proxy, citation excerpts free of Symbol-font
+ * code points (BR-14), the cited PDF opened at its page, and a reload on deep routes.
  * Run: E2E_LIVE=true UAT_*_PASSWORD=… PLAYWRIGHT_BASE_URL=<proxy origin>
  *      npx playwright test -c playwright.live.config.ts deploy --workers=1
  * Secrets in Tests: tokens stay inside the page or are only decoded for their exp, never asserted on.
@@ -15,6 +16,9 @@ test.use({ trace: "off", screenshot: "off", video: "off", channel: "chromium" })
 const shotsDir = process.env.SMOKE_SCREENSHOT_DIR ?? resolve(process.cwd(), "test-results", "smoke");
 const answerableQuestion =
   process.env.SMOKE_ANSWERABLE_QUESTION ?? "Tổng thời gian nghỉ lễ là bao nhiêu ngày trong một năm?";
+// An answer the model has just given (DEMO.md: warmup asks a few dev questions) comes back too fast to
+// tell a buffering proxy from a streaming one, so the SSE check can take a question nobody asked yet.
+const sseQuestion = process.env.SMOKE_SSE_QUESTION ?? answerableQuestion;
 const answerTimeout = 300_000;
 
 type Account = { email: string; password: string };
@@ -30,6 +34,24 @@ test.beforeAll(async () => {
     staff: { email: process.env.UAT_STAFF_EMAIL ?? "staff.uat@example.test", password: requiredEnv("UAT_STAFF_PASSWORD") },
   };
   await mkdir(shotsDir, { recursive: true });
+});
+
+test("sign-in works from the other loopback host name of the proxy (same-origin build)", async ({ page, baseURL }) => {
+  const base = new URL(baseURL!);
+  const otherHost = base.hostname === "localhost" ? "127.0.0.1" : base.hostname === "127.0.0.1" ? "localhost" : null;
+  test.skip(!otherHost, "the base URL is not a loopback host");
+  const origin = `${base.protocol}//${otherHost}:${base.port}`;
+  // A build with a fixed API origin calls it from this page cross-origin, and CORS refuses the sign-in.
+  const elsewhere: string[] = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (/^\/(api|health)\//.test(url.pathname) && url.origin !== origin) elsewhere.push(`${url.origin}${url.pathname}`);
+  });
+  await login(page, accounts.staff, origin);
+  await expect(page.getByText("API sẵn sàng"), "/health/ready from this origin").toBeVisible();
+  await page.screenshot({ path: resolve(shotsDir, `deploy-0-signed-in-${otherHost}.png`) });
+  expect(elsewhere, "API requests sent to another origin").toEqual([]);
+  await logout(page);
 });
 
 test("SSE through the proxy: events arrive one by one and the stream closes", async ({ page }) => {
@@ -73,7 +95,7 @@ test("SSE through the proxy: events arrive one by one and the stream closes", as
         closedMs,
       };
     },
-    { question: answerableQuestion, title: `Kiểm SSE ${Date.now()}` },
+    { question: sseQuestion, title: `Kiểm SSE ${Date.now()}` },
   );
 
   const startedMs = stream.arrivals.find((arrival) => arrival.event === "stream.started")?.ms;
@@ -91,7 +113,9 @@ test("SSE through the proxy: events arrive one by one and the stream closes", as
   // at once and the answer seconds later.
   expect(startedMs!, "stream.started should not wait for the answer").toBeLessThan(Math.min(3_000, completedMs!));
   if (completedMs! - startedMs! < 2_000) {
-    test.info().annotations.push({ type: "sse-inconclusive", description: "answer under 2 s: buffering cannot be told apart" });
+    const note = "answer under 2 s (already answered once?): buffering cannot be told apart, SSE check inconclusive";
+    test.info().annotations.push({ type: "sse-inconclusive", description: note });
+    console.log(`SSE INCONCLUSIVE: ${note}`);
   }
   expect(stream.closedMs - completedMs!, "the stream closes after message.completed").toBeLessThan(2_000);
 });
@@ -121,7 +145,14 @@ test("staff: refresh through the proxy keeps the session, the cited PDF opens at
   expect(storedAuthKeys, "still signed in after the refresh").toHaveLength(2);
 
   await answer.getByRole("button", { name: /Mở trích dẫn/ }).first().click();
-  const link = page.getByRole("complementary", { name: "Trích dẫn" }).getByRole("link", { name: /Mở tài liệu tại trang/ }).first();
+  const citations = page.getByRole("complementary", { name: "Trích dẫn" });
+  // BR-14: Symbol-font bullets (Private Use Area, e.g. U+F0B7) render as empty boxes.
+  const excerpts = await citations.locator("article > p:nth-of-type(2)").allTextContents();
+  expect(excerpts.length, "excerpts in the citation panel").toBeGreaterThan(0);
+  test.info().annotations.push({ type: "excerpt-start", description: excerpts.map((text) => text.slice(0, 60)).join(" | ") });
+  expect(excerpts.filter((text) => /[-]/.test(text)), "excerpts with a Private Use Area code point").toEqual([]);
+  await citations.screenshot({ path: resolve(shotsDir, "deploy-1-citation-excerpt.png") });
+  const link = citations.getByRole("link", { name: /Mở tài liệu tại trang/ }).first();
   const pageNumber = Number(/trang (\d+)/.exec((await link.innerText()) ?? "")?.[1]);
   expect(pageNumber, "the citation names a page").toBeGreaterThan(0);
   const previewResponse = context.waitForEvent("response", (response) => /\/api\/v1\/documents\/[^/]+\/preview$/.test(new URL(response.url()).pathname));
@@ -173,8 +204,8 @@ async function expectReloadServesApp(page: Page, heading: string): Promise<void>
   await expect(page.getByRole("heading", { name: heading }).first()).toBeVisible();
 }
 
-async function login(page: Page, account: Account): Promise<void> {
-  await page.goto("/login");
+async function login(page: Page, account: Account, origin = ""): Promise<void> {
+  await page.goto(`${origin}/login`);
   await page.getByLabel("Email").fill(account.email);
   await page.getByLabel("Mật khẩu", { exact: true }).fill(account.password);
   await page.getByRole("button", { name: "Đăng nhập" }).click();
