@@ -1,10 +1,14 @@
 # Example TLS server block for production certificate mounting.
 # This file is intentionally disabled by extension and is not loaded by Nginx.
-# Mount real certificates at runtime and copy this to a .conf file outside source control.
+# Mount real certificates at runtime and copy this to a .conf.template file outside source
+# control (the entrypoint renders *.conf.template into conf.d/, see default.conf.template).
 #
 # server {
 #     listen 8443 ssl http2;
-#     server_name assistant.example.com;
+#     server_name ${PROXY_SERVER_NAMES};
+#     # TC-SEC-08: other names need their own default, e.g.
+#     # server { listen 8443 ssl default_server; ssl_reject_handshake on; }
+#     absolute_redirect off;
 #
 #     ssl_certificate /etc/nginx/certs/fullchain.pem;
 #     ssl_certificate_key /etc/nginx/certs/privkey.pem;
@@ -15,5 +19,5 @@
 #     proxy_read_timeout 130s;
 #
 #     add_header Strict-Transport-Security "max-age=31536000" always;
-#     include /etc/nginx/conf.d/app.conf;
+#     # ... the location blocks of default.conf.template
 # }

@@ -25,6 +25,7 @@ Nginx
   - It is not deleted: whether and when to remove it is the owner's decision.
 - **Host names:** the frontend nginx (`deploy/frontend/nginx.conf`) answers only `localhost`, `127.0.0.1` and the names in `FRONTEND_SERVER_NAMES` (space-separated, frontend container environment). Any other `Host` gets no answer (444, TC-SEC-08), and redirects carry a relative `Location`.
   - A deployment on its own domain sets that name both in `FRONTEND_SERVER_NAMES` and in the API's `TRUSTED_HOSTS`.
+  - The production reverse proxy (`compose.prod.yaml`, `deploy/nginx/templates/default.conf.template`) does the same with `PROXY_SERVER_NAMES` in `.env.production`: other Hosts get 444, `absolute_redirect off`. Each name must also be in `TRUSTED_HOSTS`.
 
 ## 2. Containers
 

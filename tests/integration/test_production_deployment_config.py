@@ -56,6 +56,10 @@ def test_production_compose_defines_runtime_observability_services() -> None:
     assert "ports" not in services["postgres"]
     assert "ports" not in services["redis"]
     assert services["reverse-proxy"]["ports"]
+    assert services["reverse-proxy"]["environment"] == {
+        "PROXY_SERVER_NAMES": "assistant.example.com",
+        "NGINX_ENVSUBST_FILTER": "PROXY_SERVER_NAMES",
+    }
 
 
 @pytest.mark.repo_layout("compose.prod.yaml", ".env.production.example")
@@ -77,9 +81,11 @@ def test_production_compose_sets_restart_healthchecks_and_resource_limits() -> N
     assert "runtime_validation" in " ".join(services["worker"]["command"])
 
 
-@pytest.mark.repo_layout("deploy/nginx/conf.d/app.conf", "deploy/nginx/nginx.conf")
+@pytest.mark.repo_layout("deploy/nginx/templates/default.conf.template", "deploy/nginx/nginx.conf")
 def test_reverse_proxy_config_supports_sse_limits_and_security_headers() -> None:
-    config = (ROOT / "deploy" / "nginx" / "conf.d" / "app.conf").read_text(encoding="utf-8")
+    config = (ROOT / "deploy" / "nginx" / "templates" / "default.conf.template").read_text(
+        encoding="utf-8"
+    )
     nginx = (ROOT / "deploy" / "nginx" / "nginx.conf").read_text(encoding="utf-8")
 
     assert "client_max_body_size 25m" in config
@@ -90,6 +96,10 @@ def test_reverse_proxy_config_supports_sse_limits_and_security_headers() -> None
     assert "X-Content-Type-Options" in config
     assert "location = /metrics" in config
     assert "return 404" in config
+    # TC-SEC-08: a forged Host gets no answer, and redirects carry no host or port.
+    assert "listen 8080 default_server;\n    server_name _;\n    return 444;" in config
+    assert "server_name localhost 127.0.0.1 ${PROXY_SERVER_NAMES};" in config
+    assert "absolute_redirect off;" in config
     assert "log_format json_combined" in nginx
     assert "request_id" in nginx
 

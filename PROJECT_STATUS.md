@@ -15,7 +15,11 @@
   - The 12 `github-actions-mutable-action-tag` findings are gone.
 - **`check_demo.py --matrix`:** 58/59 on eaka-demo. The profile check passes: 39 `RAG_*` flags at main's defaults, simple mode, `qwen3.5-text:4b`.
   - The one failure is a real finding: the demo has a 14th document. It was uploaded on 2026-11-27 13:02 UTC, after the last reset: `ND-HR-002_Noi_quy_lao_dong_v2.0.pdf`, with no document code. Run `demo.ps1 reset` before the next demo.
-- **Not changed:** the production nginx (`deploy/nginx/conf.d/app.conf`). It still has `server_name _` and is outside this task.
+- **Production nginx (follow-up, same day):** `deploy/nginx/conf.d/app.conf` is now `deploy/nginx/templates/default.conf.template`, rendered by the nginx entrypoint with only `PROXY_SERVER_NAMES` (`compose.prod.yaml`, `.env.production`).
+  - Checked with `nginx:1.27-alpine`, the repo's `nginx.conf` and a stand-in upstream: `Host: evil.example` (with or without a port) gets no answer on `/`, `/health/live`, `/api/v1/auth/me`, `/metrics`.
+  - `localhost`, `127.0.0.1` and the configured names reach the upstream; `/metrics` stays 404; the healthcheck URL reaches the upstream; `nginx -t` passes with the list empty.
+  - The production stack itself was not started.
+- **`demo.ps1` `.env` guard (follow-up):** every action but `init`, `build`, `questions` stops before any docker call when the `.env` has no line `EAKA_PROFILE=demo`; `init` writes that line. Run from `C:\dev\eaka` (dev `.env`), `status`, `seed` and `init` now stop with exit 1.
 
 ## Demo from a fresh clone -- 2026-11-28
 

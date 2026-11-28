@@ -240,9 +240,13 @@ services:
     restart: unless-stopped
     ports:
       - "127.0.0.1:${PROXY_HTTP_PORT:-8080}:8080"
+    environment:
+      # TC-SEC-08: the host names nginx answers besides localhost and 127.0.0.1 (space-separated).
+      PROXY_SERVER_NAMES: ${PROXY_SERVER_NAMES:-}
+      NGINX_ENVSUBST_FILTER: PROXY_SERVER_NAMES  # the templates' only variable
     volumes:
       - ./deploy/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./deploy/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./deploy/nginx/templates:/etc/nginx/templates:ro
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health/live"]
       interval: 15s
