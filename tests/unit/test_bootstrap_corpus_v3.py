@@ -1,4 +1,4 @@
-"""scripts/eval/bootstrap_corpus_v3.py: manifest -> upload fields, and the access matrix."""
+"""scripts/eval/bootstrap_corpus_v3.py: manifest -> upload fields, grants and the access matrix."""
 
 from __future__ import annotations
 
@@ -8,6 +8,30 @@ from scripts.eval import bootstrap_corpus_v3 as v3
 
 DEPARTMENT_IDS = {code: f"id-{code}" for code in v3.DEPARTMENTS}
 CORPUS_KEYS = {("ND-HR-003", "2.0"), ("ND-HR-003", "2.1"), ("ND-COMP-001", "1.0")}
+ORGANIZATION_CODES = {
+    "ND-CORP-001",
+    "ND-ORG-001",
+    "ND-HR-002",
+    "ND-HR-003",
+    "ND-HR-004",
+    "ND-HR-005",
+    "ND-HR-006",
+    "ND-HR-011",
+    "ND-IT-001",
+}
+# The owner's seed (2026-11-28): the codes each account reads besides the organization ones.
+OWNER_MATRIX = {
+    "hr": {"ND-HR-007", "ND-COMP-001"},
+    "manager": {"ND-COMP-001"},
+    "staff": set(),
+    "other": set(),
+    "legal": {"ND-HR-010"},
+    "ceo": {"ND-EXEC-001", "ND-COMP-001"},
+    "payroll": {"ND-COMP-001"},
+    "hiring": {"ND-HR-007"},
+    "investigator": {"ND-HR-010"},
+    "chro": {"ND-HR-007", "ND-HR-010", "ND-EXEC-001", "ND-COMP-001"},
+}
 
 
 def _doc(**overrides):
@@ -17,6 +41,7 @@ def _doc(**overrides):
         "title": "Chính sách thời giờ làm việc và chấm công",
         "file": "x.pdf",
         "classification": "INTERNAL",
+        "visibility": "ORGANIZATION",
         "effective_from": "2027-01-01",
         "effective_to": None,
         "lifecycle_status": "ACTIVE",
@@ -48,27 +73,36 @@ def test_upload_fields_refuse_a_superseded_version_not_uploaded_yet() -> None:
         v3.upload_fields(_doc(), DEPARTMENT_IDS, {}, CORPUS_KEYS)
 
 
-def test_upload_fields_map_classification_to_scope() -> None:
-    confidential = _doc(
-        code="ND-COMP-001",
-        version="1.0",
+def test_upload_fields_take_the_manifest_visibility() -> None:
+    department = _doc(
+        code="ND-HR-007",
+        version="2.0",
         classification="CONFIDENTIAL",
+        visibility="DEPARTMENT",
         department="Phòng Nhân sự và Hành chính",
         supersedes=None,
         effective_to="2027-12-31",
     )
-    fields = v3.upload_fields(confidential, DEPARTMENT_IDS, {}, CORPUS_KEYS)
+    fields = v3.upload_fields(department, DEPARTMENT_IDS, {}, CORPUS_KEYS)
     assert (fields["access_scope"], fields["department_id"]) == ("DEPARTMENT", "id-V3-HR")
     assert fields["effective_to"] == "2027-12-31"
-    restricted = _doc(
-        code="ND-EXEC-001",
+    private = _doc(
+        code="ND-COMP-001",
         version="1.0",
-        classification="RESTRICTED",
-        supersedes="ND-EXEC-001 phiên bản 0.9",  # not in the corpus: named in the PDF only
+        classification="CONFIDENTIAL",  # visibility decides, not the classification
+        visibility="PRIVATE",
+        supersedes="ND-COMP-001 phiên bản 0.9",  # not in the corpus: named in the PDF only
     )
-    fields = v3.upload_fields(restricted, DEPARTMENT_IDS, {}, CORPUS_KEYS)
+    fields = v3.upload_fields(private, DEPARTMENT_IDS, {}, CORPUS_KEYS)
     assert fields["access_scope"] == "PRIVATE" and "department_id" not in fields
     assert "supersedes_document_id" not in fields
+
+
+def test_metadata_diff_names_what_to_update() -> None:
+    want = {"access_scope": "PRIVATE", "effective_from": "2026-12-01", "lifecycle_status": "ACTIVE"}
+    found = {**want, "access_scope": "DEPARTMENT", "department_id": "id-V3-HR"}
+    assert v3.metadata_diff(found, want) == {"access_scope": "PRIVATE", "department_id": None}
+    assert v3.metadata_diff(want, want) == {}
 
 
 def test_readers_by_code_reads_section_7_only() -> None:
@@ -86,36 +120,27 @@ def test_readers_by_code_reads_section_7_only() -> None:
     }
 
 
+def test_grant_keys_follow_the_labels_and_skip_organization_documents() -> None:
+    assert v3.grant_keys(_doc(grants=["CHRO"])) == []  # ORGANIZATION: open to everyone
+    private = _doc(visibility="PRIVATE", grants=["CHRO", "Pháp chế"])
+    assert v3.grant_keys(private) == ["legal", "chro"]
+
+
 @pytest.mark.repo_layout(
     "eval-data/corpus-v3/manifest.json", "eval-data/corpus-v3/src/ND-ORG-001.md"
 )
-def test_the_seeding_gives_each_account_exactly_its_section_7_documents() -> None:
+def test_the_manifest_gives_each_account_the_owner_matrix_and_section_7() -> None:
     manifest = v3.load_manifest()
     readers = v3.readers_by_code((v3.CORPUS / "src" / "ND-ORG-001.md").read_text(encoding="utf-8"))
     assert set(readers) == {doc["code"] for doc in manifest}
-    everyone = {
-        "ND-CORP-001",
-        "ND-ORG-001",
-        "ND-HR-002",
-        "ND-HR-003",
-        "ND-HR-004",
-        "ND-HR-005",
-        "ND-HR-006",
-        "ND-HR-011",
-        "ND-IT-001",
-    }
-    extra = {
-        "hr": {"ND-HR-007", "ND-COMP-001"},
-        "manager": {"ND-COMP-001"},
-        "staff": set(),
-        "other": set(),
-        "legal": {"ND-HR-010"},
-        "ceo": {"ND-EXEC-001"},
-    }
+    assert set(v3.ACCOUNTS) == set(OWNER_MATRIX)
     for key, account in v3.ACCOUNTS.items():
-        expected = v3.expected_codes(readers, account["groups"])
-        assert expected == everyone | extra[key], key
-        assert v3.simulated_codes(manifest, key) == expected, key
+        expected = ORGANIZATION_CODES | OWNER_MATRIX[key]
+        assert v3.manifest_codes(manifest, key) == expected, key
+        assert v3.expected_codes(readers, account["groups"]) == expected, key
+    comp = next(doc for doc in manifest if doc["code"] == "ND-COMP-001")
+    assert comp["visibility"] == "PRIVATE"  # owner, 2026-11-28: not the whole HR department
+    assert v3.grant_keys(comp) == ["hr", "manager", "ceo", "payroll", "chro"]
 
 
 @pytest.mark.repo_layout("eval-data/corpus-v3/SHA256SUMS")

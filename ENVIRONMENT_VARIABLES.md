@@ -292,6 +292,12 @@ Retrieval variable rules:
   - `exclude`: none of their chunks enters retrieval, the retrieval supplements or the citation lookup. It acts only on documents marked `DRAFT`. A document uploaded before DEC-033 stays `ACTIVE` until an admin marks it.
   - `off`: they rank and answer like `ACTIVE` documents. This is the rollback.
   - Document management and permissions are the same either way.
+- `EVAL_AS_OF_DATE` (date `YYYY-MM-DD`, default unset; added 2026-11-28, eval stacks only): the date retrieval ranks document versions by, instead of the database's current date (`app/retrieval/authority.py`).
+  - Unset or blank: the system date, as before. The demo and every stack started from `.env.example` leave it unset, and `deploy/demo/check_profile.py` reports it as a difference when set.
+  - Production refuses it at startup.
+  - `scripts/eval/compose.corpus-v3-eval.yaml` sets it to 2026-12-15 for corpus v3 unless the environment gives another date.
+  - `GET /health/ready` reports `retrieval_as_of_date` and `retrieval_as_of_source` (`EVAL_AS_OF_DATE` or `system`), and every eval run records them (`scripts/eval/reranker_check.py`).
+  - It does nothing for documents without effective dates, such as corpus V2 and the RBAC fixtures.
   - Design: `docs/design/document-authority.md`.
 - `RAG_DETERMINISTIC_ROUTE_MODE` (`legacy`, `strict` or `off`; default `strict` since FIX 1, DEC-010; set `legacy` to roll back): the condition copier `_structured_condition_value_answer`, before and after the LLM. `strict` matches cues as whole words on text that keeps its diacritics and requires the chosen source span to share the question's topic. `off` removes this branch. The other deterministic branches are not affected.
 - `RAG_REPAIR_AFTER_LLM_REFUSAL_ENABLED` (boolean, default `false` since DEC-011; FIX 2 group 1): `true` restores the old behaviour. `false` stops the deterministic repair once the LLM has refused in the request. A repair after the validator rejects an LLM answer still runs.

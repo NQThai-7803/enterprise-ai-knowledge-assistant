@@ -4,6 +4,7 @@
   "notes": [
     "Mức phân loại PUBLIC/INTERNAL map sang visibility ORGANIZATION của EAKA.",
     "CONFIDENTIAL map sang DEPARTMENT + grants; RESTRICTED map sang PRIVATE + grants theo tên. Mã phòng ban và tài khoản cụ thể do bước seed quyết định.",
+    "Ngoại lệ (owner, 2026-11-28): ND-COMP-001 tuy CONFIDENTIAL nhưng dùng PRIVATE + grants theo tên, không mở cho cả Phòng Nhân sự.",
     "ND-HR-003 có hai phiên bản: 2.0 hiệu lực 01/12/2026–31/12/2026, 2.1 hiệu lực từ 01/01/2027 (tình huống thử kiểm soát phiên bản).",
     "Corpus V2 (9 PDF cũ) không được nạp chung với corpus v3."
   ],
@@ -21,10 +22,12 @@
       "effective_to": null,
       "lifecycle_status": "ACTIVE",
       "supersedes": null,
-      "visibility": "DEPARTMENT",
-      "department": "Phòng Nhân sự và Hành chính",
+      "visibility": "PRIVATE",
       "grants": [
+        "HR Compensation",
         "quản lý cấp N5 trở lên",
+        "CEO",
+        "CHRO",
         "Payroll (Phòng Tài chính)"
       ]
     },
@@ -187,6 +190,7 @@
       "supersedes": null,
       "visibility": "PRIVATE",
       "grants": [
+        "CHRO",
         "Pháp chế",
         "người được giao điều tra (theo vụ việc)"
       ]

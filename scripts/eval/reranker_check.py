@@ -40,8 +40,8 @@ class RerankerModeRefusedError(RuntimeError):
     """The stack's reranker mode does not match what the run expects."""
 
 
-def read_mode(base_url: str, timeout: float = 15.0) -> str | None:
-    """Read reranker_mode from the readiness endpoint; None when it cannot be read."""
+def read_ready(base_url: str, timeout: float = 15.0) -> dict[str, Any] | None:
+    """The readiness endpoint's body; None when it cannot be read."""
     url = f"{base_url.rstrip('/')}/health/ready"
     try:
         with urlopen(url, timeout=timeout) as response:
@@ -51,10 +51,27 @@ def read_mode(base_url: str, timeout: float = 15.0) -> str | None:
     except (URLError, OSError):
         return None
     try:
-        mode = json.loads(body).get("reranker_mode")
-    except (ValueError, AttributeError):
+        data = json.loads(body)
+    except ValueError:
         return None
+    return data if isinstance(data, dict) else None
+
+
+def read_mode(base_url: str, timeout: float = 15.0) -> str | None:
+    """Read reranker_mode from the readiness endpoint; None when it cannot be read."""
+    mode = (read_ready(base_url, timeout) or {}).get("reranker_mode")
     return mode if mode in MODES else None
+
+
+def read_as_of(base_url: str, timeout: float = 15.0) -> dict[str, Any]:
+    """The date the stack ranks document versions by: EVAL_AS_OF_DATE or the system date.
+
+    Every eval report states it (run output fields retrieval_as_of_date and _source)."""
+    ready = read_ready(base_url, timeout) or {}
+    return {
+        "retrieval_as_of_date": ready.get("retrieval_as_of_date"),
+        "retrieval_as_of_source": ready.get("retrieval_as_of_source"),
+    }
 
 
 def refusal(actual: str | None, expected: str, allow_fallback: bool) -> str | None:
@@ -94,26 +111,33 @@ def guard(args: argparse.Namespace, base_url: str) -> dict[str, Any]:
         "reranker_mode": actual,
         "expected_reranker_mode": args.expected_reranker_mode,
         "allow_reranker_fallback": args.allow_reranker_fallback,
+        **read_as_of(base_url),
         **ollama,
     }
 
 
 def finish(output: Path, metadata: dict[str, Any], base_url: str, code: int) -> int:
-    """Record the mode and Ollama after the run; a change during the run invalidates it."""
+    """Record the mode, the as-of date and Ollama after the run; a change invalidates it."""
     end_mode = read_mode(base_url)
+    end_as_of = read_as_of(base_url)
     end_ollama = ollama_check.read()
     payload = json.loads(output.read_text(encoding="utf-8"))
     payload["reranker_mode_end"] = end_mode
+    payload["retrieval_as_of_date_end"] = end_as_of["retrieval_as_of_date"]
     payload["ollama_version_end"] = end_ollama["ollama_version"]
     payload["ollama_backend_end"] = end_ollama["ollama_backend"]
     output.write_text(json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8")
+    checked = [
+        ("reranker_mode", end_mode),
+        ("retrieval_as_of_source", end_as_of["retrieval_as_of_source"]),
+        ("ollama_version", end_ollama["ollama_version"]),
+        ("ollama_backend", end_ollama["ollama_backend"]),
+    ]
+    if metadata.get("retrieval_as_of_source") == "EVAL_AS_OF_DATE":  # a system date may roll over
+        checked.append(("retrieval_as_of_date", end_as_of["retrieval_as_of_date"]))
     changed = [
         f"{key} changed from {metadata.get(key)} to {value}"
-        for key, value in (
-            ("reranker_mode", end_mode),
-            ("ollama_version", end_ollama["ollama_version"]),
-            ("ollama_backend", end_ollama["ollama_backend"]),
-        )
+        for key, value in checked
         if value != metadata.get(key)
     ]
     if changed:

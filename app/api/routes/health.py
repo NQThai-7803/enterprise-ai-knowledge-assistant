@@ -1,3 +1,6 @@
+from datetime import date
+from typing import Literal
+
 from fastapi import APIRouter, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -5,6 +8,7 @@ from redis.asyncio import Redis
 
 from app.core.config import get_settings
 from app.db.session import check_database_connection
+from app.retrieval.authority import retrieval_as_of
 from app.retrieval.reranker_factory import resolve_reranker_mode
 
 router = APIRouter(prefix="/health", tags=["health"])
@@ -18,6 +22,9 @@ class HealthReadyResponse(BaseModel):
     status: str
     checks: dict[str, str]
     reranker_mode: str
+    # The date document versions are ranked by: EVAL_AS_OF_DATE on an eval stack, else today.
+    retrieval_as_of_date: date
+    retrieval_as_of_source: Literal["EVAL_AS_OF_DATE", "system"]
 
 
 @router.get("/live", response_model=HealthLiveResponse)
@@ -38,19 +45,19 @@ async def ready() -> HealthReadyResponse | JSONResponse:
         "redis": "ok" if redis_ready else "unavailable",
     }
 
-    reranker_mode = resolve_reranker_mode(get_settings())
-
-    if database_ready and redis_ready:
-        return HealthReadyResponse(status="ready", checks=checks, reranker_mode=reranker_mode)
-
+    as_of_date, as_of_source = retrieval_as_of()
     response = HealthReadyResponse(
-        status="not_ready",
+        status="ready" if database_ready and redis_ready else "not_ready",
         checks=checks,
-        reranker_mode=reranker_mode,
+        reranker_mode=resolve_reranker_mode(get_settings()),
+        retrieval_as_of_date=as_of_date,
+        retrieval_as_of_source=as_of_source,
     )
+    if database_ready and redis_ready:
+        return response
     return JSONResponse(
         status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        content=response.model_dump(),
+        content=response.model_dump(mode="json"),
     )
 
 

@@ -501,6 +501,15 @@ The pruning path now also normalizes whitespace before punctuation after redunda
 Final task completion still requires a live new-message runtime check proving that same-document/same-evidence duplicates are pruned in the real chat flow.
 
 
+## Document versions and the as-of date (2026-11-28)
+
+- Retrieval orders candidates by authority first (`app/retrieval/authority.py`). The order is:
+  - an ACTIVE or DRAFT document in effect on the as-of date (`effective_from` and `effective_to` around it, or not set);
+  - then an ACTIVE or DRAFT document not in effect on that date;
+  - then a superseded or archived one.
+- The as-of date is the database's current date, or `EVAL_AS_OF_DATE` on an eval stack (ENVIRONMENT_VARIABLES.md).
+- `supersedes_document_id`, `document_version` and the effective dates do not reach the prompt or the answer. A version-aware answer is planned in TASKS.md (corpus v3).
+
 ## RAG-H2.1 Reranker Authority
 
 The ranking contract is:
