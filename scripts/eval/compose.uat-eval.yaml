@@ -61,6 +61,7 @@ services:
       RAG_SIMPLE_CLAIM_CROSS_ENCODER_ENABLED: ${EVAL_SIMPLE_S5:-false}
       RAG_PROMPT_CHUNK_SELECTION: ${EVAL_CHUNK_SELECTION:-rrf}  # DEC-042 direction 2
       RAG_VALIDATOR_V2_ENABLED: ${EVAL_VALIDATOR_V2:-false}  # DEC-042 direction 1
+      RAG_UNITLESS_EVIDENCE_NUMBERS_ENABLED: ${EVAL_UNITLESS_NUMBERS:-false}  # corpus v3 controls
       # s5's cross-encoder, downloaded and mounted by eval.yml only when a configuration needs it.
       RERANKER_MODEL_CACHE_PATH: ${EVAL_CROSS_ENCODER_CACHE:-/app/data/models}
       RAG_COMPLETENESS_NUMBER_NORMALIZATION_ENABLED: ${EVAL_COMPLETENESS_NUMBERS:-true}

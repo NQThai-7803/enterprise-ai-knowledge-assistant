@@ -35,7 +35,9 @@ def _contradicted(answer: str, flag: bool, monkeypatch: pytest.MonkeyPatch) -> b
     monkeypatch.setattr(
         validation,
         "get_settings",
-        lambda: SimpleNamespace(rag_number_normalization_enabled=flag),
+        lambda: SimpleNamespace(
+            rag_number_normalization_enabled=flag, rag_unitless_evidence_numbers_enabled=False
+        ),
     )
     return validation._numbers_are_contradicted(fold_text(answer), fold_text(EVIDENCE))
 

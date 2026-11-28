@@ -222,6 +222,10 @@ class Settings(BaseSettings):
     rag_simple_claim_cross_encoder_min_score: float = -4.2
     # FIX 3c F: numbers are compared once written one way (01 = 1, 1,2 trieu = 1.200.000).
     rag_number_normalization_enabled: bool = False
+    # Corpus v3 controls (2026-11-29): in simple mode's normalized number check, a claim's
+    # number contradicts its source only through a real unit, and not when the source writes
+    # the value bare (a table whose unit is in its header).
+    rag_unitless_evidence_numbers_enabled: bool = False
     # FIX 4 (i), completeness checks: a grouped number is one number in the unit check; a
     # validated first answer rejected only for its form survives a failed retry; a retry
     # may not replace it with other values from other chunks (on: chosen in the FIX 4 batch).

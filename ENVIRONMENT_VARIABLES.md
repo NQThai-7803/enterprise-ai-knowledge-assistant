@@ -261,6 +261,7 @@ RAG_SIMPLE_CLAIM_CROSS_ENCODER_ENABLED=false
 RAG_SIMPLE_CLAIM_CROSS_ENCODER_MODEL=cross-encoder/mmarco-mMiniLMv2-L12-H384-v1
 RAG_SIMPLE_CLAIM_CROSS_ENCODER_MIN_SCORE=-4.2
 RAG_NUMBER_NORMALIZATION_ENABLED=false
+RAG_UNITLESS_EVIDENCE_NUMBERS_ENABLED=false
 RAG_COMPLETENESS_NUMBER_NORMALIZATION_ENABLED=true
 RAG_KEEP_VALIDATED_FIRST_ANSWER_ENABLED=false
 RAG_RETRY_MUST_KEEP_VALIDATED_VALUES_ENABLED=true
@@ -325,6 +326,11 @@ Retrieval variable rules:
   - `RAG_VALIDATOR_V2_ENABLED` (boolean, default `false`, DEC-042 direction 1, 2026-11-23): simple path only. Corrects the claim validator rules that rejected right drafts in the 2026-11-22 diagnosis (passive-action and cue polarity, the scope of "cho người khác", a fixed benefit row, short Vietnamese syllables as grounding, a function word read as a unit), and checks each amount of money, number of days and rate of a claim: it must be in the cited chunk (both written one way), else the claim is rejected. A value of another row of the same chunk is not caught (DEC-042).
   - `RAG_SIMPLE_CLAIM_CROSS_ENCODER_ENABLED` (boolean, s5, 2026-11-16, DEC-027), `RAG_SIMPLE_CLAIM_CROSS_ENCODER_MODEL` (string) and `RAG_SIMPLE_CLAIM_CROSS_ENCODER_MIN_SCORE` (float, raw logit, default `-4.2`, calibrated on the dev sets 2026-11-16): the per-claim relevance check scores (question or part, cited sentence) with this cross-encoder instead of e5, and takes its threshold. The model is loaded on first use from `RERANKER_MODEL_CACHE_PATH` with the `RERANKER_DEVICE`, `RERANKER_BATCH_SIZE`, `RERANKER_MAX_LENGTH`, `RERANKER_TIMEOUT_SECONDS` and `RERANKER_LOCAL_FILES_ONLY` settings; a claim it cannot score is kept. The reranker itself stays without a cross-encoder (DEC-025).
 - `RAG_NUMBER_NORMALIZATION_ENABLED` (boolean, default `false`, stays off: 0 cases changed in its DEC-013 batch; FIX 3c F): the validator compares numbers once each is written one way: leading zeros dropped (`01` = `1`), thousands separators removed (`1.200.000` = `1200000`), a decimal comma read as a point, scale words applied (`1,2 triệu` = `1.200.000`, `300 nghìn`, `tỷ`, `million`), and `đ`/`đồng`/`VND`/`₫` treated as one unit. A period after the unit (`/năm`, `mỗi năm`) is not compared.
+- `RAG_UNITLESS_EVIDENCE_NUMBERS_ENABLED` (boolean, default `false`; added 2026-11-29, `docs/design/unitless-evidence-numbers.md`): the simple mode number check (its normalized comparison) as follows.
+  - A number's unit is only a real unit (money, %, days, weeks, months, years, hours, minutes, seconds, times, people, kg, tonnes, km, litres), not any word after it.
+  - A claim's value is supported when the source writes it with the same unit or with no unit, as in a table whose unit is in its header.
+  - It still contradicts when no value of the claim is supported, or when every value the claim gives with a unit is missing from the source.
+  - Eval: `EVAL_UNITLESS_NUMBERS=true` in `scripts/eval/compose.uat-eval.yaml`.
 - FIX 4 (i), the retry forced by the completeness checks (all boolean; measured in one batch per set, `docs/eval/runs/fix4-completeness.md`):
   - `RAG_COMPLETENESS_NUMBER_NORMALIZATION_ENABLED` (default `true` since the c1+c3 batch of 2026-11-14: with the retry flag on, it fixes FR2-E01 and changes nothing else): in the numeric-unit check a thousands-grouped number (`2.500 kg`) is one number when the sources hold that value, not `2` and `500`.
   - `RAG_KEEP_VALIDATED_FIRST_ANSWER_ENABLED` (default `false`; adds a false answer on `false_refusal_dev_v1`, FR-A10): when the first answer passed citation and claim validation and was rejected only for its form (yes/no polarity, quantity number, numeric unit), and the retry fails, refuses or is still incomplete, the first answer is returned instead of NO_ANSWER. Content reasons (mismatched rows, missing names, placeholders) are not covered.
