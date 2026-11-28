@@ -73,7 +73,7 @@ python deploy\demo\check_demo.py --matrix
 - **`.env` của demo:** `demo.ps1` dùng `.env` ở gốc repo nó nằm trong, và volume Postgres giữ mật khẩu của `.env` lúc volume được tạo. Vì vậy `.env` và volume `eaka-demo_*` đi cùng nhau.
   - Mọi lệnh trừ `init`, `build`, `questions` chỉ chạy khi `.env` có dòng `EAKA_PROFILE=demo`. Thiếu dòng đó (ví dụ `.env` của stack phát triển), `demo.ps1` dừng ngay với thông báo, chưa gọi docker.
   - Nên chạy demo từ một bản clone riêng, không từ checkout phát triển.
-  - `.env` demo tạo trước 2026-11-28 không có dòng đánh dấu: kiểm đúng là `.env` của demo rồi thêm dòng `EAKA_PROFILE=demo` bằng tay. Trên máy owner, `.env` của volume `eaka-demo_*` có sẵn là `C:\dev\eaka-demo\src\.env` (thư mục xuất, không phải checkout git): chép nó vào gốc bản clone demo rồi thêm dòng đó.
+  - `.env` demo tạo trước 2026-11-28 không có dòng đánh dấu: kiểm đúng là `.env` của demo rồi thêm dòng `EAKA_PROFILE=demo` bằng tay. Trên máy owner việc này đã làm xong: xem "Máy owner" dưới đây.
   - Với một bản clone mới, `init` rồi `reset` cho ra cặp `.env` và volume khớp nhau.
 - **Chạy song song với một stack demo khác trên cùng máy:** đặt `$env:EAKA_DEMO_PROJECT` (mặc định `eaka-demo`) trước mọi lệnh. Hai stack vẫn dùng chung cổng 18480, nên chỉ bật một stack mỗi lúc.
 
@@ -124,7 +124,9 @@ python deploy\demo\check_demo.py --matrix
   - `eaka-demo_*` (hoặc `<EAKA_DEMO_PROJECT>_*`); `demo.ps1 down` giữ nguyên volume;
   - **Không bao giờ chạy `docker compose down -v`.**
   - Model e5 được tải về volume `*_model_cache` ở lần `seed` đầu; volume này được giữ qua `reset`.
-- **Bản cũ ở `C:\dev\eaka-demo`** (bản export, image `demo-5197874`) chạy cùng các script này. Từ nay dùng bản trong repo.
+- **Máy owner:** demo chạy từ `C:\dev\eaka-demo\repo`, bản clone từ GitHub (từ 2026-11-28, commit `9429f97`).
+  - `.env` của nó là bản chép của `.env` demo cũ, có thêm dòng `EAKA_PROFILE=demo`, và cặp với volume `eaka-demo_*`.
+  - Bản cũ đã đổi tên, chưa xoá, không dùng nữa: `C:\dev\eaka-demo\demo.ps1.old` (image `demo-5197874`, không có kiểm `.env`) và `C:\dev\eaka-demo\src_old_2026-11-28` (bản export, không phải checkout git).
 
 ## Lệnh
 

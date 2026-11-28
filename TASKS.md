@@ -13,7 +13,10 @@
 - **NEXT, [Medium] Recalibrate for `qwen3.5-text:4b` on a corpus v3 calibration set** (not UAT, never held-out), with the rule written before measuring:
   - `RAG_SIMPLE_CLAIM_RELEVANCE_MIN_SIMILARITY` (0.78): it was calibrated on `qwen2.5:3b` drafts of 5 dev sets (`docs/design/simple-answer-mode.md`, 109 positive and 39 negative drafts). With 4B (DEC-042 base run) the lowest claim cosine is 0.741 on UAT, 0.780 on false_refusal_v2 and 0.786 on natural_dev_v1, so the margin is gone.
   - `LLM_TOKEN_ESTIMATE_RATIO` (0.99): it was calibrated on 36 Ollama calls (PROMPT 4) with another model. With 4B, every long prompt logs `USAGE_BELOW_ESTIMATE`: 112 of 114 UAT drafts and 27 of 27 natural_dev_v1 drafts.
-- **Owner (approved 2026-11-28):** eaka-demo has a 14th document (uploaded 2026-11-27 13:02 UTC, `ND-HR-002_Noi_quy_lao_dong_v2.0.pdf`), so `check_demo.py` reports "no other document" as FAIL. After this change is merged: `demo.ps1 build`, then `demo.ps1 reset`, from a demo clone with the demo's `.env`.
+- **DONE (2026-11-28, owner-approved):** eaka-demo reset from the new demo clone `C:\dev\eaka-demo\repo` (commit `9429f97`, images `demo-9429f97`).
+  - The 14th document (uploaded 2026-11-27 13:02 UTC) is gone: the API lists exactly the 13 demo documents, all READY, and the 4 demo logins work.
+  - The old `C:\dev\eaka-demo\demo.ps1` and `src` are renamed to `demo.ps1.old` and `src_old_2026-11-28`, not deleted.
+- **Owner, before the next demo** (after closing other applications; the reset's `warmup` was stopped on low memory, 0.4 of 7.8 GB free): in `C:\dev\eaka-demo\repo`, `demo.ps1 up`, `demo.ps1 warmup`, then `python deploy\demo\check_demo.py --matrix`, expected 59/59.
 - **NEXT, [Medium] Dev sets outside UAT for yes/no, PERSON and TIME questions.**
   - In the DEC-042 base run, YES_NO is 23 UAT items against 7 in natural_dev_v1 and 1 each in false_refusal v1 and v2; TIME, TIME_RANGE, YEAR, COUNT and TIMELINE are UAT only.
   - The validator branches for these types fire on UAT only: 8 return points of `_validate_answer_against_evidence`, 86 branch arcs.
