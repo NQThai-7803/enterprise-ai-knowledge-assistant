@@ -19,6 +19,7 @@ Format follows a simplified Keep a Changelog style.
 - **Security (TC-SEC-08, production):** the reverse proxy of `compose.prod.yaml` answers only `localhost`, `127.0.0.1` and `PROXY_SERVER_NAMES` (new, `.env.production`), with a 444 `default_server` and `absolute_redirect off`.
   - `deploy/nginx/conf.d/` became `deploy/nginx/templates/`; `app.conf` is now `default.conf.template`, which also replaces the image's default server.
 - **Demo:** `demo.ps1` refuses to run on a `.env` without the line `EAKA_PROFILE=demo`, which `init` writes. A demo `.env` made before this needs the line added by hand.
+- **Docs:** `DEMO.md` names the owner's demo folder, a git clone, and the renamed old copies; `TASKS.md` records the demo reset.
 
 ### Demo from a fresh clone -- 2026-11-27
 

@@ -1,5 +1,12 @@
 # Project Status
 
+## Demo reset and owner's demo folder -- 2026-11-28
+
+- **Reset:** eaka-demo was reset from `C:\dev\eaka-demo\repo`, a clone of `9429f97` with the demo's `.env` (plus `EAKA_PROFILE=demo`).
+  - `up` and `seed` passed: the API lists exactly the 13 demo documents, all READY, so the 14th document is gone; the 4 demo logins work.
+  - Not run: the reset's `warmup` was stopped (the machine had 0.4 of 7.8 GB free), and `check_demo.py --matrix` (expected 59/59) is left to the owner before the demo. The stack is down, its volumes kept.
+- **Old copies renamed, not deleted:** `C:\dev\eaka-demo\demo.ps1.old`, `C:\dev\eaka-demo\src_old_2026-11-28`.
+
 ## Tester findings of 2026-11-27 fixed -- 2026-11-28
 
 - **TC-SEC-08:** checked on eaka-demo with the new images (`demo-45e01ec`).
