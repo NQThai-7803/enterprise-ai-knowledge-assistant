@@ -34,6 +34,13 @@ OLLAMA_OK = {
     "ollama_expected_backend": "CUDA",
     "ollama_auto_update": False,
 }
+AS_OF = {"retrieval_as_of_date": "2026-12-15", "retrieval_as_of_source": "EVAL_AS_OF_DATE"}
+
+
+@pytest.fixture(autouse=True)
+def _as_of(monkeypatch: pytest.MonkeyPatch) -> None:
+    """No test here reaches a real /health/ready for the as-of date."""
+    monkeypatch.setattr(reranker_check, "read_as_of", lambda *_: dict(AS_OF))
 
 
 def _hit(index: int = 0) -> HybridRetrievalHit:
@@ -200,6 +207,7 @@ def test_guard_records_the_mode_and_raises_on_mismatch(monkeypatch: pytest.Monke
         "reranker_mode": "lexical_fallback",
         "expected_reranker_mode": "lexical_fallback",
         "allow_reranker_fallback": False,
+        **AS_OF,
         **OLLAMA_OK,
     }
     with pytest.raises(RerankerModeRefusedError):
@@ -258,7 +266,7 @@ def test_mode_change_during_a_run_invalidates_it(
 ) -> None:
     output = tmp_path / "run.json"
     output.write_text("{}", encoding="utf-8")
-    meta = {"reranker_mode": "cross_encoder", **OLLAMA_OK}
+    meta = {"reranker_mode": "cross_encoder", **AS_OF, **OLLAMA_OK}
     monkeypatch.setattr(reranker_check, "read_mode", lambda *_: "cross_encoder")
     monkeypatch.setattr(ollama_check, "read", lambda: dict(OLLAMA_OK))
     assert reranker_check.finish(output, meta, "http://x", 0) == 0
@@ -273,7 +281,7 @@ def test_ollama_update_during_a_run_invalidates_it(
 ) -> None:
     output = tmp_path / "run.json"
     output.write_text("{}", encoding="utf-8")
-    meta = {"reranker_mode": "cross_encoder", **OLLAMA_OK}
+    meta = {"reranker_mode": "cross_encoder", **AS_OF, **OLLAMA_OK}
     monkeypatch.setattr(reranker_check, "read_mode", lambda *_: "cross_encoder")
     monkeypatch.setattr(ollama_check, "read", lambda: {**OLLAMA_OK, "ollama_version": "0.40.16"})
     assert reranker_check.finish(output, meta, "http://x", 0) == reranker_check.EXIT_MODE_CHANGED
@@ -361,3 +369,37 @@ def test_predict_error_falls_back_without_the_load_flag(caplog: pytest.LogCaptur
     assert "RERANKER_PREDICT_FAILED" in _codes(caplog)
     assert reranker._model_load_failed is False
     assert reranker.mode == "cross_encoder"
+
+
+def test_as_of_change_invalidates_a_fixed_date_run_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    output = tmp_path / "run.json"
+    output.write_text("{}", encoding="utf-8")
+    monkeypatch.setattr(reranker_check, "read_mode", lambda *_: "cross_encoder")
+    monkeypatch.setattr(ollama_check, "read", lambda: dict(OLLAMA_OK))
+    fixed = {"reranker_mode": "cross_encoder", **AS_OF, **OLLAMA_OK}
+    moved = {**AS_OF, "retrieval_as_of_date": "2026-12-16"}
+    monkeypatch.setattr(reranker_check, "read_as_of", lambda *_: moved)
+    assert reranker_check.finish(output, fixed, "http://x", 0) == reranker_check.EXIT_MODE_CHANGED
+    assert (
+        json.loads(output.read_text(encoding="utf-8"))["retrieval_as_of_date_end"] == "2026-12-16"
+    )
+    system = {**fixed, "retrieval_as_of_source": "system"}  # the day may roll over in a run
+    monkeypatch.setattr(
+        reranker_check, "read_as_of", lambda *_: {**moved, "retrieval_as_of_source": "system"}
+    )
+    assert reranker_check.finish(output, system, "http://x", 0) == 0
+
+
+def test_read_as_of_reads_the_readiness_fields(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.undo()
+    body = {"reranker_mode": "disabled", **AS_OF}
+    monkeypatch.setattr(reranker_check, "read_ready", lambda *_: body)
+    assert reranker_check.read_as_of("http://x") == AS_OF
+    assert reranker_check.read_mode("http://x") == "disabled"
+    monkeypatch.setattr(reranker_check, "read_ready", lambda *_: None)
+    assert reranker_check.read_as_of("http://x") == {
+        "retrieval_as_of_date": None,
+        "retrieval_as_of_source": None,
+    }

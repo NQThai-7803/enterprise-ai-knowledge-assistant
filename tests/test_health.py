@@ -1,9 +1,21 @@
+from datetime import UTC, date, datetime
+
 import pytest
 from fastapi.testclient import TestClient
 
+from app.core.config import Settings
 from app.main import app
+from app.retrieval import authority
 
 client = TestClient(app)
+AS_OF = {"retrieval_as_of_date": "2026-12-15", "retrieval_as_of_source": "system"}
+
+
+@pytest.fixture(autouse=True)
+def _fixed_as_of(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "app.api.routes.health.retrieval_as_of", lambda: (date(2026, 12, 15), "system")
+    )
 
 
 def test_health_live_returns_200() -> None:
@@ -72,6 +84,7 @@ def test_health_ready_returns_200_when_dependencies_are_available(
         "status": "ready",
         "checks": {"database": "ok", "redis": "ok"},
         "reranker_mode": "lexical_fallback",
+        **AS_OF,
     }
 
 
@@ -100,6 +113,7 @@ def test_health_ready_returns_503_when_database_is_unavailable(
         "status": "not_ready",
         "checks": {"database": "unavailable", "redis": "ok"},
         "reranker_mode": "lexical_fallback",
+        **AS_OF,
     }
 
 
@@ -128,6 +142,7 @@ def test_health_ready_returns_503_when_redis_is_unavailable(
         "status": "not_ready",
         "checks": {"database": "ok", "redis": "unavailable"},
         "reranker_mode": "lexical_fallback",
+        **AS_OF,
     }
 
 
@@ -158,3 +173,12 @@ def test_health_response_does_not_expose_connection_details(
     assert "password" not in payload_text
     assert "secret" not in payload_text
     assert "token" not in payload_text
+
+
+def test_retrieval_as_of_is_the_eval_date_when_set_else_today(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(authority, "get_settings", lambda: Settings())
+    assert authority.retrieval_as_of() == (datetime.now(UTC).date(), "system")
+    monkeypatch.setattr(authority, "get_settings", lambda: Settings(eval_as_of_date="2026-12-15"))
+    assert authority.retrieval_as_of() == (date(2026, 12, 15), "EVAL_AS_OF_DATE")

@@ -8,6 +8,19 @@ Format follows a simplified Keep a Changelog style.
 
 ### Corpus v3 -- 2026-11-28
 
+- **Added:** `EVAL_AS_OF_DATE` (eval stacks only; unset keeps the database date; production refuses it).
+  - Version ranking in `app/retrieval/authority.py` uses it.
+  - `GET /health/ready` reports `retrieval_as_of_date` and `retrieval_as_of_source`.
+  - `scripts/eval/reranker_check.py` records both in every eval run and refuses a run whose fixed date changed.
+  - `scripts/eval/compose.corpus-v3-eval.yaml` defaults it to 2026-12-15.
+- **Changed:** corpus v3 `manifest.json`: ND-COMP-001 PRIVATE with named grants, CHRO on ND-HR-010 (owner).
+- **Changed:** `bootstrap_corpus_v3.py`:
+  - visibility and grants come from the manifest;
+  - 10 accounts (+ payroll, hiring manager, investigator, CHRO);
+  - a loaded document is updated to the manifest;
+  - the matrix is checked against the manifest and ND-ORG-001 section 7.
+- **Docs:** `eval-data/corpus-v3/README.md`; the gold-values table of `MAPPING.md` stays outside the repo.
+
 - **Added:** `eval-data/corpus-v3/` (owner's Nova Digital corpus v3: 14 PDFs, manifest, mapping, checksums, markdown sources and build scripts).
 - **Added:** `scripts/eval/bootstrap_corpus_v3.py`: loads corpus v3 by its manifest (code, version, effective dates, lifecycle, access scope, supersedes, grants), creates its departments and accounts, and checks READY, metadata and the access matrix against ND-ORG-001 section 7.
 - **Tests:** `tests/unit/test_bootstrap_corpus_v3.py` (field mapping, supersedes, section 7, the seeded matrix, checksums).

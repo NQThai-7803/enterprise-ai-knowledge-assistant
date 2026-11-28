@@ -1067,6 +1067,8 @@ Readiness checks database connectivity.
 
 `GET /health/ready` also returns `reranker_mode`: `cross_encoder`, `lexical_fallback` or `disabled`. It says what ranks candidates at that moment; the eval runners read it.
 
+It also returns `retrieval_as_of_date` (`YYYY-MM-DD`) and `retrieval_as_of_source` (`EVAL_AS_OF_DATE` or `system`, 2026-11-28): the date retrieval ranks document versions by. The source is `system` unless an eval stack sets `EVAL_AS_OF_DATE`.
+
 ## TASK-025 hardening errors
 
 All API error responses keep the standard envelope:

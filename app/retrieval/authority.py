@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from sqlalchemy import and_, case, func, or_, true
+from datetime import UTC, date, datetime
+
+from sqlalchemy import Date, and_, case, func, literal, or_, true
 
 from app.core.config import get_settings
 from app.models import Document, DocumentLifecycleStatus
@@ -33,8 +35,17 @@ def answer_document_filter():
     return true()
 
 
+def retrieval_as_of() -> tuple[date, str]:
+    """The date versions are ranked by, and where it comes from (GET /health/ready)."""
+    as_of = get_settings().eval_as_of_date
+    if as_of is not None:
+        return as_of, "EVAL_AS_OF_DATE"
+    return datetime.now(UTC).date(), "system"  # the database's current_date, also UTC
+
+
 def current_authority_order_expression():
-    today = func.current_date()
+    as_of = get_settings().eval_as_of_date
+    today = func.current_date() if as_of is None else literal(as_of, Date)
     current = Document.lifecycle_status.in_(_ISSUED_OR_DRAFT)
     currently_effective = and_(
         current,

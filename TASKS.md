@@ -4,23 +4,40 @@
 ## Corpus v3 -- 2026-11-28
 
 - **DONE:**
-  - `eval-data/corpus-v3/`: the owner's 14 PDFs, `manifest.json`, `MAPPING.md`, `SHA256SUMS`, and `src/` (markdown, `build.py`, `stamp.py`). No secret: e-mails are `@novadigital.example`, the PDF metadata names only the producer (pypdf), and no question or test box is in the sources.
-  - `scripts/eval/bootstrap_corpus_v3.py` loads it by the manifest and creates 5 departments and 6 accounts (`V3_<KEY>_PASSWORD`). It checks READY, the metadata and the access matrix against ND-ORG-001 section 7.
-  - On the separate stack `eaka-corpusv3`: 14/14 READY and the access matrix matches.
-- **NEXT, owner decisions:**
-  - `MAPPING.md`: the section of values for writing gold (a question and answer table) is not in the repo; the full file stays in the owner's folder. Add it only if the owner wants it public.
-  - CEO and ND-COMP-001: the seed grants the CEO only ND-EXEC-001, as the owner listed. If "Quản lý cấp N5 trở lên" includes the CEO (N6 is "Head, Director"), add a grant.
-  - A DEPARTMENT document is open to the whole department: every V3-HR account reads ND-COMP-001 and ND-HR-007. Section 7 names "HR Compensation" only for ND-COMP-001.
-  - No account yet for Payroll (ND-COMP-001), recruiting managers (ND-HR-007), investigators (ND-HR-010) or the CHRO. Payroll sits in "Phòng Tài chính và Pháp chế" with Legal, so a Payroll grant must be per user, never to that department.
-- **NEXT, [Medium] future-effective documents** (behavior recorded, not changed):
-  - On 2026-11-28 no corpus v3 document is in effect yet: all start on 2026-12-01 or later.
-  - Retrieval ranks by authority (`app/retrieval/authority.py`): currently effective first, then issued but not in effect, then superseded or archived. So both ND-HR-003 versions rank the same today.
-  - `supersedes_document_id` is stored but used nowhere in retrieval or the answer. The prompt carries no version or effective date, only what the chunk text says.
-- **NEXT, answer quality on corpus v3** (with the dev set, after the owner approves it): the two controls of the leak probes (the CEO on EXEC-2027-R7, the N5 manager on the N4 band) got NO_ANSWER. Their documents' chunks were retrieved and sent to the prompt, so the refusal came from the answer layers.
+  - `eval-data/corpus-v3/`: the owner's 14 PDFs, `manifest.json`, `MAPPING.md`, `SHA256SUMS`, `README.md`, and `src/` (markdown, `build.py`, `stamp.py`). No secret: e-mails are `@novadigital.example`, the PDF metadata names only the producer (pypdf), and no question or test box is in the sources.
+  - `MAPPING.md` keeps the table of values for writing gold outside the repo, in the owner's folder only (owner, after PR #74). `corpus-v3/README.md` says so.
+  - Access (owner, after PR #74):
+    - ND-COMP-001 is PRIVATE with grants by name (HR Compensation, N5 managers, CEO, CHRO, Payroll), not DEPARTMENT for all of HR.
+    - ND-HR-010 also names CHRO.
+    - Edited in the repo `manifest.json`, because the owner's folder copy was unchanged; SHA256SUMS recomputed. The owner copies the repo version back.
+  - `scripts/eval/bootstrap_corpus_v3.py` loads by the manifest's visibility and grants labels, with 6 departments and 10 accounts (`V3_<KEY>_PASSWORD`).
+    - It updates a loaded document to the manifest (ND-COMP-001 went DEPARTMENT -> PRIVATE in place).
+    - It checks every account's list against the manifest and against ND-ORG-001 section 7.
+  - On the separate stack `eaka-corpusv3`:
+    - 14/14 READY; the 10-account matrix matches both.
+    - The 2 leak probes for all 10 accounts: 13 negatives with no citation and no forbidden text.
+    - Retrieval-level trace: 20/20 pairs conclusive.
+  - `EVAL_AS_OF_DATE` (eval stacks only, unset by default, refused in production):
+    - version ranking uses it instead of the system date;
+    - `GET /health/ready` reports it, and every eval run records it (`reranker_check.py`);
+    - `scripts/eval/compose.corpus-v3-eval.yaml` defaults it to 2026-12-15.
+- **NEXT, [Cao] version-aware answers** (not done; behind a flag, measured on the corpus v3 dev set):
+  - Put `document_version`, `effective_from` and `effective_to` into the prompt context of each source.
+  - Prefer the version in effect on the question's date (the as-of date on eval).
+  - When a replacing version takes effect later, also state the change and its date.
+  - Never use a version-history row as the main source.
+  - Today the date does little:
+    - authority (`app/retrieval/authority.py`) only breaks exact score ties, after the cosine distance and the keyword rank;
+    - on the remote-work question the 2026-12-15 and the 2027-01-15 dates swap only the tied page 4 chunks of 2.0 and 2.1;
+    - the prompt order and the answer stay the same: the 2.1 change-history row, page 6.
+- **NEXT, answer quality on corpus v3** (with the dev set, after the owner approves it):
+  - Of the 7 leak-probe controls, only the CHRO on EXEC-2027-R7 got an answer. The other 6 got NO_ANSWER while their document's chunks reached the prompt, so the refusal comes from the answer layers.
+- **Owner:** copy `eval-data/corpus-v3/manifest.json` from the repo to the corpus folder.
 - **Left on the machine:**
   - The stack `eaka-corpusv3`, down, with its 4 volumes.
   - The worktree `C:\dev\eaka-v3stack`, whose `.env` belongs to those volumes.
-  - User environment variables `EAKA_V3_{HR,MANAGER,STAFF,OTHER,LEGAL,CEO}_PASSWORD`.
+  - The image `eaka-backend:v3check-5afd608` used for the check.
+  - User environment variables `EAKA_V3_{HR,MANAGER,STAFF,OTHER,LEGAL,CEO,PAYROLL,HIRING,INVESTIGATOR,CHRO}_PASSWORD`.
 
 ## Tester findings of 2026-11-27 -- 2026-11-28
 

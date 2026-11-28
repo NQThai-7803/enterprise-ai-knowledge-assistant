@@ -1,5 +1,26 @@
 # Project Status
 
+## Corpus v3: grants by name, 10 accounts, EVAL_AS_OF_DATE -- 2026-11-28
+
+- **Manifest (repo copy):**
+  - ND-COMP-001 is PRIVATE with grants HR Compensation, N5 managers, CEO, CHRO and Payroll.
+  - ND-HR-010 also names CHRO.
+  - SHA256SUMS recomputed.
+  - The owner's folder copy was still the old one; the owner copies the repo version back.
+- **Stack `eaka-corpusv3`** (image built from `5afd608`, own volumes; `eaka-demo_*` and V2 untouched):
+  - 14/14 READY. ND-COMP-001 was updated in place from DEPARTMENT to PRIVATE.
+  - The 10-account matrix matches the manifest and ND-ORG-001 section 7.
+  - Detail and preview of every hidden document return 403/404.
+- **Leak probes** (EXEC-2027-R7, N4 band) for all 10 accounts:
+  - The 13 negatives: NO_ANSWER, no citation, no 5-gram of the forbidden document.
+  - Retrieval-level trace (`heldout_trace.py --mode route`): the forbidden chunks reach no layer for the 13 negatives and reach the prompt for the 7 controls, so 20/20 pairs are conclusive.
+  - Of the 7 controls only the CHRO on EXEC-2027-R7 was answered; the other 6 got NO_ANSWER.
+- **EVAL_AS_OF_DATE:**
+  - `GET /health/ready` reports `2026-11-28 (system)` without it and `2026-12-15 (EVAL_AS_OF_DATE)` with `compose.corpus-v3-eval.yaml`.
+  - The setting reaches the ranking: ND-HR-003 page 4 is the same chunk in 2.0 and 2.1, with a tied score. It ranks 2.0 first as of 2026-12-15 and 2.1 first as of 2027-01-15.
+  - Authority only breaks exact ties, so the remote-work answer is the same with either date. It cites the 2.1 change-history row on page 6. Version-aware answers are a [Cao] item in TASKS.
+  - The demo does not set it, and `check_profile.py` reports it as a difference when set.
+
 ## Corpus v3 in the repo and loaded on a separate stack -- 2026-11-28
 
 - **Repo:** `eval-data/corpus-v3/` holds the owner's corpus v3: 14 PDFs, 13 codes, ND-HR-003 in 2.0 and 2.1. Hashes are in `SHA256SUMS` and checked by `tests/unit/test_bootstrap_corpus_v3.py`.

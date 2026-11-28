@@ -1,0 +1,9 @@
+# Corpus v3 eval stack (eval-data/corpus-v3): layer it last, after the stack's other files.
+# Owner, 2026-11-28: retrieval ranks document versions as of EVAL_AS_OF_DATE instead of the
+# system date, so a run means the same on any day. Every corpus v3 document takes effect on
+# 2026-12-01 or later, and ND-HR-003 2.0 applies until 2026-12-31, 2.1 from 2027-01-01.
+# Runs record the date GET /health/ready reports (reranker_check: retrieval_as_of_date).
+services:
+  api:
+    environment:
+      EVAL_AS_OF_DATE: ${EVAL_AS_OF_DATE:-2026-12-15}

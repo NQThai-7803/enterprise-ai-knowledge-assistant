@@ -1,3 +1,4 @@
+from datetime import date
 from functools import lru_cache
 from math import isfinite
 from pathlib import Path
@@ -137,6 +138,9 @@ class Settings(BaseSettings):
     # DEC-033/036: exclude (the owner's data policy, default) keeps DRAFT documents (templates,
     # drafts) out of every answer path; off answers from them like ACTIVE ones (rollback).
     rag_draft_document_policy: Literal["off", "exclude"] = "exclude"
+    # Eval stacks only (2026-11-28): rank document versions as of this date instead of the
+    # database's current date (app/retrieval/authority.py). Unset keeps the system date.
+    eval_as_of_date: date | None = None
     # FIX 2 groups 1 and 2 are on by default (DEC-011); set these to roll back.
     # FIX 2 group 1: false stops the deterministic repair once the LLM has refused.
     rag_repair_after_llm_refusal_enabled: bool = False
@@ -439,6 +443,11 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             return [item.strip() for item in value.split(",") if item.strip()]
         return value
+
+    @field_validator("eval_as_of_date", mode="before")
+    @classmethod
+    def blank_eval_as_of_date_is_unset(cls, value: object) -> object:
+        return None if isinstance(value, str) and not value.strip() else value
 
     @field_validator("llm_seed", mode="before")
     @classmethod
@@ -895,6 +904,9 @@ class Settings(BaseSettings):
             or _uses_localhost(self.celery_result_backend)
         ):
             msg = "Redis URLs must not use localhost in production."
+            raise ValueError(msg)
+        if self.eval_as_of_date is not None:
+            msg = "EVAL_AS_OF_DATE is for eval stacks only; it must not be set in production."
             raise ValueError(msg)
         return self
 
