@@ -4,6 +4,7 @@
 # `init` when missing and never printed. `down` keeps the <project>_* volumes.
 # Optional: EAKA_DEMO_PROJECT (default eaka-demo), DEMO_BACKEND_IMAGE and DEMO_FRONTEND_IMAGE
 # (default eaka-backend:demo-<commit> and eaka-frontend:demo-<commit>, made by `build`).
+# Every action but init, build and questions refuses a .env without the line EAKA_PROFILE=demo.
 param([ValidateSet('init', 'build', 'up', 'down', 'status', 'seed', 'warmup', 'questions', 'reset')]
     [string]$Action = 'status',
     [string]$Confirm)  # reset only: the text "reset demo" (otherwise it is asked for)
@@ -11,6 +12,13 @@ $ErrorActionPreference = 'Stop'
 $Root = (Resolve-Path "$PSScriptRoot\..\..").Path
 Set-Location $Root
 $Project = if ($env:EAKA_DEMO_PROJECT) { $env:EAKA_DEMO_PROJECT } else { 'eaka-demo' }
+# The .env and the <project>_* volumes belong together: the .env of another stack (the dev one)
+# would meet the demo database with the wrong password. `init` marks the demo's .env with this line.
+$EnvFile = Join-Path $Root '.env'
+$EnvMarker = 'EAKA_PROFILE=demo'
+function Test-DemoEnv { (Test-Path $EnvFile) -and [bool](Select-String -Path $EnvFile -Pattern "^$EnvMarker\s*$" -Quiet) }
+$NotDemoEnv = "$EnvFile is not the demo's .env (no $EnvMarker line): nothing done. Run the demo from its own clone, after deploy\demo\demo.ps1 init there (DEMO.md)."
+if (($Action -notin 'init', 'build', 'questions') -and -not (Test-DemoEnv)) { throw $NotDemoEnv }
 $commit = git -C $Root rev-parse --short HEAD
 if (-not $env:DEMO_BACKEND_IMAGE) { $env:DEMO_BACKEND_IMAGE = "eaka-backend:demo-$commit" }
 if (-not $env:DEMO_FRONTEND_IMAGE) { $env:DEMO_FRONTEND_IMAGE = "eaka-frontend:demo-$commit" }
@@ -73,8 +81,8 @@ function Invoke-Api($Method, $Path, $Body, $Token) {
 switch ($Action) {
     'init' {
         # .env from .env.example with random secrets and the demo's LLM settings; never overwritten.
-        $envFile = Join-Path $Root '.env'
-        if (Test-Path $envFile) {
+        if (Test-Path $EnvFile) {
+            if (-not (Test-DemoEnv)) { throw $NotDemoEnv }
             '.env exists: kept as it is'
         } else {
             $text = [IO.File]::ReadAllText((Join-Path $Root '.env.example'))
@@ -91,7 +99,8 @@ switch ($Action) {
                 if ($text -match "(?m)^$key=") { $text = $text -replace "(?m)^$key=[^\r\n]*", $line }
                 else { $text = $text.TrimEnd() + "`n$line`n" }
             }
-            [IO.File]::WriteAllText($envFile, $text, (New-Object Text.UTF8Encoding $false))
+            $text = $text.TrimEnd() + "`n# deploy\demo\demo.ps1 runs only on a .env with this line`n$EnvMarker`n"
+            [IO.File]::WriteAllText($EnvFile, $text, (New-Object Text.UTF8Encoding $false))
             '.env written from .env.example (random SECRET_KEY and database password)'
         }
         foreach ($role in $Roles) {

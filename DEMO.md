@@ -61,17 +61,19 @@ python deploy\demo\check_demo.py --matrix
 - **`init`:**
   - chép `.env.example` thành `.env`, thay `SECRET_KEY` và mật khẩu Postgres bằng giá trị ngẫu nhiên;
   - đặt `LLM_ENABLED=true`, `LLM_PROVIDER=ollama`, `LLM_OLLAMA_KEEP_ALIVE=30m`, `LLM_MAX_OUTPUT_TOKENS=512`;
+  - thêm dòng đánh dấu `EAKA_PROFILE=demo` (xem `.env` của demo bên dưới);
   - tạo 4 biến môi trường User `EAKA_DEMO_{ADMIN,MANAGER,STAFF,OPS}_PASSWORD` ngẫu nhiên nếu chưa có;
-  - không ghi đè `.env` có sẵn, không in mật khẩu nào.
+  - không ghi đè `.env` có sẵn, không in mật khẩu nào. `.env` có sẵn mà không có dòng đánh dấu thì `init` dừng.
 - **Máy chỉ có CPU:** sau `init`, sửa `LLM_TIMEOUT_SECONDS=600` trong `.env`.
 - **Mật khẩu để đăng nhập giao diện:** `[Environment]::GetEnvironmentVariable('EAKA_DEMO_STAFF_PASSWORD', 'User')` (thay `STAFF` bằng vai trò cần dùng).
 - **Kết quả mong đợi** (đã thử từ bản clone mới của `a4add79` ngày 2026-11-28, 47/47 kiểm tra đạt):
   - `seed` báo `READY` cho cả 13 tài liệu, khoảng 6,5 phút (gồm tải model e5);
   - `warmup` in 3 dòng `ANSWERED citations=1`; câu đầu tiên sau khi dựng mới mất khoảng 130 s, hai câu sau khoảng 16-17 s;
   - `check_demo.py --matrix` kết thúc bằng `N/N checks passed`, và bảng câu hỏi × vai trò khớp bảng ở mục "Kịch bản".
-- **`.env` và volume đi cùng nhau:** `demo.ps1` dùng `.env` ở gốc repo nó nằm trong, và volume Postgres giữ mật khẩu của `.env` lúc volume được tạo.
-  - Chạy từ một checkout có `.env` khác (ví dụ `.env` của stack phát triển) trên volume cũ thì `migration` dừng với `password authentication failed`, và không ghi gì vào DB.
-  - Volume `eaka-demo_*` có sẵn trên máy của owner được tạo bằng `C:\dev\eaka-demo\src\.env`.
+- **`.env` của demo:** `demo.ps1` dùng `.env` ở gốc repo nó nằm trong, và volume Postgres giữ mật khẩu của `.env` lúc volume được tạo. Vì vậy `.env` và volume `eaka-demo_*` đi cùng nhau.
+  - Mọi lệnh trừ `init`, `build`, `questions` chỉ chạy khi `.env` có dòng `EAKA_PROFILE=demo`. Thiếu dòng đó (ví dụ `.env` của stack phát triển), `demo.ps1` dừng ngay với thông báo, chưa gọi docker.
+  - Nên chạy demo từ một bản clone riêng, không từ checkout phát triển.
+  - `.env` demo tạo trước 2026-11-28 không có dòng đánh dấu: kiểm đúng là `.env` của demo rồi thêm dòng `EAKA_PROFILE=demo` bằng tay. Trên máy owner, `.env` của volume `eaka-demo_*` có sẵn là `C:\dev\eaka-demo\src\.env` (thư mục xuất, không phải checkout git): chép nó vào gốc bản clone demo rồi thêm dòng đó.
   - Với một bản clone mới, `init` rồi `reset` cho ra cặp `.env` và volume khớp nhau.
 - **Chạy song song với một stack demo khác trên cùng máy:** đặt `$env:EAKA_DEMO_PROJECT` (mặc định `eaka-demo`) trước mọi lệnh. Hai stack vẫn dùng chung cổng 18480, nên chỉ bật một stack mỗi lúc.
 
@@ -106,7 +108,7 @@ python deploy\demo\check_demo.py --matrix
 | `deploy/demo/seed_demo.py` | Nạp dữ liệu demo (chạy qua `demo.ps1 seed`, trong mạng của container API, repo mount chỉ đọc) |
 | `deploy/demo/check_demo.py` | Kiểm qua nginx, gồm cả xử lý Host (TC-SEC-08: Host lạ không được trả lời, redirect chỉ có đường dẫn tương đối) và profile của API; `--matrix` hỏi các câu mẫu bằng cả 4 tài khoản |
 | `deploy/demo/check_profile.py` | Chạy trong container API (qua `check_demo.py`): báo cờ `RAG_*` nào khác mặc định của `main`, cùng model và chế độ trả lời |
-| `.env` (gốc repo) | Do `demo.ps1 init` tạo từ `.env.example`, secret ngẫu nhiên; không commit (`.gitignore`) |
+| `.env` (gốc repo) | Do `demo.ps1 init` tạo từ `.env.example`, secret ngẫu nhiên, có dòng `EAKA_PROFILE=demo`; không commit (`.gitignore`) |
 
 - **Câu hỏi:** repo công khai chỉ ghi ID. `demo.ps1` và `check_demo.py` đọc nội dung theo ID từ bộ dev trong repo, không có câu held-out nào.
 - **Image:**

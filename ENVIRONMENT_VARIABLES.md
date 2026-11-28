@@ -750,6 +750,7 @@ Production deployment uses `compose.prod.yaml` and should be configured from a p
 | `TRACEPARENT_HEADER` | `traceparent` | HTTP token name | Header used for trace hook capture. |
 | `FORWARDED_ALLOW_IPS` | `*` in production compose | Uvicorn proxy setting | Safe only because production compose does not publish the API container port directly. |
 | `PROXY_HTTP_PORT` | `8080` | host port | Local host bind for production reverse proxy verification. |
+| `PROXY_SERVER_NAMES` | empty | space-separated host names | 2026-11-28, TC-SEC-08: names the production reverse proxy answers besides `localhost` and `127.0.0.1`; any other `Host` gets no answer (444). Each name must also be in `TRUSTED_HOSTS`. |
 | `GRAFANA_ADMIN_PASSWORD` | placeholder | non-empty operator secret | Required only when starting the `observability` profile. |
 
 Production startup rejects placeholder `SECRET_KEY` values and placeholder database passwords, including `replace-with-production-secret-key` and `replace-with-production-postgres-password`.
