@@ -2819,17 +2819,23 @@ def canonical_number_unit_pairs(folded_text: str) -> tuple[tuple[str, str], ...]
     the word right after the number (or its scale word), "" when there is none; a period such
     as "/nam" or "moi nam" is not part of it, so both spellings compare equal.
     """
-    pairs = []
+    return tuple((value, unit) for value, unit, _ in _canonical_number_matches(folded_text))
+
+
+def _canonical_number_matches(folded_text: str) -> list[tuple[str, str, str]]:
+    """canonical_number_unit_pairs, each value also written without its scale word
+    ("28 trieu dong" -> ("28000000", "dong", "28"))."""
+    matches = []
     for match in _CANONICAL_NUMBER_UNIT_RE.finditer(folded_text):
         raw, scale, unit = match.group(1), match.group(2), match.group(3) or ""
         if re.fullmatch(r"\d{1,3}(?:[.,]\d{3})+", raw):
-            value = Decimal(raw.replace(".", "").replace(",", ""))
+            unscaled = Decimal(raw.replace(".", "").replace(",", ""))
         else:
-            value = Decimal(raw.replace(",", "."))
-        value *= _SCALES.get(scale or "", 1)
+            unscaled = Decimal(raw.replace(",", "."))
+        value = unscaled * _SCALES.get(scale or "", 1)
         unit = "dong" if unit in _CURRENCY_UNITS else unit
-        pairs.append((format(value.normalize(), "f"), unit))
-    return tuple(pairs)
+        matches.append((format(value.normalize(), "f"), unit, format(unscaled.normalize(), "f")))
+    return matches
 
 
 # v2: "Thang 01 - 02 cua nam" holds no number of a unit "cua".
@@ -2840,7 +2846,53 @@ _NOT_A_UNIT = frozenset(
 )  # fmt: skip
 
 
+# RAG_UNITLESS_EVIDENCE_NUMBERS_ENABLED: the words that are a value's unit. Any other word
+# after a number ("N4 co ...", "2027 tai ...") is not its unit.
+_VALUE_UNITS = frozenset(
+    {"dong", "%", "ngay", "tuan", "thang", "nam", "gio", "phut", "giay", "lan", "nguoi", "kg",
+     "tan", "km", "lit"}
+)  # fmt: skip
+
+
+def _unitless_evidence_numbers_are_contradicted(answer: str, evidence: str) -> bool:
+    """RAG_UNITLESS_EVIDENCE_NUMBERS_ENABLED: a claim's number contradicts the evidence only
+    through a real unit (_VALUE_UNITS), and not when the evidence writes that value with no
+    unit. A table gives its unit once, in a header ("Don vi: trieu dong/thang"), and its cells
+    bare, so a cell "28" supports "28 trieu dong". A value the evidence gives only in another
+    unit ("12 thang" for "12 ngay"), or nowhere, still contradicts it."""
+
+    def matches(text: str) -> list[tuple[str, str, str]]:
+        return [
+            (value, unit if unit in _VALUE_UNITS else "", unscaled)
+            for value, unit, unscaled in _canonical_number_matches(text)
+        ]
+
+    answer_matches, evidence_matches = matches(answer), matches(evidence)
+    unitless = {value for value, unit, _ in evidence_matches if not unit}
+    evidence_with_unit = {(value, unit) for value, unit, _ in evidence_matches if unit}
+    with_unit = [match for match in answer_matches if match[1]]
+    # As before, contradicted when no value of the claim is supported; a bare one now is.
+    supported = any(
+        (value, unit) in evidence_with_unit or value in unitless or unscaled in unitless
+        for value, unit, unscaled in with_unit
+    )
+    if with_unit and evidence_with_unit and not supported:
+        return True
+    evidence_values = {value for value, _, _ in evidence_matches} | {
+        unscaled for _, _, unscaled in evidence_matches
+    }
+    # Every value given with a unit is missing, even where the source names no unit at all.
+    if with_unit and evidence_values.isdisjoint(
+        {value for value, _, _ in with_unit} | {unscaled for _, _, unscaled in with_unit}
+    ):
+        return True
+    values = {value for value, _, _ in answer_matches} | {u for _, _, u in answer_matches}
+    return bool(values and evidence_values and values.isdisjoint(evidence_values))
+
+
 def _canonical_numbers_are_contradicted(answer: str, evidence: str) -> bool:
+    if get_settings().rag_unitless_evidence_numbers_enabled:
+        return _unitless_evidence_numbers_are_contradicted(answer, evidence)
     answer_pairs = canonical_number_unit_pairs(answer)
     evidence_pairs = canonical_number_unit_pairs(evidence)
     if _VALIDATOR_V2.get():
