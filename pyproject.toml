@@ -60,6 +60,8 @@ markers = [
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+# The owner's corpus v3 build scripts, kept byte for byte (eval-data/README.md).
+extend-exclude = ["eval-data/corpus-v3/src"]
 
 [tool.ruff.lint]
 select = ["B", "E", "F", "I", "SIM", "UP"]
