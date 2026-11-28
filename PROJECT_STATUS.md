@@ -1,5 +1,31 @@
 # Project Status
 
+## Corpus v3 in the repo and loaded on a separate stack -- 2026-11-28
+
+- **Repo:** `eval-data/corpus-v3/` holds the owner's corpus v3: 14 PDFs, 13 codes, ND-HR-003 in 2.0 and 2.1. Hashes are in `SHA256SUMS` and checked by `tests/unit/test_bootstrap_corpus_v3.py`.
+  - Corpus V2 and every eval set are unchanged.
+  - `MAPPING.md` is in without its gold-values section (owner to decide).
+- **Load** (`scripts/eval/bootstrap_corpus_v3.py`, stack `eaka-corpusv3`, images `demo-9429f97`, own volumes; `eaka-demo_*` and V2 untouched):
+  - 14/14 READY. Code, version, effective dates, lifecycle, scope, department and supersedes (ND-HR-003 2.1 -> 2.0) match the manifest.
+  - No other document is on the stack. A second run uploads nothing and passes again.
+- **Access matrix** = ND-ORG-001 section 7 for all 6 accounts:
+  - staff and other-department staff: the 9 organization codes;
+  - HR: + ND-HR-007, ND-COMP-001;
+  - N5 manager: + ND-COMP-001;
+  - Legal: + ND-HR-010;
+  - CEO: + ND-EXEC-001.
+  - Detail and preview of every hidden document return 403/404.
+- **Leak probes** (staff on EXEC-2027-R7 and on the N4 band):
+  - NO_ANSWER, no citation, and no 5-gram of ND-EXEC-001 or ND-COMP-001 text in the answer.
+  - At retrieval level (`heldout_trace.py --mode route`, no LLM), the documents' chunks reach no layer for staff. For the CEO and the N5 manager they reach retrieval and the prompt. So the negatives are conclusive.
+  - Both controls still got NO_ANSWER: a quality item for the corpus v3 dev set.
+- **Future-effective versions** (database date 2026-11-28; behavior only, nothing changed):
+  - Neither ND-HR-003 version is in effect yet (2.0 from 2026-12-01, 2.1 from 2027-01-01), so they rank the same.
+  - For staff the prompt held both: 2.1 page 6 (change history) ranked above 2.0 page 4.
+  - The answer, the same in 2 runs, cited only 2.1 page 6 and gave the limit that applies from 2027-01-01, not the one for December 2026.
+  - `supersedes` is not used at answer time.
+- No quality eval was run and no question was written. The probe text stays outside the repo.
+
 ## Demo reset and owner's demo folder -- 2026-11-28
 
 - **Reset:** eaka-demo was reset from `C:\dev\eaka-demo\repo`, a clone of `9429f97` with the demo's `.env` (plus `EAKA_PROFILE=demo`).

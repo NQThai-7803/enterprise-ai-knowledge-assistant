@@ -6,6 +6,13 @@ Format follows a simplified Keep a Changelog style.
 
 ## [Unreleased]
 
+### Corpus v3 -- 2026-11-28
+
+- **Added:** `eval-data/corpus-v3/` (owner's Nova Digital corpus v3: 14 PDFs, manifest, mapping, checksums, markdown sources and build scripts).
+- **Added:** `scripts/eval/bootstrap_corpus_v3.py`: loads corpus v3 by its manifest (code, version, effective dates, lifecycle, access scope, supersedes, grants), creates its departments and accounts, and checks READY, metadata and the access matrix against ND-ORG-001 section 7.
+- **Tests:** `tests/unit/test_bootstrap_corpus_v3.py` (field mapping, supersedes, section 7, the seeded matrix, checksums).
+- **Config:** ruff skips `eval-data/corpus-v3/src` (the owner's build scripts, kept byte for byte).
+
 ### Tester findings of 2026-11-27 -- 2026-11-28
 
 - **Security (TC-SEC-08):** the frontend nginx answers only `localhost`, `127.0.0.1` and the names in `FRONTEND_SERVER_NAMES` (new, empty by default).

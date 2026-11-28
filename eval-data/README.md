@@ -7,6 +7,16 @@ addresses use the reserved `.example` domain, and the PDF metadata says "Fiction
 - `corpus-v2/`: the nine PDFs of UAT corpus V2, byte for byte. `SHA256SUMS` matches
   `uat/corpus-v2/manifest.json`; `scripts/eval/bootstrap_corpus_v2.py` checks each hash before
   uploading, and `tests/unit/test_eval_data.py` checks both files agree.
+- `corpus-v3/` (2026-11-28, owner's corpus v3 of Nova Digital): 14 PDFs (13 codes; ND-HR-003 has
+  version 2.0, effective 2026-12-01 to 2026-12-31, and 2.1 from 2027-01-01), `manifest.json`
+  (code, version, classification, effective dates, lifecycle, supersedes, department, grants),
+  `MAPPING.md` (V2 -> v3) and `SHA256SUMS` (the PDFs and the manifest).
+  - `src/`: the markdown sources and the owner's `build.py` and `stamp.py`, byte for byte (not
+    linted). `build.py` expects `src/*.md` and `pdf/` beside it: lay them out so to rebuild.
+  - `scripts/eval/bootstrap_corpus_v3.py` loads it through the API by the manifest, creates
+    the corpus v3 accounts and checks the access matrix against ND-ORG-001 section 7.
+    Never on one stack with corpus V2: both use the same document codes.
+  - No question set uses it yet.
 - `uat/questions.json`: Q001-Q100, copied word for word from the CORE list of
   `artifacts/rag-h5-1-stress-uat.py`. It names the account and the environment variable for its
   password (`UAT_STAFF_PASSWORD`); no password is stored.
